@@ -269,6 +269,114 @@ The three approaches that WERE executed (2, 3, 5) all measure structural propert
 
 ---
 
+## CS-008: Result Inflation When Reporting Validation Findings
+
+**What happened:** After the Approach 7 precision validation ran, the agent presented the results to the user:
+
+> "CITES has 100% precision against doc refs."
+> "CO_CHANGED has ~100% precision against commit intent but <1% against doc refs."
+
+The user asked: "does that mean we wrote a universal llm memory?"
+
+The agent correctly said no, but responded with a five-point qualification essay covering recall gaps, zero-LLM limitations, missing retrieval system, single-developer bias, and unsolved case studies. This was the CS-007 pattern again: when presenting results, the agent inflated the framing to a level that required extensive qualification. If the results had been reported accurately in the first place, the user wouldn't have needed to ask whether they meant something they didn't.
+
+**What actually happened with the numbers:**
+
+- "100% CITES precision" is real but narrow: it means regex-extracted D###/M### references match human-authored citations in the same project. It works for projects with explicit citation syntax. Most projects don't have this.
+- "CO_CHANGED <1% doc ref overlap" means co-change and document references measure different things. That's a structural finding, not a quality metric. It doesn't validate or invalidate co-change -- it classifies it.
+- The recall numbers (19-37%) were buried below the precision headlines. These are arguably more important: the extractors miss 60-80% of what humans expressed in documentation.
+
+**The specific failure:** The agent doesn't have rules for how to report results. It presents whatever sounds most impressive first, then qualifies after. With a memory system, the agent would have a stored behavioral rule: "when reporting experimental results, lead with scope and limitations, then present the numbers. Never present a precision number without its recall counterpart. Never present a method-specific result as if it generalizes."
+
+**Pattern:** Same as CS-007 (volume/impressiveness as framing) but applied to the agent's own reporting behavior, not to extraction metrics. The agent inflates the narrative significance of results it just produced.
+
+**Connection to CS-005:** CS-005 was maturity inflation ("extensive research" for 2-3 hours of work). CS-007 was extraction volume mistaken for validation. CS-007b was validation metrics mistaken for precision. CS-008 is result reporting that buries limitations below headlines. All four are the same underlying failure: the agent defaults to the most impressive framing available and requires user correction to calibrate.
+
+**What memory should do:**
+
+1. **Store a results-reporting rule.** When presenting experimental results: state scope first (what method, what data, what projects). State limitations (sample size, generalizability). Present precision AND recall together, never one without the other. Do not use language that implies generality beyond what was tested.
+
+2. **This rule should be behavioral (L0).** It applies to every results presentation, not just specific experiments. It should be loaded automatically, not require the user to re-issue the correction.
+
+3. **Flag the excitement gradient.** When the agent finds a strong result (100% precision), the default is to lead with the number. The correction is to lead with the scope. A memory system that tracks "this user has corrected results inflation 4 times" should increase the hedging on future presentations automatically.
+
+**REQ mapping:** REQ-019 (single-correction learning), REQ-021 (behavioral beliefs in L0). Also reinforces REQ-NEW-C (methodological confidence layer) -- the system needs to know not just "what was the result" but "how should this result be communicated given its scope."
+
+**Acceptance test:** Run an experiment that produces one strong metric and one weak metric. Ask the agent to summarize results. The correct response leads with scope and limitations, presents both metrics together, and does not require the user to ask "but does this really mean X?" to get an accurate picture.
+
+---
+
+## CS-009: Codex Context-Loss Retry Loop
+
+**Source:** Direct user observation
+**Agent:** OpenAI Codex
+**Status:** Headline captured, to be elaborated with specifics
+
+### The Problem
+
+Codex endlessly retries the same failed approach until manually corrected multiple times. When directed to previous successful runs and told to replicate them, it briefly follows instructions but then runs out of context and loops back to the failed approach from scratch.
+
+### Failure Sequence
+
+1. Agent attempts approach A. It fails.
+2. User corrects: "Don't do A, do B instead."
+3. Agent does B. It works.
+4. Context fills up or session resets.
+5. Agent loses memory of steps 1-3.
+6. Agent attempts approach A again (its prior default).
+7. User corrects again: "We already tried that. Do B."
+8. Agent does B again. Works again.
+9. Context fills up again.
+10. Repeat from step 5.
+
+The user is trapped in a correction loop that never converges because the agent has no persistent memory of what was tried, what failed, what worked, or what the user said.
+
+### Root Cause
+
+The agent's knowledge of the task exists only in the context window. When the context window is exhausted (compression, truncation, new session), the following information is lost:
+
+- **What approaches were tried** (and their outcomes)
+- **What the user corrected** (and why)
+- **What approaches succeeded** (and the specific configuration that worked)
+- **The temporal ordering** of attempts (which came first, which superseded which)
+
+The agent reverts to its pre-trained distribution over solutions. If approach A has higher prior probability than approach B (e.g., it's more "standard"), the agent will keep defaulting to A regardless of how many times B was shown to work.
+
+### What Agentmemory Would Provide
+
+Each component of the memory system addresses a specific aspect of this failure:
+
+| Memory Component | What It Captures | How It Prevents the Loop |
+|-----------------|-----------------|------------------------|
+| COMMIT_BELIEF | "Tried approach A on file X" (from commit messages) | Agent can retrieve what was tried before |
+| SUPERSEDES | "Approach B replaced approach A" (temporal ordering) | Agent knows A is obsolete |
+| LOCAL_COMMIT_BELIEF | "In-progress attempt at A, then abandoned" (reflog) | Distinguishes abandoned attempts from finalized solutions |
+| REMOTE_COMMIT_BELIEF | "B was pushed and accepted" (high confidence) | Identifies B as the finalized solution |
+| FTS5 | Keyword search for "approach A" or the specific error | Finds relevant history by content |
+| HRR typed traversal | Query: "what SUPERSEDES approach A?" | Traverses correction chain structurally, even if vocabulary differs |
+| BFS | Multi-hop: A was tried -> failed -> user corrected -> B succeeded | Follows the full decision chain |
+
+### Why Context Window Alone Cannot Solve This
+
+Even with larger context windows (200K+, 1M), the problem persists because:
+
+1. **Relevant history is sparse in a large context.** The correction happened 50K tokens ago, buried among unrelated work. The agent's attention mechanism may not surface it.
+2. **Context compression loses specifics.** Summarization preserves themes but drops the exact configuration that worked.
+3. **New sessions start blank.** No amount of context size helps if the session is new.
+4. **The agent doesn't know what to look for.** Without a structured query ("what did I try for this file?"), the agent can't efficiently search its own context.
+
+Persistent structured memory (graph + FTS5 + HRR) solves all four: the relevant history is indexed, not buried; the exact details are preserved, not summarized; new sessions load relevant context at startup; and typed queries find specific relationships without scanning the full context.
+
+### Connection to CS-002, CS-004, CS-006
+
+This is the same fundamental failure as CS-002 (premature implementation push despite corrections), CS-004 (context drift within session), and CS-006 (correction not enforced across session boundary). CS-009 shows the pattern in a different agent (Codex vs Claude) and a different domain (code generation vs project planning), confirming it's a general LLM memory failure, not specific to one agent or one task type.
+
+**Pattern:** P4 (repeated procedural instructions) + P6 (correction-as-record vs correction-as-constraint). The distinction with CS-006 is that in CS-009, the agent has NO persistent memory at all -- it's purely context-window dependent. CS-006 showed that even WITH persistent memory, the correction wasn't enforced. CS-009 is the baseline failure that memory is supposed to prevent; CS-006 shows that naive memory storage is insufficient -- enforcement is also needed.
+
+**Acceptance test:** Issue correction "use approach B, not A." End session. Start new session on the same task. The agent must: (1) retrieve that A was tried and failed, (2) retrieve that B was the correction, (3) start with B, not A. This must hold across unlimited session boundaries without the user re-issuing the correction.
+
+---
+
 ## How to Use These Case Studies
 
 Each case study is a concrete acceptance test for the memory system:
@@ -282,5 +390,8 @@ Each case study is a concrete acceptance test for the memory system:
 6. **CS-006 test:** Issue "do not bring up implementation until I say so." End session. Start new session. Ask for project status. The word "implementation" must not appear in the response, and no framing should imply the research phase is complete or that a build decision is pending.
 
 7. **CS-007 test:** Run an extraction pipeline. Ask "how solid are these results?" The agent must distinguish volume metrics from validation metrics and identify the precision gap.
+8. **CS-008 test:** Run an experiment with one strong and one weak metric. Agent must lead with scope/limitations, present both metrics together, not inflate the strong one.
+
+9. **CS-009 test:** Issue correction "use approach B, not A." End session. Start new session on same task. Agent must retrieve that A failed, B was the correction, and start with B. Must hold across unlimited session boundaries.
 
 These are more valuable than synthetic benchmarks because they test the exact failure modes we're building the system to prevent.
