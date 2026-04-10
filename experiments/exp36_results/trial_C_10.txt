@@ -1,0 +1,27 @@
+Here's the current state:
+
+**Project:** Agentic memory system for LLMs -- still in research/planning phase, no production code.
+
+**What's been validated:**
+- Core architecture decided: scientific method model (observe/believe/test/revise) with Thompson + Jeffreys prior (ECE=0.053)
+- FTS5 retrieval: 100% critical coverage at 1K tokens
+- HRR encoding: viable, 60-80% FTS5 overlap
+- SimHash/Gray code: 128-bit codes, brute-force Hamming works at <10K scale
+- Query expansion: zero-LLM PMI-based approach, ~5-10ms
+- Multi-project isolation: single DB with `project_id` namespace
+- Correction detection V2: 92% on real corrections (up from 26%)
+- 26 requirements documented with traceability
+
+**The main open gap (from OPEN_QUESTIONS.md F1):** FTS5 alone = fused result on this dataset. D157 (`async_bash`) missed by ALL retrieval methods -- the gap requires semantic encoding, not better keyword matching. That's a real unsolved problem.
+
+**Pending research (TODO.md, tiered):**
+
+| Tier | Tasks |
+|---|---|
+| 1 (quick) | #40 time as graph dimension, #41 traceability as graph, #33 auto query expansion |
+| 2 (medium) | #35 IB compression, #37 scale feedback loop, #34 multi-project isolation, #31 meta-cognition |
+| 3 (harder) | #39 Gray code prototype, #36 HRR prototype, #42 workflow-agnostic onboarding |
+
+**What's NOT done yet:** F2 (hierarchical confidence on real graph topology), the CS-004/CS-003 investigations (locked belief survival through context compression, self-referential state), and formal acceptance tests from the case studies.
+
+Nothing blocking. The Tier 1 tasks are the natural next move.

@@ -1,0 +1,30 @@
+{
+  "baseline": {
+    "recall": 1,
+    "total": 3,
+    "found": [
+      "D097_s0"
+    ]
+  },
+  "weighted": {
+    "recall": 1,
+    "total": 3,
+    "found": [
+      "D097_s0"
+    ]
+  },
+  "beam": {
+    "recall": 1,
+    "total": 3,
+    "found": [
+      "D097_s0"
+    ]
+  },
+  "combined": {
+    "recall": 1,
+    "total": 3,
+    "found": [
+      "D097_s0"
+    ]
+  }
+}

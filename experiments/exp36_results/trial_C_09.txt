@@ -1,0 +1,17 @@
+The palace has one wing (`alpha_seek`) with ~10K drawers -- no `agentmemory` wing mined yet.
+
+Based on the TODO.md I read, here's where the project stands:
+
+**agentmemory -- Research & Planning Phase**
+
+All research tasks from prior sessions are complete. The active queue is:
+
+| Tier | Tasks |
+|------|-------|
+| 1 (ready now) | #40 time as graph dimension, #41 requirements traceability, #33 auto query expansion |
+| 2 (after Tier 1) | #35 IB compression, #37 feedback loop at scale, #34 multi-project isolation, #31 meta-cognition rerun |
+| 3 (hardest) | #39 Gray code/SimHash, #36 HRR prototype, #42 workflow-agnostic onboarding |
+
+Key design space already validated: Bayesian confidence (Thompson+Jeffreys), sentence-level nodes (86% token reduction), HRR encoding (60-80% FTS5 overlap), query expansion, context compression, correction detection V2 (92%), and a full privacy threat model.
+
+No production code exists. The palace has no agentmemory memories mined -- so session context is living only in the flat files in this repo.

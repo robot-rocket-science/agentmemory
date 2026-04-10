@@ -1,0 +1,230 @@
+{
+  "daily_scores": [
+    {
+      "date": "2026-03-24",
+      "commits": 154,
+      "features": 46,
+      "fixes": 22,
+      "overrides": 0,
+      "fix_rate": 0.1429,
+      "quality": 0.16,
+      "milestones_completed": []
+    },
+    {
+      "date": "2026-03-25",
+      "commits": 140,
+      "features": 34,
+      "fixes": 28,
+      "overrides": 0,
+      "fix_rate": 0.2,
+      "quality": 0.04,
+      "milestones_completed": [
+        "M005: Game-Theoretic Exit Strategy COMPL"
+      ]
+    },
+    {
+      "date": "2026-03-26",
+      "commits": 52,
+      "features": 28,
+      "fixes": 4,
+      "overrides": 5,
+      "fix_rate": 0.0769,
+      "quality": 0.27,
+      "milestones_completed": [
+        "M008: M008 COMPLETED",
+        "M009: M009 COMPLETED"
+      ]
+    },
+    {
+      "date": "2026-03-27",
+      "commits": 114,
+      "features": 54,
+      "fixes": 4,
+      "overrides": 9,
+      "fix_rate": 0.0351,
+      "quality": 0.28,
+      "milestones_completed": [
+        "M010: M010 COMPLETED",
+        "M006: Detector Utilization + Hypothesis ",
+        "M007: Holdout Validation -- 2024-2025 Tr"
+      ]
+    },
+    {
+      "date": "2026-03-28",
+      "commits": 40,
+      "features": 22,
+      "fixes": 6,
+      "overrides": 1,
+      "fix_rate": 0.15,
+      "quality": 0.35,
+      "milestones_completed": [
+        "M011: M011 COMPLETED",
+        "M012: M012 COMPLETED"
+      ]
+    },
+    {
+      "date": "2026-03-29",
+      "commits": 106,
+      "features": 64,
+      "fixes": 8,
+      "overrides": 3,
+      "fix_rate": 0.0755,
+      "quality": 0.47,
+      "milestones_completed": [
+        "M013: M013 COMPLETED",
+        "M014: M014 COMPLETED",
+        "M017: M017 COMPLETED",
+        "M015: M015 COMPLETED",
+        "M016: M016 COMPLETED",
+        "M018: M018 COMPLETED",
+        "M019: M019 COMPLETED",
+        "M020: M020 COMPLETED"
+      ]
+    },
+    {
+      "date": "2026-03-30",
+      "commits": 150,
+      "features": 78,
+      "fixes": 12,
+      "overrides": 8,
+      "fix_rate": 0.08,
+      "quality": 0.33,
+      "milestones_completed": [
+        "M021: M021 COMPLETED",
+        "M022: M022 COMPLETED",
+        "M023: M023 COMPLETED",
+        "M023: M023 COMPLETED",
+        "M023: M023 COMPLETED",
+        "M023: M023 COMPLETED"
+      ]
+    },
+    {
+      "date": "2026-03-31",
+      "commits": 62,
+      "features": 24,
+      "fixes": 4,
+      "overrides": 1,
+      "fix_rate": 0.0645,
+      "quality": 0.29,
+      "milestones_completed": [
+        "M024: M024 COMPLETED",
+        "M024: M024 COMPLETED",
+        "M025: M025 COMPLETED",
+        "M025: M025 COMPLETED",
+        "M025: M025 COMPLETED"
+      ]
+    },
+    {
+      "date": "2026-04-01",
+      "commits": 64,
+      "features": 26,
+      "fixes": 4,
+      "overrides": 0,
+      "fix_rate": 0.0625,
+      "quality": 0.34,
+      "milestones_completed": [
+        "M026: M026 COMPLETED",
+        "M027: M027 COMPLETED",
+        "M028: M028 COMPLETED"
+      ]
+    },
+    {
+      "date": "2026-04-02",
+      "commits": 48,
+      "features": 18,
+      "fixes": 4,
+      "overrides": 3,
+      "fix_rate": 0.0833,
+      "quality": 0.17,
+      "milestones_completed": [
+        "M029: M029 COMPLETED"
+      ]
+    },
+    {
+      "date": "2026-04-03",
+      "commits": 30,
+      "features": 6,
+      "fixes": 14,
+      "overrides": 0,
+      "fix_rate": 0.4667,
+      "quality": -0.27,
+      "milestones_completed": [
+        "M031: M031 COMPLETED",
+        "M030: M030 COMPLETED",
+        "M032: M032 COMPLETED"
+      ]
+    },
+    {
+      "date": "2026-04-04",
+      "commits": 14,
+      "features": 8,
+      "fixes": 2,
+      "overrides": 0,
+      "fix_rate": 0.1429,
+      "quality": 0.43,
+      "milestones_completed": [
+        "M033: M033 COMPLETED"
+      ]
+    },
+    {
+      "date": "2026-04-05",
+      "commits": 20,
+      "features": 12,
+      "fixes": 6,
+      "overrides": 0,
+      "fix_rate": 0.3,
+      "quality": 0.3,
+      "milestones_completed": [
+        "M033: M033 COMPLETED"
+      ]
+    },
+    {
+      "date": "2026-04-06",
+      "commits": 100,
+      "features": 28,
+      "fixes": 14,
+      "overrides": 2,
+      "fix_rate": 0.14,
+      "quality": 0.1,
+      "milestones_completed": [
+        "M034: M034 COMPLETED",
+        "M035: M035 COMPLETED"
+      ]
+    },
+    {
+      "date": "2026-04-07",
+      "commits": 27,
+      "features": 10,
+      "fixes": 6,
+      "overrides": 0,
+      "fix_rate": 0.2222,
+      "quality": 0.15,
+      "milestones_completed": []
+    },
+    {
+      "date": "2026-04-08",
+      "commits": 21,
+      "features": 9,
+      "fixes": 6,
+      "overrides": 0,
+      "fix_rate": 0.2857,
+      "quality": 0.14,
+      "milestones_completed": []
+    },
+    {
+      "date": "2026-04-09",
+      "commits": 12,
+      "features": 5,
+      "fixes": 4,
+      "overrides": 0,
+      "fix_rate": 0.3333,
+      "quality": 0.08,
+      "milestones_completed": []
+    }
+  ],
+  "correlations": {
+    "fix_vs_override_rho": -0.1402,
+    "feature_vs_override_rho": 0.6369,
+    "quality_vs_override_rho": 0.3309
+  }
+}

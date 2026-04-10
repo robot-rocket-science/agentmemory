@@ -1,0 +1,30 @@
+Here's the current state:
+
+**Project:** Agentic memory system for LLMs (MCP + SQLite + typed graph, scientific method model)
+**Phase:** Research only -- no production code
+
+---
+
+**What's done (from last session, 2026-04-09):**
+- Full literature survey, architecture design, 29 approaches cataloged, 30 requirements
+- Core research areas covered: Bayesian confidence (Thompson+Jeffreys validated), HRR encoding, context compression, correction detection V2 (26% -> 92%), privacy threat model, meta-cognition, information bottleneck, multi-project isolation, cross-model MCP, query expansion, time dimension, traceability, scaling behavior
+
+---
+
+**Open design threads:**
+1. Interview loop MCP tool -- how it loops, when it exits (thresholds TBD)
+2. CONTRADICTS edges as escalation signal (not traversal penalty)
+3. Typed node/edge constraint table
+4. HRR deferred to v2 pending retrieval bottleneck confirmation
+
+---
+
+**Next research tasks (from TODO, prioritized):**
+
+| Tier | Task |
+|------|------|
+| 1 | #40 time as graph dimension, #41 requirements traceability, #33 query expansion |
+| 2 | #35 IB for belief compression, #37 scale feedback loop, #34 multi-project isolation, #31 meta-cognition rerun |
+| 3 | #39 Gray code/SimHash, #36 HRR prototype, #42 workflow-agnostic onboarding |
+
+Most of those Tier 1-2 items already have experiment files based on the design space table -- worth confirming which are actually done vs just researched. What do you want to pick up?

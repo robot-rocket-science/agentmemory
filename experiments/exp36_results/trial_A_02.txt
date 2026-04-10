@@ -1,0 +1,28 @@
+Here's where we are:
+
+**Research phase -- no production code.** All findings are simulations and hypotheses, not validated results.
+
+**Architecture decisions locked:**
+- SQLite + WAL, fully local, zero network calls
+- Scientific method model: observe/believe/test/revise
+- Thompson sampling + Jeffreys prior Beta(0.5,0.5) -- ECE=0.053, validated
+- MCP server, cross-model from day one
+- Progressive context loading: L0/L1/L2/L3
+- Retrieval stack: FTS5 (keywords) + HRR single-hop (vocabulary bridge) + BFS (exact multi-hop) + HRR iterative (fuzzy multi-hop)
+
+**What's been done:** 35+ experiments, 27 requirements (REQ-001 through REQ-027, with 028-030 drafted), 5 case studies (CS-001 to CS-005), full privacy threat model, correction detection V2 at 92%.
+
+**Key open threads (from OPEN_QUESTIONS.md and TODO.md):**
+
+| Priority | Item |
+|---|---|
+| Design | Interview loop MCP tool -- what questions it generates, how it exits |
+| Design | REQ-028/029/030 formally into REQUIREMENTS.md with traceability |
+| Research | Tier 1: time as graph dimension (#40), traceability as graph structure (#41), auto query expansion (#33) |
+| Research | Tier 2: IB for belief compression (#35), scale/feedback loop (#37), multi-project isolation (#34), meta-cognition (#31) |
+| Research | Tier 3: Gray code/SimHash (#39), HRR prototype (#36), workflow-agnostic onboarding (#42) |
+| Meta | Decide when research is sufficient to begin architecture/implementation |
+
+**The biggest open question** is that last one -- you haven't made a call on when research is "done enough" to start building. That decision drives everything else.
+
+Where do you want to go next?

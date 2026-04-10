@@ -1,0 +1,35 @@
+Here's the current state:
+
+**Project:** Agentic memory system for LLMs (MCP server, SQLite, scientific method model)
+**Phase:** Research only -- no production code
+
+---
+
+**Research coverage is broad.** All major areas have been explored:
+
+| Settled | Key finding |
+|---|---|
+| Bayesian retrieval ranking | Thompson + Jeffreys, ECE=0.053 -- passes |
+| HRR encoding | Works; real value is fuzzy-start, not multi-hop |
+| Context compression survival | Hybrid: CLAUDE.md + status injection + compactPrompt |
+| Correction detection | 26% -> 92% with V2 zero-LLM detector |
+| Typed graph w/ epistemic state | Designed, not implemented |
+| Privacy | 8 threats documented; T1/T2 unmitigable |
+
+---
+
+**Open threads still pending decision:**
+
+1. Interview loop design (uncertain conflict triggers -- thresholds TBD)
+2. REQ-028/029/030 not yet formally added to REQUIREMENTS.md
+3. Edge weight uncertainty signal (CONTRADICTS as escalation, not penalty -- architecture not locked)
+
+**Next TODO tier (research tasks, ordered):**
+
+- **Tier 1 (independent, do first):** #40 time as graph dim, #41 traceability as graph structure, #33 auto query expansion
+- **Tier 2:** #35 IB compression, #37 scale/feedback loop, #34 multi-project isolation, #31 meta-cognition rerun
+- **Tier 3:** #39 Gray code, #36 HRR prototype, #42 workflow-agnostic onboarding
+
+**Meta-question still open:** When is research sufficient to start implementation? That's your call.
+
+What do you want to tackle?

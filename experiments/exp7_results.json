@@ -1,0 +1,10 @@
+{
+  "ece_mean": 0.0526,
+  "ece_std": 0.005,
+  "exploration_mean": 0.25,
+  "rank_correlation_mean": 0.3882,
+  "domain_precision_mean": 0.8622,
+  "beliefs_tested_mean": 200.0,
+  "req009_pass": true,
+  "req010_pass": true
+}

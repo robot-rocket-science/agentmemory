@@ -1,0 +1,30 @@
+Here's where things stand:
+
+## Project: agentmemory
+
+**Status:** Research phase, no production code.
+
+### What's been validated
+| Area | Key Result |
+|------|-----------|
+| Bayesian retrieval | Thompson + Jeffreys, ECE=0.053, passes |
+| Correction detection | V2: 26% -> 92% on real overrides (zero-LLM) |
+| HRR encoding | Works experimentally, but real value is fuzzy-start traversal, not multi-hop |
+| Two-hop HRR (S^2) | Failed -- near-saturated at 85% capacity; correct path is iterative BFS |
+| Granular decomposition | 86% token reduction with sentence-level nodes |
+| Context compression | Hybrid: CLAUDE.md + status injection + compactPrompt |
+| Scaling | Degrades at 10K beliefs; hierarchical propagation helps |
+
+### Open design threads
+1. Interview loop for uncertainty (entry/exit thresholds TBD -- needs experiments)
+2. Edge weight uncertainty signal -- CONTRADICTS nodes are escalation signals, not penalties
+3. Typed nodes with edge constraint table
+4. HRR deferred to v2 pending confirmation retrieval is the bottleneck
+5. REQ-028/029/030 added but not formally written into REQUIREMENTS.md
+
+### Next on deck (TODO.md Tier 1 -- independent, no blockers)
+- **#40** Time as graph dimension
+- **#41** Requirements traceability as graph structure
+- **#33** Automatic query expansion without LLM
+
+What do you want to hit?

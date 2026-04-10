@@ -1,0 +1,18 @@
+Here's the current state:
+
+**Research phase, no production code.**
+
+Last session (2026-04-09) completed through Exp 26 (real HRR benchmark on the alpha-seek graph). Key finding: HRR's value is fuzzy-start traversal, not multi-hop -- S^2 fails at scale, iterative BFS is the right mechanism.
+
+**Open research tasks (tiered):**
+
+- Tier 1 (quick): #40 time as graph dim, #41 traceability as graph structure, #33 auto query expansion
+- Tier 2 (medium): #35 IB compression, #37 scale/feedback loop, #34 multi-project isolation, #31 meta-cognition rerun
+- Tier 3 (builds on above): #39 Gray code/SimHash, #36 HRR prototype, #42 workflow-agnostic onboarding
+
+**Active design threads waiting on decisions:**
+- Interview loop MCP tool design (uncertainty-triggered, exit threshold TBD)
+- REQ-028/029/030 need to be formally added to REQUIREMENTS.md
+- Thresholds throughout (conflict_ratio escalation, confidence tiers) are all TBD
+
+What do you want to tackle?

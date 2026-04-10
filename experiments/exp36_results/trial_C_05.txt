@@ -1,0 +1,27 @@
+Here's where things stand:
+
+---
+
+**Project:** agentic memory system for LLMs (MCP server, SQLite, Bayesian retrieval)
+**Status:** Research phase. No production code. ~1 day of work done as of 2026-04-09.
+
+**What's solid:**
+- Architecture decisions locked (SQLite+WAL, scientific method model, Thompson+Jeffreys sampling, MCP interface, zero-LLM default, progressive context loading L0-L3)
+- 9 experiments run; Exp 2/5b passing (ECE=0.066), Exp 26 (HRR on real graph) shows HRR's real value is fuzzy-start traversal, not multi-hop
+- Requirements REQ-001 through REQ-030
+- Full doc set: PLAN.md, REQUIREMENTS.md, APPROACHES.md, EXPERIMENTS.md, CASE_STUDIES.md, PRIVACY_THREAT_MODEL.md, HRR_RESEARCH.md, etc.
+
+**Open design threads:**
+1. Interview loop MCP tool (uncertainty-triggered, multi-round, GSD-style)
+2. Edge weight uncertainty signal (`conflict_ratio`); CONTRADICTS nodes are escalation signals, not penalties
+3. Typed nodes + edge constraint table
+4. HRR deferred to v2 (fuzzy-start only; S^2 doesn't scale)
+5. REQ-028/029/030 not yet formally written into REQUIREMENTS.md
+6. All thresholds still TBD (interview exit, conflict_ratio escalation, confidence tiers)
+
+**Logical next steps (from TODO.md):**
+- Design the interview loop MCP tool
+- Formally add REQ-028/029/030 with traceability
+- Decide if research is sufficient to move forward
+
+What do you want to focus on?

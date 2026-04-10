@@ -1,0 +1,26 @@
+Here's the current state:
+
+**Phase:** Pure research -- no production code exists.
+
+**Design decisions locked:**
+- Scientific method model: observe/believe/test/revise
+- Thompson sampling + Jeffreys prior (Beta(0.5, 0.5)) for belief ranking -- validated at ECE=0.053
+- Sentence-level graph nodes -- 86% token reduction vs decision-level
+- Correction detection V2 -- 92% on real data (up from 26%)
+- Local-first, no telemetry (REQ-017/018)
+- Single-correction learning with locked beliefs (REQ-019/020)
+- 26 requirements documented in REQUIREMENTS.md
+
+**All major research areas covered** (see the design space table in TODO.md): Bayesian, HRR, Gray code/SimHash, time dimension, traceability, query expansion, meta-cognition, info bottleneck, multi-project isolation, privacy, cross-model MCP, context compression, case studies.
+
+**Pending research (tiered in TODO.md):**
+
+| Tier | Tasks |
+|------|-------|
+| 1 (quick) | #40 time as graph dim, #41 requirements traceability, #33 auto query expansion |
+| 2 (medium) | #35 IB compression, #37 scale/feedback loop, #34 multi-project isolation, #31 meta-cognition rerun |
+| 3 (harder) | #39 Gray code prototype, #36 HRR prototype, #42 workflow-agnostic onboarding |
+
+**Also open:** case study investigations (CS-004 locked-belief compression survival, CS-003 self-referential state), and the meta-question of what "research complete" criteria look like.
+
+What do you want to work on?

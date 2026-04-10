@@ -1,0 +1,116 @@
+{
+  "h1_ignored_rate": {
+    "ignored_0.00": {
+      "ece_mean": 0.0285,
+      "ece_std": 0.0012
+    },
+    "ignored_0.10": {
+      "ece_mean": 0.0428,
+      "ece_std": 0.0038
+    },
+    "ignored_0.20": {
+      "ece_mean": 0.1021,
+      "ece_std": 0.0041
+    },
+    "ignored_0.30": {
+      "ece_mean": 0.1631,
+      "ece_std": 0.005
+    },
+    "ignored_0.50": {
+      "ece_mean": 0.2777,
+      "ece_std": 0.0062
+    }
+  },
+  "h2_selection_bias": {
+    "random": {
+      "ece_mean": 0.1629,
+      "ece_std": 0.008,
+      "beliefs_tested_frac": 1.0
+    },
+    "topk": {
+      "ece_mean": 0.2238,
+      "ece_std": 0.0106,
+      "beliefs_tested_frac": 0.9635
+    }
+  },
+  "h3_binning": {
+    "bins_5": 0.0106,
+    "bins_10": 0.0123,
+    "bins_20": 0.0123,
+    "bins_50": 0.0123,
+    "source_user_stated": {
+      "ece": 0.0263,
+      "mean_confidence": 0.8255,
+      "mean_actual_use_rate": 0.8518,
+      "true_rate": 0.85
+    },
+    "source_document": {
+      "ece": 0.0111,
+      "mean_confidence": 0.6315,
+      "mean_actual_use_rate": 0.642,
+      "true_rate": 0.65
+    },
+    "source_agent_inferred": {
+      "ece": 0.0057,
+      "mean_confidence": 0.4642,
+      "mean_actual_use_rate": 0.4609,
+      "true_rate": 0.45
+    },
+    "source_cross_reference": {
+      "ece": 0.0062,
+      "mean_confidence": 0.5361,
+      "mean_actual_use_rate": 0.5393,
+      "true_rate": 0.55
+    }
+  },
+  "h4_convergence": {
+    "session_5": {
+      "ece": 0.2387,
+      "beliefs_tested": 144,
+      "mean_abs_error_per_belief": 0.158,
+      "median_abs_error_per_belief": 0.15,
+      "median_retrievals_per_belief": 1.0
+    },
+    "session_10": {
+      "ece": 0.1517,
+      "beliefs_tested": 184,
+      "mean_abs_error_per_belief": 0.1528,
+      "median_abs_error_per_belief": 0.1357,
+      "median_retrievals_per_belief": 3.0
+    },
+    "session_20": {
+      "ece": 0.1509,
+      "beliefs_tested": 200,
+      "mean_abs_error_per_belief": 0.1267,
+      "median_abs_error_per_belief": 0.1167,
+      "median_retrievals_per_belief": 5.0
+    },
+    "session_50": {
+      "ece": 0.1566,
+      "beliefs_tested": 200,
+      "mean_abs_error_per_belief": 0.0913,
+      "median_abs_error_per_belief": 0.0654,
+      "median_retrievals_per_belief": 12.0
+    },
+    "session_100": {
+      "ece": 0.1687,
+      "beliefs_tested": 200,
+      "mean_abs_error_per_belief": 0.0767,
+      "median_abs_error_per_belief": 0.0591,
+      "median_retrievals_per_belief": 25.0
+    },
+    "session_200": {
+      "ece": 0.1745,
+      "beliefs_tested": 200,
+      "mean_abs_error_per_belief": 0.0631,
+      "median_abs_error_per_belief": 0.05,
+      "median_retrievals_per_belief": 50.0
+    }
+  },
+  "h5_theoretical_floor": {
+    "oracle_ece_100_samples": 0.003,
+    "oracle_ece_std": 0.0001,
+    "oracle_with_ignored_ece": 0.1835,
+    "oracle_with_ignored_std": 0.0026
+  }
+}

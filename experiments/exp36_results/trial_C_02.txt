@@ -1,0 +1,29 @@
+Here's where the project stands:
+
+**Phase:** Research only. No production code.
+
+**Completed research areas (major):**
+- Architecture design (scientific method model: observe/believe/test/revise)
+- Bayesian confidence: Thompson + Jeffreys validated (ECE=0.053, Exp 7)
+- HRR encoding: works, 60-80% FTS5 overlap, but S^2 multi-hop fails at scale -- real value is fuzzy-start traversal
+- Correction detection V2: 92% on real overrides (zero-LLM viable)
+- Scaling degrades at 10K beliefs; hierarchical propagation helps
+- Sentence-level nodes: 86% token reduction (Exp 16)
+- Privacy threat model: T1/T2 unmitigable (cloud LLM), T4-T7 mitigable
+- Context compression strategy: CLAUDE.md + status injection + compactPrompt
+- Multi-project isolation: single DB with project_id namespace
+- Query expansion: corpus PMI + pseudo-relevance, ~5-10ms, zero-LLM
+- 30 requirements (REQ-001 to REQ-030), 29 approaches tracked, 5 case studies
+
+**Open design threads:**
+1. Interview loop MCP tool (uncertainty-triggered, GSD-style, exit threshold TBD)
+2. Edge weight conflict signal: `conflict_ratio = contradict / (support + contradict)`; CONTRADICTS nodes are escalation-prioritized, not penalized
+3. Typed nodes + edge constraint table (prevents silent graph corruption)
+4. HRR deferred to v2 pending Exp 22 bottleneck confirmation
+
+**Next up (from TODO Tier 1 -- no blockers):**
+- `#40` Time as graph dimension
+- `#41` Requirements traceability as graph structure
+- `#33` Automatic query expansion without LLM
+
+MemPalace note: the palace only has `alpha_seek` wing -- this project's memories aren't mined in yet.

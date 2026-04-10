@@ -1,0 +1,38 @@
+Here's where we are:
+
+---
+
+## Status: Research phase, no production code
+
+**Last real work:** 2026-04-09 (today per memory, but that was the previous session)
+
+### What's been validated
+
+| Area | Key result |
+|---|---|
+| Bayesian confidence | Thompson + Jeffreys, ECE=0.053-0.066, passing |
+| HRR encoding | Exp 26 on real graph (586 nodes) -- fuzzy-start traversal is the value, not multi-hop |
+| Correction detection | V2 at 92% on real data (was 26%) |
+| Granular decomposition | 86% token reduction with sentence-level nodes |
+| Query expansion | Corpus PMI + pseudo-relevance, zero-LLM, ~5-10ms |
+| Scaling | Degrades at 10K; hierarchical propagation helps |
+| Context compression | Hybrid: CLAUDE.md + status injection |
+| Multi-project isolation | Single DB with project_id namespace |
+
+### Open design threads
+
+1. Interview loop for uncertainty (MCP tool not yet designed)
+2. Edge weight uncertainty signal (conflict_ratio thresholds TBD)
+3. Typed nodes with edge constraint table
+4. HRR deferred to v2 pending retrieval bottleneck confirmation
+5. REQ-028/029/030 added but not formally written into REQUIREMENTS.md
+
+### What's next (from TODO.md)
+
+Active research queue, ordered by dependency tier:
+
+- **Tier 1 (any order):** #40 time as graph dim, #41 traceability as graph, #33 auto query expansion
+- **Tier 2:** #35 IB for belief compression, #37 scale/feedback loop, #34 multi-project isolation, #31 meta-cognition (agent failed last run)
+- **Tier 3:** #39 Gray code/SimHash, #36 HRR prototype, #42 workflow-agnostic onboarding
+
+The biggest near-term design gaps are the interview loop MCP tool and formalizing REQ-028/029/030.

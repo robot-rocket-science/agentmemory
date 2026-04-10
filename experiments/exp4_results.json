@@ -1,0 +1,713 @@
+{
+  "100": {
+    "token_budget": 100,
+    "overall_coverage": 0.3077,
+    "total_needed": 13,
+    "total_found": 4,
+    "per_topic": {
+      "dispatch_gate": {
+        "needed": [
+          "D089",
+          "D106",
+          "D137"
+        ],
+        "found": [],
+        "missed": [
+          "D089",
+          "D106",
+          "D137"
+        ],
+        "coverage": 0.0,
+        "retrieved_count": 3
+      },
+      "calls_puts": {
+        "needed": [
+          "D096",
+          "D100",
+          "D073"
+        ],
+        "found": [
+          "D073"
+        ],
+        "missed": [
+          "D096",
+          "D100"
+        ],
+        "coverage": 0.3333333333333333,
+        "retrieved_count": 4
+      },
+      "capital_5k": {
+        "needed": [
+          "D099"
+        ],
+        "found": [
+          "D099"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 2
+      },
+      "agent_behavior": {
+        "needed": [
+          "D157",
+          "D188"
+        ],
+        "found": [
+          "D188"
+        ],
+        "missed": [
+          "D157"
+        ],
+        "coverage": 0.5,
+        "retrieved_count": 3
+      },
+      "strict_typing": {
+        "needed": [
+          "D071",
+          "D113"
+        ],
+        "found": [],
+        "missed": [
+          "D071",
+          "D113"
+        ],
+        "coverage": 0.0,
+        "retrieved_count": 5
+      },
+      "gcp_primary": {
+        "needed": [
+          "D120",
+          "D078"
+        ],
+        "found": [
+          "D078"
+        ],
+        "missed": [
+          "D120"
+        ],
+        "coverage": 0.5,
+        "retrieved_count": 3
+      }
+    }
+  },
+  "250": {
+    "token_budget": 250,
+    "overall_coverage": 0.7692,
+    "total_needed": 13,
+    "total_found": 10,
+    "per_topic": {
+      "dispatch_gate": {
+        "needed": [
+          "D089",
+          "D106",
+          "D137"
+        ],
+        "found": [
+          "D089"
+        ],
+        "missed": [
+          "D106",
+          "D137"
+        ],
+        "coverage": 0.3333333333333333,
+        "retrieved_count": 9
+      },
+      "calls_puts": {
+        "needed": [
+          "D096",
+          "D100",
+          "D073"
+        ],
+        "found": [
+          "D096",
+          "D100",
+          "D073"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 7
+      },
+      "capital_5k": {
+        "needed": [
+          "D099"
+        ],
+        "found": [
+          "D099"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 5
+      },
+      "agent_behavior": {
+        "needed": [
+          "D157",
+          "D188"
+        ],
+        "found": [
+          "D188"
+        ],
+        "missed": [
+          "D157"
+        ],
+        "coverage": 0.5,
+        "retrieved_count": 7
+      },
+      "strict_typing": {
+        "needed": [
+          "D071",
+          "D113"
+        ],
+        "found": [
+          "D071",
+          "D113"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 7
+      },
+      "gcp_primary": {
+        "needed": [
+          "D120",
+          "D078"
+        ],
+        "found": [
+          "D120",
+          "D078"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 7
+      }
+    }
+  },
+  "500": {
+    "token_budget": 500,
+    "overall_coverage": 0.8462,
+    "total_needed": 13,
+    "total_found": 11,
+    "per_topic": {
+      "dispatch_gate": {
+        "needed": [
+          "D089",
+          "D106",
+          "D137"
+        ],
+        "found": [
+          "D089",
+          "D106"
+        ],
+        "missed": [
+          "D137"
+        ],
+        "coverage": 0.6666666666666666,
+        "retrieved_count": 20
+      },
+      "calls_puts": {
+        "needed": [
+          "D096",
+          "D100",
+          "D073"
+        ],
+        "found": [
+          "D096",
+          "D100",
+          "D073"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 13
+      },
+      "capital_5k": {
+        "needed": [
+          "D099"
+        ],
+        "found": [
+          "D099"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 13
+      },
+      "agent_behavior": {
+        "needed": [
+          "D157",
+          "D188"
+        ],
+        "found": [
+          "D188"
+        ],
+        "missed": [
+          "D157"
+        ],
+        "coverage": 0.5,
+        "retrieved_count": 11
+      },
+      "strict_typing": {
+        "needed": [
+          "D071",
+          "D113"
+        ],
+        "found": [
+          "D071",
+          "D113"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 20
+      },
+      "gcp_primary": {
+        "needed": [
+          "D120",
+          "D078"
+        ],
+        "found": [
+          "D120",
+          "D078"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 14
+      }
+    }
+  },
+  "1000": {
+    "token_budget": 1000,
+    "overall_coverage": 1.0,
+    "total_needed": 13,
+    "total_found": 13,
+    "per_topic": {
+      "dispatch_gate": {
+        "needed": [
+          "D089",
+          "D106",
+          "D137"
+        ],
+        "found": [
+          "D089",
+          "D106",
+          "D137"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 33
+      },
+      "calls_puts": {
+        "needed": [
+          "D096",
+          "D100",
+          "D073"
+        ],
+        "found": [
+          "D096",
+          "D100",
+          "D073"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 26
+      },
+      "capital_5k": {
+        "needed": [
+          "D099"
+        ],
+        "found": [
+          "D099"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 19
+      },
+      "agent_behavior": {
+        "needed": [
+          "D157",
+          "D188"
+        ],
+        "found": [
+          "D157",
+          "D188"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 19
+      },
+      "strict_typing": {
+        "needed": [
+          "D071",
+          "D113"
+        ],
+        "found": [
+          "D071",
+          "D113"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 34
+      },
+      "gcp_primary": {
+        "needed": [
+          "D120",
+          "D078"
+        ],
+        "found": [
+          "D120",
+          "D078"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 34
+      }
+    }
+  },
+  "1500": {
+    "token_budget": 1500,
+    "overall_coverage": 1.0,
+    "total_needed": 13,
+    "total_found": 13,
+    "per_topic": {
+      "dispatch_gate": {
+        "needed": [
+          "D089",
+          "D106",
+          "D137"
+        ],
+        "found": [
+          "D089",
+          "D106",
+          "D137"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 50
+      },
+      "calls_puts": {
+        "needed": [
+          "D096",
+          "D100",
+          "D073"
+        ],
+        "found": [
+          "D096",
+          "D100",
+          "D073"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 47
+      },
+      "capital_5k": {
+        "needed": [
+          "D099"
+        ],
+        "found": [
+          "D099"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 19
+      },
+      "agent_behavior": {
+        "needed": [
+          "D157",
+          "D188"
+        ],
+        "found": [
+          "D157",
+          "D188"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 21
+      },
+      "strict_typing": {
+        "needed": [
+          "D071",
+          "D113"
+        ],
+        "found": [
+          "D071",
+          "D113"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 34
+      },
+      "gcp_primary": {
+        "needed": [
+          "D120",
+          "D078"
+        ],
+        "found": [
+          "D120",
+          "D078"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 50
+      }
+    }
+  },
+  "2000": {
+    "token_budget": 2000,
+    "overall_coverage": 1.0,
+    "total_needed": 13,
+    "total_found": 13,
+    "per_topic": {
+      "dispatch_gate": {
+        "needed": [
+          "D089",
+          "D106",
+          "D137"
+        ],
+        "found": [
+          "D089",
+          "D106",
+          "D137"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 50
+      },
+      "calls_puts": {
+        "needed": [
+          "D096",
+          "D100",
+          "D073"
+        ],
+        "found": [
+          "D096",
+          "D100",
+          "D073"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 50
+      },
+      "capital_5k": {
+        "needed": [
+          "D099"
+        ],
+        "found": [
+          "D099"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 19
+      },
+      "agent_behavior": {
+        "needed": [
+          "D157",
+          "D188"
+        ],
+        "found": [
+          "D157",
+          "D188"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 21
+      },
+      "strict_typing": {
+        "needed": [
+          "D071",
+          "D113"
+        ],
+        "found": [
+          "D071",
+          "D113"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 34
+      },
+      "gcp_primary": {
+        "needed": [
+          "D120",
+          "D078"
+        ],
+        "found": [
+          "D120",
+          "D078"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 50
+      }
+    }
+  },
+  "3000": {
+    "token_budget": 3000,
+    "overall_coverage": 1.0,
+    "total_needed": 13,
+    "total_found": 13,
+    "per_topic": {
+      "dispatch_gate": {
+        "needed": [
+          "D089",
+          "D106",
+          "D137"
+        ],
+        "found": [
+          "D089",
+          "D106",
+          "D137"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 50
+      },
+      "calls_puts": {
+        "needed": [
+          "D096",
+          "D100",
+          "D073"
+        ],
+        "found": [
+          "D096",
+          "D100",
+          "D073"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 50
+      },
+      "capital_5k": {
+        "needed": [
+          "D099"
+        ],
+        "found": [
+          "D099"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 19
+      },
+      "agent_behavior": {
+        "needed": [
+          "D157",
+          "D188"
+        ],
+        "found": [
+          "D157",
+          "D188"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 21
+      },
+      "strict_typing": {
+        "needed": [
+          "D071",
+          "D113"
+        ],
+        "found": [
+          "D071",
+          "D113"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 34
+      },
+      "gcp_primary": {
+        "needed": [
+          "D120",
+          "D078"
+        ],
+        "found": [
+          "D120",
+          "D078"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 50
+      }
+    }
+  },
+  "5000": {
+    "token_budget": 5000,
+    "overall_coverage": 1.0,
+    "total_needed": 13,
+    "total_found": 13,
+    "per_topic": {
+      "dispatch_gate": {
+        "needed": [
+          "D089",
+          "D106",
+          "D137"
+        ],
+        "found": [
+          "D089",
+          "D106",
+          "D137"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 50
+      },
+      "calls_puts": {
+        "needed": [
+          "D096",
+          "D100",
+          "D073"
+        ],
+        "found": [
+          "D096",
+          "D100",
+          "D073"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 50
+      },
+      "capital_5k": {
+        "needed": [
+          "D099"
+        ],
+        "found": [
+          "D099"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 19
+      },
+      "agent_behavior": {
+        "needed": [
+          "D157",
+          "D188"
+        ],
+        "found": [
+          "D157",
+          "D188"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 21
+      },
+      "strict_typing": {
+        "needed": [
+          "D071",
+          "D113"
+        ],
+        "found": [
+          "D071",
+          "D113"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 34
+      },
+      "gcp_primary": {
+        "needed": [
+          "D120",
+          "D078"
+        ],
+        "found": [
+          "D120",
+          "D078"
+        ],
+        "missed": [],
+        "coverage": 1.0,
+        "retrieved_count": 50
+      }
+    }
+  }
+}

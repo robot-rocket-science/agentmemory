@@ -1,0 +1,38 @@
+{
+  "200": {
+    "n_beliefs": 200,
+    "ece_mean": 0.0605,
+    "ece_std": 0.0058,
+    "test_coverage_mean": 1.0,
+    "convergence_rate_mean": 0.5635,
+    "wall_seconds_mean": 0.047,
+    "retrievals_per_second": 52945.0
+  },
+  "1000": {
+    "n_beliefs": 1000,
+    "ece_mean": 0.1361,
+    "ece_std": 0.0031,
+    "test_coverage_mean": 0.9176,
+    "convergence_rate_mean": 0.4004,
+    "wall_seconds_mean": 0.232,
+    "retrievals_per_second": 10764.0
+  },
+  "5000": {
+    "n_beliefs": 5000,
+    "ece_mean": 0.1661,
+    "ece_std": 0.0021,
+    "test_coverage_mean": 0.3842,
+    "convergence_rate_mean": 0.4454,
+    "wall_seconds_mean": 1.123,
+    "retrievals_per_second": 2226.0
+  },
+  "10000": {
+    "n_beliefs": 10000,
+    "ece_mean": 0.1711,
+    "ece_std": 0.0017,
+    "test_coverage_mean": 0.2177,
+    "convergence_rate_mean": 0.4479,
+    "wall_seconds_mean": 2.231,
+    "retrievals_per_second": 1120.0
+  }
+}

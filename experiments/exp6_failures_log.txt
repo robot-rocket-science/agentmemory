@@ -1,0 +1,98 @@
+============================================================
+Experiment 6 Phase B: Detecting Memory Failure Patterns
+============================================================
+  P1: Detecting repeated decisions...
+    8 candidate repeated decision pairs (sim >= 0.25)
+    D118-D121: sim=0.377
+      1: Contract selection philosophy: rules-based filters vs learned selection: No hard
+      2: Whether to add a max_entry_price filter to cap contract selection to sub-$0.50 o
+    D159-D161: sim=0.326
+      1: Which contextual bandit algorithm to use for M024 contract selection: Thompson S
+      2: Which event stream to use for M024 walk-forward evaluation: Evaluate bandit on R
+    D160-D161: sim=0.286
+      1: Arm discretization for M024 bandit contract selection: 9 arms: 3 delta buckets x
+      2: Which event stream to use for M024 walk-forward evaluation: Evaluate bandit on R
+    D144-D162: sim=0.279
+      1: Execution order and gate policy for queued milestones after M023-vyt1ni: Run all
+      2: Execution priority for 4 milestones after M024-60hkjc, informed by M023-vyt1ni k
+    D194-D195: sim=0.278
+      1: How to prevent research findings from being ignored during milestone execution: 
+      2: Execution fidelity gap: research findings must be verified as actually incorpora
+    D159-D160: sim=0.267
+      1: Which contextual bandit algorithm to use for M024 contract selection: Thompson S
+      2: Arm discretization for M024 bandit contract selection: 9 arms: 3 delta buckets x
+    D127-D163: sim=0.263
+      1: D097 walk-forward verdict for highvol fixed-family (highvol_strict and highvol) 
+      2: D097 walk-forward verdict for Thompson Sampling bandit contract selector (M024):
+    D148-D160: sim=0.250
+      1: Revised scope for M024-60hkjc (Contextual Bandit): 4 runs: LinUCB + Thompson Sam
+      2: Arm discretization for M024 bandit contract selection: 9 arms: 3 delta buckets x
+  P2: Detecting repeated research...
+    1 cross-milestone overlaps (sim >= 0.30)
+    1 without cross-citation (potential repeated research)
+    K183(M018) - K191(M001): sim=0.417
+      1: M018: KNOWLEDGE.md M001 OTM baseline E[V]=+2.854 is bothsides (calls+puts), not 
+      2: M001_OTM_baseline call-only E[V] is -0.08 (margin=-1.7pp), NOT +2.854
+  P3: Detecting repeated debugging sessions...
+    169 fix/debug commits out of 1154 total
+    66 clusters of similar fixes (potential re-debugging)
+    Cluster (size 6):
+      2026-03-25 feat: add v2 re-run GCP dispatch defs (image b6b8566 with expiry fix)
+      2026-03-25 feat: add v2 re-run GCP dispatch defs (image b6b8566 with expiry fix)
+      2026-03-26 feat: add 3 controlled CLEAN re-run dispatch configs (hold_mode=fixed,
+    Cluster (size 6):
+      2026-04-03 fix: guard against DuckDB NULL crash in feed.at() when ticker has no c
+      2026-04-03 fix: guard against DuckDB NULL crash in feed.at() when ticker has no c
+      2026-04-03 fix: rewrite all feed.py DuckDB queries to CTE pattern — prevents NULL
+    Cluster (size 4):
+      2026-03-24 Fix put intrinsic pricing bug, redispatch argmax runs, update docs
+      2026-03-24 Fix put intrinsic pricing bug, redispatch argmax runs, update docs
+      2026-03-24 Redispatch argmax runs with REAL put intrinsic fix (putfix image)
+    Cluster (size 4):
+      2026-03-24 fix: export_event_routing_v2a.py API mismatches with optimus-prime
+      2026-03-24 fix: export_event_routing_v2a.py API mismatches with optimus-prime
+      2026-03-24 fix: sys.path ordering in export_event_routing_v2a.py (append optimus-
+    Cluster (size 4):
+      2026-03-24 fix: platform-aware sys.path for archon compatibility
+      2026-03-24 fix: platform-aware sys.path for archon compatibility
+      2026-03-24 fix(S01/T01): Fixed sys.path and module resolution for archon, dispatc
+  P4: Detecting repeated procedural instructions...
+    100 procedural decisions out of 173
+    9 clusters of repeated instructions
+    17 dispatch-related decisions
+    4 runbook-related decisions
+    Cluster (size 3): D097 walk-forward verdict for F4 (delta_spread_trail) exit r
+      D124: D097 walk-forward verdict for F4 (delta_spread_trail) exit rule on arg
+      D127: D097 walk-forward verdict for highvol fixed-family (highvol_strict and
+      D163: D097 walk-forward verdict for Thompson Sampling bandit contract select
+    Cluster (size 2): Config selection criterion for holdout re-derivation sweep: 
+      D091: Config selection criterion for holdout re-derivation sweep: Use the sa
+      D095: Re-derived best config for holdout validation (M007-xtpz0d S01): 0.05/
+    Cluster (size 2): How to evaluate strategy performance across time: Walk-forwa
+      D097: How to evaluate strategy performance across time: Walk-forward per-yea
+      D202: How to evaluate strategy performance during paper trading and live dep
+    Cluster (size 2): GCP as primary compute platform for M010 and all future back
+      D078: GCP as primary compute platform for M010 and all future backtest dispa
+      D080: GCP VM pricing strategy reaffirmation: SPOT-first with STANDARD fallba
+    Cluster (size 2): Scope applicability of oracle exit ceiling calculations: Ora
+      D105: Scope applicability of oracle exit ceiling calculations: Oracle ceilin
+      D125: Retire D105: Argmax oracle ceiling recalculated with quantitative evid
+  P5: Detecting dispatch gate failures...
+    36 dispatch-related failure commits
+    23 dispatch-related knowledge entries
+    2026-03-24 fix: gcp_dispatch metadata delimiter handles spaces in backtest-flags
+    2026-03-24 fix: gcp_dispatch metadata delimiter handles spaces in backtest-flags
+    2026-03-24 feat(S05/T03): Dispatched 3 S05 GCP backtests after fixing NameError in…
+    2026-03-24 feat(S05/T03): Dispatched 3 S05 GCP backtests after fixing NameError in…
+    2026-03-24 Fix put intrinsic pricing bug, redispatch argmax runs, update docs
+
+============================================================
+FAILURE PATTERN SUMMARY
+============================================================
+  P1 Repeated decisions:       8 candidates
+  P2 Repeated research:        1 uncited overlaps
+  P3 Repeated debugging:       66 fix clusters
+  P4 Repeated instructions:    9 clusters (17 dispatch, 4 runbook)
+  P5 Dispatch failures:        36 failure commits
+
+Output: experiments/exp6_failures.json

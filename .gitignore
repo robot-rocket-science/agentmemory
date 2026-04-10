@@ -1,0 +1,15 @@
+.python-version
+.claude/settings.local.json
+.claude/prohibitions.txt
+__pycache__/
+*.pyc
+.venv/
+
+# Large reproducible result files (regenerate from source scripts)
+experiments/exp6_timeline.json
+experiments/exp3_eval_sheets.json
+experiments/exp3_eval_sheets_v2.json
+experiments/exp3_demo_output.json
+experiments/exp6_failures.json
+experiments/exp1_overrides_results.json
+experiments/exp3_attribution.json

@@ -1,0 +1,39 @@
+============================================================
+TIMELINE SUMMARY
+============================================================
+Total events: 1790
+  Decisions: 173
+  Milestone events: 84
+  Knowledge entries: 379
+  Commits (alpha-seek): 544
+  Commits (alpha-seek-memtest): 610
+
+Events with timestamps: 1743/1790
+Events with D###/M### references: 531/1790
+Signal commits (reference D###/M###): 259/1154
+
+Citation edges: 775
+
+Top 20 most-referenced nodes:
+  D097: 74 references
+  M023: 33 references
+  M026: 31 references
+  M025: 24 references
+  M006: 23 references
+  M002: 22 references
+  M005: 21 references
+  M022: 20 references
+  M024: 20 references
+  M037: 20 references
+  M007: 19 references
+  M003: 18 references
+  M030: 17 references
+  M021: 16 references
+  M027: 16 references
+  M032: 16 references
+  M008: 15 references
+  M010: 14 references
+  M018: 14 references
+  M031: 14 references
+
+Date range: 2026-03-24 to 2026-04-09

@@ -1,0 +1,61 @@
+{
+  "total_decisions": 173,
+  "total_sentence_nodes": 1195,
+  "avg_sentences_per_decision": 6.9,
+  "total_original_tokens": 36486,
+  "total_sentence_tokens": 35741,
+  "core_nodes": 132,
+  "core_tokens": 4839,
+  "type_distribution": {
+    "evidence": 349,
+    "context": 585,
+    "constraint": 132,
+    "supersession": 47,
+    "rationale": 39,
+    "implementation": 43
+  },
+  "top_anchors": [
+    {
+      "id": "D097",
+      "refs": 61
+    },
+    {
+      "id": "M025",
+      "refs": 27
+    },
+    {
+      "id": "M023",
+      "refs": 22
+    },
+    {
+      "id": "M006",
+      "refs": 21
+    },
+    {
+      "id": "M024",
+      "refs": 18
+    },
+    {
+      "id": "M022",
+      "refs": 17
+    },
+    {
+      "id": "M010",
+      "refs": 14
+    },
+    {
+      "id": "M026",
+      "refs": 12
+    },
+    {
+      "id": "M021",
+      "refs": 11
+    },
+    {
+      "id": "D174",
+      "refs": 11
+    }
+  ],
+  "anchor_tokens_full": 399,
+  "anchor_tokens_core": 71
+}

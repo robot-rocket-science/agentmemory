@@ -1,0 +1,25 @@
+Here's where we're at:
+
+**Project: agentmemory** -- research phase, no production code yet.
+
+---
+
+**Research is largely done.** The design space table in TODO.md covers 14 major areas, all with experiments or research docs. Key validated findings:
+
+- Thompson + Jeffreys prior: ECE=0.053, passes
+- Sentence-level nodes: 86% token reduction
+- HRR: real value is fuzzy-start traversal, not multi-hop (S^2 fails at scale)
+- Correction detection V2: 26% -> 92%
+- Context compression: hybrid persistence strategy designed
+
+**Open design threads (not yet resolved):**
+1. Interview loop MCP tool -- how it generates questions, loop exit condition
+2. CONTRADICTS edge handling -- escalation signal, threshold TBD
+3. Typed node constraints -- designed but not formalized
+4. REQ-028/029/030 -- need formal REQUIREMENTS.md entries with traceability
+
+**Pending research tasks (TODO Tier 1-3):** #33, #34, #35, #36, #37, #39, #40, #41, #42 -- mostly research + small prototypes, ordered by dependency.
+
+**The meta-question:** Whether research is sufficient to move to architecture/implementation -- you haven't made that call yet.
+
+What do you want to pick up?

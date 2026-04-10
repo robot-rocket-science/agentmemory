@@ -1,0 +1,55 @@
+Sweeping 6 prior strengths x 7 exploration weights x 20 trials
+/Users/thelorax/projects/agentmemory/experiments/exp2_bayesian_calibration.py:291: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  rho, _ = spearmanr(confs, trues)
+/Users/thelorax/projects/agentmemory/experiments/exp2b_parameter_sweep.py:154: RuntimeWarning: Mean of empty slice
+  "rank_corr_mean": round(float(np.nanmean(ranks)), 4),
+  ps= 1.0 ew=0.00 -> ECE=0.0511 expl=0.0000 conv=0.7273 [----]
+  ps= 1.0 ew=0.05 -> ECE=0.0460 expl=0.0000 conv=0.7164 [----]
+  ps= 1.0 ew=0.10 -> ECE=0.0652 expl=0.0000 conv=0.6772 [----]
+  ps= 1.0 ew=0.20 -> ECE=0.0756 expl=0.0000 conv=0.4660 [----]
+  ps= 1.0 ew=0.30 -> ECE=0.1164 expl=0.1198 conv=0.4617 [----]
+  ps= 1.0 ew=0.50 -> ECE=0.1176 expl=0.3707 conv=0.4582 [----]
+  ps= 1.0 ew=1.00 -> ECE=0.0912 expl=0.8492 conv=0.4492 [----]
+  ps= 2.0 ew=0.00 -> ECE=0.1160 expl=0.0000 conv=0.5731 [----]
+  ps= 2.0 ew=0.05 -> ECE=0.1018 expl=0.0000 conv=0.5795 [----]
+  ps= 2.0 ew=0.10 -> ECE=0.1207 expl=0.0000 conv=0.4950 [----]
+  ps= 2.0 ew=0.20 -> ECE=0.1517 expl=0.0005 conv=0.5256 [----]
+  ps= 2.0 ew=0.30 -> ECE=0.1439 expl=0.0757 conv=0.5207 [----]
+  ps= 2.0 ew=0.50 -> ECE=0.1069 expl=0.4730 conv=0.5750 [----]
+  ps= 2.0 ew=1.00 -> ECE=0.0712 expl=0.8614 conv=0.5550 [----]
+  ps= 3.0 ew=0.00 -> ECE=0.1332 expl=0.0000 conv=0.7301 [----]
+  ps= 3.0 ew=0.05 -> ECE=0.1347 expl=0.0000 conv=0.7180 [----]
+  ps= 3.0 ew=0.10 -> ECE=0.1374 expl=0.0000 conv=0.6580 [----]
+  ps= 3.0 ew=0.20 -> ECE=0.1326 expl=0.0000 conv=0.5620 [----]
+  ps= 3.0 ew=0.30 -> ECE=0.1356 expl=0.1185 conv=0.6311 [----]
+  ps= 3.0 ew=0.50 -> ECE=0.1138 expl=0.5248 conv=0.7377 [----]
+  ps= 3.0 ew=1.00 -> ECE=0.0716 expl=0.8486 conv=0.6192 [----]
+  ps= 5.0 ew=0.00 -> ECE=0.1847 expl=0.0000 conv=1.0000 [----]
+  ps= 5.0 ew=0.05 -> ECE=0.1807 expl=0.0000 conv=0.9970 [----]
+  ps= 5.0 ew=0.10 -> ECE=0.1473 expl=0.0000 conv=0.9350 [----]
+  ps= 5.0 ew=0.20 -> ECE=0.1474 expl=0.0000 conv=0.7705 [----]
+  ps= 5.0 ew=0.30 -> ECE=0.1398 expl=0.1302 conv=0.8927 [----]
+  ps= 5.0 ew=0.50 -> ECE=0.1084 expl=0.6056 conv=0.7867 [----]
+  ps= 5.0 ew=1.00 -> ECE=0.0579 expl=0.8865 conv=0.6340 [----]
+  ps= 8.0 ew=0.00 -> ECE=0.2010 expl=0.0000 conv=1.0000 [----]
+  ps= 8.0 ew=0.05 -> ECE=0.1780 expl=0.0000 conv=0.9940 [----]
+  ps= 8.0 ew=0.10 -> ECE=0.0805 expl=0.0000 conv=0.9390 [----]
+  ps= 8.0 ew=0.20 -> ECE=0.1509 expl=0.0000 conv=0.8635 [----]
+  ps= 8.0 ew=0.30 -> ECE=0.1418 expl=0.0878 conv=0.9258 [----]
+  ps= 8.0 ew=0.50 -> ECE=0.1271 expl=0.4551 conv=0.8863 [----]
+  ps= 8.0 ew=1.00 -> ECE=0.0699 expl=0.8836 conv=0.7990 [----]
+  ps=10.0 ew=0.00 -> ECE=0.1903 expl=0.0000 conv=1.0000 [----]
+  ps=10.0 ew=0.05 -> ECE=0.1716 expl=0.0000 conv=1.0000 [----]
+  ps=10.0 ew=0.10 -> ECE=0.0760 expl=0.0000 conv=1.0000 [----]
+  ps=10.0 ew=0.20 -> ECE=0.0602 expl=0.0000 conv=0.9152 [----]
+  ps=10.0 ew=0.30 -> ECE=0.0939 expl=0.0000 conv=0.9510 [----]
+  ps=10.0 ew=0.50 -> ECE=0.1268 expl=0.4200 conv=0.9069 [----]
+  ps=10.0 ew=1.00 -> ECE=0.0701 expl=0.8820 conv=0.8253 [----]
+
+--- 0/42 configurations pass both requirements ---
+No configurations pass both. Closest:
+  ps=1.0 ew=0.50 ECE=0.1176 expl=0.3707
+  ps=1.0 ew=0.30 ECE=0.1164 expl=0.1198
+  ps=5.0 ew=0.30 ECE=0.1398 expl=0.1302
+  ps=3.0 ew=0.30 ECE=0.1356 expl=0.1185
+  ps=1.0 ew=0.05 ECE=0.0460 expl=0.0000

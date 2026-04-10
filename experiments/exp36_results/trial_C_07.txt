@@ -1,0 +1,31 @@
+Here's where things stand:
+
+## agentmemory -- Current State (2026-04-09)
+
+**Phase:** Research only. No production code.
+
+### What's been validated
+- Thompson + Jeffreys prior (ECE=0.066, confirmed working)
+- Correction detection V2: 26% -> 92% on real data
+- HRR encoding works (60-80% FTS5 overlap, S^2 does not scale -- defer to v2)
+- Full design space explored across ~15 areas (see table in TODO.md)
+
+### Architecture decisions locked
+- SQLite + WAL, local-first, zero-network
+- Scientific method model (observe/believe/test/revise)
+- MCP server interface, cross-model from day one
+- Progressive context: L0/L1/L2/L3 loading
+- Single DB with `project_id` namespace for isolation
+
+### Open threads (not resolved)
+1. Interview loop design (what triggers it, how it exits, threshold TBDs)
+2. Edge weight handling -- CONTRADICTS is an escalation signal, not a traversal penalty
+3. REQ-028/029/030 need formal writeup in REQUIREMENTS.md
+4. All numeric thresholds are TBD (by experiment)
+
+### Next up (TODO Tier 1 -- independent, no blockers)
+- **#40** Time as graph dimension
+- **#41** Requirements traceability as graph structure
+- **#33** Automatic query expansion without LLM
+
+MemPalace palace itself only has the `alpha_seek` wing loaded (10K drawers) -- no agentmemory project content mined into it yet.

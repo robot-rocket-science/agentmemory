@@ -1,0 +1,452 @@
+[
+  {
+    "id": "D002_s0",
+    "parent_decision": "D002",
+    "sentence_index": 0,
+    "content": "Minimum per-trade return target: Minimum 2x return on premium (100%+ gain) per winning trade.",
+    "tokens": 23,
+    "type": "evidence",
+    "references": []
+  },
+  {
+    "id": "D002_s1",
+    "parent_decision": "D002",
+    "sentence_index": 1,
+    "content": "Contract selection constraint, not exit target.",
+    "tokens": 11,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D002_s2",
+    "parent_decision": "D002",
+    "sentence_index": 2,
+    "content": "Select contracts with enough convexity that a recovery move delivers >=2x.",
+    "tokens": 18,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D002_s3",
+    "parent_decision": "D002",
+    "sentence_index": 3,
+    "content": "Hold to expiry is baseline exit.",
+    "tokens": 8,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D003_s0",
+    "parent_decision": "D003",
+    "sentence_index": 0,
+    "content": "Hold-to-expiry and sizing are open research questions: Neither locked.",
+    "tokens": 17,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D003_s1",
+    "parent_decision": "D003",
+    "sentence_index": 1,
+    "content": "Hold-to-expiry is baseline to beat. $200/trade is starting point.",
+    "tokens": 16,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D003_s2",
+    "parent_decision": "D003",
+    "sentence_index": 2,
+    "content": "Agent should figure out optimal entry/exit/sizing.",
+    "tokens": 12,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D003_s3",
+    "parent_decision": "D003",
+    "sentence_index": 3,
+    "content": "H19d tested specific stop rules on simplified returns -- evidence, not proof. v2-06 VIX-adaptive hold contradicts universal hold.",
+    "tokens": 32,
+    "type": "constraint",
+    "references": []
+  },
+  {
+    "id": "D004_s0",
+    "parent_decision": "D004",
+    "sentence_index": 0,
+    "content": "Signal model configuration for production use: LightGBM + V2 (57 features) + 15% target threshold, trained on all events (no VIX conditioning)",
+    "tokens": 35,
+    "type": "evidence",
+    "references": []
+  },
+  {
+    "id": "D004_s1",
+    "parent_decision": "D004",
+    "sentence_index": 1,
+    "content": "Walk-forward AUC=0.7606 on 56-ticker universe.",
+    "tokens": 11,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D004_s2",
+    "parent_decision": "D004",
+    "sentence_index": 2,
+    "content": "V2 features help LightGBM.",
+    "tokens": 6,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D004_s3",
+    "parent_decision": "D004",
+    "sentence_index": 3,
+    "content": "VIX conditioning reduces AUC by -0.05. 15% target massively outperforms 5% (+0.19 AUC).",
+    "tokens": 21,
+    "type": "evidence",
+    "references": []
+  },
+  {
+    "id": "D005_s0",
+    "parent_decision": "D005",
+    "sentence_index": 0,
+    "content": "Sizing strategy: pct_equity_0.5 (0.5% of NAV per trade) as production baseline",
+    "tokens": 19,
+    "type": "evidence",
+    "references": []
+  },
+  {
+    "id": "D005_s1",
+    "parent_decision": "D005",
+    "sentence_index": 1,
+    "content": "14-strategy sweep: Sharpe 2.54, MaxDD 31.5%. pct_equity dominance is structural for asymmetric payoffs (26x avg winner, -93% avg loser).",
+    "tokens": 34,
+    "type": "evidence",
+    "references": []
+  },
+  {
+    "id": "D005_s2",
+    "parent_decision": "D005",
+    "sentence_index": 2,
+    "content": "Kelly blows up.",
+    "tokens": 3,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D006_s0",
+    "parent_decision": "D006",
+    "sentence_index": 0,
+    "content": "SDT Bayes-optimal entry threshold: score >= 0.056602 (16.7% of events) replaces heuristic top-decile (10%)",
+    "tokens": 26,
+    "type": "supersession",
+    "references": []
+  },
+  {
+    "id": "D006_s1",
+    "parent_decision": "D006",
+    "sentence_index": 1,
+    "content": "Walk-forward SDT analysis on 13 years.",
+    "tokens": 9,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D006_s2",
+    "parent_decision": "D006",
+    "sentence_index": 2,
+    "content": "Catches 46.2% of winners vs 34.1% at top-decile.",
+    "tokens": 12,
+    "type": "evidence",
+    "references": []
+  },
+  {
+    "id": "D006_s3",
+    "parent_decision": "D006",
+    "sentence_index": 3,
+    "content": "Miss analysis: 505/766 winners missed at top-decile.",
+    "tokens": 13,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D007_s0",
+    "parent_decision": "D007",
+    "sentence_index": 0,
+    "content": "Post-2020 AUC degradation is genuine sensitivity loss: d' decline 0.888->0.695 is real sensitivity loss, not just bias drift.",
+    "tokens": 31,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D007_s1",
+    "parent_decision": "D007",
+    "sentence_index": 1,
+    "content": "Requires feature engineering, not threshold optimization.",
+    "tokens": 14,
+    "type": "constraint",
+    "references": []
+  },
+  {
+    "id": "D007_s2",
+    "parent_decision": "D007",
+    "sentence_index": 2,
+    "content": "SDT separates d' (sensitivity) from c (criterion).",
+    "tokens": 12,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D007_s3",
+    "parent_decision": "D007",
+    "sentence_index": 3,
+    "content": "Both degrade post-2020.",
+    "tokens": 5,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D007_s4",
+    "parent_decision": "D007",
+    "sentence_index": 4,
+    "content": "Worst: 2021 d'=0.384, 2024 d'=0.334.",
+    "tokens": 9,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D008_s0",
+    "parent_decision": "D008",
+    "sentence_index": 0,
+    "content": "MCTS portfolio allocator for breadth events: Build MCTS portfolio allocator -- worth the complexity for correlation-aware diversification",
+    "tokens": 34,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D008_s1",
+    "parent_decision": "D008",
+    "sentence_index": 1,
+    "content": "T8b: sector-cap captures 97% returns but MCTS adds correlation-aware diversification with 60% less DD. ~200 LOC.",
+    "tokens": 28,
+    "type": "evidence",
+    "references": []
+  },
+  {
+    "id": "D009_s0",
+    "parent_decision": "D009",
+    "sentence_index": 0,
+    "content": "Sector cap applied before top-decile selection: Cap filter first, then top-decile from survivors.",
+    "tokens": 24,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D009_s1",
+    "parent_decision": "D009",
+    "sentence_index": 1,
+    "content": "Ensures cap doesn't waste decile slots on same-sector duplicates.",
+    "tokens": 16,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D009_s2",
+    "parent_decision": "D009",
+    "sentence_index": 2,
+    "content": "If top-decile first then cap, actual trade count drops below intended decile size.",
+    "tokens": 20,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D010_s0",
+    "parent_decision": "D010",
+    "sentence_index": 0,
+    "content": "SignalStrategy is stateless per day: on_day() returns SignalDecision records for new entries only.",
+    "tokens": 24,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D010_s1",
+    "parent_decision": "D010",
+    "sentence_index": 1,
+    "content": "Hold tracking is runner's responsibility.",
+    "tokens": 10,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D010_s2",
+    "parent_decision": "D010",
+    "sentence_index": 2,
+    "content": "Keeps strategy pure and testable.",
+    "tokens": 8,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D010_s3",
+    "parent_decision": "D010",
+    "sentence_index": 3,
+    "content": "Hold state belongs in runner loop.",
+    "tokens": 8,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D011_s0",
+    "parent_decision": "D011",
+    "sentence_index": 0,
+    "content": "FillModel slippage gate: Keep SLIPPAGE_REJECT_PCT=0.10 with worst-case market impact when volume=0.",
+    "tokens": 24,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D011_s1",
+    "parent_decision": "D011",
+    "sentence_index": 1,
+    "content": "Use OI as volume proxy.",
+    "tokens": 5,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D011_s2",
+    "parent_decision": "D011",
+    "sentence_index": 2,
+    "content": "Conservative fill modeling is correct.",
+    "tokens": 9,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D011_s3",
+    "parent_decision": "D011",
+    "sentence_index": 3,
+    "content": "Over-rejection is detectable via n_fill_rejected diagnostic.",
+    "tokens": 15,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D012_s0",
+    "parent_decision": "D012",
+    "sentence_index": 0,
+    "content": "Compound simulation sizing approximation: Use ret_on_premium directly from trades.json.",
+    "tokens": 21,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D012_s1",
+    "parent_decision": "D012",
+    "sentence_index": 1,
+    "content": "Valid because backtester's own fill prices determine the fraction.",
+    "tokens": 16,
+    "type": "rationale",
+    "references": []
+  },
+  {
+    "id": "D013_s0",
+    "parent_decision": "D013",
+    "sentence_index": 0,
+    "content": "GE excluded from tradeable universe: Remove GE from tradeable set.",
+    "tokens": 16,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D013_s1",
+    "parent_decision": "D013",
+    "sentence_index": 1,
+    "content": "Keep in DuckDB as feature input.",
+    "tokens": 8,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D013_s2",
+    "parent_decision": "D013",
+    "sentence_index": 2,
+    "content": "GE was a structural penny-option anomaly. 17 trades = 109.5% of total PnL.",
+    "tokens": 18,
+    "type": "evidence",
+    "references": []
+  },
+  {
+    "id": "D013_s3",
+    "parent_decision": "D013",
+    "sentence_index": 3,
+    "content": "Model scored GE BELOW average on its biggest winners.",
+    "tokens": 13,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D014_s0",
+    "parent_decision": "D014",
+    "sentence_index": 0,
+    "content": "Archon is canonical data host: Archon hosts all DuckDB files.",
+    "tokens": 15,
+    "type": "evidence",
+    "references": []
+  },
+  {
+    "id": "D014_s1",
+    "parent_decision": "D014",
+    "sentence_index": 1,
+    "content": "Rsync direction: archon -> willow/GCP.",
+    "tokens": 9,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D014_s2",
+    "parent_decision": "D014",
+    "sentence_index": 2,
+    "content": "Archon has broader data, is GPU pipeline host, has more disk headroom.",
+    "tokens": 17,
+    "type": "evidence",
+    "references": []
+  },
+  {
+    "id": "D015_s0",
+    "parent_decision": "D015",
+    "sentence_index": 0,
+    "content": "Gitea for git hosting, no CI/CD workflows: Gitea on mintaka for git hosting.",
+    "tokens": 19,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D015_s1",
+    "parent_decision": "D015",
+    "sentence_index": 1,
+    "content": "No automated lint/test/deploy workflows.",
+    "tokens": 10,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D015_s2",
+    "parent_decision": "D015",
+    "sentence_index": 2,
+    "content": "Solo dev runs tests locally.",
+    "tokens": 7,
+    "type": "context",
+    "references": []
+  },
+  {
+    "id": "D015_s3",
+    "parent_decision": "D015",
+    "sentence_index": 3,
+    "content": "GitHub Actions too slow.",
+    "tokens": 6,
+    "type": "context",
+    "references": []
+  }
+]

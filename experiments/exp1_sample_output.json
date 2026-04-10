@@ -1,0 +1,322 @@
+[
+  {
+    "turn_id": "turn_001",
+    "speaker": "user",
+    "text": "I decided to use PostgreSQL for the backend database because of its JSON support and we've been using it for years. Also, don't use MySQL -- I had terrible experiences with it at my last company.",
+    "extracted_beliefs": [
+      {
+        "content": "to use PostgreSQL for the backend database because of its JSON support and we've",
+        "type": "factual",
+        "confidence": 1.0,
+        "pattern": "(?:I|we|they|he|she)\\s+(?:decided|chose|picked|sel..."
+      },
+      {
+        "content": "MySQL -- I had terrible experiences with it at my last company",
+        "type": "preference",
+        "confidence": 0.3,
+        "pattern": "(?:don't|do not|doesn't|does not)\\s+(?:like|want|u..."
+      },
+      {
+        "content": "decided to PostgreSQL for the backend database because of its JSON supp",
+        "type": "relational",
+        "confidence": 1.0,
+        "pattern": "(\\w+(?:\\s+\\w+)?)\\s+(?:uses?|runs? on|built with|de..."
+      },
+      {
+        "content": "t MySQL -- I had terrible experiences with it at my last compa",
+        "type": "relational",
+        "confidence": 0.3,
+        "pattern": "(\\w+(?:\\s+\\w+)?)\\s+(?:uses?|runs? on|built with|de..."
+      },
+      {
+        "content": "use PostgreSQL for the backend database of its JSON support and we've been using it for years. Also",
+        "type": "causal",
+        "confidence": 0.3,
+        "pattern": "(.{5,40})\\s+(?:because|due to|caused by)\\s+(.{5,60..."
+      }
+    ],
+    "count": 5
+  },
+  {
+    "turn_id": "turn_002",
+    "speaker": "assistant",
+    "text": "The deployment failed because the Docker image was built for arm64 but the server runs x86_64. To fix this, first rebuild with --platform linux/amd64, then push to the registry, and finally redeploy.",
+    "extracted_beliefs": [
+      {
+        "content": "Docker image built for arm64 but the server",
+        "type": "factual",
+        "confidence": 1.0,
+        "pattern": "(\\w+(?:\\s+\\w+)?)\\s+(?:is|are|was|were)\\s+(?:a|an|t..."
+      },
+      {
+        "content": "The deployment failed the Docker image was built for arm64 but the server runs x86",
+        "type": "causal",
+        "confidence": 0.7,
+        "pattern": "(.{5,40})\\s+(?:because|due to|caused by)\\s+(.{5,60..."
+      },
+      {
+        "content": "fix this rebuild with --platform linux/amd64, then push to the registry, and finally rede",
+        "type": "procedural",
+        "confidence": 0.87,
+        "pattern": "(?:to|in order to)\\s+(\\w+(?:\\s+\\w+){1,5}),?\\s+(?:y..."
+      },
+      {
+        "content": "rebuild with --platform linux/amd64, then push to the registry, and finally rede",
+        "type": "procedural",
+        "confidence": 0.87,
+        "pattern": "(?:step \\d|first|then|next|finally|after that),?\\s..."
+      },
+      {
+        "content": "The deployment failed because the Docker image was built for arm64 but the server runs x86_64",
+        "type": "factual",
+        "confidence": 0.5,
+        "pattern": "sentence_classification"
+      }
+    ],
+    "count": 5
+  },
+  {
+    "turn_id": "turn_003",
+    "speaker": "user",
+    "text": "We're going with React for the frontend. The team prefers TypeScript over JavaScript. Make sure all new components use functional style, not class components.",
+    "extracted_beliefs": [
+      {
+        "content": "new components functional style, not class components",
+        "type": "relational",
+        "confidence": 0.3,
+        "pattern": "(\\w+(?:\\s+\\w+)?)\\s+(?:uses?|runs? on|built with|de..."
+      },
+      {
+        "content": "all new components use functional style, not class components",
+        "type": "procedural",
+        "confidence": 1.0,
+        "pattern": "(?:make sure|ensure|remember to|don't forget to)\\s..."
+      },
+      {
+        "content": "We're going with React for the frontend",
+        "type": "factual",
+        "confidence": 1.0,
+        "pattern": "sentence_classification"
+      },
+      {
+        "content": "The team prefers TypeScript over JavaScript",
+        "type": "preference",
+        "confidence": 1.0,
+        "pattern": "sentence_classification"
+      }
+    ],
+    "count": 4
+  },
+  {
+    "turn_id": "turn_004",
+    "speaker": "user",
+    "text": "John works at Anthropic on the API team. He manages the rate limiting service. The current rate limit is 1000 requests per minute for the pro tier.",
+    "extracted_beliefs": [
+      {
+        "content": "rate limit 1000 requests per minute for the",
+        "type": "factual",
+        "confidence": 1.0,
+        "pattern": "(\\w+(?:\\s+\\w+)?)\\s+(?:is|are|was|were)\\s+(?:a|an|t..."
+      },
+      {
+        "content": "John Anthropic on the API team. He manages the rate limiting serv",
+        "type": "factual",
+        "confidence": 1.0,
+        "pattern": "(\\w+(?:\\s+\\w+)?)\\s+(?:works? at|lives? in|manages?..."
+      },
+      {
+        "content": "John works at Anthropic on the API team",
+        "type": "factual",
+        "confidence": 1.0,
+        "pattern": "sentence_classification"
+      },
+      {
+        "content": "The current rate limit is 1000 requests per minute for the pro tier",
+        "type": "factual",
+        "confidence": 1.0,
+        "pattern": "sentence_classification"
+      }
+    ],
+    "count": 4
+  },
+  {
+    "turn_id": "turn_005",
+    "speaker": "assistant",
+    "text": "The test suite crashed with a segfault in the native module. This is likely caused by a memory corruption bug in the FFI bindings. I'd recommend switching to the pure Python implementation until we can debug the native code.",
+    "extracted_beliefs": [
+      {
+        "content": "This likely caused by a memory corruption",
+        "type": "factual",
+        "confidence": 0.7,
+        "pattern": "(\\w+(?:\\s+\\w+)?)\\s+(?:is|are|was|were)\\s+(?:a|an|t..."
+      },
+      {
+        "content": "The test suite",
+        "type": "procedural",
+        "confidence": 1.0,
+        "pattern": "(.{5,40})\\s+(?:failed|errored|crashed|broke|doesn'..."
+      },
+      {
+        "content": "ult in the native module. This is likely a memory corruption bug in the FFI bindings. I'd recommend s",
+        "type": "causal",
+        "confidence": 0.53,
+        "pattern": "(.{5,40})\\s+(?:because|due to|caused by)\\s+(.{5,60..."
+      },
+      {
+        "content": "I'd recommend switching to the pure Python implementation until we can debug the native code",
+        "type": "procedural",
+        "confidence": 1.0,
+        "pattern": "sentence_classification"
+      }
+    ],
+    "count": 4
+  },
+  {
+    "turn_id": "turn_006",
+    "speaker": "user",
+    "text": "Let's settle this -- we're using uv for package management, not pip or poetry. It's faster and I prefer the lockfile format. Also we always pin exact versions in production.",
+    "extracted_beliefs": [
+      {
+        "content": "the lockfile format. Also we always pin exact versions in production",
+        "type": "preference",
+        "confidence": 0.87,
+        "pattern": "(?:I|we|they|he|she)\\s+(?:prefer|like|want|love|al..."
+      },
+      {
+        "content": "Let's settle this -- we're using uv for package management, not pip or poetry",
+        "type": "factual",
+        "confidence": 1.0,
+        "pattern": "sentence_classification"
+      },
+      {
+        "content": "It's faster and I prefer the lockfile format",
+        "type": "preference",
+        "confidence": 1.0,
+        "pattern": "sentence_classification"
+      }
+    ],
+    "count": 3
+  },
+  {
+    "turn_id": "turn_007",
+    "speaker": "user",
+    "text": "Can you check on the PR? I think Sarah submitted it yesterday. The build pipeline uses GitHub Actions and deploys to AWS ECS. Oh and remember that staging uses a different database than production.",
+    "extracted_beliefs": [
+      {
+        "content": "build pipeline GitHub Actions and deploys to AWS ECS. Oh and remember that",
+        "type": "relational",
+        "confidence": 0.7,
+        "pattern": "(\\w+(?:\\s+\\w+)?)\\s+(?:uses?|runs? on|built with|de..."
+      },
+      {
+        "content": "staging a different database than production",
+        "type": "relational",
+        "confidence": 1.0,
+        "pattern": "(\\w+(?:\\s+\\w+)?)\\s+(?:uses?|runs? on|built with|de..."
+      },
+      {
+        "content": "The build pipeline uses GitHub Actions and deploys to AWS ECS",
+        "type": "factual",
+        "confidence": 0.5,
+        "pattern": "sentence_classification"
+      },
+      {
+        "content": "Oh and remember that staging uses a different database than production",
+        "type": "factual",
+        "confidence": 1.0,
+        "pattern": "sentence_classification"
+      }
+    ],
+    "count": 4
+  },
+  {
+    "turn_id": "turn_008",
+    "speaker": "assistant",
+    "text": "I noticed the API response times have degraded since we added the caching layer. The p95 went from 120ms to 450ms. This might be because Redis is running on the same instance as the application server.",
+    "extracted_beliefs": [
+      {
+        "content": "because Redis running on the same instance as",
+        "type": "factual",
+        "confidence": 0.7,
+        "pattern": "(\\w+(?:\\s+\\w+)?)\\s+(?:is|are|was|were)\\s+(?:a|an|t..."
+      },
+      {
+        "content": "went from 120ms to 450ms. This might be Redis is running on the same instance as the application ser",
+        "type": "causal",
+        "confidence": 0.7,
+        "pattern": "(.{5,40})\\s+(?:because|due to|caused by)\\s+(.{5,60..."
+      },
+      {
+        "content": "This might be because Redis is running on the same instance as the application server",
+        "type": "factual",
+        "confidence": 0.5,
+        "pattern": "sentence_classification"
+      }
+    ],
+    "count": 3
+  },
+  {
+    "turn_id": "turn_009",
+    "speaker": "user",
+    "text": "For the new feature, I want the agent to remember conversations across sessions. The memory should persist even if the CLI crashes. Performance is important -- retrieval should take less than 500ms.",
+    "extracted_beliefs": [
+      {
+        "content": "the agent to remember conversations across sessions. The memory should persist e",
+        "type": "preference",
+        "confidence": 0.7,
+        "pattern": "(?:I|we|they|he|she)\\s+(?:prefer|like|want|love|al..."
+      },
+      {
+        "content": "Performance important",
+        "type": "factual",
+        "confidence": 1.0,
+        "pattern": "(\\w+(?:\\s+\\w+)?)\\s+(?:is|are|was|were)\\s+(?:a|an|t..."
+      },
+      {
+        "content": "For the new feature, I want the agent to remember conversations across sessions",
+        "type": "preference",
+        "confidence": 1.0,
+        "pattern": "sentence_classification"
+      },
+      {
+        "content": "The memory should persist even if the CLI crashes",
+        "type": "factual",
+        "confidence": 0.5,
+        "pattern": "sentence_classification"
+      },
+      {
+        "content": "Performance is important -- retrieval should take less than 500ms",
+        "type": "factual",
+        "confidence": 1.0,
+        "pattern": "sentence_classification"
+      }
+    ],
+    "count": 5
+  },
+  {
+    "turn_id": "turn_010",
+    "speaker": "user",
+    "text": "Good morning. What were we working on yesterday? I think we were debugging the authentication flow but I'm not sure where we left off.",
+    "extracted_beliefs": [
+      {
+        "content": "What we working on yesterday",
+        "type": "factual",
+        "confidence": 0.3,
+        "pattern": "(\\w+(?:\\s+\\w+)?)\\s+(?:is|are|was|were)\\s+(?:a|an|t..."
+      },
+      {
+        "content": "think we debugging the authentication flow but I",
+        "type": "factual",
+        "confidence": 0.7,
+        "pattern": "(\\w+(?:\\s+\\w+)?)\\s+(?:is|are|was|were)\\s+(?:a|an|t..."
+      },
+      {
+        "content": "I think we were debugging the authentication flow but I'm not sure where we left off",
+        "type": "procedural",
+        "confidence": 0.5,
+        "pattern": "sentence_classification"
+      }
+    ],
+    "count": 3
+  }
+]

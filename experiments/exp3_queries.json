@@ -1,0 +1,22 @@
+[
+  {"id": "q01", "query": "paper trading agents status", "original": "what is the status on the paper trading agents?"},
+  {"id": "q02", "query": "master results file updated", "original": "did we update the master results file?"},
+  {"id": "q03", "query": "analysis frameworks summary results hamiltonian jacobian dual matrix", "original": "please review the results, use the 3 analysis frameworks and provide a summary table"},
+  {"id": "q04", "query": "change config test results update configuration", "original": "change a config based on these test results"},
+  {"id": "q05", "query": "update config latest research findings", "original": "update the config based on our latest research"},
+  {"id": "q06", "query": "review documentation ground truth state decisions", "original": "review all of our documentation and update it as necessary so we are working with full ground truth"},
+  {"id": "q07", "query": "results invalidate experiments assumptions built upon", "original": "what do these results tell us about our experiments so far; do they invalidate anything we've already run and built upon?"},
+  {"id": "q08", "query": "project status strategy outlook full overview", "original": "whats our full project status and strategy outlook?"},
+  {"id": "q09", "query": "accomplished progress current state goals roadmap", "original": "what have we accomplished, where are we now, where are we going?"},
+  {"id": "q10", "query": "shortest path goal remaining work critical path", "original": "whats the shortest path to goal for this project based on your reading of everything in this directory?"},
+  {"id": "q11", "query": "restore session context crash recovery previous work", "original": "please restore the session context, my pc just crashed and i lost everything"},
+  {"id": "q12", "query": "fill model slippage mechanics how it works", "original": "how does the fill model work?"},
+  {"id": "q13", "query": "full pipeline end to end components ingest output stages", "original": "explain to me the full pipeline end to end, how each component works, what each component ingests and outputs to the next stage"},
+  {"id": "q14", "query": "control flow paper trading agents execution loop", "original": "tell me about the control flow for the paper trading agents"},
+  {"id": "q15", "query": "paper trading agent configs differences configurations why", "original": "what is the difference between the paper trading agent configs and why are they in place?"},
+  {"id": "q16", "query": "failed experiments rejected approaches what didnt work", "original": "what were some failed experiments that lead to our current project state?"},
+  {"id": "q17", "query": "reversed superseded changed decisions overridden", "original": "what got reversed?"},
+  {"id": "q18", "query": "GBM model argmax selector downstream signal interaction", "original": "how does the GBM model affect the argmax selector downstream?"},
+  {"id": "q19", "query": "million USD pnl config high performance backtest results", "original": "we ran a config or a few configs that got over a million USD pnl can you find that data?"},
+  {"id": "q20", "query": "paper trading agents four eight expanded added new why", "original": "hang on earlier we had 4 paper trading agents now theres 8 what happened?"}
+]

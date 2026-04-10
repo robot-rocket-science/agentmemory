@@ -1,0 +1,24 @@
+{
+  "test_a": {
+    "behavior_ranks": [
+      0,
+      1,
+      2
+    ],
+    "distractor_ranks": [
+      3,
+      4,
+      5,
+      6,
+      8
+    ],
+    "separation_ratio": 184.32,
+    "all_above": true
+  },
+  "test_b": {
+    "single_hop_recall": "5/5",
+    "two_hop_targets": 3,
+    "two_hop_found": 1
+  },
+  "test_c": {}
+}
