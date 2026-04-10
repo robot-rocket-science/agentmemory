@@ -217,6 +217,47 @@ HRR is a **selective amplifier**, not a universal replacement. It earns its cost
 
 ---
 
+---
+
+## H1/H2: HRR Encoding and Retrieval on Auto-Constructed Graphs
+
+### Setup
+Encoded all 5 pilot graphs in HRR (DIM=2048, capacity=227 per partition). Partitioned by edge type, then chunked at capacity. Ran 50 random ground-truth queries per repo.
+
+### Results
+
+| Repo | Edges | Partitions | R@5 | R@10 | Best Type (R@10) |
+|------|-------|-----------|-----|------|-----------------|
+| **debserver** | 126 | 3 | **0.813** | **0.880** | CO_CHANGED: 1.000, IMPORTS: 1.000, CITES: 0.824 |
+| **smoltcp** | 1,937 | 10 | 0.271 | 0.378 | IMPORTS: 0.487, CO_CHANGED: 0.300 |
+| **rclcpp** | 3,581 | 19 | 0.141 | 0.206 | CO_CHANGED: 0.207, IMPORTS: 0.117 |
+| **gsd-2** | 3,427 | 18 | 0.127 | 0.166 | CO_CHANGED: 0.201, IMPORTS: 0.190 |
+| **boa** | 11,839 | 54 | 0.044 | 0.074 | CO_CHANGED: 0.079 |
+
+### Key Finding: Partition Count Determines Retrieval Quality
+
+HRR retrieval quality is **inversely correlated with partition count**, not graph shape or edge type.
+
+- **debserver (3 partitions):** R@10 = 0.880. Every edge type fits in a single partition. The query hits the right partition and finds the answer.
+- **smoltcp (10 partitions):** R@10 = 0.378. IMPORTS (275 edges, 2 partitions) works better than CO_CHANGED (1662 edges, 8 partitions).
+- **boa (54 partitions):** R@10 = 0.074. 11K co-change edges split across 50 partitions. A query's target edge is in one of 50 partitions, but the query correlates against all 50, and 49 return noise.
+
+**Why this happens:** When querying, we correlate against every partition and aggregate results. Partitions without the target edge contribute noise (random similarity scores). With 50 partitions, the signal from the 1 correct partition is buried under noise from 49 others. The noise scales with partition count; the signal doesn't.
+
+### This Changes the Architecture
+
+The naive partitioning strategy (chunk by type, then by size) fails at scale. The problem is not HRR's math -- it's that we're querying the wrong partitions.
+
+**Solutions to explore:**
+1. **Partition routing:** Given a query (source, edge_type), only query partitions that contain edges involving the source node. Requires a partition-to-node index. Eliminates noise from irrelevant partitions.
+2. **Locality-sensitive partitioning:** Group edges by neighborhood (nodes that share edges), not by type. A source node's edges stay in the same partition.
+3. **Hierarchical encoding:** Per-node local superpositions (all edges touching node A in one vector), queried directly. No global superposition needed for single-hop.
+4. **Higher dimensionality:** DIM=4096 or 8192 increases capacity per partition, reducing partition count. But 11K edges still needs ~50 partitions at DIM=2048.
+
+**The debserver result validates HRR's core capability.** When the graph fits within capacity (126 edges, 3 partitions), retrieval is excellent (R@10=0.880). The challenge is making it work at scale, which is an engineering problem (partition routing), not a mathematical limitation.
+
+---
+
 ## Open Questions for Next Phase
 
 1. **Sentence-level decomposition:** All experiments used file-level nodes. Sentence-level (as in alpha-seek Exp 29) should increase HRR value by reducing vocabulary overlap within edges (a sentence about "dispatch gates" vs a sentence about "flow control" have lower overlap than their parent files).
