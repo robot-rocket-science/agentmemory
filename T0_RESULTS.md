@@ -9,9 +9,33 @@
 
 ## Executive Summary
 
-We built 4 extractors (git history, imports, structural, node classifier) and ran them on 7 repos spanning 5 graph shapes. The extractors produced 3-8 edge types per repo with very low overlap between methods (0.6-13.5%), confirming they are genuinely complementary.
+### What we built
+4 extractors (git history, imports, structural, node classifier), an HRR encoder with partition routing and adaptive thresholds, an FTS5 comparison harness, and 3 validation methods. Ran on 7 pilot repos spanning 5 graph shapes (protocol layers, pure docs, compiler pipeline, infrastructure, large monorepo).
 
-The vocabulary overlap analysis (M2) -- the key HRR relevance predictor -- produced a surprising result: **most repos have moderate vocabulary overlap (median Jaccard 0.1-0.2), with only 2-39% of edges below the 0.1 threshold where FTS5 fails.** HRR's value is concentrated in specific edge types (CITES, CROSS_REFERENCES, CONFIG_COUPLING) rather than being uniformly needed.
+### Key findings (in order of importance)
+
+**1. HRR scales when you threshold correctly.**
+Initial results showed HRR failing on larger repos (boa R@10=0.074). This was not an HRR limitation -- it was a threshold error. A fixed co-change weight threshold (w>=3) is appropriate for small repos but floods large repos with noise. An adaptive threshold (`w >= max(3, ceil(commits * 0.005))`) normalizes by commit count, keeping every repo at 1-9 partitions. Combined with partition routing, all 5 repos achieve R@10 of 0.44-0.90:
+
+| Repo | Before (w>=3, no routing) | After (adaptive + routing) | Improvement |
+|------|--------------------------|---------------------------|-------------|
+| boa (3,354 commits) | 0.074 | **0.466** | 6.3x |
+| gsd-2 (2,150 commits) | 0.166 | **0.441** | 2.7x |
+| smoltcp (1,577 commits) | 0.378 | **0.641** | 1.7x |
+| rustls (5,024 commits) | -- | **0.711** | new |
+| debserver (526 commits) | 0.880 | **0.900** | 1.0x |
+
+**2. HRR and FTS5 are genuinely complementary (selective amplifier confirmed).**
+On low-vocabulary-overlap edges (<0.1 Jaccard), HRR outperforms FTS5 by 2.6-3.2x. On high-overlap edges (>0.3), FTS5 outperforms HRR by 2.2-5x. They find different targets with minimal overlap. Neither alone is sufficient.
+
+**3. Extraction methods are complementary and produce signal, not noise.**
+4 extraction methods have 0.6-13.5% edge overlap at w>=3 -- they find genuinely different relationships. Validation via negative sampling confirms co-change edges predict directory proximity at 15-73x lift over random, and import relationships at 19-230x lift. Degree distributions are heavy-tailed with clustering 3-53x above random -- properties of real dependency graphs.
+
+**4. HRR's value concentrates on vocabulary-boundary edges.**
+CONFIG_COUPLING (82% below 0.1 overlap), CROSS_REFERENCES (75%), DOC_CODE_COUPLING (79%), CITES (49%). For same-language code coupling and test-source relationships, FTS5 is sufficient.
+
+**5. COMMIT_BELIEF is the only truly universal edge type.**
+CO_CHANGED fails for doc-only and single-author repos. IMPORTS varies by language. CITES requires citation conventions. But every repo with git history produces useful commit message belief nodes.
 
 ---
 
@@ -592,17 +616,30 @@ The precision gap from CS-007 is closed for the CITES method. It remains open fo
 
 ---
 
+## Questions Resolved in This Phase
+
+| Question | Resolution |
+|----------|-----------|
+| Does HRR scale to larger graphs? | **Yes**, with adaptive thresholds + routing. boa: 0.074 -> 0.466 (6.3x). All repos 0.44-0.90 R@10. |
+| Are extraction methods complementary? | **Yes**. 0.6-13.5% overlap at threshold. Each finds different relationships. |
+| Are extracted edges signal or noise? | **Signal**. 15-73x lift on directory prediction, 50x clustering vs random. |
+| Does HRR add value over FTS5? | **Yes, selectively**. 2.6-3.2x on low-overlap edges. FTS5 wins 2.2-5x on high-overlap. |
+| Which edge types benefit from HRR? | CONFIG_COUPLING, CROSS_REFERENCES, DOC_CODE_COUPLING, CITES. |
+| Does gsd-2 have ground truth to compare? | **No**. Schema exists but tables are empty. |
+
 ## Open Questions for Next Phase
 
-1. **Sentence-level decomposition:** All experiments used file-level nodes. Sentence-level (as in alpha-seek Exp 29) should increase HRR value by reducing vocabulary overlap within edges (a sentence about "dispatch gates" vs a sentence about "flow control" have lower overlap than their parent files).
+1. **Sentence-level decomposition.** All experiments used file-level nodes. Sentence-level (as in alpha-seek Exp 29) should increase HRR value by reducing within-edge vocabulary overlap. A sentence about "dispatch gates" vs "flow control" has lower overlap than their parent files.
 
-2. **HRR encoding of these graphs:** We haven't yet encoded any of these extracted graphs in HRR. The extraction pipeline works; the next step is running Exp 31-style HRR tests on smoltcp, boa, gsd-2 to measure actual retrieval precision/recall.
+2. **Scale to medium/large tier repos.** The adaptive threshold normalizes by commit count, but dealii (66K commits) and cockroach (32K stars) will stress-test both the threshold formula and extraction speed. 20 more repos on archon need processing.
 
-3. **Ground truth validation on gsd-2:** gsd-2 has existing SQLite graph tables. We should compare our auto-discovered edges against theirs for precision/recall.
+3. **Edge type count vs HRR selectivity.** gsd-2 has 8 active edge types. Does HRR selectivity improve with more types? More orthogonal vectors should give better geometric filtering.
 
-4. **Scale:** The largest repo tested (boa: 11K co-change edges) is within HRR capacity with partitioning. But dealii (66K commits, ~20K co-change edges) and cockroach will stress-test capacity limits.
+4. **BFS as the third retrieval method.** Neither HRR nor FTS5 covers the "Neither" gap (targets missed by both). BFS from FTS5/HRR hits should fill it. Not yet tested in the combined pipeline.
 
-5. **Edge type count vs HRR selectivity:** gsd-2 has 8 active edge types. Does HRR selectivity improve with more types? (More orthogonal vectors = better geometric filtering.)
+5. **Local vs remote commit beliefs.** The taxonomy defines these as distinct node types. Not yet implemented in the extractor -- requires running on the originating machine with reflog access.
+
+6. **Production integration.** The extraction pipeline (4 scripts) + HRR encoder + FTS5 index need to be unified into a single onboarding tool that runs on any repo and produces a queryable graph.
 
 ---
 
@@ -610,8 +647,9 @@ The precision gap from CS-007 is closed for the CITES method. It remains open fo
 
 | File | Contents |
 |------|----------|
-| EDGE_TYPE_TAXONOMY.md | 4-tier type taxonomy with HRR implications |
-| TODO_CROSS_PROJECT_TESTING.md | Full testing plan with corpus inventory |
+| EDGE_TYPE_TAXONOMY.md | 4-tier type taxonomy with HRR implications, local/remote commit distinction |
+| TODO_CROSS_PROJECT_TESTING.md | Full testing plan: 37-project corpus, 7 phases, success criteria |
+| T0_RESULTS.md | This file: all research results, findings, validation |
 | scripts/corpus_clone.sh | Idempotent corpus clone/sync to archon |
 | scripts/corpus_map.py | Repo profiling and manifest generation |
 | scripts/extract_git_edges.py | T0.2: CO_CHANGED + COMMIT_BELIEF + REFERENCES_ISSUE |
@@ -620,5 +658,8 @@ The precision gap from CS-007 is closed for the CITES method. It remains open fo
 | scripts/classify_nodes.py | T0.5: Automatic node type classification |
 | scripts/analyze_overlap.py | T0.6: Cross-method overlap analysis |
 | scripts/refine_and_vocab.py | T0.7 + M2: Edge type refinement + vocabulary overlap |
+| scripts/hrr_encoder.py | H1: HRR encoding with adaptive thresholds, partition routing, evaluation |
+| scripts/hrr_vs_fts5.py | H3: Head-to-head HRR vs FTS5 on low/high overlap edges |
+| scripts/validate_edges.py | V1: Triangulation, negative sampling, self-consistency validation |
 | corpus_manifest.json | 27-repo manifest with languages, markers, methods |
-| archon:extracted/*.json | All extraction results (cached by HEAD hash) |
+| archon:~/agentmemory-corpus/extracted/ | All extraction + encoding results (cached by HEAD hash) |

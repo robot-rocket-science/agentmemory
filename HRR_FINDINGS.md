@@ -319,6 +319,32 @@ HRR + FTS5 are co-primary retrieval axes. BFS is exact-depth backup. FFT cost at
 
 ---
 
+## Cross-Project Validation (2026-04-10)
+
+The findings above were based on a single project (alpha-seek). Cross-project testing on 7 diverse repos (smoltcp, adr, boa, debserver, gsd-2, rclcpp, rustls) confirmed and extended them. Full results in T0_RESULTS.md. Key additions:
+
+### HRR scales with adaptive thresholds + partition routing
+
+Initial cross-project testing showed HRR failing on larger repos (boa R@10=0.074 with 54 partitions). This was a threshold error, not an HRR limitation. A fixed co-change weight threshold (w>=3) generates noise on large repos. The adaptive formula `w >= max(3, ceil(commits * 0.005))` normalizes by commit count. Combined with partition routing (only query partitions containing the source node), all repos achieve R@10 of 0.44-0.90:
+
+| Repo | Commits | R@10 (naive) | R@10 (adaptive + routed) |
+|------|---------|-------------|--------------------------|
+| debserver | 526 | 0.880 | 0.900 |
+| rustls | 5,024 | -- | 0.711 |
+| smoltcp | 1,577 | 0.378 | 0.641 |
+| boa | 3,354 | 0.074 | 0.466 |
+| gsd-2 | 2,150 | 0.166 | 0.441 |
+
+### Selective amplifier confirmed
+
+HRR outperforms FTS5 by 2.6-3.2x on low-vocabulary-overlap edges. FTS5 outperforms HRR by 2.2-5x on high-overlap edges. They find genuinely different targets. HRR's value concentrates on vocabulary-boundary edge types: CONFIG_COUPLING (82% below 0.1 Jaccard overlap), CROSS_REFERENCES (75%), DOC_CODE_COUPLING (79%), CITES (49%).
+
+### Edges are validated as signal
+
+Co-change edges predict directory proximity at 15-73x lift over random pairs. Import lift at 19-230x. Clustering coefficients 3-53x above random graph expectation. Heavy-tailed degree distributions on larger repos. The extraction pipeline produces real structural coupling, not noise.
+
+---
+
 ## Files
 
 | File | Contents |
