@@ -616,6 +616,43 @@ The precision gap from CS-007 is closed for the CITES method. It remains open fo
 
 ---
 
+---
+
+## Full Corpus Results: 38 Repos (2026-04-10)
+
+### HRR Retrieval Across 38 Repos
+
+All 39 repos fully extracted (git edges, imports, structural, node types) and HRR-encoded with adaptive thresholds and partition routing. One repo (bigtime, 14 commits) produced no edges.
+
+| Tier | Count | Avg Partitions | R@10 Range | Repos |
+|------|-------|---------------|-----------|-------|
+| Excellent (>0.8) | 10 | 2 | 0.80-1.00 | adr, code-monkey, email-secretary, terraform, sports-betting-arbitrage, jose-bully, commonmark-spec, debserver, evolve, quinn |
+| Good (0.4-0.8) | 7 | 10 | 0.42-0.71 | rustls, ludwig, blitz, alpha-seek, babel, optimus-prime, cockroach |
+| Moderate (0.2-0.4) | 16 | 31 | 0.21-0.38 | smoltcp, taichi, openssl, micropython, pulumi, alpha-seek-memtest, bevy, duckdb, nx, su2, airflow, bullet3, dagster, dealii, rclcpp, saleor |
+| Weak (<0.2) | 5 | 85 | 0.07-0.19 | px4-autopilot, gsd-2, esp-idf, mlflow, boa |
+
+**The partition-count correlation holds across the full corpus:**
+- Excellent tier averages 2 partitions
+- Good tier averages 10
+- Moderate tier averages 31
+- Weak tier averages 85
+
+**Notable results:**
+- **cockroach (116K commits, 965 nodes)** achieves R@10=0.415 with only 8 partitions. The adaptive threshold (w>=585) aggressively filters to only the strongest co-change signals, keeping the graph compact.
+- **babel (18K commits, 870 npm workspace deps)** achieves R@10=0.442. The PACKAGE_DEPENDS_ON edges from package.json workspaces are high-signal and fit in few partitions.
+- **terraform (35K commits)** achieves R@10=1.000 with 2 partitions. The adaptive threshold (w>=177) reduces to 19 nodes of extremely tight coupling.
+- **saleor (22K commits, 15K+ import edges)** has R@10=0.205 despite 75 partitions. Dense Python import graphs produce many partitions. The adaptive threshold helps co-change but doesn't reduce import edge count.
+
+**The weak tier is dominated by repos with dense import graphs or extreme commit counts:**
+- boa (54 partitions, dense Rust imports)
+- esp-idf (111 partitions, 19K C files)
+- px4-autopilot (160 partitions, 13K C++ files)
+- mlflow (80 partitions, 6K Python files)
+
+These repos would benefit from import-graph-specific partitioning (e.g., partition by package/module rather than arbitrary chunks).
+
+---
+
 ## Questions Resolved in This Phase
 
 | Question | Resolution |
