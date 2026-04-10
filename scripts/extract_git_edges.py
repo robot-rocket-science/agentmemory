@@ -110,7 +110,8 @@ def parse_git_log(repo: Path, max_files: int = 50) -> list[CommitRecord]:
     fmt: str = "%x00%H%x01%aI%x01%aN%x01%s%x01%b"
     r: subprocess.CompletedProcess[str] = subprocess.run(
         ["git", "log", "--format=" + fmt, "--name-only", "--no-merges"],
-        cwd=repo, capture_output=True, text=True, timeout=120,
+        cwd=repo, capture_output=True, text=True, timeout=600,
+        errors="replace",
     )
     if r.returncode != 0:
         print(f"git log failed: {r.stderr}", file=sys.stderr)
