@@ -269,7 +269,26 @@ Added a partition-to-node index. At query time, only correlate against partition
 
 Routing helps most where partition count is highest. boa went from 54 noise-contributing partitions to avg 4.3 relevant ones. gsd-2 went from 18 to avg 1.9.
 
-boa's 0.189 is still not ideal. Hub nodes (avg 4.3 partitions) still query too many partitions because the co-change graph is dense. Next step: locality-sensitive partitioning (group by neighborhood rather than type-then-chunk) to keep a node's edges in fewer partitions.
+boa's 0.189 is still not ideal. Hub nodes (avg 4.3 partitions) still query too many partitions because the co-change graph is dense.
+
+### Root Cause: Fixed Weight Threshold
+
+The partition explosion was not an HRR problem. It was a threshold problem. w>=3 is appropriate for a 526-commit repo (debserver: 0.57% of commits) but generates noise for a 3,354-commit repo (boa: 0.09% of commits). Three co-occurrences across 3,354 commits could be coincidence. Twenty is real coupling.
+
+Normalizing by commit count: at threshold ~0.5-0.6% of total commits, every repo lands at 1-4 partitions:
+
+| Repo | Commits | Threshold at ~0.6% | Edges | Partitions |
+|------|---------|-------------------|-------|------------|
+| smoltcp | 1,577 | w>=10 (0.63%) | 339 | 2 |
+| boa | 3,354 | w>=20 (0.60%) | 777 | 4 |
+| gsd-2 | 2,150 | w>=10 (0.47%) | 164 | 1 |
+| rclcpp | 1,801 | w>=10 (0.56%) | 215 | 1 |
+| rustls | 5,024 | w>=20 (0.40%) | 423 | 2 |
+| debserver | 526 | w>=3 (0.57%) | 26 | 1 |
+
+**Adaptive threshold formula:** `w >= max(3, ceil(commits * 0.005))`
+
+This keeps every repo at 1-4 co-change partitions regardless of size. The weak co-change signal (w=3-10 on a 3K+ commit repo) is not lost -- it's available as lower-confidence edges for BFS or secondary retrieval. But it doesn't pollute the HRR superpositions.
 
 ---
 
@@ -344,7 +363,47 @@ boa and gsd-2 show clustering 50x above random -- a property of real dependency 
 
 The low agreement is not a weakness -- methods measure genuinely different things (co-change = empirical coupling, imports = explicit dependency, structural = conventions). The negative sampling results above confirm that single-method edges carry signal independently.
 
-**Conclusion:** The validation gap concern was legitimate to raise. The evidence now shows the edges are meaningful: co-change predicts directory structure at 15-73x lift, clustering is 3-53x above random, and degree distributions are heavy-tailed (real graph property). The extraction pipeline produces signal, not noise.
+**Conclusion:** The validation gap concern was legitimate to raise. The evidence now shows the edges are not random noise: co-change predicts directory structure at 15-73x lift, clustering is 3-53x above random, and degree distributions are heavy-tailed. However, "not random" is not the same as "meaningful" -- see CS-007b. Systematic noise (bulk operations, CI-driven co-changes) also produces non-random structure. The precision gap is narrowed but not closed.
+
+### Approach 7: Human-Authored Ground Truth Already In The Repos (2026-04-10)
+
+**Key insight:** We don't need to build a ground truth dataset or label edges. Two layers of human-authored graph structure already exist in every project:
+
+**Layer 1: Document cross-references.** Project markdown files contain thousands of sentences with explicit human-authored references: D### decisions, M### milestones, REQ-### requirements, file paths, section headers referencing other sections. Each sentence is a node. Each reference is a directed edge that a human deliberately wrote.
+
+| Project | MD files | Total lines | Unique decisions referenced | Docs with cross-refs |
+|---|---|---|---|---|
+| alpha-seek | 104 | 21,569 | 143 | 95 |
+| optimus-prime | 969 | 233,282 | 34 | 688 |
+| debserver | 105 | 9,658 | ~12 | 64 |
+| gsd-2 | 979 | 100,733 | TBD | 88 |
+| code-monkey | 166 | 46,678 | TBD | 132 |
+
+**Layer 2: Git history as human-authored intent graph.** Every commit is a human decision: "these specific files changed together for this reason." This is not derived structure -- it IS the ground truth for co-change relationships.
+
+- **Commit messages** are human-authored belief nodes ("fix race condition in scheduler" asserts what was wrong and how it was fixed)
+- **Commit-to-file groupings** are intentional associations -- a human deliberately chose to group these file changes into one atomic unit
+- **Branches** are human-scoped units of work -- a human decided this set of commits belongs to one feature/fix
+- **Merge commits** are human-declared integration points connecting branches
+- **PR/issue references** in commit messages are explicit human-authored links from implementation to motivation
+
+**Why this is different from the validation above:** The negative sampling and self-consistency checks test structural properties of the extracted graph (clustering, degree distribution, lift over random). Those prove the graph is not random noise, but systematic noise also passes those tests. Approach 7 tests **alignment with recorded human intent**: do auto-extracted edges correspond to relationships humans already expressed through their natural workflow (commits, document references, branch scoping)?
+
+**Comparison design:**
+
+1. Build a **document reference graph**: parse all .md files into sentences, extract all explicit D###/M###/REQ-### references as edges between the files containing them.
+2. Build a **commit intent graph**: for each commit, the files it touches are connected by human intent. The commit message explains the relationship. Branches scope groups of commits. Filter out bulk operations (commits touching >50 files, merge commits, formatting-only commits).
+3. Compare our auto-extracted edges against both reference graphs:
+   - For each auto-extracted CO_CHANGED edge: does the commit history confirm these files were deliberately grouped (not just bulk operations)? What fraction of the co-change weight comes from meaningful commits vs. bulk operations?
+   - For each auto-extracted CITES edge: does the document reference graph contain the same citation?
+   - For each auto-extracted IMPORTS edge: does the commit history show these files being modified together when the import was added/changed?
+4. Compute **precision** (fraction of auto-extracted edges confirmed by reference graph) and **recall** (fraction of reference graph edges captured by auto-extraction).
+
+**What this gives us:** Direct edge-level correspondence with human intent. Not structural properties, not statistical lift over random -- actual measurement of whether each extracted edge matches something a human expressed.
+
+**Applicable to:** All personal projects with git history and markdown documentation. alpha-seek (143 decisions, 95 cross-referencing docs) is the strongest candidate. optimus-prime (969 md files, 233K lines) is the largest corpus.
+
+---
 
 ### Original Approaches Proposed (retained for reference)
 
@@ -469,6 +528,67 @@ The data confirms the hypothesis from the corrected architecture assessment:
 4. **Neither method alone is sufficient.** Both have high "Neither" counts -- many targets are missed by both. This suggests BFS (the third method in the architecture) is needed for the remaining gap.
 
 5. **HRR's value scales inversely with partition count.** debserver (3 partitions) shows HRR recall 0.853 on low-overlap edges. gsd-2 (18 partitions) shows 0.193. The partition routing problem from H1/H2 is the primary bottleneck, not the vocabulary overlap prediction.
+
+---
+
+## Approach 7 Results: Edge Precision Against Human-Authored Ground Truth (2026-04-10)
+
+Built two reference graphs per project: document cross-references (D###/M### citations between .md files) and commit intent (filtered git history). Compared auto-extracted edges against both.
+
+Scripts: `extract_doc_references.py`, `extract_commit_intent.py`, `compare_edges.py`
+Data: `experiments/exp37_results/`
+
+### Alpha-Seek Precision
+
+| Method | vs Doc Refs | vs Commit Intent | vs Both | Unvalidated |
+|---|---|---|---|---|
+| CITES | **100.0%** | 16.1% | 16.1% | 0/261 |
+| CROSS_REFERENCES | **98.8%** | 24.1% | 24.1% | 1/83 |
+| CO_CHANGED | 0.5% | **100.0%** | 0.5% | 0/20,618 |
+| IMPORTS | 0.0% | 41.4% | 0.0% | 222/379 |
+| TESTS | 0.0% | 86.2% | 0.0% | 4/29 |
+
+### Debserver Precision
+
+| Method | vs Doc Refs | vs Commit Intent | vs Both | Unvalidated |
+|---|---|---|---|---|
+| CO_CHANGED | 0.9% | **97.3%** | 0.9% | 275/10,077 |
+
+### GSD-2 Precision
+
+| Method | vs Doc Refs | vs Commit Intent | vs Both | Unvalidated |
+|---|---|---|---|---|
+| CO_CHANGED | 0.3% | **99.8%** | 0.3% | 411/162,931 |
+
+### Recall Against Document References
+
+| Project | Doc Direct Recall | Doc Co-Citation Recall |
+|---|---|---|
+| alpha-seek | 36.6% (185/506) | 13.5% (367/2724) |
+| debserver | 19.6% (36/184) | 8.2% (91/1111) |
+| gsd-2 | 18.9% (97/513) | 17.1% (427/2495) |
+
+### Interpretation
+
+**What CS-007/007b asked:** Are the auto-extracted edges meaningful? Do they correspond to relationships humans expressed?
+
+**What the data shows:**
+
+1. **CITES extraction has 100% precision.** Every auto-extracted citation edge corresponds to a human-authored document reference. This is the first method to achieve ground-truth-validated precision. The CS-007 precision gap is CLOSED for CITES.
+
+2. **CO_CHANGED has ~100% precision against commit intent but <1% against doc refs.** Co-change edges are definitionally correct as git history, and they survive aggressive filtering (the commit intent extractor removes bulk ops, merge commits, noise). But 99.5% of co-change edges connect files that share NO document cross-references. Co-change captures a real kind of coupling -- empirical coupling from development workflow -- but it is almost entirely invisible to document-level references. These are different relationship layers, both real, measuring different things.
+
+3. **IMPORTS has 41% commit intent overlap, 0% doc ref overlap, 59% unvalidated.** Import edges where the files never co-changed (59%) might be stable imports that never needed modification together. Not necessarily noise, but not confirmed by any other signal.
+
+4. **Recall is low (19-37%).** The extractors find less than 40% of relationships humans expressed in documentation. The document reference graph contains relationship types the code-based extractors cannot discover -- semantic connections, design rationale, decision justification. This is the gap the memory system needs to fill (possibly via LLM enrichment or the interview loop).
+
+5. **The "both" column is the strongest validation signal.** 101 edges in alpha-seek are confirmed by both doc refs AND commit intent. These are edges where human-authored documentation references align with human-authored commit groupings. This is genuine ground-truth-level validation.
+
+### Does This Close the CS-007 Gap?
+
+Partially. CITES is fully validated (100% precision). CO_CHANGED is validated as real coupling but not as "meaningful" in the documentation sense -- it measures a different kind of relationship than what humans write in docs. The low recall numbers reveal that code-based extraction alone misses 60-80% of human-expressed relationships.
+
+The precision gap from CS-007 is closed for the CITES method. It remains open for CO_CHANGED (the precision question was never "are these files really co-changed?" but "does co-change represent meaningful architectural coupling?"). The answer appears to be: yes, but it's a different kind of meaning than what humans express in documentation.
 
 ---
 

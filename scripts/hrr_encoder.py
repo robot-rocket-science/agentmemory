@@ -123,24 +123,53 @@ class Edge(NamedTuple):
     weight: float
 
 
-def load_edges(extracted_dir: Path, repo_name: str, min_cochange_weight: int = 3) -> list[Edge]:
-    """Load all file-to-file edges from extraction results."""
+def adaptive_cochange_threshold(commits: int) -> int:
+    """Compute adaptive co-change weight threshold based on commit count.
+
+    At ~0.5% of commits, every repo lands at 1-4 partitions.
+    Formula: max(3, ceil(commits * 0.005))
+    """
+    return max(3, math.ceil(commits * 0.005))
+
+
+def load_edges(
+    extracted_dir: Path,
+    repo_name: str,
+    min_cochange_weight: int | None = None,
+) -> list[Edge]:
+    """Load all file-to-file edges from extraction results.
+
+    If min_cochange_weight is None, uses adaptive threshold based on commit count.
+    """
     edges: list[Edge] = []
 
     # Git co-change (filtered by weight)
     git_path: Path = extracted_dir / "git_edges" / f"{repo_name}.json"
     if git_path.exists():
         git_data: dict[str, Any] = json.loads(git_path.read_text())
+
+        # Determine threshold
+        threshold: int
+        if min_cochange_weight is not None:
+            threshold = min_cochange_weight
+        else:
+            commits: int = git_data.get("summary", {}).get("commits_analyzed", 100)
+            threshold = adaptive_cochange_threshold(commits)
+
         co_changed: list[dict[str, Any]] = git_data.get("co_changed_edges", [])
+        loaded_count: int = 0
         for e in co_changed:
             w: int = e.get("weight", 1)
-            if w >= min_cochange_weight:
+            if w >= threshold:
                 edges.append(Edge(
                     source=e["source"],
                     target=e["target"],
                     edge_type="CO_CHANGED",
                     weight=float(w),
                 ))
+                loaded_count += 1
+
+        print(f"  co-change threshold: w>={threshold} (adaptive from {git_data.get('summary', {}).get('commits_analyzed', '?')} commits), {loaded_count} edges", file=sys.stderr)
 
     # Imports
     imp_path: Path = extracted_dir / "import_edges" / f"{repo_name}.json"

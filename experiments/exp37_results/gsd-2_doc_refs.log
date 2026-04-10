@@ -1,0 +1,7 @@
+[doc-refs] gsd-2
+  files: 581
+  sentences: 12042
+  reference types: {'D': 9, 'M': 280, 'R': 10, 'file_path': 3766, 'heading': 63}
+  direct edges: 562
+  co-citation edges: 2495
+  avg refs/file: 16.92

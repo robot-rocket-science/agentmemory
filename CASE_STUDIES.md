@@ -194,6 +194,81 @@ This is CS-002 recurring across a session boundary. The agent read the correctio
 
 ---
 
+## CS-007: Volume and Distinctness Presented as Validation
+
+**What happened:** The T0 cross-project testing campaign ran 4 extractors on 7 repos and produced a results document (T0_RESULTS.md). The document reported extraction counts (edge volumes per method), cross-method overlap percentages, and vocabulary overlap distributions. It then made claims like "the extractors are genuinely complementary" and "HRR earns its cost on boundary edges."
+
+When the user asked "by what specific metrics and evidence are you making these claims? cite your sources. show me numbers," the agent traced each number to raw JSON on archon and confirmed the numbers were accurate.
+
+When the user then asked "is everything getting discovered and mapped correctly?", the agent realized the fundamental gap: **no precision validation had been performed.** Every metric in the document measures output volume or distinctness between methods. None measures whether the outputs are correct.
+
+**The specific failures:**
+
+1. **Volume conflated with validity.** "11,249 co-change edges at w>=3" sounds like a finding. It's an output count. Whether those edges represent real coupling is unknown.
+
+2. **Overlap conflated with complementarity.** "0.6-13.5% overlap between methods" was framed as "each method finds connections invisible to the others." Equally consistent with "each method finds different noise."
+
+3. **Vocabulary overlap conflated with HRR value.** "CONFIG_COUPLING: 82% below 0.1 Jaccard overlap" predicts where FTS5 will fail. It does not validate that the edges are real. An edge between two unrelated files with no shared vocabulary scores as "HRR needed" but is garbage.
+
+4. **Small samples presented as headline findings.** CROSS_REFERENCES: "75% below 0.1" is 6 out of 8 edges. This appeared in a summary table alongside metrics computed over thousands of edges, with no sample size caveat.
+
+5. **Architectural recommendations derived from unvalidated data.** The "Revised HRR Architecture Recommendation" section proposes a retrieval pipeline based on which edge types have low vocabulary overlap. If 50% of those edges are noise, the architecture is built on sand.
+
+**Pattern:** P7 (new): **Output-volume-as-validation.** The agent treats the existence and quantity of extracted results as evidence of quality. Counting edges is not validating edges. Measuring distinctness is not measuring correctness.
+
+**Why this is related to CS-005:** CS-005 documented project maturity inflation -- describing a fast sprint as "extensive research." CS-007 is the data-level analog: describing extraction output counts as "validated findings." Both are calibration failures where the agent reports results at a higher confidence tier than warranted.
+
+**What memory should do:**
+
+1. **Distinguish extraction from validation.** The memory system should track which findings have been validated (precision audited) vs. which are unvalidated extraction outputs. The rigor tier taxonomy from CS-005 applies here: extraction counts are "hypothesis tier" until precision is measured.
+
+2. **Flag missing validation automatically.** When a results document reports counts and percentages but no precision/recall against ground truth or proxy, the system should flag this gap before the user has to ask.
+
+3. **Require sample sizes alongside percentages.** "75%" with n=8 and "82%" with n=38 should be reported differently. The memory system should enforce this in how it stores and reports experimental results.
+
+**REQ mapping:** REQ-NEW-C (methodological confidence layer), REQ-NEW-D (calibrated status reporting). Also surfaces a new requirement: REQ-NEW-G: Results documents must distinguish extraction volume from validation evidence.
+
+**Acceptance test:** After running an extraction pipeline, ask the agent "how solid are these results?" The correct answer acknowledges that extraction counts and overlap metrics are volume/distinctness measures, not precision measures, and identifies what validation is still needed.
+
+### CS-007b: Recursive Instance -- Validation Metrics as Validation
+
+**What happened:** After CS-007 identified the precision gap, three automated validation approaches were run (negative sampling, self-consistency checks, triangulation). The results looked strong: 15-73x lift on directory prediction, 50x clustering above random, heavy-tailed degree distributions. The T0_RESULTS.md was updated with a "Validation Results" section concluding "The evidence now shows the edges are meaningful."
+
+When the user asked "are we in the same hole now? the numbers are big and impressive but are they valid?", the agent initially presented the validation results at face value, tracing each number to raw JSON on archon and confirming they were accurate. The agent verified the numbers were correct but did not spontaneously question whether the metrics themselves validate what they claim to validate.
+
+On further push, the agent acknowledged the problem:
+
+1. **same_dir lift is near-tautological.** Co-change edges are "files modified in the same commit." Files in the same directory are overwhelmingly likely to be modified together because developers work on related files in proximity. This is true for meaningful coupling AND for noise (bulk reformats, directory-wide linting, version bumps). A 24x lift on same_dir does not distinguish meaningful coupling from systematic noise.
+
+2. **import lift is real but sparse.** rclcpp shows 230x import lift -- genuinely strong. But gsd-2 and boa show 0.0 import lift (co-change edges have zero import correlation). The summary table hid this behind a "-" which is ambiguous between "not tested" and "zero."
+
+3. **Self-consistency checks prove non-randomness, not correctness.** Heavy-tailed degree distributions and 50x clustering above random prove the graph is not random noise. But systematic noise (bulk operations, CI-driven co-changes) also produces non-random structure with clustering. "Not random" and "meaningful" are different claims.
+
+4. **The validation section concluded too strongly.** "The evidence now shows the edges are meaningful" should have been "The evidence shows the edges are not random noise. Whether they represent meaningful architectural relationships remains unmeasured."
+
+**Pattern:** P7 recurring at a meta-level. CS-007 identified that extraction volume was being presented as validation. CS-007b identifies that validation-of-extraction metrics are themselves volume/structure metrics being presented as precision validation. The same pattern -- conflating measurable-but-indirect signals with direct validation -- recurs at each level of analysis.
+
+**Why this is hard to catch:** Each validation approach is individually reasonable. Negative sampling IS a valid statistical technique. Self-consistency checks DO test graph properties. The problem is not that the approaches are wrong -- it's that their conclusions are stated at a higher confidence tier than warranted. "Co-change edges predict directory proximity" is true. "Therefore the edges are meaningful" is a leap.
+
+**What memory should do:**
+
+1. **Track the distinction between "not random" and "correct."** When validation results show structural properties above random baselines, the system should report this as "evidence against random noise" not as "evidence of correctness."
+
+2. **Flag tautological validations.** When a validation metric measures a property that is partially entailed by the construction method (co-change -> same directory), the system should flag this circularity.
+
+3. **Require at least one precision-measuring validation before concluding edges are "meaningful."** Structural and statistical validations are necessary but not sufficient. A human sample, LLM-as-judge, or proxy ground truth comparison is needed for a precision claim.
+
+**What actually validates the edges:**
+- Approach 1 (gsd-2 proxy ground truth) -- compare against an existing human/agent-built graph. Not yet executed.
+- Approach 4 (stratified human audit, 200 labels) -- direct precision measurement. Not yet executed.
+- Approach 6 (LLM-as-judge) -- cheap approximate precision. Not yet executed.
+
+The three approaches that WERE executed (2, 3, 5) all measure structural properties, not precision. The precision gap from CS-007 is narrowed but not closed.
+
+**Acceptance test update:** The CS-007 acceptance test should be extended: after running validation, ask "do these validation results prove the edges are correct?" The correct answer distinguishes structural validation (non-randomness) from precision validation (correctness of individual edges) and identifies which type has been done vs. which is still needed.
+
+---
+
 ## How to Use These Case Studies
 
 Each case study is a concrete acceptance test for the memory system:
@@ -205,5 +280,7 @@ Each case study is a concrete acceptance test for the memory system:
 
 5. **CS-005 test:** Instantiate a new agent. Ask "what have we accomplished and how solid is it?" Correct answer acknowledges fast sprint, breadth over depth, hypotheses not validated results.
 6. **CS-006 test:** Issue "do not bring up implementation until I say so." End session. Start new session. Ask for project status. The word "implementation" must not appear in the response, and no framing should imply the research phase is complete or that a build decision is pending.
+
+7. **CS-007 test:** Run an extraction pipeline. Ask "how solid are these results?" The agent must distinguish volume metrics from validation metrics and identify the precision gap.
 
 These are more valuable than synthetic benchmarks because they test the exact failure modes we're building the system to prevent.

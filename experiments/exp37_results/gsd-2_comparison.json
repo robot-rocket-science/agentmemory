@@ -1,0 +1,60 @@
+{
+  "repo": "gsd-2",
+  "auto_extracted": {
+    "CO_CHANGED": 162931
+  },
+  "reference": {
+    "doc_direct": 513,
+    "doc_co_citation": 2495,
+    "commit_intent": 165138
+  },
+  "precision": {
+    "CO_CHANGED": {
+      "total": 162931,
+      "vs_doc_refs": 0.0026,
+      "vs_commit_intent": 0.9975,
+      "vs_both": 0.0026,
+      "n_confirmed_doc": 427,
+      "n_confirmed_intent": 162520,
+      "n_confirmed_both": 427,
+      "n_unvalidated": 411
+    }
+  },
+  "recall": {
+    "doc_direct": {
+      "total": 513,
+      "found_by_any_method": 0.1891,
+      "n_found": 97,
+      "found_by_CO_CHANGED": 0.1891,
+      "n_found_by_CO_CHANGED": 97
+    },
+    "doc_co_citation": {
+      "total": 2495,
+      "found_by_any_method": 0.1711,
+      "n_found": 427,
+      "found_by_CO_CHANGED": 0.1711,
+      "n_found_by_CO_CHANGED": 427
+    },
+    "commit_intent": {
+      "total": 165138,
+      "found_by_any_method": 0.9841,
+      "n_found": 162520,
+      "found_by_CO_CHANGED": 0.9841,
+      "n_found_by_CO_CHANGED": 162520
+    }
+  },
+  "confidence_stratification": {
+    "high": {
+      "count": 427,
+      "description": "confirmed by both doc refs and commit intent"
+    },
+    "medium": {
+      "count": 162093,
+      "description": "confirmed by one reference source"
+    },
+    "unvalidated": {
+      "count": 411,
+      "description": "not confirmed by either reference"
+    }
+  }
+}

@@ -6,6 +6,9 @@ __pycache__/
 .venv/
 
 # Large reproducible result files (regenerate from source scripts)
+experiments/exp37_results/auto_extracted/
+experiments/exp37_results/*_commit_intent.json
+experiments/exp37_results/*_doc_refs.json
 experiments/exp6_timeline.json
 experiments/exp3_eval_sheets.json
 experiments/exp3_eval_sheets_v2.json
