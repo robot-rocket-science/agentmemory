@@ -653,6 +653,46 @@ These repos would benefit from import-graph-specific partitioning (e.g., partiti
 
 ---
 
+---
+
+## C1: Combined Pipeline Results (FTS5 + HRR + BFS)
+
+### The Definitive Test
+
+All three retrieval methods running together for the first time. FTS5 for keyword search, HRR for vocabulary-bridge traversal, BFS for structural expansion from hits.
+
+| Repo | FTS5 Alone | HRR Alone | BFS Alone | **Combined** | Neither |
+|------|-----------|----------|----------|-------------|---------|
+| debserver | 0.277 | 0.923 | 0.046 | **1.000** | 0.0% |
+| smoltcp | 0.312 | 0.523 | 0.253 | **0.949** | 5.1% |
+| gsd-2 | 0.188 | 0.435 | 0.247 | **0.776** | 22.4% |
+| boa | 0.103 | 0.310 | 0.317 | **0.687** | 31.3% |
+
+### What Each Method Contributes
+
+No single method dominates. Each finds targets the others miss:
+
+| Repo | HRR-only finds | BFS-only finds | FTS5-only finds |
+|------|---------------|----------------|-----------------|
+| debserver | 44 | 3 | 2 |
+| smoltcp | 91 | 60 | 41 |
+| gsd-2 | 29 | 21 | 8 |
+| boa | 80 | 95 | 18 |
+
+**BFS is essential.** It uniquely finds 3-95 targets per repo that neither FTS5 nor HRR can reach. For boa (dense code graph), BFS is the largest unique contributor.
+
+**HRR is essential.** It uniquely finds 29-91 targets per repo. These are the vocabulary-bridge connections that FTS5 structurally cannot reach and BFS can't find without a starting node.
+
+**FTS5 is essential.** It uniquely finds 2-41 targets per repo. These are keyword-matched targets that HRR's approximate retrieval missed and BFS didn't traverse to.
+
+### The Architecture Is Validated
+
+debserver achieves **perfect recall (1.000)** -- every ground-truth target is found by at least one of the three methods. smoltcp is near-perfect at 0.949. Even boa (the hardest case with dense import graphs) reaches 0.687.
+
+The "Neither" percentage (targets missed by all three) drops from 38-69% (single method) to 0-31% (combined). The remaining gap on boa and gsd-2 is likely addressable with deeper BFS (depth 2 instead of 1) or better import-graph partitioning.
+
+---
+
 ## Questions Resolved in This Phase
 
 | Question | Resolution |
