@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Experiment 31: Sentence-Level HRR (for real this time)
 
@@ -19,8 +21,10 @@ import sqlite3
 import sys
 from collections import defaultdict
 from pathlib import Path
+from typing import Any
 
 import numpy as np
+import numpy.typing as npt
 
 ALPHA_SEEK_DB = Path("/Users/thelorax/projects/.gsd/workflows/spikes/"
                      "260406-1-associative-memory-for-gsd-please-explor/"
@@ -28,56 +32,63 @@ ALPHA_SEEK_DB = Path("/Users/thelorax/projects/.gsd/workflows/spikes/"
 
 DIM = 2048  # higher dim for more capacity headroom
 
+NDArr = npt.NDArray[np.floating[Any]]
+SentDict = dict[str, dict[str, Any]]
+GroupDict = dict[str, list[str]]
+EdgeList = list[tuple[str, str, str]]
+
 
 # --- HRR Core ---
 
-def make_vec(rng):
-    v = rng.standard_normal(DIM)
+def make_vec(rng: np.random.Generator) -> NDArr:
+    v: NDArr = rng.standard_normal(DIM)
     return v / np.linalg.norm(v)
 
-def bind(a, b):
-    return np.real(np.fft.ifft(np.fft.fft(a) * np.fft.fft(b)))
+def bind(a: NDArr, b: NDArr) -> NDArr:
+    result: NDArr = np.real(np.fft.ifft(np.fft.fft(a) * np.fft.fft(b)))
+    return result
 
-def unbind(key, bound):
-    return np.real(np.fft.ifft(np.conj(np.fft.fft(key)) * np.fft.fft(bound)))
+def unbind(key: NDArr, bound: NDArr) -> NDArr:
+    result: NDArr = np.real(np.fft.ifft(np.conj(np.fft.fft(key)) * np.fft.fft(bound)))
+    return result
 
-def cos_sim(a, b):
-    na, nb = np.linalg.norm(a), np.linalg.norm(b)
+def cos_sim(a: NDArr, b: NDArr) -> float:
+    na = float(np.linalg.norm(a))
+    nb = float(np.linalg.norm(b))
     if na == 0 or nb == 0: return 0.0
     return float(np.dot(a, b) / (na * nb))
 
-def nearest_k(query, memory, k=5):
-    sims = [(l, cos_sim(query, v)) for l, v in memory.items()]
+def nearest_k(query: NDArr, memory: dict[str, NDArr], k: int = 5) -> list[tuple[str, float]]:
+    sims: list[tuple[str, float]] = [(l, cos_sim(query, v)) for l, v in memory.items()]
     sims.sort(key=lambda x: x[1], reverse=True)
     return sims[:k]
 
 
 # --- Step 1: Sentence Decomposition ---
 
-def split_sentences(text):
-    parts = re.split(r'(?<=[.!?])\s+(?=[A-Z])', text)
-    sents = []
+def split_sentences(text: str) -> list[str]:
+    parts: list[str | Any] = re.split(r'(?<=[.!?])\s+(?=[A-Z])', text)
+    sents: list[str] = []
     for p in parts:
-        for sp in p.split(' | '):
+        for sp in str(p).split(' | '):
             sp = sp.strip()
             if len(sp) > 10:
                 sents.append(sp)
     return sents
 
 
-def build_sentence_nodes(db):
-    """Decompose decisions into sentence nodes."""
-    sentences = {}  # sid -> {content, parent, index, tokens}
-    groups = {}     # decision_id -> [sentence_ids in order]
+def build_sentence_nodes(db: sqlite3.Connection) -> tuple[SentDict, GroupDict]:
+    sentences: SentDict = {}
+    groups: GroupDict = {}
 
     for row in db.execute("SELECT id, decision, choice, rationale FROM decisions"):
-        did = row[0]
+        did: str = str(row[0])
         full = f"{row[1]}: {row[2]}"
         if row[3]:
             full += f" | {row[3]}"
 
         sents = split_sentences(full)
-        group = []
+        group: list[str] = []
         for i, s in enumerate(sents):
             sid = f"{did}_s{i}"
             sentences[sid] = {
@@ -94,20 +105,19 @@ def build_sentence_nodes(db):
 
 # --- Step 2: Build Typed Edges Between Sentences ---
 
-def build_sentence_edges(sentences, groups):
-    """Extract typed edges between sentence nodes."""
-    edges = []
+def build_sentence_edges(sentences: SentDict, groups: GroupDict) -> EdgeList:
+    edges: EdgeList = []
 
     # NEXT_IN_DECISION: sequential within same decision
-    for did, group in groups.items():
+    for _did, group in groups.items():
         for i in range(len(group) - 1):
             edges.append((group[i], group[i+1], "NEXT_IN_DECISION"))
 
     # CITES: sentence mentioning D### -> first sentence of that decision
     d_ref_pattern = re.compile(r'\bD(\d{2,3})\b')
     for sid, sent in sentences.items():
-        parent = sent["parent"]
-        for match in d_ref_pattern.finditer(sent["content"]):
+        parent: str = str(sent["parent"])
+        for match in d_ref_pattern.finditer(str(sent["content"])):
             target_did = f"D{match.group(1)}"
             if target_did != parent and target_did in groups and groups[target_did]:
                 target_sid = groups[target_did][0]  # first sentence = core assertion
@@ -115,10 +125,10 @@ def build_sentence_edges(sentences, groups):
 
     # M### references: sentence mentioning M### -> create MILESTONE_REF edge
     m_ref_pattern = re.compile(r'\bM(\d{2,3})\b')
-    milestone_sids = {}  # store milestone references for SAME_TOPIC detection
+    milestone_sids: dict[str, list[str]] = {}
 
     for sid, sent in sentences.items():
-        for match in m_ref_pattern.finditer(sent["content"]):
+        for match in m_ref_pattern.finditer(str(sent["content"])):
             mid = f"M{match.group(1)}"
             if mid not in milestone_sids:
                 milestone_sids[mid] = []
@@ -127,9 +137,9 @@ def build_sentence_edges(sentences, groups):
     # SAME_TOPIC: sentences from different decisions referencing same milestone
     for mid, sids in milestone_sids.items():
         # Only connect sentences from different parents
-        by_parent = defaultdict(list)
+        by_parent: defaultdict[str, list[str]] = defaultdict(list)
         for sid in sids:
-            by_parent[sentences[sid]["parent"]].append(sid)
+            by_parent[str(sentences[sid]["parent"])].append(sid)
 
         parents = list(by_parent.keys())
         for i in range(len(parents)):
@@ -143,7 +153,7 @@ def build_sentence_edges(sentences, groups):
 
 # --- Main ---
 
-def main():
+def main() -> None:
     rng = np.random.default_rng(42)
 
     print("=" * 60, file=sys.stderr)
@@ -158,7 +168,7 @@ def main():
     edges = build_sentence_edges(sentences, groups)
 
     # Edge type distribution
-    edge_types = defaultdict(int)
+    edge_types: defaultdict[str, int] = defaultdict(int)
     for _, _, et in edges:
         edge_types[et] += 1
 
@@ -170,18 +180,17 @@ def main():
 
     # --- Partition into subgraphs by decision cluster ---
     # Group edges by the parent decision of the source sentence
-    sg_by_parent = defaultdict(list)
+    sg_by_parent: defaultdict[str, EdgeList] = defaultdict(list)
     for src, dst, et in edges:
-        parent = sentences[src]["parent"]
+        parent: str = str(sentences[src]["parent"])
         sg_by_parent[parent].append((src, dst, et))
 
     # Merge small subgraphs until each has 30-80 edges
-    subgraph_edges = {}
-    current_sg = "sg_0"
-    current_edges = []
+    subgraph_edges: dict[str, EdgeList] = {}
+    current_edges: EdgeList = []
     sg_idx = 0
 
-    for parent, pedges in sorted(sg_by_parent.items()):
+    for _parent, pedges in sorted(sg_by_parent.items()):
         current_edges.extend(pedges)
         if len(current_edges) >= 50:
             subgraph_edges[f"sg_{sg_idx}"] = current_edges
@@ -196,29 +205,31 @@ def main():
         print(f"    {sg_name}: {len(sg_edges)} edges", file=sys.stderr)
 
     # --- Assign random vectors ---
-    node_vecs = {sid: make_vec(rng) for sid in sentences}
-    edge_type_vecs = {
+    node_vecs: dict[str, NDArr] = {sid: make_vec(rng) for sid in sentences}
+    edge_type_vecs: dict[str, NDArr] = {
         "NEXT_IN_DECISION": make_vec(rng),
         "CITES": make_vec(rng),
         "SAME_TOPIC": make_vec(rng),
     }
 
     # --- Encode each subgraph ---
-    sg_superpositions = {}
+    sg_superpositions: dict[str, NDArr] = {}
     for sg_name, sg_edges in subgraph_edges.items():
-        S = np.zeros(DIM)
+        sg_vec: NDArr = np.zeros(DIM)
         for src, dst, et in sg_edges:
             if src in node_vecs and dst in node_vecs and et in edge_type_vecs:
-                S += bind(bind(node_vecs[src], edge_type_vecs[et]), node_vecs[dst])
-        sg_superpositions[sg_name] = S
+                sg_vec += bind(bind(node_vecs[src], edge_type_vecs[et]), node_vecs[dst])
+        sg_superpositions[sg_name] = sg_vec
 
     # Also make a union of all subgraph superpositions (for broad queries)
-    S_union = sum(sg_superpositions.values())
+    S_union: NDArr = np.zeros(DIM)
+    for v in sg_superpositions.values():
+        S_union = S_union + v
 
     # --- Tests ---
 
     # Find a good test node: a sentence that CITES another decision
-    citing_sentences = [(src, dst) for src, dst, et in edges if et == "CITES"]
+    citing_sentences: list[tuple[str, str]] = [(src, dst) for src, dst, et in edges if et == "CITES"]
     print(f"\n  CITES edges between sentences: {len(citing_sentences)}", file=sys.stderr)
 
     if not citing_sentences:
@@ -226,44 +237,44 @@ def main():
         return
 
     # Pick a sentence with multiple outgoing CITES
-    cites_out = defaultdict(list)
+    cites_out: defaultdict[str, list[str]] = defaultdict(list)
     for src, dst, et in edges:
         if et == "CITES":
             cites_out[src].append(dst)
 
-    best_citers = sorted(cites_out.items(), key=lambda x: len(x[1]), reverse=True)[:5]
-    test_sid = best_citers[0][0]
-    test_targets = best_citers[0][1]
+    best_citers: list[tuple[str, list[str]]] = sorted(cites_out.items(), key=lambda x: len(x[1]), reverse=True)[:5]
+    test_sid: str = best_citers[0][0]
+    test_targets: list[str] = best_citers[0][1]
 
     print(f"\n  TEST 1: Single-hop CITES from {test_sid}", file=sys.stderr)
-    print(f"  Content: {sentences[test_sid]['content'][:80]}", file=sys.stderr)
+    print(f"  Content: {str(sentences[test_sid]['content'])[:80]}", file=sys.stderr)
     print(f"  Ground truth targets ({len(test_targets)}):", file=sys.stderr)
     for t in test_targets:
-        print(f"    {t}: {sentences[t]['content'][:60]}", file=sys.stderr)
+        print(f"    {t}: {str(sentences[t]['content'])[:60]}", file=sys.stderr)
 
     # Query the union superposition
-    query = bind(node_vecs[test_sid], edge_type_vecs["CITES"])
-    result = unbind(query, S_union)
-    matches = nearest_k(result, node_vecs, k=10)
+    query: NDArr = bind(node_vecs[test_sid], edge_type_vecs["CITES"])
+    result: NDArr = unbind(query, S_union)
+    matches: list[tuple[str, float]] = nearest_k(result, node_vecs, k=10)
 
     print(f"  HRR top-10:", file=sys.stderr)
     for label, sim in matches:
         marker = "***" if label in test_targets else "   "
-        content = sentences[label]["content"][:50] if label in sentences else "?"
+        content = str(sentences[label]["content"])[:50] if label in sentences else "?"
         print(f"    {marker} {label} ({sim:.4f}): {content}", file=sys.stderr)
 
-    found = set(m[0] for m in matches[:len(test_targets)]) & set(test_targets)
+    found: set[str] = set(m[0] for m in matches[:len(test_targets)]) & set(test_targets)
     print(f"  Recall@{len(test_targets)}: {len(found)}/{len(test_targets)}", file=sys.stderr)
 
     # --- TEST 2: NEXT_IN_DECISION (sequential within decision) ---
-    test_group = list(groups.values())[10]  # pick a decision with sentences
+    test_group: list[str] = list(groups.values())[10]  # pick a decision with sentences
     if len(test_group) >= 3:
-        test_src = test_group[0]
-        expected_next = test_group[1]
+        test_src: str = test_group[0]
+        expected_next: str = test_group[1]
 
         print(f"\n  TEST 2: NEXT_IN_DECISION from {test_src}", file=sys.stderr)
-        print(f"  Source: {sentences[test_src]['content'][:60]}", file=sys.stderr)
-        print(f"  Expected next: {sentences[expected_next]['content'][:60]}", file=sys.stderr)
+        print(f"  Source: {str(sentences[test_src]['content'])[:60]}", file=sys.stderr)
+        print(f"  Expected next: {str(sentences[expected_next]['content'])[:60]}", file=sys.stderr)
 
         query = bind(node_vecs[test_src], edge_type_vecs["NEXT_IN_DECISION"])
         result = unbind(query, S_union)
@@ -272,7 +283,7 @@ def main():
         print(f"  HRR top-5:", file=sys.stderr)
         for label, sim in matches:
             marker = "***" if label == expected_next else "   "
-            content = sentences[label]["content"][:50] if label in sentences else "?"
+            content = str(sentences[label]["content"])[:50] if label in sentences else "?"
             print(f"    {marker} {label} ({sim:.4f}): {content}", file=sys.stderr)
 
         if matches[0][0] == expected_next:
@@ -285,26 +296,26 @@ def main():
     print(f"\n  TEST 3: Edge selectivity (CITES vs NEXT_IN_DECISION)", file=sys.stderr)
     print(f"  Query {test_sid} with CITES type:", file=sys.stderr)
 
-    query_cites = bind(node_vecs[test_sid], edge_type_vecs["CITES"])
-    result_cites = unbind(query_cites, S_union)
-    matches_cites = nearest_k(result_cites, node_vecs, k=5)
+    query_cites: NDArr = bind(node_vecs[test_sid], edge_type_vecs["CITES"])
+    result_cites: NDArr = unbind(query_cites, S_union)
+    matches_cites: list[tuple[str, float]] = nearest_k(result_cites, node_vecs, k=5)
 
-    query_next = bind(node_vecs[test_sid], edge_type_vecs["NEXT_IN_DECISION"])
-    result_next = unbind(query_next, S_union)
-    matches_next = nearest_k(result_next, node_vecs, k=5)
+    query_next: NDArr = bind(node_vecs[test_sid], edge_type_vecs["NEXT_IN_DECISION"])
+    result_next: NDArr = unbind(query_next, S_union)
+    matches_next: list[tuple[str, float]] = nearest_k(result_next, node_vecs, k=5)
 
-    actual_cites_targets = set(cites_out.get(test_sid, []))
-    actual_next_targets = set()
-    parent = sentences[test_sid]["parent"]
-    group = groups[parent]
+    actual_cites_targets: set[str] = set(cites_out.get(test_sid, []))
+    actual_next_targets: set[str] = set()
+    parent_str: str = str(sentences[test_sid]["parent"])
+    group: list[str] = groups[parent_str]
     idx = group.index(test_sid)
     if idx + 1 < len(group):
         actual_next_targets.add(group[idx + 1])
 
-    cites_in_cites_results = set(m[0] for m in matches_cites) & actual_cites_targets
-    next_in_cites_results = set(m[0] for m in matches_cites) & actual_next_targets
-    cites_in_next_results = set(m[0] for m in matches_next) & actual_cites_targets
-    next_in_next_results = set(m[0] for m in matches_next) & actual_next_targets
+    cites_in_cites_results: set[str] = set(m[0] for m in matches_cites) & actual_cites_targets
+    next_in_cites_results: set[str] = set(m[0] for m in matches_cites) & actual_next_targets
+    cites_in_next_results: set[str] = set(m[0] for m in matches_next) & actual_cites_targets
+    next_in_next_results: set[str] = set(m[0] for m in matches_next) & actual_next_targets
 
     print(f"  CITES query -> correct CITES targets: {len(cites_in_cites_results)}", file=sys.stderr)
     print(f"  CITES query -> NEXT bleed-in: {len(next_in_cites_results)}", file=sys.stderr)

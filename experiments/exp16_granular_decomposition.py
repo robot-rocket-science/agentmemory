@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Experiment 16: Granular Node Decomposition
 
@@ -13,6 +15,7 @@ import re
 import sqlite3
 import sys
 from pathlib import Path
+from typing import Any
 
 
 ALPHA_SEEK_DB = Path("/Users/thelorax/projects/.gsd/workflows/spikes/"
@@ -32,7 +35,7 @@ def split_into_sentences(text: str) -> list[str]:
     # or after digits (D097. should not split)
     parts = re.split(r'(?<=[.!?])\s+(?=[A-Z])', text)
 
-    sentences = []
+    sentences: list[str] = []
     for part in parts:
         # Further split on pipe separator (decision | rationale format)
         subparts = part.split(' | ')
@@ -66,13 +69,13 @@ def classify_sentence(sentence: str) -> str:
 
 def extract_refs(sentence: str) -> list[str]:
     """Extract D###, M###, K### references from a sentence."""
-    refs = set()
+    refs: set[str] = set()
     for m in re.finditer(r'\b(D\d{2,3}|M\d{2,3}|K\d{2,3})\b', sentence):
         refs.add(m.group(1))
     return sorted(refs)
 
 
-def main():
+def main() -> None:
     db = sqlite3.connect(str(ALPHA_SEEK_DB))
 
     decisions = db.execute(
@@ -82,15 +85,15 @@ def main():
     print(f"Decomposing {len(decisions)} decisions into sentence-level nodes\n",
           file=sys.stderr)
 
-    all_nodes = []
+    all_nodes: list[dict[str, Any]] = []
     total_original_tokens = 0
     total_sentence_tokens = 0
-    sentences_per_decision = []
-    type_counts = {}
+    sentences_per_decision: list[int] = []
+    type_counts: dict[str, int] = {}
     cross_refs = 0
 
     for row in decisions:
-        did = row[0]
+        did: str = row[0]
         full_text = f"{row[1]}: {row[2]}"
         if row[3]:
             full_text += f" | {row[3]}"
@@ -113,7 +116,7 @@ def main():
             refs = [r for r in refs if r != did]
             cross_refs += len(refs)
 
-            node = {
+            node: dict[str, Any] = {
                 "id": f"{did}_s{i}",
                 "parent_decision": did,
                 "sentence_index": i,
@@ -144,10 +147,10 @@ def main():
 
     # Token analysis: if we only load the relevant sentence(s) instead of whole decision
     # For anchor nodes, we might load just the assertion sentence
-    assertion_nodes = [n for n in all_nodes if n["type"] == "assertion"]
-    constraint_nodes = [n for n in all_nodes if n["type"] == "constraint"]
+    assertion_nodes: list[dict[str, Any]] = [n for n in all_nodes if n["type"] == "assertion"]
+    constraint_nodes: list[dict[str, Any]] = [n for n in all_nodes if n["type"] == "constraint"]
     core_nodes = assertion_nodes + constraint_nodes
-    core_tokens = sum(n["tokens"] for n in core_nodes)
+    core_tokens: int = sum(n["tokens"] for n in core_nodes)
 
     print(f"\n  Token analysis:", file=sys.stderr)
     print(f"    All sentences total: {total_sentence_tokens:,} tokens", file=sys.stderr)
@@ -158,22 +161,22 @@ def main():
 
     # What would anchor context look like?
     # Top 10 most-referenced decisions, loading only their assertion sentences
-    ref_counts = {}
+    ref_counts: dict[str, int] = {}
     for n in all_nodes:
         for ref in n["references"]:
             ref_counts[ref] = ref_counts.get(ref, 0) + 1
 
-    top_anchors = sorted(ref_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+    top_anchors: list[tuple[str, int]] = sorted(ref_counts.items(), key=lambda x: x[1], reverse=True)[:10]
 
     print(f"\n  Top 10 anchor candidates (by cross-reference count):", file=sys.stderr)
     anchor_tokens_full = 0
     anchor_tokens_core = 0
     for anchor_id, count in top_anchors:
-        anchor_sentences = [n for n in all_nodes if n["parent_decision"] == anchor_id]
-        anchor_core = [n for n in anchor_sentences if n["type"] in ("assertion", "constraint")]
+        anchor_sentences: list[dict[str, Any]] = [n for n in all_nodes if n["parent_decision"] == anchor_id]
+        anchor_core: list[dict[str, Any]] = [n for n in anchor_sentences if n["type"] in ("assertion", "constraint")]
 
-        full_tok = sum(n["tokens"] for n in anchor_sentences)
-        core_tok = sum(n["tokens"] for n in anchor_core)
+        full_tok: int = sum(n["tokens"] for n in anchor_sentences)
+        core_tok: int = sum(n["tokens"] for n in anchor_core)
         anchor_tokens_full += full_tok
         anchor_tokens_core += core_tok
 
@@ -186,7 +189,7 @@ def main():
     print(f"    Reduction: {(1 - anchor_tokens_core/anchor_tokens_full):.0%}", file=sys.stderr)
 
     # Output
-    output = {
+    output: dict[str, Any] = {
         "total_decisions": len(decisions),
         "total_sentence_nodes": len(all_nodes),
         "avg_sentences_per_decision": round(float(spd.mean()), 1),

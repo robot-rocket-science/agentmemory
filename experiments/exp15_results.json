@@ -5,8 +5,8 @@
     "ece_std": 0.0058,
     "test_coverage_mean": 1.0,
     "convergence_rate_mean": 0.5635,
-    "wall_seconds_mean": 0.047,
-    "retrievals_per_second": 52945.0
+    "wall_seconds_mean": 0.067,
+    "retrievals_per_second": 37247.0
   },
   "1000": {
     "n_beliefs": 1000,
@@ -14,8 +14,8 @@
     "ece_std": 0.0031,
     "test_coverage_mean": 0.9176,
     "convergence_rate_mean": 0.4004,
-    "wall_seconds_mean": 0.232,
-    "retrievals_per_second": 10764.0
+    "wall_seconds_mean": 0.328,
+    "retrievals_per_second": 7622.0
   },
   "5000": {
     "n_beliefs": 5000,
@@ -23,8 +23,8 @@
     "ece_std": 0.0021,
     "test_coverage_mean": 0.3842,
     "convergence_rate_mean": 0.4454,
-    "wall_seconds_mean": 1.123,
-    "retrievals_per_second": 2226.0
+    "wall_seconds_mean": 1.607,
+    "retrievals_per_second": 1556.0
   },
   "10000": {
     "n_beliefs": 10000,
@@ -32,7 +32,7 @@
     "ece_std": 0.0017,
     "test_coverage_mean": 0.2177,
     "convergence_rate_mean": 0.4479,
-    "wall_seconds_mean": 2.231,
-    "retrievals_per_second": 1120.0
+    "wall_seconds_mean": 3.161,
+    "retrievals_per_second": 791.0
   }
 }

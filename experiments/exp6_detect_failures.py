@@ -8,24 +8,31 @@ P4: Repeated procedural instructions (runbook, dispatch gate reminders)
 P5: Dispatch gate failures (agent skipped protocol, caused failures)
 """
 
+from __future__ import annotations
+
 import json
 import re
 import sys
 from collections import defaultdict
 from itertools import combinations
 from pathlib import Path
+from typing import Any
 
 
 TIMELINE_PATH = Path("experiments/exp6_timeline.json")
 
+TimelineEvent = dict[str, Any]
+Timeline = dict[str, Any]
+ResultDict = dict[str, Any]
 
-def load_timeline() -> dict:
+
+def load_timeline() -> Timeline:
     return json.loads(TIMELINE_PATH.read_text())
 
 
 # --- Text Similarity (zero-LLM) ---
 
-STOPWORDS = {
+STOPWORDS: set[str] = {
     "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
     "have", "has", "had", "do", "does", "did", "will", "would", "could",
     "should", "may", "might", "shall", "can", "need", "must", "ought",
@@ -42,50 +49,46 @@ STOPWORDS = {
 
 
 def tokenize(text: str) -> set[str]:
-    words = re.findall(r'[a-z0-9]+', text.lower())
+    words: list[str | Any] = re.findall(r'[a-z0-9]+', text.lower())
     return {w for w in words if w not in STOPWORDS and len(w) > 2}
 
 
 def jaccard(a: set[str], b: set[str]) -> float:
     if not a or not b:
         return 0.0
-    intersection = a & b
-    union = a | b
+    intersection: set[str] = a & b
+    union: set[str] = a | b
     return len(intersection) / len(union)
 
 
 # --- P1: Repeated Decisions ---
 
-def detect_repeated_decisions(timeline: dict) -> dict:
-    """Find decision pairs with high similarity but no citation link between them."""
+def detect_repeated_decisions(timeline: Timeline) -> ResultDict:
     print("  P1: Detecting repeated decisions...", file=sys.stderr)
 
-    decisions = [e for e in timeline["events"] if e["event_type"] == "decision"]
-    edges = timeline["edges"]
+    decisions: list[TimelineEvent] = [e for e in timeline["events"] if e["event_type"] == "decision"]
+    edges: list[TimelineEvent] = timeline["edges"]
 
-    # Build citation set: which decisions cite each other?
-    citation_pairs = set()
+    citation_pairs: set[tuple[str, str]] = set()
     for edge in edges:
         if edge["type"] in ("CITES", "SUPERSEDES", "SOURCED_FROM"):
             citation_pairs.add((edge["from"], edge["to"]))
             citation_pairs.add((edge["to"], edge["from"]))
 
-    # Tokenize all decisions
-    decision_tokens = {}
+    decision_tokens: dict[str, set[str]] = {}
     for d in decisions:
         decision_tokens[d["id"]] = tokenize(d["content"])
 
-    # Compare all pairs
-    candidates = []
+    candidates: list[dict[str, Any]] = []
     for d1, d2 in combinations(decisions, 2):
-        id1, id2 = d1["id"], d2["id"]
+        id1: str = d1["id"]
+        id2: str = d2["id"]
 
-        # Skip if they already cite each other (intentional relationship)
         if (id1, id2) in citation_pairs:
             continue
 
-        sim = jaccard(decision_tokens[id1], decision_tokens[id2])
-        if sim >= 0.25:  # threshold: 25% word overlap
+        sim: float = jaccard(decision_tokens[id1], decision_tokens[id2])
+        if sim >= 0.25:
             candidates.append({
                 "decision_1": id1,
                 "decision_2": id2,
@@ -116,41 +119,36 @@ def detect_repeated_decisions(timeline: dict) -> dict:
 
 # --- P2: Repeated Research ---
 
-def detect_repeated_research(timeline: dict) -> dict:
-    """Find knowledge entries across different milestones covering the same topic."""
+def detect_repeated_research(timeline: Timeline) -> ResultDict:
     print("  P2: Detecting repeated research...", file=sys.stderr)
 
-    knowledge = [e for e in timeline["events"] if e["event_type"] == "knowledge"]
+    knowledge: list[TimelineEvent] = [e for e in timeline["events"] if e["event_type"] == "knowledge"]
 
-    # Group knowledge by milestone context
-    by_milestone = defaultdict(list)
+    by_milestone: defaultdict[str, list[TimelineEvent]] = defaultdict(list)
     for k in knowledge:
-        ctx = k["context"]
-        # Extract milestone ID
-        m = re.match(r'M(\d{3})', ctx)
+        ctx: str = k["context"]
+        m: re.Match[str] | None = re.match(r'M(\d{3})', ctx)
         if m:
             by_milestone[f"M{m.group(1)}"].append(k)
         else:
             by_milestone["_ungrouped"].append(k)
 
-    # Compare knowledge across milestones
-    milestone_pairs = list(combinations(
-        [(m, entries) for m, entries in by_milestone.items() if m != "_ungrouped"],
+    milestone_pairs: list[tuple[tuple[str, list[TimelineEvent]], tuple[str, list[TimelineEvent]]]] = list(combinations(
+        [(ms, entries) for ms, entries in by_milestone.items() if ms != "_ungrouped"],
         2
     ))
 
-    cross_milestone_overlaps = []
+    cross_milestone_overlaps: list[dict[str, Any]] = []
     for (m1, entries1), (m2, entries2) in milestone_pairs:
         for k1 in entries1:
-            tokens1 = tokenize(k1["content"])
+            tokens1: set[str] = tokenize(k1["content"])
             for k2 in entries2:
-                tokens2 = tokenize(k2["content"])
-                sim = jaccard(tokens1, tokens2)
+                tokens2: set[str] = tokenize(k2["content"])
+                sim: float = jaccard(tokens1, tokens2)
                 if sim >= 0.30:
-                    # Check if they reference each other
-                    k1_refs = set(k1.get("references", []))
-                    k2_refs = set(k2.get("references", []))
-                    cross_cited = bool(k1_refs & {k2["id"]}) or bool(k2_refs & {k1["id"]})
+                    k1_refs: set[Any] = set(k1.get("references", []))
+                    k2_refs: set[Any] = set(k2.get("references", []))
+                    cross_cited: bool = bool(k1_refs & {k2["id"]}) or bool(k2_refs & {k1["id"]})
 
                     cross_milestone_overlaps.append({
                         "entry_1": k1["id"],
@@ -164,7 +162,7 @@ def detect_repeated_research(timeline: dict) -> dict:
                     })
 
     cross_milestone_overlaps.sort(key=lambda x: x["similarity"], reverse=True)
-    uncited = [o for o in cross_milestone_overlaps if not o["cross_cited"]]
+    uncited: list[dict[str, Any]] = [o for o in cross_milestone_overlaps if not o["cross_cited"]]
 
     print(f"    {len(cross_milestone_overlaps)} cross-milestone overlaps (sim >= 0.30)", file=sys.stderr)
     print(f"    {len(uncited)} without cross-citation (potential repeated research)", file=sys.stderr)
@@ -181,20 +179,18 @@ def detect_repeated_research(timeline: dict) -> dict:
         "milestones_with_knowledge": len(by_milestone) - (1 if "_ungrouped" in by_milestone else 0),
         "cross_milestone_overlaps": len(cross_milestone_overlaps),
         "uncited_overlaps": len(uncited),
-        "candidates": uncited[:50],  # top 50 for review
+        "candidates": uncited[:50],
     }
 
 
 # --- P3: Avoidable Debugging ---
 
-def detect_repeated_debugging(timeline: dict) -> dict:
-    """Find commits with error/fix patterns that appear multiple times."""
+def detect_repeated_debugging(timeline: Timeline) -> ResultDict:
     print("  P3: Detecting repeated debugging sessions...", file=sys.stderr)
 
-    commits = [e for e in timeline["events"] if e["event_type"] == "commit"]
+    commits: list[TimelineEvent] = [e for e in timeline["events"] if e["event_type"] == "commit"]
 
-    # Keywords indicating debugging/fixing
-    fix_patterns = [
+    fix_patterns: list[str] = [
         r'\bfix(?:ed|es|ing)?\b',
         r'\bbug\b',
         r'\bdebug\b',
@@ -206,23 +202,21 @@ def detect_repeated_debugging(timeline: dict) -> dict:
         r'\bcorrect(?:ed|ion|s)?\b',
     ]
 
-    fix_commits = []
+    fix_commits: list[TimelineEvent] = []
     for c in commits:
-        msg = c["content"].lower()
+        msg: str = c["content"].lower()
         if any(re.search(p, msg) for p in fix_patterns):
             fix_commits.append(c)
 
-    # Group fix commits by topic (tokenized similarity)
-    fix_tokens = [(c, tokenize(c["content"])) for c in fix_commits]
+    fix_tokens: list[tuple[TimelineEvent, set[str]]] = [(c, tokenize(c["content"])) for c in fix_commits]
 
-    # Find clusters of similar fix commits
-    fix_clusters = []
-    used = set()
+    fix_clusters: list[dict[str, Any]] = []
+    used: set[int] = set()
 
     for i, (c1, t1) in enumerate(fix_tokens):
         if i in used:
             continue
-        cluster = [c1]
+        cluster: list[TimelineEvent] = [c1]
         used.add(i)
 
         for j, (c2, t2) in enumerate(fix_tokens):
@@ -248,9 +242,9 @@ def detect_repeated_debugging(timeline: dict) -> dict:
     print(f"    {len(fix_commits)} fix/debug commits out of {len(commits)} total", file=sys.stderr)
     print(f"    {len(fix_clusters)} clusters of similar fixes (potential re-debugging)", file=sys.stderr)
 
-    for cluster in fix_clusters[:5]:
-        print(f"    Cluster (size {cluster['size']}):", file=sys.stderr)
-        for c in cluster["commits"][:3]:
+    for cluster_item in fix_clusters[:5]:
+        print(f"    Cluster (size {cluster_item['size']}):", file=sys.stderr)
+        for c in cluster_item["commits"][:3]:
             print(f"      {c['timestamp'][:10]} {c['content'][:70]}", file=sys.stderr)
 
     return {
@@ -265,73 +259,69 @@ def detect_repeated_debugging(timeline: dict) -> dict:
 
 # --- P4: Repeated Procedural Instructions ---
 
-def detect_repeated_instructions(timeline: dict) -> dict:
-    """Find decisions that repeatedly instruct the same procedure."""
+def detect_repeated_instructions(timeline: Timeline) -> ResultDict:
     print("  P4: Detecting repeated procedural instructions...", file=sys.stderr)
 
-    decisions = [e for e in timeline["events"] if e["event_type"] == "decision"]
+    decisions: list[TimelineEvent] = [e for e in timeline["events"] if e["event_type"] == "decision"]
 
-    # Keywords indicating procedural rules/instructions
-    procedural_keywords = [
+    procedural_keywords: list[str] = [
         "must", "always", "never", "rule", "protocol", "runbook",
         "gate", "dispatch", "follow", "ensure", "require", "mandatory",
         "hard rule", "do not", "don't",
     ]
 
-    procedural_decisions = []
+    procedural_decisions: list[dict[str, Any]] = []
     for d in decisions:
-        content_lower = d["content"].lower()
-        matches = [kw for kw in procedural_keywords if kw in content_lower]
-        if matches:
+        content_lower: str = d["content"].lower()
+        keyword_matches: list[str] = [kw for kw in procedural_keywords if kw in content_lower]
+        if keyword_matches:
             procedural_decisions.append({
                 **d,
-                "matched_keywords": matches,
+                "matched_keywords": keyword_matches,
             })
 
-    # Find clusters of similar procedural decisions
-    proc_tokens = [(d, tokenize(d["content"])) for d in procedural_decisions]
-    clusters = []
-    used = set()
+    proc_tokens: list[tuple[dict[str, Any], set[str]]] = [(d, tokenize(d["content"])) for d in procedural_decisions]
+    clusters: list[dict[str, Any]] = []
+    used: set[int] = set()
 
     for i, (d1, t1) in enumerate(proc_tokens):
         if i in used:
             continue
-        cluster = [d1]
+        cluster_items: list[dict[str, Any]] = [d1]
         used.add(i)
 
         for j, (d2, t2) in enumerate(proc_tokens):
             if j in used or j <= i:
                 continue
-            if jaccard(t1, t2) >= 0.20:  # lower threshold for procedural
-                cluster.append(d2)
+            if jaccard(t1, t2) >= 0.20:
+                cluster_items.append(d2)
                 used.add(j)
 
-        if len(cluster) >= 2:
+        if len(cluster_items) >= 2:
             clusters.append({
-                "size": len(cluster),
-                "topic": cluster[0]["content"][:80],
+                "size": len(cluster_items),
+                "topic": cluster_items[0]["content"][:80],
                 "decisions": [{
                     "id": d["id"],
                     "content": d["content"][:150],
                     "context": d["context"],
                     "keywords": d["matched_keywords"],
-                } for d in cluster],
+                } for d in cluster_items],
             })
 
     clusters.sort(key=lambda x: x["size"], reverse=True)
 
-    # Also specifically look for dispatch gate and runbook mentions
-    dispatch_decisions = [d for d in decisions if "dispatch" in d["content"].lower()]
-    runbook_decisions = [d for d in decisions if "runbook" in d["content"].lower()]
+    dispatch_decisions: list[TimelineEvent] = [d for d in decisions if "dispatch" in d["content"].lower()]
+    runbook_decisions: list[TimelineEvent] = [d for d in decisions if "runbook" in d["content"].lower()]
 
     print(f"    {len(procedural_decisions)} procedural decisions out of {len(decisions)}", file=sys.stderr)
     print(f"    {len(clusters)} clusters of repeated instructions", file=sys.stderr)
     print(f"    {len(dispatch_decisions)} dispatch-related decisions", file=sys.stderr)
     print(f"    {len(runbook_decisions)} runbook-related decisions", file=sys.stderr)
 
-    for cluster in clusters[:5]:
-        print(f"    Cluster (size {cluster['size']}): {cluster['topic'][:60]}", file=sys.stderr)
-        for d in cluster["decisions"][:3]:
+    for cluster_item in clusters[:5]:
+        print(f"    Cluster (size {cluster_item['size']}): {cluster_item['topic'][:60]}", file=sys.stderr)
+        for d in cluster_item["decisions"][:3]:
             print(f"      {d['id']}: {d['content'][:70]}", file=sys.stderr)
 
     return {
@@ -357,14 +347,12 @@ def detect_repeated_instructions(timeline: dict) -> dict:
 
 # --- P5: Dispatch Gate Failures ---
 
-def detect_dispatch_failures(timeline: dict) -> dict:
-    """Find commits indicating dispatch failures or gate violations."""
+def detect_dispatch_failures(timeline: Timeline) -> ResultDict:
     print("  P5: Detecting dispatch gate failures...", file=sys.stderr)
 
-    commits = [e for e in timeline["events"] if e["event_type"] == "commit"]
+    commits: list[TimelineEvent] = [e for e in timeline["events"] if e["event_type"] == "commit"]
 
-    # Patterns indicating dispatch problems
-    dispatch_failure_patterns = [
+    dispatch_failure_patterns: list[str] = [
         r'dispatch.*fail',
         r'dispatch.*fix',
         r'dispatch.*gate',
@@ -376,9 +364,9 @@ def detect_dispatch_failures(timeline: dict) -> dict:
         r'fix.*dispatch',
     ]
 
-    dispatch_failures = []
+    dispatch_failures: list[dict[str, Any]] = []
     for c in commits:
-        msg = c["content"].lower()
+        msg: str = c["content"].lower()
         for p in dispatch_failure_patterns:
             if re.search(p, msg):
                 dispatch_failures.append({
@@ -390,9 +378,8 @@ def detect_dispatch_failures(timeline: dict) -> dict:
                 })
                 break
 
-    # Also look for knowledge entries about dispatch issues
-    knowledge = [e for e in timeline["events"] if e["event_type"] == "knowledge"]
-    dispatch_knowledge = [k for k in knowledge if "dispatch" in k["content"].lower()]
+    knowledge: list[TimelineEvent] = [e for e in timeline["events"] if e["event_type"] == "knowledge"]
+    dispatch_knowledge: list[TimelineEvent] = [k for k in knowledge if "dispatch" in k["content"].lower()]
 
     print(f"    {len(dispatch_failures)} dispatch-related failure commits", file=sys.stderr)
     print(f"    {len(dispatch_knowledge)} dispatch-related knowledge entries", file=sys.stderr)
@@ -414,21 +401,20 @@ def detect_dispatch_failures(timeline: dict) -> dict:
 
 # --- Main ---
 
-def main():
+def main() -> None:
     print("=" * 60, file=sys.stderr)
     print("Experiment 6 Phase B: Detecting Memory Failure Patterns", file=sys.stderr)
     print("=" * 60, file=sys.stderr)
 
-    timeline = load_timeline()
+    timeline: Timeline = load_timeline()
 
-    results = {}
+    results: dict[str, ResultDict] = {}
     results["p1"] = detect_repeated_decisions(timeline)
     results["p2"] = detect_repeated_research(timeline)
     results["p3"] = detect_repeated_debugging(timeline)
     results["p4"] = detect_repeated_instructions(timeline)
     results["p5"] = detect_dispatch_failures(timeline)
 
-    # Summary
     print(f"\n{'='*60}", file=sys.stderr)
     print("FAILURE PATTERN SUMMARY", file=sys.stderr)
     print(f"{'='*60}", file=sys.stderr)
@@ -440,7 +426,7 @@ def main():
           f"{results['p4']['runbook_decisions']} runbook)", file=sys.stderr)
     print(f"  P5 Dispatch failures:        {results['p5']['dispatch_failure_commits']} failure commits", file=sys.stderr)
 
-    output_path = Path("experiments/exp6_failures.json")
+    output_path: Path = Path("experiments/exp6_failures.json")
     output_path.write_text(json.dumps(results, indent=2))
     print(f"\nOutput: {output_path}", file=sys.stderr)
 

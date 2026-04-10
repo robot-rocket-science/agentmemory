@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Experiment 6 Phase A: Build unified timeline from alpha-seek project history.
 
@@ -16,9 +18,9 @@ import re
 import sqlite3
 import subprocess
 import sys
-from dataclasses import dataclass, field, asdict
-from datetime import datetime
+from dataclasses import dataclass, asdict
 from pathlib import Path
+from typing import Any
 
 
 ALPHA_SEEK_DB = Path("/Users/thelorax/projects/.gsd/workflows/spikes/"
@@ -44,7 +46,7 @@ class TimelineEvent:
 
 def extract_d_m_refs(text: str) -> list[str]:
     """Extract D### and M### references from text."""
-    refs = set()
+    refs: set[str] = set()
     for m in re.finditer(r'\bD(\d{2,3})\b', text):
         refs.add(f"D{m.group(1)}")
     for m in re.finditer(r'\bM(\d{2,3})\b', text):
@@ -54,10 +56,10 @@ def extract_d_m_refs(text: str) -> list[str]:
 
 def extract_decisions(db: sqlite3.Connection) -> list[TimelineEvent]:
     """Extract decisions and assign approximate timestamps from milestone context."""
-    events = []
+    events: list[TimelineEvent] = []
 
     # Build milestone timestamp lookup
-    milestone_times = {}
+    milestone_times: dict[str, dict[str, str]] = {}
     for row in db.execute("SELECT id, created_at, completed_at FROM milestones"):
         mid = row[0].split("-")[0]  # M005-4iw23z -> M005
         milestone_times[mid] = {
@@ -66,13 +68,13 @@ def extract_decisions(db: sqlite3.Connection) -> list[TimelineEvent]:
         }
 
     for row in db.execute("SELECT id, when_context, scope, decision, choice, rationale, superseded_by FROM decisions ORDER BY seq"):
-        did = row[0]
-        when_ctx = row[1] or ""
-        scope = row[2] or ""
-        decision = row[3] or ""
-        choice = row[4] or ""
-        rationale = row[5] or ""
-        superseded = row[6] or ""
+        did: str = row[0]
+        when_ctx: str = row[1] or ""
+        _scope: str = row[2] or ""
+        decision: str = row[3] or ""
+        choice: str = row[4] or ""
+        rationale: str = row[5] or ""
+        _superseded: str = row[6] or ""
 
         content = f"{decision}: {choice}"
         if rationale:
@@ -107,15 +109,15 @@ def extract_decisions(db: sqlite3.Connection) -> list[TimelineEvent]:
 
 def extract_milestones(db: sqlite3.Connection) -> list[TimelineEvent]:
     """Extract milestone start and end events."""
-    events = []
+    events: list[TimelineEvent] = []
 
     for row in db.execute("SELECT id, title, status, created_at, completed_at FROM milestones ORDER BY created_at"):
-        mid_full = row[0]
+        mid_full: str = row[0]
         mid = mid_full.split("-")[0]
-        title = row[1] or mid
-        status = row[2] or "unknown"
-        created = row[3] or ""
-        completed = row[4]
+        title: str = row[1] or mid
+        status: str = row[2] or "unknown"
+        created: str = row[3] or ""
+        completed: str | None = row[4]
 
         events.append(TimelineEvent(
             id=f"{mid}_start",
@@ -143,13 +145,13 @@ def extract_milestones(db: sqlite3.Connection) -> list[TimelineEvent]:
 
 def extract_knowledge(db: sqlite3.Connection) -> list[TimelineEvent]:
     """Extract knowledge entries."""
-    events = []
+    events: list[TimelineEvent] = []
 
     for row in db.execute("SELECT id, content, category, created_at FROM mem_nodes WHERE source_type='knowledge' ORDER BY id"):
-        kid = row[0]
-        content = row[1] or ""
-        category = row[2] or ""
-        created = row[3] or ""
+        kid: str = row[0]
+        content: str = row[1] or ""
+        category: str = row[2] or ""
+        created: str = row[3] or ""
 
         refs = extract_d_m_refs(content)
 
@@ -174,7 +176,7 @@ def extract_knowledge(db: sqlite3.Connection) -> list[TimelineEvent]:
 
 def extract_git_commits(repo_path: Path, repo_name: str) -> list[TimelineEvent]:
     """Extract git commits with D###/M### references."""
-    events = []
+    events: list[TimelineEvent] = []
 
     try:
         result = subprocess.run(
@@ -215,9 +217,9 @@ def extract_git_commits(repo_path: Path, repo_name: str) -> list[TimelineEvent]:
     return events
 
 
-def extract_edges(db: sqlite3.Connection) -> list[dict]:
+def extract_edges(db: sqlite3.Connection) -> list[dict[str, Any]]:
     """Extract citation edges for the citation graph."""
-    edges = []
+    edges: list[dict[str, Any]] = []
     for row in db.execute("SELECT from_id, to_id, edge_type, weight, reason FROM mem_edges"):
         edges.append({
             "from": row[0],
@@ -229,7 +231,7 @@ def extract_edges(db: sqlite3.Connection) -> list[dict]:
     return edges
 
 
-def build_timeline():
+def build_timeline() -> None:
     print("=" * 60, file=sys.stderr)
     print("Experiment 6 Phase A: Building Unified Timeline", file=sys.stderr)
     print("=" * 60, file=sys.stderr)
@@ -267,7 +269,7 @@ def build_timeline():
     all_events = decisions + milestones + knowledge + commits_as + commits_mt
 
     # Sort by timestamp (events without timestamps go to the end)
-    def sort_key(e):
+    def sort_key(e: TimelineEvent) -> str:
         if e.timestamp:
             return e.timestamp
         # For decisions without timestamps, use ID number for ordering
@@ -281,7 +283,7 @@ def build_timeline():
     # Compute stats
     with_timestamps = sum(1 for e in all_events if e.timestamp)
     with_refs = sum(1 for e in all_events if e.references)
-    ref_counts = {}
+    ref_counts: dict[str, int] = {}
     for e in all_events:
         for r in e.references:
             ref_counts[r] = ref_counts.get(r, 0) + 1
@@ -327,7 +329,7 @@ def build_timeline():
     print(f"\n{summary}", file=sys.stderr)
 
     # Write outputs
-    timeline_data = {
+    timeline_data: dict[str, Any] = {
         "events": [asdict(e) for e in all_events],
         "edges": edges,
         "stats": {

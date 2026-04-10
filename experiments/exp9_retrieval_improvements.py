@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Experiment 9: Information-Theoretic Retrieval Improvements
 
@@ -14,17 +16,17 @@ import json
 import re
 import sqlite3
 import sys
-from collections import defaultdict
 from pathlib import Path
+from typing import Any
+from collections.abc import Callable
 
-import numpy as np
-from datasketch import MinHash, MinHashLSH
+from datasketch import MinHash, MinHashLSH  # type: ignore[import-untyped]
 
 ALPHA_SEEK_DB = Path("/Users/thelorax/projects/.gsd/workflows/spikes/"
                      "260406-1-associative-memory-for-gsd-please-explor/"
                      "sandbox/alpha-seek.db")
 
-CRITICAL_BELIEFS = {
+CRITICAL_BELIEFS: dict[str, dict[str, list[str]]] = {
     "dispatch_gate": {
         "queries": [
             "dispatch gate deploy protocol",
@@ -78,18 +80,20 @@ CRITICAL_BELIEFS = {
 
 # --- Load Data ---
 
-def load_nodes() -> dict[str, dict]:
+def load_nodes() -> dict[str, dict[str, str | int]]:
     db = sqlite3.connect(str(ALPHA_SEEK_DB))
-    nodes = {}
+    nodes: dict[str, dict[str, str | int]] = {}
     for row in db.execute("SELECT id, content FROM mem_nodes WHERE superseded_by IS NULL"):
-        nodes[row[0]] = {"id": row[0], "content": row[1], "tokens": len(row[1]) // 4}
+        node_id: str = str(row[0])
+        content: str = str(row[1])
+        nodes[node_id] = {"id": node_id, "content": content, "tokens": len(content) // 4}
     db.close()
     return nodes
 
 
 # --- Method 1: FTS5 Baseline (from Exp 4) ---
 
-def build_fts(nodes: dict) -> sqlite3.Connection:
+def build_fts(nodes: dict[str, dict[str, str | int]]) -> sqlite3.Connection:
     db = sqlite3.connect(":memory:")
     db.execute("CREATE VIRTUAL TABLE fts USING fts5(id, content, tokenize='porter')")
     for nid, node in nodes.items():
@@ -99,7 +103,7 @@ def build_fts(nodes: dict) -> sqlite3.Connection:
 
 
 def search_fts(query: str, fts_db: sqlite3.Connection, top_k: int = 30) -> list[str]:
-    terms = [t.strip() for t in query.split() if len(t.strip()) > 2]
+    terms: list[str] = [t.strip() for t in query.split() if len(t.strip()) > 2]
     if not terms:
         return []
     fts_query = " OR ".join(terms)
@@ -108,14 +112,14 @@ def search_fts(query: str, fts_db: sqlite3.Connection, top_k: int = 30) -> list[
             "SELECT id FROM fts WHERE fts MATCH ? ORDER BY rank LIMIT ?",
             (fts_query, top_k)
         ).fetchall()
-        return [r[0] for r in results]
+        return [str(r[0]) for r in results]
     except Exception:
         return []
 
 
 # --- Method 2: FTS5 + Stemming/Synonym Expansion ---
 
-SYNONYMS = {
+SYNONYMS: dict[str, list[str]] = {
     "capital": ["bankroll", "money", "funds", "investment", "budget", "USD", "dollars"],
     "deploy": ["dispatch", "ship", "release", "push", "launch"],
     "gate": ["check", "verification", "protocol", "guard", "prerequisite"],
@@ -133,8 +137,8 @@ SYNONYMS = {
 
 def expand_query(query: str) -> str:
     """Expand query with synonyms."""
-    terms = query.lower().split()
-    expanded = set(terms)
+    terms: list[str] = query.lower().split()
+    expanded: set[str] = set(terms)
     for term in terms:
         if term in SYNONYMS:
             expanded.update(SYNONYMS[term])
@@ -148,7 +152,7 @@ def search_fts_expanded(query: str, fts_db: sqlite3.Connection, top_k: int = 30)
             "SELECT id FROM fts WHERE fts MATCH ? ORDER BY rank LIMIT ?",
             (expanded, top_k)
         ).fetchall()
-        return [r[0] for r in results]
+        return [str(r[0]) for r in results]
     except Exception:
         return []
 
@@ -158,8 +162,8 @@ def search_fts_expanded(query: str, fts_db: sqlite3.Connection, top_k: int = 30)
 def tokenize_for_minhash(text: str) -> set[str]:
     """3-gram shingles for MinHash."""
     text = text.lower()
-    words = re.findall(r'[a-z0-9]+', text)
-    shingles = set()
+    words: list[str] = re.findall(r'[a-z0-9]+', text)
+    shingles: set[str] = set()
     for i in range(len(words) - 2):
         shingles.add(f"{words[i]}_{words[i+1]}_{words[i+2]}")
     # Also add individual words
@@ -167,14 +171,17 @@ def tokenize_for_minhash(text: str) -> set[str]:
     return shingles
 
 
-def build_minhash_index(nodes: dict, num_perm: int = 128) -> tuple[MinHashLSH, dict]:
-    lsh = MinHashLSH(threshold=0.1, num_perm=num_perm)
-    minhashes = {}
+def build_minhash_index(
+    nodes: dict[str, dict[str, str | int]], num_perm: int = 128
+) -> tuple[MinHashLSH, dict[str, MinHash]]:
+    lsh: MinHashLSH = MinHashLSH(threshold=0.1, num_perm=num_perm)
+    minhashes: dict[str, MinHash] = {}
 
     for nid, node in nodes.items():
-        m = MinHash(num_perm=num_perm)
-        for s in tokenize_for_minhash(node["content"]):
-            m.update(s.encode('utf8'))
+        m: MinHash = MinHash(num_perm=num_perm)
+        content_val: str = str(node["content"])
+        for s in tokenize_for_minhash(content_val):
+            m.update(s.encode('utf8'))  # type: ignore[no-untyped-call]
         minhashes[nid] = m
         try:
             lsh.insert(nid, m)
@@ -185,41 +192,46 @@ def build_minhash_index(nodes: dict, num_perm: int = 128) -> tuple[MinHashLSH, d
 
 
 def search_minhash(query: str, lsh: MinHashLSH, num_perm: int = 128) -> list[str]:
-    m = MinHash(num_perm=num_perm)
+    m: MinHash = MinHash(num_perm=num_perm)
     for s in tokenize_for_minhash(query):
-        m.update(s.encode('utf8'))
-    return lsh.query(m)
+        m.update(s.encode('utf8'))  # type: ignore[no-untyped-call]
+    result: list[Any] = lsh.query(m)  # type: ignore[no-untyped-call]
+    return [str(r) for r in result]
 
 
 # --- Method 4: Combined (FTS expanded + MinHash) ---
 
 def search_combined(query: str, fts_db: sqlite3.Connection,
                     lsh: MinHashLSH, top_k: int = 30) -> list[str]:
-    fts_results = set(search_fts_expanded(query, fts_db, top_k))
-    minhash_results = set(search_minhash(query, lsh))
-    combined = fts_results | minhash_results
+    fts_results: set[str] = set(search_fts_expanded(query, fts_db, top_k))
+    minhash_results: set[str] = set(search_minhash(query, lsh))
+    combined: set[str] = fts_results | minhash_results
     return list(combined)[:top_k]
 
 
 # --- Evaluation ---
 
-def evaluate_method(method_name: str, search_fn, nodes: dict) -> dict:
+def evaluate_method(
+    method_name: str,
+    search_fn: Callable[[str], list[str]],
+    nodes: dict[str, dict[str, str | int]],
+) -> dict[str, Any]:
     """Evaluate a retrieval method against all critical belief topics."""
     total_needed = 0
     total_found = 0
-    per_topic = {}
+    per_topic: dict[str, dict[str, Any]] = {}
 
     for topic_id, topic in CRITICAL_BELIEFS.items():
-        needed = set(topic["needed"])
+        needed: set[str] = set(topic["needed"])
         total_needed += len(needed)
 
         # Try all query variants for this topic
-        all_retrieved = set()
+        all_retrieved: set[str] = set()
         for query in topic["queries"]:
             results = search_fn(query)
             all_retrieved.update(results)
 
-        found = needed & all_retrieved
+        found: set[str] = needed & all_retrieved
         total_found += len(found)
 
         per_topic[topic_id] = {
@@ -239,7 +251,7 @@ def evaluate_method(method_name: str, search_fn, nodes: dict) -> dict:
     }
 
 
-def main():
+def main() -> None:
     print("=" * 60, file=sys.stderr)
     print("Experiment 9: Retrieval Improvement Comparison", file=sys.stderr)
     print("=" * 60, file=sys.stderr)
@@ -251,25 +263,26 @@ def main():
     fts_db = build_fts(nodes)
     print("  Built FTS5 index", file=sys.stderr)
 
-    lsh, minhashes = build_minhash_index(nodes)
+    lsh, _minhashes = build_minhash_index(nodes)
     print(f"  Built MinHash LSH index", file=sys.stderr)
 
     # Evaluate each method
-    methods = {
+    methods: dict[str, Callable[[str], list[str]]] = {
         "fts_baseline": lambda q: search_fts(q, fts_db),
         "fts_expanded": lambda q: search_fts_expanded(q, fts_db),
         "minhash_only": lambda q: search_minhash(q, lsh),
         "fts_expanded_plus_minhash": lambda q: search_combined(q, fts_db, lsh),
     }
 
-    results = {}
+    results: dict[str, dict[str, Any]] = {}
     for name, fn in methods.items():
         result = evaluate_method(name, fn, nodes)
         results[name] = result
 
         print(f"\n  {name}: {result['overall_coverage']:.0%} coverage "
               f"({result['total_found']}/{result['total_needed']})", file=sys.stderr)
-        for topic, tr in result["per_topic"].items():
+        topic_results: dict[str, Any] = result["per_topic"]
+        for topic, tr in topic_results.items():
             status = "OK" if tr["coverage"] == 1.0 else f"MISS {tr['missed']}"
             print(f"    {topic}: {tr['coverage']:.0%} (retrieved {tr['total_retrieved']}) [{status}]",
                   file=sys.stderr)
@@ -284,15 +297,19 @@ def main():
         print(f"{name:<30} {r['overall_coverage']:>10.0%} {r['total_found']:>6}", file=sys.stderr)
 
     # What did expansion/minhash find that baseline missed?
-    baseline_found = set()
-    for topic in results["fts_baseline"]["per_topic"].values():
-        baseline_found.update(topic["found"])
+    baseline_found: set[str] = set()
+    baseline_per_topic: dict[str, Any] = results["fts_baseline"]["per_topic"]
+    for topic_data in baseline_per_topic.values():
+        found_list: list[str] = topic_data["found"]
+        baseline_found.update(found_list)
 
     for method in ["fts_expanded", "minhash_only", "fts_expanded_plus_minhash"]:
-        method_found = set()
-        for topic in results[method]["per_topic"].values():
-            method_found.update(topic["found"])
-        new_finds = method_found - baseline_found
+        method_found: set[str] = set()
+        method_per_topic: dict[str, Any] = results[method]["per_topic"]
+        for topic_data in method_per_topic.values():
+            found_list = topic_data["found"]
+            method_found.update(found_list)
+        new_finds: set[str] = method_found - baseline_found
         if new_finds:
             print(f"\n  {method} found that baseline missed: {new_finds}", file=sys.stderr)
 

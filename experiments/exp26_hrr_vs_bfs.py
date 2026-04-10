@@ -20,18 +20,30 @@ Metrics: precision@k and recall@k vs BFS ground truth.
 Run with: uv run python experiments/exp26_hrr_vs_bfs.py
 """
 
+from __future__ import annotations
+
 import json
 import sqlite3
 import sys
 from collections import defaultdict
 from pathlib import Path
+from typing import TypedDict
 
 import numpy as np
+import numpy.typing as npt
 
 
-ALPHA_SEEK_DB = Path("/Users/thelorax/projects/.gsd/workflows/spikes/"
+ALPHA_SEEK_DB: Path = Path("/Users/thelorax/projects/.gsd/workflows/spikes/"
                      "260406-1-associative-memory-for-gsd-please-explor/"
                      "sandbox/alpha-seek.db")
+
+
+class NodeInfo(TypedDict):
+    content: str
+    category: str
+
+
+EdgeInfo = TypedDict("EdgeInfo", {"from": str, "to": str, "type": str})
 
 # 8192-dim: capacity ~910 bindings, covers our 775 edges with headroom
 DIM = 8192
@@ -42,30 +54,32 @@ SEP = "=" * 65
 # Core HRR ops
 # ---------------------------------------------------------------------------
 
-def make_vector(rng: np.random.Generator) -> np.ndarray:
-    v = rng.standard_normal(DIM)
+def make_vector(rng: np.random.Generator) -> npt.NDArray[np.float64]:
+    v: npt.NDArray[np.float64] = rng.standard_normal(DIM)
     v /= np.linalg.norm(v)
     return v
 
 
-def convolve(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    return np.real(np.fft.irfft(np.fft.rfft(a) * np.fft.rfft(b), n=DIM))
+def convolve(a: npt.NDArray[np.float64], b: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
+    result: npt.NDArray[np.float64] = np.real(np.fft.irfft(np.fft.rfft(a) * np.fft.rfft(b), n=DIM))
+    return result
 
 
-def correlate(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    return np.real(np.fft.irfft(np.conj(np.fft.rfft(a)) * np.fft.rfft(b), n=DIM))
+def correlate(a: npt.NDArray[np.float64], b: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
+    result: npt.NDArray[np.float64] = np.real(np.fft.irfft(np.conj(np.fft.rfft(a)) * np.fft.rfft(b), n=DIM))
+    return result
 
 
-def cos_sim(a: np.ndarray, b: np.ndarray) -> float:
-    na, nb = np.linalg.norm(a), np.linalg.norm(b)
+def cos_sim(a: npt.NDArray[np.float64], b: npt.NDArray[np.float64]) -> float:
+    na = float(np.linalg.norm(a))
+    nb = float(np.linalg.norm(b))
     if na == 0 or nb == 0:
         return 0.0
     return float(np.dot(a, b) / (na * nb))
 
 
-def top_k(query_vec: np.ndarray, node_vecs: dict[str, np.ndarray], k: int) -> list[tuple[str, float]]:
-    """Return top-k (node_id, similarity) pairs."""
-    sims = [(nid, cos_sim(query_vec, v)) for nid, v in node_vecs.items()]
+def top_k(query_vec: npt.NDArray[np.float64], node_vecs: dict[str, npt.NDArray[np.float64]], k: int) -> list[tuple[str, float]]:
+    sims: list[tuple[str, float]] = [(nid, cos_sim(query_vec, v)) for nid, v in node_vecs.items()]
     sims.sort(key=lambda x: x[1], reverse=True)
     return sims[:k]
 
@@ -74,21 +88,21 @@ def top_k(query_vec: np.ndarray, node_vecs: dict[str, np.ndarray], k: int) -> li
 # Load graph from SQLite
 # ---------------------------------------------------------------------------
 
-def load_graph(db_path: Path) -> tuple[dict, list]:
-    db = sqlite3.connect(str(db_path))
-    nodes = {}
+def load_graph(db_path: Path) -> tuple[dict[str, NodeInfo], list[EdgeInfo]]:
+    db: sqlite3.Connection = sqlite3.connect(str(db_path))
+    nodes: dict[str, NodeInfo] = {}
     for row in db.execute(
         "SELECT id, content, category FROM mem_nodes WHERE superseded_by IS NULL"
     ):
-        nodes[row[0]] = {"content": row[1], "category": row[2]}
+        nodes[str(row[0])] = NodeInfo(content=str(row[1]), category=str(row[2]))
 
-    edges = []
+    edges: list[EdgeInfo] = []
     for row in db.execute(
         "SELECT from_id, to_id, edge_type FROM mem_edges"
     ):
         # Only include edges where both endpoints are in nodes
-        if row[0] in nodes and row[1] in nodes:
-            edges.append({"from": row[0], "to": row[1], "type": row[2]})
+        if str(row[0]) in nodes and str(row[1]) in nodes:
+            edges.append(EdgeInfo(**{"from": str(row[0]), "to": str(row[1]), "type": str(row[2])}))
 
     db.close()
     return nodes, edges
@@ -98,17 +112,17 @@ def load_graph(db_path: Path) -> tuple[dict, list]:
 # BFS ground truth
 # ---------------------------------------------------------------------------
 
-def bfs_one_hop(edges: list, source: str, edge_type: str) -> set[str]:
+def bfs_one_hop(edges: list[EdgeInfo], source: str, edge_type: str) -> set[str]:
     return {e["to"] for e in edges if e["from"] == source and e["type"] == edge_type}
 
 
-def bfs_one_hop_reverse(edges: list, target: str, edge_type: str) -> set[str]:
+def bfs_one_hop_reverse(edges: list[EdgeInfo], target: str, edge_type: str) -> set[str]:
     return {e["from"] for e in edges if e["to"] == target and e["type"] == edge_type}
 
 
-def bfs_two_hop(edges: list, source: str, e1: str, e2: str) -> set[str]:
+def bfs_two_hop(edges: list[EdgeInfo], source: str, e1: str, e2: str) -> set[str]:
     mid = bfs_one_hop(edges, source, e1)
-    result = set()
+    result: set[str] = set()
     for m in mid:
         result |= bfs_one_hop(edges, m, e2)
     result.discard(source)
@@ -134,10 +148,10 @@ def precision_recall_at_k(retrieved: list[str], relevant: set[str], k: int) -> t
 # ---------------------------------------------------------------------------
 
 def build_hrr_graph(
-    nodes: dict,
-    edges: list,
-    rng: np.random.Generator
-) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray], np.ndarray]:
+    nodes: dict[str, NodeInfo],
+    edges: list[EdgeInfo],
+    rng: np.random.Generator,
+) -> tuple[dict[str, npt.NDArray[np.float64]], dict[str, npt.NDArray[np.float64]], npt.NDArray[np.float64]]:
     """
     Assign random vectors to nodes and edge types.
     Encode each edge as convolve(node_A, edge_type, node_B).
@@ -146,26 +160,28 @@ def build_hrr_graph(
     Returns: node_vecs, edge_type_vecs, S
     """
     # Assign random vectors to every node
-    node_vecs = {nid: make_vector(rng) for nid in nodes}
+    node_vecs: dict[str, npt.NDArray[np.float64]] = {nid: make_vector(rng) for nid in nodes}
 
     # Assign random vectors to each unique edge type
-    edge_types = list({e["type"] for e in edges})
-    edge_type_vecs = {et: make_vector(rng) for et in edge_types}
+    edge_types: list[str] = list({e["type"] for e in edges})
+    edge_type_vecs: dict[str, npt.NDArray[np.float64]] = {et: make_vector(rng) for et in edge_types}
 
     # Encode each edge as a bound triple and superpose
-    S = np.zeros(DIM)
+    graph_s: npt.NDArray[np.float64] = np.zeros(DIM)
     for e in edges:
         # Triple binding: from_node * edge_type * to_node
-        bound = convolve(convolve(node_vecs[e["from"]], edge_type_vecs[e["type"]]),
-                         node_vecs[e["to"]])
-        S += bound
+        bound: npt.NDArray[np.float64] = convolve(
+            convolve(node_vecs[e["from"]], edge_type_vecs[e["type"]]),
+            node_vecs[e["to"]],
+        )
+        graph_s += bound
 
-    # Normalize S to unit length for stable cosine similarity
-    s_norm = np.linalg.norm(S)
+    # Normalize to unit length for stable cosine similarity
+    s_norm = float(np.linalg.norm(graph_s))
     if s_norm > 0:
-        S /= s_norm
+        graph_s /= s_norm
 
-    return node_vecs, edge_type_vecs, S
+    return node_vecs, edge_type_vecs, graph_s
 
 
 # ---------------------------------------------------------------------------
@@ -175,10 +191,10 @@ def build_hrr_graph(
 def hrr_one_hop_forward(
     source: str,
     edge_type: str,
-    node_vecs: dict[str, np.ndarray],
-    edge_type_vecs: dict[str, np.ndarray],
-    S: np.ndarray,
-    k: int
+    node_vecs: dict[str, npt.NDArray[np.float64]],
+    edge_type_vecs: dict[str, npt.NDArray[np.float64]],
+    graph_s: npt.NDArray[np.float64],
+    k: int,
 ) -> list[tuple[str, float]]:
     """
     Query: source -[edge_type]-> ?
@@ -189,26 +205,26 @@ def hrr_one_hop_forward(
       Given A and E, recover B:
       correlate(A, correlate(E, S)) or correlate(convolve(A, E), S)
     """
-    q = convolve(node_vecs[source], edge_type_vecs[edge_type])
-    recovered = correlate(q, S)
+    q: npt.NDArray[np.float64] = convolve(node_vecs[source], edge_type_vecs[edge_type])
+    recovered: npt.NDArray[np.float64] = correlate(q, graph_s)
     return top_k(recovered, node_vecs, k)
 
 
 def hrr_one_hop_reverse(
     target: str,
     edge_type: str,
-    node_vecs: dict[str, np.ndarray],
-    edge_type_vecs: dict[str, np.ndarray],
-    S: np.ndarray,
-    k: int
+    node_vecs: dict[str, npt.NDArray[np.float64]],
+    edge_type_vecs: dict[str, npt.NDArray[np.float64]],
+    graph_s: npt.NDArray[np.float64],
+    k: int,
 ) -> list[tuple[str, float]]:
     """
     Query: ? -[edge_type]-> target
     For triple (A * E * B), to recover A given E and B:
     correlate(convolve(edge_type_vec, node_target), S)
     """
-    q = convolve(edge_type_vecs[edge_type], node_vecs[target])
-    recovered = correlate(q, S)
+    q: npt.NDArray[np.float64] = convolve(edge_type_vecs[edge_type], node_vecs[target])
+    recovered: npt.NDArray[np.float64] = correlate(q, graph_s)
     return top_k(recovered, node_vecs, k)
 
 
@@ -216,10 +232,10 @@ def hrr_two_hop(
     source: str,
     e1: str,
     e2: str,
-    node_vecs: dict[str, np.ndarray],
-    edge_type_vecs: dict[str, np.ndarray],
-    S: np.ndarray,
-    k: int
+    node_vecs: dict[str, npt.NDArray[np.float64]],
+    edge_type_vecs: dict[str, npt.NDArray[np.float64]],
+    graph_s: npt.NDArray[np.float64],
+    k: int,
 ) -> list[tuple[str, float]]:
     """
     Query: source -[e1]-> ? -[e2]-> ?
@@ -230,13 +246,13 @@ def hrr_two_hop(
     then (A*E1*B) * (B*E2*C) = A * E1 * (B*B) * E2 * C
     Since B*B ≈ delta (autocorrelation peak), this ≈ A * E1 * E2 * C.
     """
-    S2 = convolve(S, S)
-    s2_norm = np.linalg.norm(S2)
+    s2: npt.NDArray[np.float64] = convolve(graph_s, graph_s)
+    s2_norm = float(np.linalg.norm(s2))
     if s2_norm > 0:
-        S2 /= s2_norm
+        s2 /= s2_norm
 
-    q = convolve(convolve(node_vecs[source], edge_type_vecs[e1]), edge_type_vecs[e2])
-    recovered = correlate(q, S2)
+    q: npt.NDArray[np.float64] = convolve(convolve(node_vecs[source], edge_type_vecs[e1]), edge_type_vecs[e2])
+    recovered: npt.NDArray[np.float64] = correlate(q, s2)
     return top_k(recovered, node_vecs, k)
 
 
@@ -244,17 +260,23 @@ def hrr_two_hop(
 # Main
 # ---------------------------------------------------------------------------
 
-def main():
-    rng = np.random.default_rng(42)
+def _avg_metric(records: list[dict[str, float]], key: str) -> float:
+    return sum(r[key] for r in records) / len(records)
+
+
+def main() -> None:
+    rng: np.random.Generator = np.random.default_rng(42)
 
     print(SEP)
     print(f"Experiment 26: Real HRR vs BFS  (n={DIM})")
     print(SEP)
 
     # Load graph
+    nodes: dict[str, NodeInfo]
+    edges: list[EdgeInfo]
     nodes, edges = load_graph(ALPHA_SEEK_DB)
     print(f"\nGraph: {len(nodes)} nodes, {len(edges)} edges", file=sys.stderr)
-    edge_type_counts = defaultdict(int)
+    edge_type_counts: defaultdict[str, int] = defaultdict(int)
     for e in edges:
         edge_type_counts[e["type"]] += 1
     for et, n in sorted(edge_type_counts.items(), key=lambda x: -x[1]):
@@ -262,16 +284,21 @@ def main():
 
     # Build HRR
     print(f"\nBuilding HRR graph encoding...", file=sys.stderr)
-    node_vecs, edge_type_vecs, S = build_hrr_graph(nodes, edges, rng)
+    node_vecs: dict[str, npt.NDArray[np.float64]]
+    edge_type_vecs: dict[str, npt.NDArray[np.float64]]
+    graph_s: npt.NDArray[np.float64]
+    node_vecs, edge_type_vecs, graph_s = build_hrr_graph(nodes, edges, rng)
     print(f"  Graph superposition built. Capacity headroom: {DIM//9} max bindings, {len(edges)} used",
           file=sys.stderr)
 
     # Build outgoing-edge index for selecting good test cases
-    out_edges = defaultdict(lambda: defaultdict(set))  # out_edges[from][type] = {to, ...}
+    out_edges: dict[str, dict[str, set[str]]] = {}
     for e in edges:
-        out_edges[e["from"]][e["type"]].add(e["to"])
+        out_edges.setdefault(e["from"], {}).setdefault(e["type"], set()).add(e["to"])
 
-    results = {"single_hop_forward": [], "single_hop_reverse": [], "two_hop": []}
+    results: dict[str, list[dict[str, float]]] = {
+        "single_hop_forward": [], "single_hop_reverse": [], "two_hop": [],
+    }
 
     # -----------------------------------------------------------------------
     # Test 1: Single-hop forward  A -[CITES]-> ?
@@ -282,25 +309,25 @@ def main():
     print(f"\n  {'Source':>8}  {'BFS hits':>9}  {'P@5':>6}  {'R@5':>6}  {'P@10':>6}  {'R@10':>6}  HRR top-3")
 
     # Pick sources with at least 1 and at most 6 CITES targets (manageable ground truth)
-    test_sources_cites = [
+    test_sources_cites: list[str] = [
         nid for nid in out_edges
         if 1 <= len(out_edges[nid].get("CITES", set())) <= 6
     ][:12]
 
     for source in test_sources_cites:
-        gt = bfs_one_hop(edges, source, "CITES")
-        hrr_results = hrr_one_hop_forward(source, "CITES", node_vecs, edge_type_vecs, S, k=10)
-        hrr_ids = [r[0] for r in hrr_results]
+        gt: set[str] = bfs_one_hop(edges, source, "CITES")
+        hrr_results: list[tuple[str, float]] = hrr_one_hop_forward(source, "CITES", node_vecs, edge_type_vecs, graph_s, k=10)
+        hrr_ids: list[str] = [r[0] for r in hrr_results]
 
         p5, r5 = precision_recall_at_k(hrr_ids, gt, 5)
         p10, r10 = precision_recall_at_k(hrr_ids, gt, 10)
-        top3 = ", ".join(f"{r[0]}({'Y' if r[0] in gt else 'n'})" for r in hrr_results[:3])
+        top3: str = ", ".join(f"{r[0]}({'Y' if r[0] in gt else 'n'})" for r in hrr_results[:3])
 
         print(f"  {source:>8}  {len(gt):>9}  {p5:>6.2f}  {r5:>6.2f}  {p10:>6.2f}  {r10:>6.2f}  {top3}")
         results["single_hop_forward"].append({"p5": p5, "r5": r5, "p10": p10, "r10": r10})
 
-    avg = lambda key: sum(r[key] for r in results["single_hop_forward"]) / len(results["single_hop_forward"])
-    print(f"\n  Mean:  P@5={avg('p5'):.3f}  R@5={avg('r5'):.3f}  P@10={avg('p10'):.3f}  R@10={avg('r10'):.3f}")
+    fwd: list[dict[str, float]] = results["single_hop_forward"]
+    print(f"\n  Mean:  P@5={_avg_metric(fwd, 'p5'):.3f}  R@5={_avg_metric(fwd, 'r5'):.3f}  P@10={_avg_metric(fwd, 'p10'):.3f}  R@10={_avg_metric(fwd, 'r10'):.3f}")
 
     # -----------------------------------------------------------------------
     # Test 2: Single-hop reverse  ? -[CITES]-> B
@@ -311,18 +338,18 @@ def main():
     print(f"\n  {'Target':>8}  {'BFS hits':>9}  {'P@5':>6}  {'R@5':>6}  {'P@10':>6}  {'R@10':>6}  HRR top-3")
 
     # Pick targets that have 1-5 incoming CITES edges
-    in_edges = defaultdict(lambda: defaultdict(set))
+    in_edges_map: dict[str, dict[str, set[str]]] = {}
     for e in edges:
-        in_edges[e["to"]][e["type"]].add(e["from"])
+        in_edges_map.setdefault(e["to"], {}).setdefault(e["type"], set()).add(e["from"])
 
-    test_targets_cites = [
-        nid for nid in in_edges
-        if 1 <= len(in_edges[nid].get("CITES", set())) <= 5
+    test_targets_cites: list[str] = [
+        nid for nid in in_edges_map
+        if 1 <= len(in_edges_map[nid].get("CITES", set())) <= 5
     ][:12]
 
     for target in test_targets_cites:
         gt = bfs_one_hop_reverse(edges, target, "CITES")
-        hrr_results = hrr_one_hop_reverse(target, "CITES", node_vecs, edge_type_vecs, S, k=10)
+        hrr_results = hrr_one_hop_reverse(target, "CITES", node_vecs, edge_type_vecs, graph_s, k=10)
         hrr_ids = [r[0] for r in hrr_results]
 
         p5, r5 = precision_recall_at_k(hrr_ids, gt, 5)
@@ -332,8 +359,8 @@ def main():
         print(f"  {target:>8}  {len(gt):>9}  {p5:>6.2f}  {r5:>6.2f}  {p10:>6.2f}  {r10:>6.2f}  {top3}")
         results["single_hop_reverse"].append({"p5": p5, "r5": r5, "p10": p10, "r10": r10})
 
-    avg = lambda key: sum(r[key] for r in results["single_hop_reverse"]) / len(results["single_hop_reverse"])
-    print(f"\n  Mean:  P@5={avg('p5'):.3f}  R@5={avg('r5'):.3f}  P@10={avg('p10'):.3f}  R@10={avg('r10'):.3f}")
+    rev: list[dict[str, float]] = results["single_hop_reverse"]
+    print(f"\n  Mean:  P@5={_avg_metric(rev, 'p5'):.3f}  R@5={_avg_metric(rev, 'r5'):.3f}  P@10={_avg_metric(rev, 'p10'):.3f}  R@10={_avg_metric(rev, 'r10'):.3f}")
 
     # -----------------------------------------------------------------------
     # Test 3: Two-hop  A -[CITES]-> B -[DECIDED_IN]-> M
@@ -344,7 +371,7 @@ def main():
     print(f"\n  {'Source':>8}  {'BFS hits':>9}  {'P@5':>6}  {'R@5':>6}  {'P@10':>6}  {'R@10':>6}  HRR top-3")
 
     # Sources that have CITES edges leading to nodes with DECIDED_IN edges
-    test_sources_2hop = []
+    test_sources_2hop: list[str] = []
     for nid in out_edges:
         gt = bfs_two_hop(edges, nid, "CITES", "DECIDED_IN")
         if 1 <= len(gt) <= 8:
@@ -353,7 +380,7 @@ def main():
 
     for source in test_sources_2hop:
         gt = bfs_two_hop(edges, source, "CITES", "DECIDED_IN")
-        hrr_results = hrr_two_hop(source, "CITES", "DECIDED_IN", node_vecs, edge_type_vecs, S, k=10)
+        hrr_results = hrr_two_hop(source, "CITES", "DECIDED_IN", node_vecs, edge_type_vecs, graph_s, k=10)
         hrr_ids = [r[0] for r in hrr_results]
 
         p5, r5 = precision_recall_at_k(hrr_ids, gt, 5)
@@ -363,8 +390,8 @@ def main():
         print(f"  {source:>8}  {len(gt):>9}  {p5:>6.2f}  {r5:>6.2f}  {p10:>6.2f}  {r10:>6.2f}  {top3}")
         results["two_hop"].append({"p5": p5, "r5": r5, "p10": p10, "r10": r10})
 
-    avg = lambda key: sum(r[key] for r in results["two_hop"]) / len(results["two_hop"])
-    print(f"\n  Mean:  P@5={avg('p5'):.3f}  R@5={avg('r5'):.3f}  P@10={avg('p10'):.3f}  R@10={avg('r10'):.3f}")
+    two: list[dict[str, float]] = results["two_hop"]
+    print(f"\n  Mean:  P@5={_avg_metric(two, 'p5'):.3f}  R@5={_avg_metric(two, 'r5'):.3f}  P@10={_avg_metric(two, 'p10'):.3f}  R@10={_avg_metric(two, 'r10'):.3f}")
 
     # -----------------------------------------------------------------------
     # Summary
@@ -373,8 +400,8 @@ def main():
     print("SUMMARY")
     print(SEP)
 
-    def mean_results(key):
-        r = results[key]
+    def mean_results(key: str) -> dict[str, float]:
+        r: list[dict[str, float]] = results[key]
         return {k: sum(x[k] for x in r) / len(r) for k in ["p5", "r5", "p10", "r10"]}
 
     for label, key in [
@@ -382,7 +409,7 @@ def main():
         ("Single-hop reverse (CITES)", "single_hop_reverse"),
         ("Two-hop (CITES->DECIDED_IN)", "two_hop"),
     ]:
-        m = mean_results(key)
+        m: dict[str, float] = mean_results(key)
         print(f"\n  {label}:")
         print(f"    P@5={m['p5']:.3f}  R@5={m['r5']:.3f}  P@10={m['p10']:.3f}  R@10={m['r10']:.3f}")
 
@@ -396,7 +423,7 @@ def main():
 """)
 
     # Save results
-    out = Path(__file__).parent / "exp26_results.json"
+    out: Path = Path(__file__).parent / "exp26_results.json"
     with open(out, "w") as f:
         json.dump(results, f, indent=2)
     print(f"  Results saved to {out.name}")

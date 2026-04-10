@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Interactive CLI labeling tool for Experiment 3.
 
@@ -8,9 +10,10 @@ Usage: uv run python experiments/exp3_label_cli.py
 """
 
 import json
+import re
 import sqlite3
-import sys
 from pathlib import Path
+from typing import Any
 
 
 EVAL_PATH = Path("experiments/exp3_eval_sheets_v2.json")
@@ -20,21 +23,21 @@ ALPHA_SEEK_DB = Path("/Users/thelorax/projects/.gsd/workflows/spikes/"
                      "sandbox/alpha-seek.db")
 
 
-def load_rich_content() -> dict[str, str]:
+def load_rich_content() -> dict[str, Any]:
     """Load richer content from source tables for terse mem_nodes entries."""
-    enriched = {}
+    enriched: dict[str, Any] = {}
     db = sqlite3.connect(str(ALPHA_SEEK_DB))
 
     # Decisions: combine decision + choice + rationale
     for row in db.execute("SELECT id, decision, choice, rationale FROM decisions"):
-        parts = [row[1] or "", row[2] or ""]
+        parts: list[str] = [row[1] or "", row[2] or ""]
         if row[3]:
             parts.append(f"Rationale: {row[3][:200]}")
         enriched[row[0]] = " | ".join(p for p in parts if p)
 
     # Milestones: get the title from mem_nodes (already there) but also check milestones table
     for row in db.execute("SELECT id, content FROM mem_nodes WHERE source_type='milestone'"):
-        node_id = row[0]
+        node_id: str = row[0]
         if node_id not in enriched:
             # Try to find more context from edges
             edges = db.execute(
@@ -46,9 +49,9 @@ def load_rich_content() -> dict[str, str]:
                 enriched[node_id] = f"{row[1]} -- Related: {related}"
 
     # Compute sequence context: what's the ID range so we can show relative age
-    max_d = db.execute("SELECT MAX(CAST(SUBSTR(id, 2) AS INTEGER)) FROM mem_nodes WHERE id LIKE 'D%'").fetchone()[0] or 0
-    max_m = db.execute("SELECT MAX(CAST(SUBSTR(id, 3) AS INTEGER)) FROM mem_nodes WHERE id LIKE '_M%'").fetchone()[0] or 0
-    max_k = db.execute("SELECT MAX(CAST(SUBSTR(id, 2) AS INTEGER)) FROM mem_nodes WHERE id LIKE 'K%'").fetchone()[0] or 0
+    max_d: int = db.execute("SELECT MAX(CAST(SUBSTR(id, 2) AS INTEGER)) FROM mem_nodes WHERE id LIKE 'D%'").fetchone()[0] or 0
+    max_m: int = db.execute("SELECT MAX(CAST(SUBSTR(id, 3) AS INTEGER)) FROM mem_nodes WHERE id LIKE '_M%'").fetchone()[0] or 0
+    max_k: int = db.execute("SELECT MAX(CAST(SUBSTR(id, 2) AS INTEGER)) FROM mem_nodes WHERE id LIKE 'K%'").fetchone()[0] or 0
     enriched["_meta_max_d"] = max_d
     enriched["_meta_max_m"] = max_m
     enriched["_meta_max_k"] = max_k
@@ -61,18 +64,18 @@ def load_rich_content() -> dict[str, str]:
     return enriched
 
 
-def load_progress() -> dict:
+def load_progress() -> dict[str, dict[str, int]]:
     if LABELS_PATH.exists():
-        return json.loads(LABELS_PATH.read_text())
+        return json.loads(LABELS_PATH.read_text())  # type: ignore[no-any-return]
     return {}
 
 
-def save_progress(labels: dict):
+def save_progress(labels: dict[str, dict[str, int]]) -> None:
     LABELS_PATH.write_text(json.dumps(labels, indent=2))
 
 
-def main():
-    evals = json.loads(EVAL_PATH.read_text())
+def main() -> None:
+    evals: list[dict[str, Any]] = json.loads(EVAL_PATH.read_text())
     labels = load_progress()
     rich_content = load_rich_content()
 
@@ -95,49 +98,48 @@ def main():
     print(f"  Q = Quit (progress saved)\n")
 
     for ev in evals:
-        qid = ev["query_id"]
+        qid: str = ev["query_id"]
 
         # Skip already-completed queries
         if qid in labels and len(labels[qid]) == len(ev["eval_items"]):
             continue
 
-        print(f"\n{'─'*60}")
+        print(f"\n{'---'*20}")
         print(f"Query {qid}: {ev.get('original_query', ev['query'])}")
         print(f"  ({len(ev['eval_items'])} results to label)")
-        print(f"{'─'*60}\n")
+        print(f"{'---'*20}\n")
 
         if qid not in labels:
             labels[qid] = {}
 
         for i, item in enumerate(ev["eval_items"]):
-            eid = item["eval_id"]
+            eid: str = item["eval_id"]
 
             # Skip already-labeled items
             if eid in labels[qid]:
                 continue
 
             # Show enriched content if available, otherwise the default
-            node_id = item["node_id"]
-            display = rich_content.get(node_id, item["content"])
+            node_id: str = item["node_id"]
+            display: str = rich_content.get(node_id, item["content"])
 
             # Temporal context: relative age based on ID sequence
             age_hint = ""
-            import re
             if m := re.match(r"D(\d+)", node_id):
                 num = int(m.group(1))
-                max_d = rich_content.get("_meta_max_d", 999)
-                pct = num / max_d if max_d else 0
-                age_hint = f"decision {num}/{max_d} ({'early' if pct < 0.3 else 'mid' if pct < 0.7 else 'recent'})"
+                max_d_val: int = rich_content.get("_meta_max_d", 999)
+                pct = num / max_d_val if max_d_val else 0
+                age_hint = f"decision {num}/{max_d_val} ({'early' if pct < 0.3 else 'mid' if pct < 0.7 else 'recent'})"
             elif m := re.match(r"_M(\d+)", node_id):
                 num = int(m.group(1))
-                max_m = rich_content.get("_meta_max_m", 999)
-                pct = num / max_m if max_m else 0
-                age_hint = f"milestone {num}/{max_m} ({'early' if pct < 0.3 else 'mid' if pct < 0.7 else 'recent'})"
+                max_m_val: int = rich_content.get("_meta_max_m", 999)
+                pct = num / max_m_val if max_m_val else 0
+                age_hint = f"milestone {num}/{max_m_val} ({'early' if pct < 0.3 else 'mid' if pct < 0.7 else 'recent'})"
             elif m := re.match(r"K(\d+)", node_id):
                 num = int(m.group(1))
-                max_k = rich_content.get("_meta_max_k", 999)
-                pct = num / max_k if max_k else 0
-                age_hint = f"knowledge {num}/{max_k} ({'early' if pct < 0.3 else 'mid' if pct < 0.7 else 'recent'})"
+                max_k_val: int = rich_content.get("_meta_max_k", 999)
+                pct = num / max_k_val if max_k_val else 0
+                age_hint = f"knowledge {num}/{max_k_val} ({'early' if pct < 0.3 else 'mid' if pct < 0.7 else 'recent'})"
 
             # Supersession status
             sup_key = f"_superseded_{node_id}"
@@ -147,11 +149,12 @@ def main():
             print(f"  [{i+1}/{len(ev['eval_items'])}] ({node_id}) {display}")
             if node_id in rich_content and rich_content[node_id] != item["content"]:
                 print(f"           [short: {item['content'][:80]}]")
-            meta_parts = [f"category: {item['category']}", f"source: {item['source_type']}"]
+            meta_parts: list[str] = [f"category: {item['category']}", f"source: {item['source_type']}"]
             if age_hint:
                 meta_parts.append(age_hint)
             print(f"           {' | '.join(meta_parts)}")
 
+            choice = ""
             while True:
                 try:
                     choice = input("  Score (1-5/S/Q): ").strip().upper()

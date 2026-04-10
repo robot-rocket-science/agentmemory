@@ -10,11 +10,14 @@ Questions:
 - What propagation weight works for power-law topology?
 """
 
+from __future__ import annotations
+
 import json
 import sqlite3
 import sys
 from collections import defaultdict
 from pathlib import Path
+from typing import Any, cast
 
 import numpy as np
 from experiments.exp2_bayesian_calibration import Belief, compute_calibration
@@ -29,35 +32,45 @@ DOMAINS = ["strategy", "methodology", "knowledge", "architecture",
 N_SESSIONS = 50
 N_TRIALS = 10
 
+NodeDict = dict[str, dict[str, Any]]
+AdjDict = defaultdict[str, list[tuple[str, str, float]]]
+AnchorDict = dict[str, int]
+SubgraphDict = dict[str, set[str]]
+DegreeDict = dict[str, int]
 
-def load_real_graph():
+
+def load_real_graph() -> tuple[NodeDict, AdjDict, AnchorDict, SubgraphDict, DegreeDict]:
     """Load alpha-seek nodes and build real subgraphs from anchors."""
     db = sqlite3.connect(str(ALPHA_SEEK_DB))
 
-    nodes = {}
+    nodes: NodeDict = {}
     for row in db.execute("SELECT id, content, category, confidence FROM mem_nodes WHERE superseded_by IS NULL"):
-        nodes[row[0]] = {
+        nodes[str(row[0])] = {
             "content": row[1],
             "category": row[2] or "unknown",
             "confidence": row[3] or 0.5,
         }
 
-    adj = defaultdict(list)
+    adj: AdjDict = defaultdict(list)
     for row in db.execute("SELECT from_id, to_id, edge_type, weight FROM mem_edges"):
-        adj[row[0]].append((row[1], row[2], row[3] or 1.0))
-        adj[row[1]].append((row[0], row[2], row[3] or 1.0))
+        from_id: str = str(row[0])
+        to_id: str = str(row[1])
+        edge_type: str = str(row[2])
+        weight: float = float(row[3] or 1.0)
+        adj[from_id].append((to_id, edge_type, weight))
+        adj[to_id].append((from_id, edge_type, weight))
 
     db.close()
 
     # Find natural anchors (degree >= 10)
-    degrees = {nid: len(adj.get(nid, [])) for nid in nodes}
-    anchors = {nid: deg for nid, deg in degrees.items() if deg >= 10}
+    degrees: DegreeDict = {nid: len(adj.get(nid, [])) for nid in nodes}
+    anchors: AnchorDict = {nid: deg for nid, deg in degrees.items() if deg >= 10}
 
     # Build subgraphs via BFS from each anchor (1-hop)
-    subgraphs = {}
+    subgraphs: SubgraphDict = {}
     for anchor_id in anchors:
-        members = set()
-        for neighbor, etype, weight in adj.get(anchor_id, []):
+        members: set[str] = set()
+        for neighbor, _etype, _weight in adj.get(anchor_id, []):
             if neighbor in nodes and neighbor not in anchors:
                 members.add(neighbor)
         subgraphs[anchor_id] = members
@@ -65,21 +78,21 @@ def load_real_graph():
     return nodes, adj, anchors, subgraphs, degrees
 
 
-def create_beliefs_from_graph(nodes, rng):
+def create_beliefs_from_graph(nodes: NodeDict, rng: np.random.Generator) -> dict[str, Belief]:
     """Create belief objects from real graph nodes with semi-realistic true rates."""
-    beliefs = {}
+    beliefs: dict[str, Belief] = {}
     # Assign true rates based on category (domain proxy)
-    category_rates = {
+    category_rates: dict[str, float] = {
         "strategy": 0.75, "methodology": 0.80, "knowledge": 0.60,
         "architecture": 0.65, "data-source": 0.55, "backtesting": 0.70,
         "agent behavior": 0.85, "milestone": 0.50, "unknown": 0.50,
     }
 
     for nid, node in nodes.items():
-        cat = node["category"]
-        base_rate = category_rates.get(cat, 0.55)
+        cat: str = node["category"]
+        base_rate: float = category_rates.get(cat, 0.55)
         # Add noise to true rate
-        true_rate = np.clip(base_rate + rng.normal(0, 0.1), 0.1, 0.95)
+        true_rate: float = float(np.clip(base_rate + rng.normal(0, 0.1), 0.1, 0.95))
 
         beliefs[nid] = Belief(
             id=hash(nid) % 100000,
@@ -88,21 +101,22 @@ def create_beliefs_from_graph(nodes, rng):
             alpha=0.5,
             beta_param=0.5,
         )
-        beliefs[nid]._nid = nid  # keep track of node ID
+        beliefs[nid].nid = nid  # keep track of node ID
 
     return beliefs
 
 
-def run_flat(beliefs_dict, rng):
+def run_flat(beliefs_dict: dict[str, Belief], rng: np.random.Generator) -> dict[str, Any]:
     """Flat Thompson sampling (baseline)."""
-    beliefs = list(beliefs_dict.values())
+    beliefs: list[Belief] = list(beliefs_dict.values())
     n = len(beliefs)
 
     for _ in range(N_SESSIONS):
         for _ in range(10):
             samples = np.array([rng.beta(max(b.alpha, 0.01), max(b.beta_param, 0.01)) for b in beliefs])
             top_k = np.argpartition(samples, -5)[-5:]
-            for idx in top_k:
+            for idx_val in top_k:
+                idx: int = int(idx_val)
                 beliefs[idx].retrieval_count += 1
                 if rng.random() < 0.30:
                     beliefs[idx].update("ignored")
@@ -116,18 +130,18 @@ def run_flat(beliefs_dict, rng):
     return {"ece": cal["ece"], "coverage": round(tested / n, 4)}
 
 
-def run_hierarchical(beliefs_dict, subgraphs, anchors, prop_weight, rng):
+def run_hierarchical(beliefs_dict: dict[str, Belief], subgraphs: SubgraphDict, anchors: AnchorDict, prop_weight: float, rng: np.random.Generator) -> dict[str, Any]:
     """Hierarchical with real subgraphs and configurable propagation weight."""
-    beliefs = list(beliefs_dict.values())
-    nid_to_idx = {b._nid: i for i, b in enumerate(beliefs)}
+    beliefs: list[Belief] = list(beliefs_dict.values())
+    nid_to_idx: dict[str, int] = {b.nid: i for i, b in enumerate(beliefs)}
     n = len(beliefs)
 
     # Map anchor indices to member indices
-    anchor_members = {}
+    anchor_members: dict[int, list[int]] = {}
     for anchor_nid, members in subgraphs.items():
         if anchor_nid in nid_to_idx:
             anchor_idx = nid_to_idx[anchor_nid]
-            member_idxs = [nid_to_idx[m] for m in members if m in nid_to_idx]
+            member_idxs: list[int] = [nid_to_idx[m] for m in members if m in nid_to_idx]
             anchor_members[anchor_idx] = member_idxs
 
     for _ in range(N_SESSIONS):
@@ -135,24 +149,25 @@ def run_hierarchical(beliefs_dict, subgraphs, anchors, prop_weight, rng):
             samples = np.array([rng.beta(max(b.alpha, 0.01), max(b.beta_param, 0.01)) for b in beliefs])
             top_k = np.argpartition(samples, -5)[-5:]
 
-            for idx in top_k:
+            for idx_val in top_k:
+                idx: int = int(idx_val)
                 b = beliefs[idx]
                 b.retrieval_count += 1
 
                 if rng.random() < 0.30:
-                    outcome = "ignored"
+                    outcome: str = "ignored"
                 elif rng.random() < b.true_usefulness_rate:
                     outcome = "used"
                 else:
                     outcome = "harmful"
-                b.update(outcome)
+                b.update(outcome)  # type: ignore[arg-type]
 
                 # Propagate if this is an anchor
                 if idx in anchor_members and outcome != "ignored":
-                    members = anchor_members[idx]
+                    members_list = anchor_members[idx]
                     # Scale propagation by 1/sqrt(subgraph_size) to prevent over-propagation
-                    scaled_weight = prop_weight / max(1, np.sqrt(len(members)))
-                    for midx in members:
+                    scaled_weight: float = prop_weight / max(1, float(np.sqrt(len(members_list))))
+                    for midx in members_list:
                         if outcome == "used":
                             beliefs[midx].alpha += scaled_weight
                         else:
@@ -164,32 +179,32 @@ def run_hierarchical(beliefs_dict, subgraphs, anchors, prop_weight, rng):
     return {"ece": cal["ece"], "coverage": round(tested / n, 4)}
 
 
-def main():
+def main() -> None:
     rng_base = np.random.default_rng(42)
 
     print("=" * 60, file=sys.stderr)
     print("Experiment 26: Real Topology Hierarchical Confidence", file=sys.stderr)
     print("=" * 60, file=sys.stderr)
 
-    nodes, adj, anchors, subgraphs, degrees = load_real_graph()
+    nodes, _adj, anchors, subgraphs, _degrees = load_real_graph()
     print(f"  Nodes: {len(nodes)}", file=sys.stderr)
     print(f"  Anchors (degree >= 10): {len(anchors)}", file=sys.stderr)
     for aid, deg in sorted(anchors.items(), key=lambda x: x[1], reverse=True)[:5]:
         sg_size = len(subgraphs.get(aid, set()))
         print(f"    {aid}: degree={deg}, subgraph={sg_size} members", file=sys.stderr)
 
-    results = {}
+    results: dict[str, dict[str, Any]] = {}
 
     # Flat baseline
     print(f"\n  Running flat Thompson...", file=sys.stderr)
-    flat_eces = []
-    flat_covs = []
+    flat_eces: list[float] = []
+    flat_covs: list[float] = []
     for _ in range(N_TRIALS):
-        seed = rng_base.integers(0, 2**32)
+        seed: int = int(cast(int, rng_base.integers(0, 2**32)))
         beliefs = create_beliefs_from_graph(nodes, np.random.default_rng(seed))
         r = run_flat(beliefs, np.random.default_rng(seed))
-        flat_eces.append(r["ece"])
-        flat_covs.append(r["coverage"])
+        flat_eces.append(float(r["ece"]))
+        flat_covs.append(float(r["coverage"]))
 
     results["flat"] = {
         "ece": round(float(np.mean(flat_eces)), 4),
@@ -200,14 +215,14 @@ def main():
     # Hierarchical with different propagation weights
     for pw in [0.1, 0.3, 0.5, 1.0]:
         print(f"\n  Running hierarchical (prop_weight={pw})...", file=sys.stderr)
-        h_eces = []
-        h_covs = []
+        h_eces: list[float] = []
+        h_covs: list[float] = []
         for _ in range(N_TRIALS):
-            seed = rng_base.integers(0, 2**32)
+            seed = int(cast(int, rng_base.integers(0, 2**32)))
             beliefs = create_beliefs_from_graph(nodes, np.random.default_rng(seed))
             r = run_hierarchical(beliefs, subgraphs, anchors, pw, np.random.default_rng(seed))
-            h_eces.append(r["ece"])
-            h_covs.append(r["coverage"])
+            h_eces.append(float(r["ece"]))
+            h_covs.append(float(r["coverage"]))
 
         results[f"hierarchical_pw{pw}"] = {
             "ece": round(float(np.mean(h_eces)), 4),

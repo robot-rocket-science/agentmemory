@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Task #20: Run zero-LLM extraction on real OVERRIDES.md data.
 
@@ -11,6 +13,7 @@ so we know exactly what each override says and which topic it belongs to.
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from experiments.exp1_extraction_pipeline import extract_beliefs, classify_text
@@ -20,24 +23,24 @@ from experiments.exp6_detect_failures_v2 import parse_overrides
 OVERRIDES_PATH = Path("/Users/thelorax/projects/alpha-seek-memtest/docs/gsd-archive/OVERRIDES.md")
 
 
-def main():
-    overrides = parse_overrides(OVERRIDES_PATH)
+def main() -> None:
+    overrides: list[dict[str, Any]] = parse_overrides(OVERRIDES_PATH)
 
     print(f"Testing extraction on {len(overrides)} overrides\n", file=sys.stderr)
 
-    results = []
+    results: list[dict[str, Any]] = []
     total_beliefs = 0
     correction_detected = 0
-    topic_detected = 0
+    _topic_detected = 0
 
     for i, override in enumerate(overrides):
-        text = override["change"]
+        text: str = override["change"]
         beliefs = extract_beliefs(text)
         total_beliefs += len(beliefs)
 
         # Can we detect this is a correction?
         text_lower = text.lower()
-        is_correction_signals = [
+        is_correction_signals: list[bool] = [
             "always" in text_lower,
             "never" in text_lower,
             "do not" in text_lower or "don't" in text_lower or "dont" in text_lower,
@@ -57,7 +60,7 @@ def main():
         # Classification
         btype, conf = classify_text(text)
 
-        result = {
+        result: dict[str, Any] = {
             "override_index": i,
             "timestamp": override["timestamp"][:10],
             "text": text[:150],
@@ -101,9 +104,9 @@ def main():
           f"({with_beliefs_and_correction/len(overrides):.0%})", file=sys.stderr)
 
     # Classification distribution
-    class_counts = {}
+    class_counts: dict[str, int] = {}
     for r in results:
-        c = r["classification"]
+        c: str = r["classification"]
         class_counts[c] = class_counts.get(c, 0) + 1
     print(f"\n  Classification distribution:", file=sys.stderr)
     for c, count in sorted(class_counts.items(), key=lambda x: x[1], reverse=True):

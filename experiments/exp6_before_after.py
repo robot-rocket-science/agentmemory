@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Experiment 6 Phase C: Before/after analysis of memory enforcement mechanisms.
 
@@ -15,9 +17,9 @@ We analyze: does the override rate decrease as these mechanisms accumulate?
 
 import json
 import sys
-from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 
 FAILURES_PATH = Path("experiments/exp6_failures_v2.json")
@@ -28,14 +30,16 @@ def parse_date(ts: str) -> datetime:
     return datetime.fromisoformat(ts.replace("Z", "+00:00"))
 
 
-def main():
-    failures = json.loads(FAILURES_PATH.read_text())
-    timeline = json.loads(TIMELINE_PATH.read_text())
+def main() -> None:
+    failures: dict[str, Any] = json.loads(FAILURES_PATH.read_text())
+    timeline: dict[str, Any] = json.loads(TIMELINE_PATH.read_text())
 
     # Get all overrides with timestamps from clusters
-    all_overrides = []
-    for cluster in failures["topic_clusters"]:
-        for override in cluster["overrides"]:
+    all_overrides: list[dict[str, str]] = []
+    topic_clusters: list[dict[str, Any]] = failures["topic_clusters"]
+    for cluster in topic_clusters:
+        cluster_overrides: list[dict[str, Any]] = cluster["overrides"]
+        for override in cluster_overrides:
             all_overrides.append({
                 "timestamp": override["timestamp"],
                 "topic": cluster["topic_id"],
@@ -48,21 +52,24 @@ def main():
     all_overrides.sort(key=lambda x: x["timestamp"])
 
     # --- Override rate by day ---
-    by_date = defaultdict(list)
+    by_date: dict[str, list[dict[str, str]]] = {}
     for o in all_overrides:
-        date = o["timestamp"][:10]
+        date: str = o["timestamp"][:10]
+        if date not in by_date:
+            by_date[date] = []
         by_date[date].append(o)
 
     # Fill in zero-override days
+    daily_counts: list[dict[str, Any]] = []
     if all_overrides:
         start = parse_date(all_overrides[0]["timestamp"]).date()
         end = parse_date(all_overrides[-1]["timestamp"]).date()
         current = start
-        daily_counts = []
         while current <= end:
             date_str = current.isoformat()
-            count = len(by_date.get(date_str, []))
-            topics = list(set(o["topic"] for o in by_date.get(date_str, [])))
+            day_overrides: list[dict[str, str]] = by_date.get(date_str, [])
+            count = len(day_overrides)
+            topics: list[str] = list(set(o["topic"] for o in day_overrides))
             daily_counts.append({
                 "date": date_str,
                 "overrides": count,
@@ -71,7 +78,7 @@ def main():
             current += timedelta(days=1)
 
     # --- Key enforcement dates ---
-    enforcement_events = [
+    enforcement_events: list[dict[str, str]] = [
         {"date": "2026-03-27", "event": "D089: dispatch gate rule + D097: backtesting protocol to CLAUDE.md + D106: deploy gate discipline", "type": "rule"},
         {"date": "2026-03-28", "event": "Pyright pre-commit hook added", "type": "automation"},
         {"date": "2026-03-30", "event": "D137: dispatch runbook created as living document", "type": "documentation"},
@@ -85,35 +92,39 @@ def main():
 
     print("\nDaily override counts:", file=sys.stderr)
     for day in daily_counts:
-        bar = "#" * day["overrides"]
-        topics = ", ".join(day["topics"][:3]) if day["topics"] else ""
-        print(f"  {day['date']}: {day['overrides']:2d} {bar} {topics}", file=sys.stderr)
+        bar = "#" * int(day["overrides"])
+        day_topics: list[str] = day["topics"]
+        topics_str = ", ".join(day_topics[:3]) if day_topics else ""
+        print(f"  {day['date']}: {day['overrides']:2d} {bar} {topics_str}", file=sys.stderr)
 
     # --- Compute rolling averages ---
     print("\n3-day rolling average:", file=sys.stderr)
     for i in range(len(daily_counts)):
-        window = daily_counts[max(0, i-2):i+1]
-        avg = sum(d["overrides"] for d in window) / len(window)
-        date = daily_counts[i]["date"]
+        window: list[dict[str, Any]] = daily_counts[max(0, i-2):i+1]
+        avg: float = sum(int(d["overrides"]) for d in window) / len(window)
+        date_val: str = daily_counts[i]["date"]
         bar = "#" * int(avg * 2)
         # Mark enforcement events
         enforcement = ""
         for e in enforcement_events:
-            if e["date"] == date:
+            if e["date"] == date_val:
                 enforcement = f" <-- {e['event'][:50]}"
-        print(f"  {date}: {avg:4.1f} {bar}{enforcement}", file=sys.stderr)
+        print(f"  {date_val}: {avg:4.1f} {bar}{enforcement}", file=sys.stderr)
 
     # --- Per-topic timeline ---
     print(f"\n{'='*60}", file=sys.stderr)
     print("PER-TOPIC OVERRIDE TIMELINE", file=sys.stderr)
     print(f"{'='*60}", file=sys.stderr)
 
-    topic_timelines = defaultdict(list)
+    topic_timelines: dict[str, list[str]] = {}
     for o in all_overrides:
-        topic_timelines[o["topic"]].append(o["timestamp"][:10])
+        topic_key: str = o["topic"]
+        if topic_key not in topic_timelines:
+            topic_timelines[topic_key] = []
+        topic_timelines[topic_key].append(o["timestamp"][:10])
 
     for topic, dates in sorted(topic_timelines.items(), key=lambda x: len(x[1]), reverse=True):
-        desc = next((c["description"] for c in failures["topic_clusters"] if c["topic_id"] == topic), topic)
+        desc: str = next((c["description"] for c in topic_clusters if c["topic_id"] == topic), topic)
         print(f"\n  {topic} ({len(dates)} overrides): {desc}", file=sys.stderr)
         for d in dates:
             print(f"    {d}", file=sys.stderr)
@@ -128,22 +139,22 @@ def main():
     print("DISPATCH GATE: BEFORE/AFTER RUNBOOK (D137, 2026-03-30)", file=sys.stderr)
     print(f"{'='*60}", file=sys.stderr)
 
-    dispatch_overrides = [o for o in all_overrides if o["topic"] == "dispatch_gate"]
-    before_runbook = [o for o in dispatch_overrides if o["timestamp"] < "2026-03-30"]
-    after_runbook = [o for o in dispatch_overrides if o["timestamp"] >= "2026-03-30"]
+    dispatch_overrides: list[dict[str, str]] = [o for o in all_overrides if o["topic"] == "dispatch_gate"]
+    before_runbook: list[dict[str, str]] = [o for o in dispatch_overrides if o["timestamp"] < "2026-03-30"]
+    after_runbook: list[dict[str, str]] = [o for o in dispatch_overrides if o["timestamp"] >= "2026-03-30"]
 
     days_before = (parse_date("2026-03-30T00:00:00Z") - parse_date("2026-03-24T00:00:00Z")).days
     days_after = (parse_date("2026-04-07T00:00:00Z") - parse_date("2026-03-30T00:00:00Z")).days
 
-    rate_before = len(before_runbook) / days_before if days_before > 0 else 0
-    rate_after = len(after_runbook) / days_after if days_after > 0 else 0
+    rate_before: float = len(before_runbook) / days_before if days_before > 0 else 0
+    rate_after: float = len(after_runbook) / days_after if days_after > 0 else 0
 
     print(f"  Before runbook (Mar 24-29): {len(before_runbook)} overrides in {days_before} days "
           f"= {rate_before:.2f}/day", file=sys.stderr)
     print(f"  After runbook (Mar 30-Apr 6): {len(after_runbook)} overrides in {days_after} days "
           f"= {rate_after:.2f}/day", file=sys.stderr)
     if rate_before > 0:
-        reduction = (rate_before - rate_after) / rate_before * 100
+        reduction: float = (rate_before - rate_after) / rate_before * 100
         print(f"  Change: {reduction:+.0f}%", file=sys.stderr)
 
     # --- Overall before/after the big enforcement day (Mar 27) ---
@@ -153,30 +164,31 @@ def main():
 
     # Mar 27 had 10 overrides -- that's both the peak AND when enforcement rules were added
     # Use Mar 28 as the split (day after enforcement rules added)
-    before_enforcement = [o for o in all_overrides if o["timestamp"] < "2026-03-28"]
-    after_enforcement = [o for o in all_overrides if o["timestamp"] >= "2026-03-28"]
+    before_enforcement: list[dict[str, str]] = [o for o in all_overrides if o["timestamp"] < "2026-03-28"]
+    after_enforcement: list[dict[str, str]] = [o for o in all_overrides if o["timestamp"] >= "2026-03-28"]
 
     days_before_e = 4  # Mar 24-27
     days_after_e = 10  # Mar 28 - Apr 6
 
-    rate_before_e = len(before_enforcement) / days_before_e if days_before_e > 0 else 0
-    rate_after_e = len(after_enforcement) / days_after_e if days_after_e > 0 else 0
+    rate_before_e: float = len(before_enforcement) / days_before_e if days_before_e > 0 else 0
+    rate_after_e: float = len(after_enforcement) / days_after_e if days_after_e > 0 else 0
 
     print(f"  Before (Mar 24-27): {len(before_enforcement)} overrides in {days_before_e} days "
           f"= {rate_before_e:.2f}/day", file=sys.stderr)
     print(f"  After (Mar 28-Apr 6): {len(after_enforcement)} overrides in {days_after_e} days "
           f"= {rate_after_e:.2f}/day", file=sys.stderr)
     if rate_before_e > 0:
-        reduction_e = (rate_before_e - rate_after_e) / rate_before_e * 100
+        reduction_e: float = (rate_before_e - rate_after_e) / rate_before_e * 100
         print(f"  Change: {reduction_e:+.0f}%", file=sys.stderr)
 
     # --- Commit rate for context ---
-    commits = [e for e in timeline["events"] if e["event_type"] == "commit"]
-    commits_before = [c for c in commits if c["timestamp"] < "2026-03-28"]
-    commits_after = [c for c in commits if c["timestamp"] >= "2026-03-28"]
+    events: list[dict[str, Any]] = timeline["events"]
+    commits: list[dict[str, Any]] = [e for e in events if e["event_type"] == "commit"]
+    commits_before: list[dict[str, Any]] = [c for c in commits if c["timestamp"] < "2026-03-28"]
+    commits_after: list[dict[str, Any]] = [c for c in commits if c["timestamp"] >= "2026-03-28"]
 
-    commit_rate_before = len(commits_before) / days_before_e if days_before_e > 0 else 0
-    commit_rate_after = len(commits_after) / days_after_e if days_after_e > 0 else 0
+    commit_rate_before: float = len(commits_before) / days_before_e if days_before_e > 0 else 0
+    commit_rate_after: float = len(commits_after) / days_after_e if days_after_e > 0 else 0
 
     print(f"\n  Context: commit rates", file=sys.stderr)
     print(f"  Before: {len(commits_before)} commits in {days_before_e} days = {commit_rate_before:.1f}/day", file=sys.stderr)
@@ -198,7 +210,7 @@ def main():
     print(f"  can the system learn from the first override and automatically", file=sys.stderr)
     print(f"  promote it to always-loaded context?", file=sys.stderr)
 
-    output = {
+    output: dict[str, Any] = {
         "daily_counts": daily_counts,
         "enforcement_events": enforcement_events,
         "dispatch_gate_before_after": {

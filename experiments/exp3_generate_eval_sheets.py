@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Generate blind evaluation sheets for Experiment 3.
 
@@ -9,6 +11,7 @@ Method attribution is stored separately and revealed only after labeling.
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from experiments.exp3_retrieval_comparison import (
@@ -16,22 +19,22 @@ from experiments.exp3_retrieval_comparison import (
 )
 
 
-def main():
+def main() -> None:
     nodes, adj = load_graph(ALPHA_SEEK_DB)
     fts_db = build_fts_index(nodes)
 
-    queries = json.loads(Path("experiments/exp3_queries.json").read_text())
+    queries: list[dict[str, str]] = json.loads(Path("experiments/exp3_queries.json").read_text())
 
-    all_evals = []
-    all_attributions = {}
+    all_evals: list[dict[str, Any]] = []
+    all_attributions: dict[str, Any] = {}
     total_items = 0
 
     for q in queries:
-        ev = prepare_blind_evaluation(q["query"], q["id"], nodes, fts_db, adj)
+        ev: dict[str, Any] = prepare_blind_evaluation(q["query"], q["id"], nodes, fts_db, adj)
         ev["original_query"] = q["original"]
 
         # Separate attribution from eval sheet
-        attribution = ev.pop("_attribution")
+        attribution: Any = ev.pop("_attribution")
         all_attributions[q["id"]] = attribution
 
         all_evals.append(ev)
@@ -54,7 +57,7 @@ def main():
 
     # Write a human-readable labeling form
     form_path = Path("experiments/exp3_labeling_form.md")
-    lines = [
+    lines: list[str] = [
         "# Experiment 3: Retrieval Quality Labeling Form",
         "",
         "For each query, label every result as:",
@@ -75,7 +78,7 @@ def main():
         lines.append("| # | Label | Content | Category |")
         lines.append("|---|-------|---------|----------|")
         for item in ev["eval_items"]:
-            content_short = item["content"][:80].replace("|", "/")
+            content_short: str = item["content"][:80].replace("|", "/")
             lines.append(f"| {item['eval_id']} | ___ | {content_short} | {item['category']} |")
         lines.append("")
 

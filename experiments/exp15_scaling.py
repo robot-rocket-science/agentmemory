@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Experiment 15: Scaling Behavior of Thompson Sampling Feedback Loop
 
@@ -15,12 +17,12 @@ import json
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 import numpy as np
-from scipy.stats import spearmanr
 
 from experiments.exp2_bayesian_calibration import (
-    Belief, compute_calibration, _digamma,
+    Belief, compute_calibration,
 )
 
 
@@ -29,11 +31,11 @@ N_SESSIONS = 50
 N_TRIALS = 10  # fewer trials for larger scales (speed)
 DOMAINS = ["database", "frontend", "deployment", "strategy", "testing",
            "security", "performance", "documentation", "devops", "research"]
-TRUE_RATES = {d: 0.4 + 0.05 * i for i, d in enumerate(DOMAINS)}  # 0.40 to 0.85
+TRUE_RATES: dict[str, float] = {d: 0.4 + 0.05 * i for i, d in enumerate(DOMAINS)}  # 0.40 to 0.85
 
 
 def create_beliefs(n: int) -> list[Belief]:
-    beliefs = []
+    beliefs: list[Belief] = []
     for i in range(n):
         domain = DOMAINS[i % len(DOMAINS)]
         beliefs.append(Belief(
@@ -46,13 +48,13 @@ def create_beliefs(n: int) -> list[Belief]:
     return beliefs
 
 
-def run_trial(n_beliefs: int, rng: np.random.Generator) -> dict:
+def run_trial(n_beliefs: int, rng: np.random.Generator) -> dict[str, Any]:
     beliefs = create_beliefs(n_beliefs)
 
     t_start = time.perf_counter()
     total_retrievals = 0
 
-    for session in range(N_SESSIONS):
+    for _session in range(N_SESSIONS):
         for _ in range(10):  # 10 retrievals per session
             # Thompson sampling
             samples = np.array([
@@ -62,7 +64,8 @@ def run_trial(n_beliefs: int, rng: np.random.Generator) -> dict:
             top_k_idx = np.argpartition(samples, -5)[-5:]
             top_k_idx = top_k_idx[np.argsort(samples[top_k_idx])[::-1]]
 
-            for idx in top_k_idx:
+            for idx_np in top_k_idx:
+                idx = int(idx_np)
                 b = beliefs[idx]
                 b.retrieval_count += 1
                 total_retrievals += 1
@@ -76,7 +79,7 @@ def run_trial(n_beliefs: int, rng: np.random.Generator) -> dict:
 
     t_elapsed = time.perf_counter() - t_start
 
-    cal = compute_calibration(beliefs)
+    cal: dict[str, Any] = compute_calibration(beliefs)
     tested = sum(1 for b in beliefs if b.retrieval_count > 0)
     converged = sum(1 for b in beliefs
                     if b.retrieval_count > 0
@@ -93,7 +96,7 @@ def run_trial(n_beliefs: int, rng: np.random.Generator) -> dict:
     }
 
 
-def main():
+def main() -> None:
     rng_base = np.random.default_rng(42)
 
     print("=" * 60, file=sys.stderr)
@@ -102,25 +105,25 @@ def main():
     print(f"  {N_SESSIONS} sessions, {N_TRIALS} trials per scale", file=sys.stderr)
     print("=" * 60, file=sys.stderr)
 
-    results = {}
+    results: dict[int, dict[str, Any]] = {}
 
     for n in SCALES:
         print(f"\n  Scale: {n:,} beliefs...", file=sys.stderr)
-        trial_results = []
+        trial_results: list[dict[str, Any]] = []
 
-        for trial in range(N_TRIALS):
-            seed = rng_base.integers(0, 2**32)
+        for _trial in range(N_TRIALS):
+            seed = int(rng_base.integers(0, 2**32))  # type: ignore[reportUnknownArgumentType]
             rng = np.random.default_rng(seed)
             r = run_trial(n, rng)
             trial_results.append(r)
 
-        eces = [r["ece"] for r in trial_results]
-        coverages = [r["test_coverage"] for r in trial_results]
-        conv_rates = [r["convergence_rate"] for r in trial_results]
-        wall_times = [r["wall_seconds"] for r in trial_results]
-        ret_rates = [r["retrievals_per_second"] for r in trial_results]
+        eces: list[float] = [r["ece"] for r in trial_results]
+        coverages: list[float] = [r["test_coverage"] for r in trial_results]
+        conv_rates: list[float] = [r["convergence_rate"] for r in trial_results]
+        wall_times: list[float] = [r["wall_seconds"] for r in trial_results]
+        ret_rates: list[float] = [r["retrievals_per_second"] for r in trial_results]
 
-        summary = {
+        summary: dict[str, Any] = {
             "n_beliefs": n,
             "ece_mean": round(float(np.mean(eces)), 4),
             "ece_std": round(float(np.std(eces)), 4),

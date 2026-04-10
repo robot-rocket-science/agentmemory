@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Experiment 3: BFS vs FTS5 vs Hybrid Retrieval Quality
 
@@ -18,9 +20,9 @@ import json
 import sqlite3
 import sys
 from collections import defaultdict
-from dataclasses import dataclass, field
-from math import log
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -55,7 +57,7 @@ def load_graph(db_path: Path) -> tuple[dict[str, Node], dict[str, list[tuple[str
     db = sqlite3.connect(str(db_path))
     db.row_factory = sqlite3.Row
 
-    nodes = {}
+    nodes: dict[str, Node] = {}
     for row in db.execute("SELECT id, content, category, source_type, confidence FROM mem_nodes WHERE superseded_by IS NULL"):
         nodes[row["id"]] = Node(
             id=row["id"],
@@ -72,7 +74,7 @@ def load_graph(db_path: Path) -> tuple[dict[str, Node], dict[str, list[tuple[str
 
     db.close()
     print(f"Loaded {len(nodes)} nodes, {sum(len(v) for v in adj.values()) // 2} edges", file=sys.stderr)
-    return nodes, adj
+    return nodes, dict(adj)
 
 
 def build_fts_index(nodes: dict[str, Node]) -> sqlite3.Connection:
@@ -119,7 +121,7 @@ def retrieve_bfs(
 ) -> list[tuple[str, float]]:
     """BFS traversal with hub damping. Returns (node_id, score) pairs."""
     visited: dict[str, float] = {}
-    queue = [(sid, 0, 1.0) for sid in seed_ids if sid in nodes]
+    queue: list[tuple[str, int, float]] = [(sid, 0, 1.0) for sid in seed_ids if sid in nodes]
 
     while queue:
         node_id, depth, score = queue.pop(0)
@@ -133,9 +135,9 @@ def retrieve_bfs(
             continue
 
         neighbors = adj.get(node_id, [])
-        degree = len(neighbors)
+        _degree = len(neighbors)
 
-        for neighbor_id, edge_type, weight in neighbors:
+        for neighbor_id, _edge_type, weight in neighbors:
             if neighbor_id not in nodes:
                 continue
 
@@ -147,7 +149,7 @@ def retrieve_bfs(
             queue.append((neighbor_id, depth + 1, next_score))
 
     # Sort by score, return top_k
-    ranked = sorted(visited.items(), key=lambda x: x[1], reverse=True)
+    ranked: list[tuple[str, float]] = sorted(visited.items(), key=lambda x: x[1], reverse=True)
     return ranked[:top_k]
 
 
@@ -178,13 +180,13 @@ def retrieve_hybrid(
     max_fts = max(fts_scores.values()) if fts_scores else 1.0
     max_bfs = max(bfs_scores.values()) if bfs_scores else 1.0
 
-    combined = {}
+    combined: dict[str, float] = {}
     for nid in all_ids:
         fts_norm = fts_scores.get(nid, 0) / max_fts if max_fts > 0 else 0
         bfs_norm = bfs_scores.get(nid, 0) / max_bfs if max_bfs > 0 else 0
         combined[nid] = 0.5 * fts_norm + 0.5 * bfs_norm
 
-    ranked = sorted(combined.items(), key=lambda x: x[1], reverse=True)
+    ranked: list[tuple[str, float]] = sorted(combined.items(), key=lambda x: x[1], reverse=True)
     return ranked[:top_k]
 
 
@@ -196,7 +198,7 @@ def prepare_blind_evaluation(
     nodes: dict[str, Node],
     fts_db: sqlite3.Connection,
     adj: dict[str, list[tuple[str, str, float]]],
-) -> dict:
+) -> dict[str, Any]:
     """Run all three methods and prepare a blind evaluation sheet."""
     fts_results = retrieve_fts(query, fts_db, top_k=15)
     bfs_seeds = [nid for nid, _ in retrieve_fts(query, fts_db, top_k=3)]
@@ -204,11 +206,11 @@ def prepare_blind_evaluation(
     hybrid_results = retrieve_hybrid(query, fts_db, adj, nodes, top_k=15)
 
     # Collect all unique results
-    all_ids = set()
-    method_map = {}  # node_id -> set of methods that returned it
+    all_ids: set[str] = set()
+    method_map: dict[str, set[str]] = {}  # node_id -> set of methods that returned it
 
     for method_name, results in [("fts", fts_results), ("bfs", bfs_results), ("hybrid", hybrid_results)]:
-        for nid, score in results:
+        for nid, _score in results:
             all_ids.add(nid)
             if nid not in method_map:
                 method_map[nid] = set()
@@ -220,7 +222,7 @@ def prepare_blind_evaluation(
     rng.shuffle(shuffled_ids)
 
     # Build evaluation sheet (method attribution hidden)
-    eval_items = []
+    eval_items: list[dict[str, Any]] = []
     for i, nid in enumerate(shuffled_ids):
         node = nodes.get(nid)
         if not node:
@@ -237,7 +239,7 @@ def prepare_blind_evaluation(
         })
 
     # Store the method attribution separately (for scoring after labeling)
-    attribution = {
+    attribution: dict[str, list[str]] = {
         nid: list(methods) for nid, methods in method_map.items()
     }
 
@@ -255,7 +257,7 @@ def prepare_blind_evaluation(
 
 # --- Main ---
 
-def main():
+def main() -> None:
     if not ALPHA_SEEK_DB.exists():
         print(f"ERROR: Alpha-seek database not found at {ALPHA_SEEK_DB}", file=sys.stderr)
         sys.exit(1)
@@ -287,7 +289,7 @@ def main():
 
     print(f"\nRunning {len(demo_queries)} demo queries...\n", file=sys.stderr)
 
-    all_evals = []
+    all_evals: list[dict[str, Any]] = []
     for qid, query in demo_queries:
         eval_sheet = prepare_blind_evaluation(query, qid, nodes, fts_db, adj)
         all_evals.append(eval_sheet)

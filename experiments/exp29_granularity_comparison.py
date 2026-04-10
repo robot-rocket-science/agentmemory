@@ -10,17 +10,26 @@ surrounding context for the agent to act on them.
 Uses the 6 critical belief topics from Exp 4/6 as ground truth.
 """
 
+from __future__ import annotations
+
 import json
 import re
 import sqlite3
 import sys
 from pathlib import Path
+from typing import Any, TypedDict
 
-ALPHA_SEEK_DB = Path("/Users/thelorax/projects/.gsd/workflows/spikes/"
+ALPHA_SEEK_DB: Path = Path("/Users/thelorax/projects/.gsd/workflows/spikes/"
                      "260406-1-associative-memory-for-gsd-please-explor/"
                      "sandbox/alpha-seek.db")
 
-CRITICAL = {
+
+class TopicInfo(TypedDict):
+    query: str
+    needed: set[str]
+
+
+CRITICAL: dict[str, TopicInfo] = {
     "dispatch_gate": {
         "query": "dispatch gate deploy protocol verification runbook",
         "needed": {"D089", "D106", "D137"},
@@ -47,12 +56,24 @@ CRITICAL = {
     },
 }
 
-TOKEN_BUDGET = 1000
+TOKEN_BUDGET: int = 1000
 
 
-def split_into_sentences(text):
-    parts = re.split(r'(?<=[.!?])\s+(?=[A-Z])', text)
-    sentences = []
+class DecisionItem(TypedDict):
+    content: str
+    tokens: int
+
+
+class SentenceItem(TypedDict):
+    content: str
+    tokens: int
+    parent: str
+    index: int
+
+
+def split_into_sentences(text: str) -> list[str]:
+    parts: list[str] = re.split(r'(?<=[.!?])\s+(?=[A-Z])', text)
+    sentences: list[str] = []
     for part in parts:
         for sp in part.split(' | '):
             sp = sp.strip()
@@ -61,39 +82,39 @@ def split_into_sentences(text):
     return sentences
 
 
-def load_data():
-    db = sqlite3.connect(str(ALPHA_SEEK_DB))
+def load_data() -> tuple[dict[str, DecisionItem], dict[str, SentenceItem]]:
+    db: sqlite3.Connection = sqlite3.connect(str(ALPHA_SEEK_DB))
 
     # Decision-level nodes
-    decisions = {}
+    decisions: dict[str, DecisionItem] = {}
     for row in db.execute("SELECT id, decision, choice, rationale FROM decisions"):
-        full = f"{row[1]}: {row[2]}"
+        full: str = f"{row[1]}: {row[2]}"
         if row[3]:
             full += f" | {row[3]}"
-        decisions[row[0]] = {
-            "content": full,
-            "tokens": len(full) // 4,
-        }
+        decisions[str(row[0])] = DecisionItem(
+            content=full,
+            tokens=len(full) // 4,
+        )
 
     # Sentence-level decomposition
-    sentences = {}
+    sentences: dict[str, SentenceItem] = {}
     for did, dec in decisions.items():
-        sents = split_into_sentences(dec["content"])
+        sents: list[str] = split_into_sentences(dec["content"])
         for i, sent in enumerate(sents):
-            sid = f"{did}_s{i}"
-            sentences[sid] = {
-                "content": sent,
-                "tokens": len(sent) // 4,
-                "parent": did,
-                "index": i,
-            }
+            sid: str = f"{did}_s{i}"
+            sentences[sid] = SentenceItem(
+                content=sent,
+                tokens=len(sent) // 4,
+                parent=did,
+                index=i,
+            )
 
     db.close()
     return decisions, sentences
 
 
-def build_fts(items, table_name="fts"):
-    db = sqlite3.connect(":memory:")
+def build_fts(items: dict[str, DecisionItem] | dict[str, SentenceItem], table_name: str = "fts") -> sqlite3.Connection:
+    db: sqlite3.Connection = sqlite3.connect(":memory:")
     db.execute(f"CREATE VIRTUAL TABLE {table_name} USING fts5(id, content, tokenize='porter')")
     for nid, item in items.items():
         db.execute(f"INSERT INTO {table_name} VALUES (?, ?)", (nid, item["content"]))
@@ -101,21 +122,27 @@ def build_fts(items, table_name="fts"):
     return db
 
 
-def search(query, fts_db, items, budget, table_name="fts"):
-    terms = [t for t in query.split() if len(t) > 2]
-    q = " OR ".join(terms)
+def search(
+    query: str,
+    fts_db: sqlite3.Connection,
+    items: dict[str, DecisionItem] | dict[str, SentenceItem],
+    budget: int,
+    table_name: str = "fts",
+) -> tuple[list[str], int]:
+    terms: list[str] = [t for t in query.split() if len(t) > 2]
+    q: str = " OR ".join(terms)
     try:
-        results = fts_db.execute(
+        results: list[Any] = fts_db.execute(
             f"SELECT id FROM {table_name} WHERE {table_name} MATCH ? ORDER BY rank LIMIT 50",
             (q,)
         ).fetchall()
-    except:
+    except sqlite3.OperationalError:
         return [], 0
 
-    retrieved = []
-    tokens_used = 0
+    retrieved: list[str] = []
+    tokens_used: int = 0
     for row in results:
-        nid = row[0]
+        nid: str = str(row[0])
         item = items[nid]
         if tokens_used + item["tokens"] > budget:
             continue
@@ -125,49 +152,68 @@ def search(query, fts_db, items, budget, table_name="fts"):
     return retrieved, tokens_used
 
 
-def main():
+class LevelResult(TypedDict):
+    found: list[str]
+    missed: list[str]
+    coverage: float
+    items_retrieved: int
+    tokens_used: int
+
+
+class TopicResult(TypedDict):
+    decision_level: LevelResult
+    sentence_level: LevelResult
+
+
+def main() -> None:
+    decisions: dict[str, DecisionItem]
+    sentences: dict[str, SentenceItem]
     decisions, sentences = load_data()
 
     print(f"Decisions: {len(decisions)}, Sentences: {len(sentences)}", file=sys.stderr)
     print(f"Token budget: {TOKEN_BUDGET}\n", file=sys.stderr)
 
-    fts_dec = build_fts(decisions, "fts_dec")
-    fts_sent = build_fts(sentences, "fts_sent")
+    fts_dec: sqlite3.Connection = build_fts(decisions, "fts_dec")
+    fts_sent: sqlite3.Connection = build_fts(sentences, "fts_sent")
 
-    results = {}
+    results: dict[str, TopicResult] = {}
 
     for topic_id, topic in CRITICAL.items():
-        query = topic["query"]
-        needed = topic["needed"]
+        query: str = topic["query"]
+        needed: set[str] = topic["needed"]
 
         # Decision-level retrieval
+        dec_retrieved: list[str]
+        dec_tokens: int
         dec_retrieved, dec_tokens = search(query, fts_dec, decisions, TOKEN_BUDGET, "fts_dec")
-        dec_found = needed & set(dec_retrieved)
-        dec_items = len(dec_retrieved)
+        dec_found: set[str] = needed & set(dec_retrieved)
+        dec_items: int = len(dec_retrieved)
 
         # Sentence-level retrieval
+        sent_retrieved: list[str]
+        sent_tokens: int
         sent_retrieved, sent_tokens = search(query, fts_sent, sentences, TOKEN_BUDGET, "fts_sent")
         # Map sentence IDs back to parent decisions
-        sent_parents = {sentences[sid]["parent"] for sid in sent_retrieved}
-        sent_found = needed & sent_parents
-        sent_items = len(sent_retrieved)
+        sent_parents: set[str] = {sentences[sid]["parent"] for sid in sent_retrieved}
+        sent_found: set[str] = needed & sent_parents
+        sent_items: int = len(sent_retrieved)
 
-        results[topic_id] = {
-            "decision_level": {
-                "found": list(dec_found),
-                "missed": list(needed - dec_found),
-                "coverage": len(dec_found) / len(needed) if needed else 0,
-                "items_retrieved": dec_items,
-                "tokens_used": dec_tokens,
-            },
-            "sentence_level": {
-                "found": list(sent_found),
-                "missed": list(needed - sent_found),
-                "coverage": len(sent_found) / len(needed) if needed else 0,
-                "items_retrieved": sent_items,
-                "tokens_used": sent_tokens,
-            },
-        }
+        results[topic_id] = TopicResult(
+            decision_level=LevelResult(
+                found=list(dec_found),
+                missed=list(needed - dec_found),
+                coverage=len(dec_found) / len(needed) if needed else 0,
+                items_retrieved=dec_items,
+                tokens_used=dec_tokens,
+            ),
+            sentence_level=LevelResult(
+                found=list(sent_found),
+                missed=list(needed - sent_found),
+                coverage=len(sent_found) / len(needed) if needed else 0,
+                items_retrieved=sent_items,
+                tokens_used=sent_tokens,
+            ),
+        )
 
         print(f"  {topic_id}:", file=sys.stderr)
         print(f"    Decision: {len(dec_found)}/{len(needed)} found, "
@@ -179,8 +225,8 @@ def main():
         if sent_retrieved:
             print(f"    Sentence content sample:", file=sys.stderr)
             for sid in sent_retrieved[:3]:
-                s = sentences[sid]
-                print(f"      [{s['parent']}_s{s['index']}] {s['content'][:80]}", file=sys.stderr)
+                sent_item: SentenceItem = sentences[sid]
+                print(f"      [{sent_item['parent']}_s{sent_item['index']}] {sent_item['content'][:80]}", file=sys.stderr)
 
     # Summary
     print(f"\n{'='*60}", file=sys.stderr)
@@ -188,24 +234,24 @@ def main():
           f"{'Sent Cov':>9} {'Sent Tok':>9} {'Sent #':>6}", file=sys.stderr)
     print("-" * 70, file=sys.stderr)
 
-    dec_total_found = 0
-    sent_total_found = 0
-    dec_total_tokens = 0
-    sent_total_tokens = 0
-    total_needed = 0
+    dec_total_found: int = 0
+    sent_total_found: int = 0
+    dec_total_tokens: int = 0
+    sent_total_tokens: int = 0
+    total_needed: int = 0
 
     for topic_id, r in results.items():
-        needed_count = len(CRITICAL[topic_id]["needed"])
+        needed_count: int = len(CRITICAL[topic_id]["needed"])
         total_needed += needed_count
-        d = r["decision_level"]
-        s = r["sentence_level"]
+        d: LevelResult = r["decision_level"]
+        sl: LevelResult = r["sentence_level"]
         dec_total_found += len(d["found"])
-        sent_total_found += len(s["found"])
+        sent_total_found += len(sl["found"])
         dec_total_tokens += d["tokens_used"]
-        sent_total_tokens += s["tokens_used"]
+        sent_total_tokens += sl["tokens_used"]
 
         print(f"{topic_id:<18} {d['coverage']:>8.0%} {d['tokens_used']:>8} {d['items_retrieved']:>5} "
-              f"{s['coverage']:>9.0%} {s['tokens_used']:>9} {s['items_retrieved']:>6}", file=sys.stderr)
+              f"{sl['coverage']:>9.0%} {sl['tokens_used']:>9} {sl['items_retrieved']:>6}", file=sys.stderr)
 
     print(f"\n  Decision-level: {dec_total_found}/{total_needed} found, "
           f"avg {dec_total_tokens/6:.0f} tokens/topic", file=sys.stderr)
@@ -217,7 +263,8 @@ def main():
     # The key question: does sentence-level give ENOUGH context?
     print(f"\n  QUALITATIVE: Does sentence-level retrieval provide enough context?", file=sys.stderr)
     print(f"  Decision-level returns {dec_total_found} decisions with full rationale.", file=sys.stderr)
-    print(f"  Sentence-level returns {sum(r['sentence_level']['items_retrieved'] for r in results.values())} "
+    sent_total_items: int = sum(r['sentence_level']['items_retrieved'] for r in results.values())
+    print(f"  Sentence-level returns {sent_total_items} "
           f"individual sentences -- more items, less context per item.", file=sys.stderr)
     print(f"  The question: can the agent act on isolated sentences, or does it need", file=sys.stderr)
     print(f"  the surrounding rationale? This requires qualitative inspection.", file=sys.stderr)

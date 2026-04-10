@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Experiment 2: Bayesian Confidence Calibration Simulation
 
@@ -11,13 +13,11 @@ Protocol: EXPERIMENTS.md, Experiment 2
 
 import json
 import sys
-from dataclasses import dataclass, field
-from math import log, lgamma, exp
-from pathlib import Path
-from typing import Literal
+from dataclasses import dataclass
+from math import log, lgamma
+from typing import Any, Literal
 
 import numpy as np
-from scipy.stats import beta as beta_dist
 
 
 def _digamma(x: float) -> float:
@@ -71,6 +71,7 @@ class Belief:
     used_count: int = 0
     harmful_count: int = 0
     ignored_count: int = 0
+    nid: str = ""
 
     @property
     def confidence(self) -> float:
@@ -108,10 +109,10 @@ class Belief:
 
 
 def create_beliefs(config: ExperimentConfig, use_source_priors: bool) -> list[Belief]:
-    beliefs = []
+    beliefs: list[Belief] = []
     bid = 0
 
-    sources = [
+    sources: list[tuple[str, int, float, float, float]] = [
         ("user_stated", config.n_user_stated, config.true_rate_user, 9.0, 1.0),
         ("document", config.n_document, config.true_rate_document, 7.0, 3.0),
         ("agent_inferred", config.n_agent_inferred, config.true_rate_agent, 1.0, 1.0),
@@ -138,29 +139,36 @@ def create_beliefs(config: ExperimentConfig, use_source_priors: bool) -> list[Be
 
 # --- Simulation ---
 
+def _rng_seed(rng: np.random.Generator) -> int:
+    raw: Any = rng.integers(0, 2**32)
+    return int(raw)
+
+
 def run_single_trial(
     config: ExperimentConfig,
     use_source_priors: bool,
     rng: np.random.Generator,
-) -> dict:
+) -> dict[str, Any]:
     beliefs = create_beliefs(config, use_source_priors)
-    session_records = []
+    session_records: list[dict[str, Any]] = []
 
     for session in range(config.n_sessions):
-        session_data = {"session": session, "retrievals": []}
+        retrievals: list[dict[str, Any]] = []
+        session_data: dict[str, Any] = {"session": session, "retrievals": retrievals}
 
         for _ in range(config.n_retrievals_per_session):
             # Score all beliefs by expected utility (relevance = 1.0 for all)
-            scores = [(b, b.expected_utility(1.0, config)) for b in beliefs]
+            scores: list[tuple[Belief, float]] = [(b, b.expected_utility(1.0, config)) for b in beliefs]
             scores.sort(key=lambda x: x[1], reverse=True)
 
             # Retrieve top-k
-            retrieved = [b for b, _ in scores[:config.n_beliefs_per_retrieval]]
+            retrieved: list[Belief] = [b for b, _ in scores[:config.n_beliefs_per_retrieval]]
 
             for belief in retrieved:
                 belief.retrieval_count += 1
 
                 # Simulate outcome: Bernoulli draw from true usefulness rate
+                outcome: Literal["used", "harmful", "ignored"]
                 if rng.random() < belief.true_usefulness_rate:
                     outcome = "used"
                 else:
@@ -174,7 +182,7 @@ def run_single_trial(
                 belief.update(outcome)
                 confidence_after = belief.confidence
 
-                session_data["retrievals"].append({
+                retrievals.append({
                     "belief_id": belief.id,
                     "source_type": belief.source_type,
                     "true_rate": belief.true_usefulness_rate,
@@ -194,14 +202,14 @@ def run_single_trial(
 
 # --- Metrics ---
 
-def compute_calibration(beliefs: list[Belief], n_bins: int = 10) -> dict:
+def compute_calibration(beliefs: list[Belief], n_bins: int = 10) -> dict[str, Any]:
     """Expected Calibration Error and per-bin calibration."""
     # Only include beliefs that have been tested at least once
     tested = [b for b in beliefs if b.retrieval_count > 0]
     if not tested:
         return {"ece": 1.0, "bins": [], "n_tested": 0}
 
-    bins = [[] for _ in range(n_bins)]
+    bins: list[list[tuple[float, float]]] = [[] for _ in range(n_bins)]
     for b in tested:
         bin_idx = min(int(b.confidence * n_bins), n_bins - 1)
         # Exclude IGNORED from denominator: Beta only tracks used/harmful,
@@ -213,7 +221,7 @@ def compute_calibration(beliefs: list[Belief], n_bins: int = 10) -> dict:
         bins[bin_idx].append((b.confidence, actual_use_rate))
 
     ece = 0.0
-    bin_data = []
+    bin_data: list[dict[str, Any]] = []
     total = len(tested)
 
     for i, bin_contents in enumerate(bins):
@@ -227,10 +235,10 @@ def compute_calibration(beliefs: list[Belief], n_bins: int = 10) -> dict:
             })
             continue
 
-        confs = [c for c, _ in bin_contents]
-        actuals = [a for _, a in bin_contents]
-        mean_conf = np.mean(confs)
-        mean_actual = np.mean(actuals)
+        confs: list[float] = [c for c, _ in bin_contents]
+        actuals: list[float] = [a for _, a in bin_contents]
+        mean_conf = float(np.mean(confs))
+        mean_actual = float(np.mean(actuals))
         error = abs(mean_conf - mean_actual)
         ece += (len(bin_contents) / total) * error
 
@@ -245,7 +253,7 @@ def compute_calibration(beliefs: list[Belief], n_bins: int = 10) -> dict:
     return {"ece": round(float(ece), 4), "bins": bin_data, "n_tested": len(tested)}
 
 
-def compute_convergence(beliefs: list[Belief], threshold: float = 0.10) -> dict:
+def compute_convergence(beliefs: list[Belief], threshold: float = 0.10) -> dict[str, Any]:
     """How many beliefs converged to within threshold of their true rate."""
     tested = [b for b in beliefs if b.retrieval_count > 0]
     converged = [b for b in tested if abs(b.confidence - b.true_usefulness_rate) <= threshold]
@@ -256,19 +264,21 @@ def compute_convergence(beliefs: list[Belief], threshold: float = 0.10) -> dict:
     }
 
 
-def compute_exploration(session_records: list[dict], beliefs: list[Belief]) -> dict:
+def compute_exploration(session_records: list[dict[str, Any]], beliefs: list[Belief]) -> dict[str, Any]:
     """What fraction of retrievals targeted uncertain beliefs."""
     # Compute median entropy across all beliefs
-    entropies = [b.entropy for b in beliefs]
+    entropies: list[float] = [b.entropy for b in beliefs]
     median_entropy = float(np.median(entropies))
 
     total_retrievals = 0
     exploration_retrievals = 0
 
     for session in session_records:
-        for ret in session["retrievals"]:
+        retrieval_list: list[dict[str, Any]] = session["retrievals"]
+        for ret in retrieval_list:
             total_retrievals += 1
-            if ret["entropy"] > median_entropy:
+            entropy_val: float = ret["entropy"]
+            if entropy_val > median_entropy:
                 exploration_retrievals += 1
 
     return {
@@ -285,32 +295,36 @@ def compute_rank_correlation(beliefs: list[Belief]) -> float:
     if len(tested) < 3:
         return 0.0
 
-    from scipy.stats import spearmanr
-    confs = [b.confidence for b in tested]
-    trues = [b.true_usefulness_rate for b in tested]
-    rho, _ = spearmanr(confs, trues)
-    return round(float(rho), 4)
+    from scipy.stats import spearmanr  # type: ignore[import-untyped]
+    confs: list[float] = [b.confidence for b in tested]
+    trues: list[float] = [b.true_usefulness_rate for b in tested]
+    result: Any = spearmanr(confs, trues)
+    rho: float = float(result.statistic)
+    return round(rho, 4)
 
 
 # --- Main ---
 
-def run_experiment(config: ExperimentConfig) -> dict:
+def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
     rng_base = np.random.default_rng(config.seed)
 
-    results = {"config": config.__dict__, "source_informed": [], "uniform_prior": []}
+    source_informed_list: list[dict[str, Any]] = []
+    uniform_prior_list: list[dict[str, Any]] = []
 
     for trial in range(config.n_trials):
-        seed = rng_base.integers(0, 2**32)
+        seed: int = _rng_seed(rng_base)
 
         # Source-informed priors
         rng = np.random.default_rng(seed)
         trial_result = run_single_trial(config, use_source_priors=True, rng=rng)
-        calibration = compute_calibration(trial_result["beliefs"])
-        convergence = compute_convergence(trial_result["beliefs"])
-        exploration = compute_exploration(trial_result["sessions"], trial_result["beliefs"])
-        rank_corr = compute_rank_correlation(trial_result["beliefs"])
+        beliefs_list: list[Belief] = trial_result["beliefs"]
+        sessions_list: list[dict[str, Any]] = trial_result["sessions"]
+        calibration = compute_calibration(beliefs_list)
+        convergence = compute_convergence(beliefs_list)
+        exploration = compute_exploration(sessions_list, beliefs_list)
+        rank_corr = compute_rank_correlation(beliefs_list)
 
-        results["source_informed"].append({
+        source_informed_list.append({
             "trial": trial,
             "ece": calibration["ece"],
             "convergence_rate": convergence["convergence_rate"],
@@ -323,12 +337,14 @@ def run_experiment(config: ExperimentConfig) -> dict:
         # Uniform priors (control)
         rng = np.random.default_rng(seed)  # same seed for fair comparison
         trial_result = run_single_trial(config, use_source_priors=False, rng=rng)
-        calibration = compute_calibration(trial_result["beliefs"])
-        convergence = compute_convergence(trial_result["beliefs"])
-        exploration = compute_exploration(trial_result["sessions"], trial_result["beliefs"])
-        rank_corr = compute_rank_correlation(trial_result["beliefs"])
+        beliefs_list = trial_result["beliefs"]
+        sessions_list = trial_result["sessions"]
+        calibration = compute_calibration(beliefs_list)
+        convergence = compute_convergence(beliefs_list)
+        exploration = compute_exploration(sessions_list, beliefs_list)
+        rank_corr = compute_rank_correlation(beliefs_list)
 
-        results["uniform_prior"].append({
+        uniform_prior_list.append({
             "trial": trial,
             "ece": calibration["ece"],
             "convergence_rate": convergence["convergence_rate"],
@@ -341,18 +357,23 @@ def run_experiment(config: ExperimentConfig) -> dict:
         if (trial + 1) % 10 == 0:
             print(f"  Trial {trial + 1}/{config.n_trials} complete", file=sys.stderr)
 
+    results: dict[str, Any] = {
+        "config": config.__dict__,
+        "source_informed": source_informed_list,
+        "uniform_prior": uniform_prior_list,
+    }
     return results
 
 
-def summarize(results: dict) -> dict:
-    summary = {}
+def summarize(results: dict[str, Any]) -> dict[str, Any]:
+    summary: dict[str, Any] = {}
 
     for group_name in ["source_informed", "uniform_prior"]:
-        trials = results[group_name]
-        eces = [t["ece"] for t in trials]
-        conv_rates = [t["convergence_rate"] for t in trials]
-        explore_fracs = [t["exploration_fraction"] for t in trials]
-        rank_corrs = [t["rank_correlation"] for t in trials]
+        trials: list[dict[str, Any]] = results[group_name]
+        eces: list[float] = [float(t["ece"]) for t in trials]
+        conv_rates: list[float] = [float(t["convergence_rate"]) for t in trials]
+        explore_fracs: list[float] = [float(t["exploration_fraction"]) for t in trials]
+        rank_corrs: list[float] = [float(t["rank_correlation"]) for t in trials]
 
         summary[group_name] = {
             "ece": {
@@ -376,7 +397,7 @@ def summarize(results: dict) -> dict:
         }
 
     # Requirement checks
-    si = summary["source_informed"]
+    si: dict[str, Any] = summary["source_informed"]
     summary["requirement_checks"] = {
         "REQ-009_calibration": {
             "threshold": "ECE < 0.10",
@@ -393,7 +414,7 @@ def summarize(results: dict) -> dict:
     return summary
 
 
-def main():
+def main() -> None:
     config = ExperimentConfig()
 
     print("=" * 60, file=sys.stderr)
@@ -409,7 +430,7 @@ def main():
     # Print summary to stderr for human reading
     print("\n--- SUMMARY ---", file=sys.stderr)
     for group in ["source_informed", "uniform_prior"]:
-        g = summary[group]
+        g: dict[str, Any] = summary[group]
         print(f"\n{group}:", file=sys.stderr)
         print(f"  ECE:          {g['ece']['mean']:.4f} +/- {g['ece']['std']:.4f} "
               f"(90% CI: {g['ece']['p5']:.4f} - {g['ece']['p95']:.4f})", file=sys.stderr)
@@ -421,13 +442,14 @@ def main():
               f"{g['rank_correlation']['std']:.4f}", file=sys.stderr)
 
     print("\n--- REQUIREMENT CHECKS ---", file=sys.stderr)
-    for req_id, check in summary["requirement_checks"].items():
-        status = "PASS" if check["pass"] else "FAIL"
+    req_checks: dict[str, Any] = summary["requirement_checks"]
+    for req_id, check in req_checks.items():
+        status: str = "PASS" if check["pass"] else "FAIL"
         print(f"  {req_id}: {status} (threshold: {check['threshold']}, "
               f"result: {check['result']:.4f})", file=sys.stderr)
 
     # Write full results to stdout as JSON
-    output = {"summary": summary, "config": config.__dict__}
+    output: dict[str, Any] = {"summary": summary, "config": config.__dict__}
     print(json.dumps(output, indent=2))
 
 

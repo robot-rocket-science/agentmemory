@@ -16,16 +16,19 @@ Setup:
   high-relevance beliefs rank above low-relevance ones?)
 """
 
+from __future__ import annotations
+
 import json
 import sys
 from dataclasses import dataclass
-from math import lgamma, log
+from pathlib import Path
+from typing import Any, cast
 
 import numpy as np
-from scipy.stats import spearmanr
+from scipy.stats import spearmanr  # type: ignore[import-untyped]
 
 from experiments.exp2_bayesian_calibration import (
-    Belief, compute_calibration, _digamma,
+    Belief, compute_calibration,
 )
 
 
@@ -34,11 +37,11 @@ class DomainBelief(Belief):
     domain: str = ""
 
 
-DOMAINS = ["database", "frontend", "deployment", "strategy"]
+DOMAINS: list[str] = ["database", "frontend", "deployment", "strategy"]
 
 # Relevance matrix: query_context x domain -> relevance score
 # Each row sums to ~2.0 to keep total relevance comparable across contexts
-RELEVANCE_MATRIX = {
+RELEVANCE_MATRIX: dict[str, dict[str, float]] = {
     "database_task":    {"database": 0.9, "frontend": 0.1, "deployment": 0.3, "strategy": 0.1},
     "frontend_task":    {"database": 0.1, "frontend": 0.9, "deployment": 0.1, "strategy": 0.1},
     "deployment_task":  {"database": 0.2, "frontend": 0.1, "deployment": 0.9, "strategy": 0.2},
@@ -46,12 +49,12 @@ RELEVANCE_MATRIX = {
     "cross_cutting":    {"database": 0.5, "frontend": 0.5, "deployment": 0.5, "strategy": 0.5},
 }
 
-TRUE_RATES = {"database": 0.75, "frontend": 0.65, "deployment": 0.55, "strategy": 0.80}
+TRUE_RATES: dict[str, float] = {"database": 0.75, "frontend": 0.65, "deployment": 0.55, "strategy": 0.80}
 
 
 def create_domain_beliefs(n_per_domain: int = 50) -> list[DomainBelief]:
-    beliefs = []
-    bid = 0
+    beliefs: list[DomainBelief] = []
+    bid: int = 0
     for domain in DOMAINS:
         for _ in range(n_per_domain):
             beliefs.append(DomainBelief(
@@ -66,44 +69,44 @@ def create_domain_beliefs(n_per_domain: int = 50) -> list[DomainBelief]:
     return beliefs
 
 
-def run_trial(n_sessions: int, rng: np.random.Generator) -> dict:
-    beliefs = create_domain_beliefs()
-    n_retrievals = 10
-    n_retrieve_k = 5
+def run_trial(n_sessions: int, rng: np.random.Generator) -> dict[str, Any]:
+    beliefs: list[DomainBelief] = create_domain_beliefs()
+    n_retrievals: int = 10
+    n_retrieve_k: int = 5
 
     # Cycle through query contexts
-    contexts = list(RELEVANCE_MATRIX.keys())
-    exploration_count = 0
-    total_count = 0
-    domain_precision_scores = []
+    contexts: list[str] = list(RELEVANCE_MATRIX.keys())
+    exploration_count: int = 0
+    total_count: int = 0
+    domain_precision_scores: list[float] = []
 
     for session in range(n_sessions):
         # Pick a query context for this session
-        ctx = contexts[session % len(contexts)]
-        relevance_map = RELEVANCE_MATRIX[ctx]
+        ctx: str = contexts[session % len(contexts)]
+        relevance_map: dict[str, float] = RELEVANCE_MATRIX[ctx]
 
-        entropies = [b.entropy for b in beliefs]
-        median_ent = float(np.median(entropies)) if entropies else 0
+        entropies: list[float] = [b.entropy for b in beliefs]
+        median_ent: float = float(np.median(entropies)) if entropies else 0
 
         for _ in range(n_retrievals):
             # Thompson sampling with relevance weighting
-            samples = []
+            samples: list[tuple[DomainBelief, float, float]] = []
             for b in beliefs:
-                s = rng.beta(max(b.alpha, 0.01), max(b.beta_param, 0.01))
-                relevance = relevance_map[b.domain]
-                score = s * relevance
+                s: float = float(rng.beta(max(b.alpha, 0.01), max(b.beta_param, 0.01)))
+                relevance: float = relevance_map[b.domain]
+                score: float = s * relevance
                 samples.append((b, score, relevance))
 
             samples.sort(key=lambda x: x[1], reverse=True)
-            retrieved = [(b, rel) for b, _, rel in samples[:n_retrieve_k]]
+            retrieved: list[tuple[DomainBelief, float]] = [(b, rel) for b, _, rel in samples[:n_retrieve_k]]
 
             # Domain precision: what fraction of retrieved beliefs are from
             # the high-relevance domain?
-            high_rel_domain = max(relevance_map, key=relevance_map.get)
-            from_target = sum(1 for b, _ in retrieved if b.domain == high_rel_domain)
+            high_rel_domain: str = max(relevance_map, key=lambda k: relevance_map[k])
+            from_target: int = sum(1 for b, _ in retrieved if b.domain == high_rel_domain)
             domain_precision_scores.append(from_target / n_retrieve_k)
 
-            for b, rel in retrieved:
+            for b, _rel in retrieved:
                 total_count += 1
                 if b.entropy > median_ent:
                     exploration_count += 1
@@ -120,15 +123,15 @@ def run_trial(n_sessions: int, rng: np.random.Generator) -> dict:
                 else:
                     b.update("harmful")
 
-    cal = compute_calibration(beliefs)
-    rank = 0.0
-    tested = [b for b in beliefs if b.retrieval_count > 0]
+    cal: dict[str, Any] = compute_calibration(cast(list[Belief], beliefs))
+    rank: float = 0.0
+    tested: list[DomainBelief] = [b for b in beliefs if b.retrieval_count > 0]
     if len(tested) > 2:
-        confs = [b.confidence for b in tested]
-        trues = [b.true_usefulness_rate for b in tested]
+        confs: list[float] = [b.confidence for b in tested]
+        trues: list[float] = [b.true_usefulness_rate for b in tested]
         if len(set(trues)) > 1:
-            rho, _ = spearmanr(confs, trues)
-            rank = float(rho) if not np.isnan(rho) else 0.0
+            rho_val: float = float(cast(Any, spearmanr(confs, trues)).statistic)
+            rank = rho_val if not np.isnan(rho_val) else 0.0
 
     return {
         "ece": cal["ece"],
@@ -140,10 +143,10 @@ def run_trial(n_sessions: int, rng: np.random.Generator) -> dict:
     }
 
 
-def main():
-    rng_base = np.random.default_rng(42)
-    n_trials = 100
-    n_sessions = 50
+def main() -> None:
+    rng_base: np.random.Generator = np.random.default_rng(42)
+    n_trials: int = 100
+    n_sessions: int = 50
 
     print("=" * 60, file=sys.stderr)
     print("Experiment 7: Variable-Relevance Thompson Sampling", file=sys.stderr)
@@ -152,20 +155,20 @@ def main():
     print(f"  Jeffreys prior Beta(0.5, 0.5)", file=sys.stderr)
     print("=" * 60, file=sys.stderr)
 
-    trial_results = []
+    trial_results: list[dict[str, Any]] = []
     for trial in range(n_trials):
-        seed = rng_base.integers(0, 2**32)
-        rng = np.random.default_rng(seed)
-        result = run_trial(n_sessions, rng)
+        seed: int = int(cast(int, rng_base.integers(0, 2**32)))
+        rng: np.random.Generator = np.random.default_rng(seed)
+        result: dict[str, Any] = run_trial(n_sessions, rng)
         trial_results.append(result)
         if (trial + 1) % 25 == 0:
             print(f"  Trial {trial + 1}/{n_trials}", file=sys.stderr)
 
-    eces = [r["ece"] for r in trial_results]
-    expls = [r["exploration"] for r in trial_results]
-    ranks = [r["rank_correlation"] for r in trial_results]
-    dom_precs = [r["domain_precision"] for r in trial_results]
-    tested = [r["beliefs_tested"] for r in trial_results]
+    eces: list[float] = [float(r["ece"]) for r in trial_results]
+    expls: list[float] = [float(r["exploration"]) for r in trial_results]
+    ranks: list[float] = [float(r["rank_correlation"]) for r in trial_results]
+    dom_precs: list[float] = [float(r["domain_precision"]) for r in trial_results]
+    tested: list[float] = [float(r["beliefs_tested"]) for r in trial_results]
 
     print(f"\n{'='*60}", file=sys.stderr)
     print("RESULTS", file=sys.stderr)
@@ -186,12 +189,12 @@ def main():
     print(f"  {'Domain precision':<20} {'N/A':>18} {np.mean(dom_precs):>18.4f}", file=sys.stderr)
 
     # Requirement checks
-    ece_pass = float(np.mean(eces)) < 0.10
-    expl_pass = 0.15 <= float(np.mean(expls)) <= 0.50
+    ece_pass: bool = float(np.mean(eces)) < 0.10
+    expl_pass: bool = 0.15 <= float(np.mean(expls)) <= 0.50
     print(f"\n  REQ-009 (ECE < 0.10): {'PASS' if ece_pass else 'FAIL'} ({np.mean(eces):.4f})", file=sys.stderr)
     print(f"  REQ-010 (exploration 0.15-0.50): {'PASS' if expl_pass else 'FAIL'} ({np.mean(expls):.4f})", file=sys.stderr)
 
-    summary = {
+    summary: dict[str, Any] = {
         "ece_mean": round(float(np.mean(eces)), 4),
         "ece_std": round(float(np.std(eces)), 4),
         "exploration_mean": round(float(np.mean(expls)), 4),
@@ -207,5 +210,4 @@ def main():
 
 
 if __name__ == "__main__":
-    from pathlib import Path
     main()

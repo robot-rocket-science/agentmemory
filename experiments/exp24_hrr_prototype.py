@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Experiment 24: Holographic Reduced Representation Prototype
 
@@ -6,7 +8,7 @@ useful approximate retrieval via vector similarity.
 
 HRR basics:
 - Circular convolution binds two vectors: bind(A, B) = A * B (in frequency domain)
-- Circular correlation unbinds: unbind(bound, A) ≈ B
+- Circular correlation unbinds: unbind(bound, A) ~ B
 - Superposition (addition) encodes multiple bindings in one vector
 - Same dimensionality throughout (holographic property)
 
@@ -14,13 +16,13 @@ Test: encode alpha-seek sentence nodes as HRR vectors, query by
 correlation, compare retrieval quality to FTS5 baseline.
 """
 
-import json
 import re
 import sqlite3
 import sys
 from pathlib import Path
 
 import numpy as np
+import numpy.typing as npt
 
 
 ALPHA_SEEK_DB = Path("/Users/thelorax/projects/.gsd/workflows/spikes/"
@@ -32,26 +34,29 @@ DIM = 512  # vector dimensionality
 
 # --- HRR Operations ---
 
-def make_vector(rng: np.random.Generator) -> np.ndarray:
+def make_vector(rng: np.random.Generator) -> npt.NDArray[np.float64]:
     """Random unit vector in DIM dimensions."""
     v = rng.standard_normal(DIM)
-    return v / np.linalg.norm(v)
+    norm = np.linalg.norm(v)
+    return v / norm  # type: ignore[no-any-return]
 
 
-def circular_convolve(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+def circular_convolve(a: npt.NDArray[np.float64], b: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
     """Bind two vectors via circular convolution (multiply in frequency domain)."""
-    return np.real(np.fft.ifft(np.fft.fft(a) * np.fft.fft(b)))
+    result = np.real(np.fft.ifft(np.fft.fft(a) * np.fft.fft(b)))
+    return result  # type: ignore[no-any-return]
 
 
-def circular_correlate(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+def circular_correlate(a: npt.NDArray[np.float64], b: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
     """Unbind: approximate inverse of convolution."""
-    return np.real(np.fft.ifft(np.fft.fft(a) * np.conj(np.fft.fft(b))))
+    result = np.real(np.fft.ifft(np.fft.fft(a) * np.conj(np.fft.fft(b))))
+    return result  # type: ignore[no-any-return]
 
 
-def cosine_sim(a: np.ndarray, b: np.ndarray) -> float:
+def cosine_sim(a: npt.NDArray[np.float64], b: npt.NDArray[np.float64]) -> float:
     """Cosine similarity between two vectors."""
-    norm_a = np.linalg.norm(a)
-    norm_b = np.linalg.norm(b)
+    norm_a = float(np.linalg.norm(a))
+    norm_b = float(np.linalg.norm(b))
     if norm_a == 0 or norm_b == 0:
         return 0.0
     return float(np.dot(a, b) / (norm_a * norm_b))
@@ -68,7 +73,7 @@ def text_to_bag_of_words(text: str) -> set[str]:
     return {w for w in words if w not in stopwords and len(w) > 2}
 
 
-def encode_text(text: str, word_vectors: dict[str, np.ndarray]) -> np.ndarray:
+def encode_text(text: str, word_vectors: dict[str, npt.NDArray[np.float64]]) -> npt.NDArray[np.float64]:
     """Encode text as sum of word vectors (bag-of-words HRR encoding)."""
     words = text_to_bag_of_words(text)
     if not words:
@@ -79,14 +84,14 @@ def encode_text(text: str, word_vectors: dict[str, np.ndarray]) -> np.ndarray:
         if w in word_vectors:
             vec += word_vectors[w]
 
-    norm = np.linalg.norm(vec)
+    norm = float(np.linalg.norm(vec))
     if norm > 0:
         vec /= norm
     return vec
 
 
-def encode_with_role(text: str, role_vector: np.ndarray,
-                     word_vectors: dict[str, np.ndarray]) -> np.ndarray:
+def encode_with_role(text: str, role_vector: npt.NDArray[np.float64],
+                     word_vectors: dict[str, npt.NDArray[np.float64]]) -> npt.NDArray[np.float64]:
     """Encode text bound with a role vector (e.g., DECISION, KNOWLEDGE, CONSTRAINT)."""
     text_vec = encode_text(text, word_vectors)
     return circular_convolve(text_vec, role_vector)
@@ -94,7 +99,7 @@ def encode_with_role(text: str, role_vector: np.ndarray,
 
 # --- Test ---
 
-def main():
+def main() -> None:
     rng = np.random.default_rng(42)
 
     print("=" * 60, file=sys.stderr)
@@ -104,41 +109,41 @@ def main():
 
     # Load nodes
     db = sqlite3.connect(str(ALPHA_SEEK_DB))
-    nodes = []
+    nodes: list[dict[str, str]] = []
     for row in db.execute("SELECT id, content FROM mem_nodes WHERE superseded_by IS NULL"):
         nodes.append({"id": row[0], "content": row[1]})
     db.close()
     print(f"  Loaded {len(nodes)} nodes", file=sys.stderr)
 
     # Build word vocabulary from corpus
-    all_words = set()
+    all_words: set[str] = set()
     for node in nodes:
         all_words.update(text_to_bag_of_words(node["content"]))
     print(f"  Vocabulary: {len(all_words)} words", file=sys.stderr)
 
     # Assign random vectors to each word
-    word_vectors = {w: make_vector(rng) for w in all_words}
+    word_vectors: dict[str, npt.NDArray[np.float64]] = {w: make_vector(rng) for w in all_words}
 
     # Role vectors for typed encoding
-    roles = {
+    roles: dict[str, npt.NDArray[np.float64]] = {
         "decision": make_vector(rng),
         "knowledge": make_vector(rng),
         "milestone": make_vector(rng),
     }
 
     # Encode all nodes
-    node_vectors = {}
+    node_vectors: dict[str, npt.NDArray[np.float64]] = {}
     for node in nodes:
         nid = node["id"]
         # Determine role from ID prefix
         if nid.startswith("D"):
-            role = "decision"
+            _role = "decision"
         elif nid.startswith("K"):
-            role = "knowledge"
+            _role = "knowledge"
         elif nid.startswith("_M"):
-            role = "milestone"
+            _role = "milestone"
         else:
-            role = "knowledge"
+            _role = "knowledge"
 
         node_vectors[nid] = encode_text(node["content"], word_vectors)
 
@@ -147,7 +152,7 @@ def main():
     # --- Test 1: Can we find similar nodes by cosine similarity? ---
     print(f"\n  Test 1: Top-5 similar to each critical decision", file=sys.stderr)
 
-    test_queries = {
+    test_queries: dict[str, str] = {
         "dispatch_gate": "dispatch gate deploy protocol verification always follow",
         "calls_puts": "calls puts equal citizens strategy both directions",
         "capital": "starting capital bankroll five thousand dollars",
@@ -164,7 +169,7 @@ def main():
         query_vec = encode_text(query_text, word_vectors)
 
         # HRR retrieval: cosine similarity
-        sims = [(nid, cosine_sim(query_vec, vec)) for nid, vec in node_vectors.items()]
+        sims: list[tuple[str, float]] = [(nid, cosine_sim(query_vec, vec)) for nid, vec in node_vectors.items()]
         sims.sort(key=lambda x: x[1], reverse=True)
         hrr_top5 = [nid for nid, _ in sims[:5]]
 

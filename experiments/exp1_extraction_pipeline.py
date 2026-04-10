@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Experiment 1: Zero-LLM Belief Extraction Pipeline
 
@@ -15,8 +17,8 @@ Protocol: EXPERIMENTS.md, Experiment 1
 import json
 import re
 import sys
-from dataclasses import dataclass, field
-from pathlib import Path
+from dataclasses import dataclass
+from typing import Any
 
 
 # --- Extracted Belief ---
@@ -47,7 +49,7 @@ def detect_correction(text: str) -> tuple[bool, list[str], float]:
     2 of 5 "misses" were actually not corrections (informational statements).
     """
     text_lower = text.lower().strip()
-    signals = []
+    signals: list[str] = []
 
     # Imperative verb start (34% of corrections)
     if re.match(r'^(use|add|remove|update|follow|convert|make|do|try|run|keep|'
@@ -90,34 +92,34 @@ def detect_correction(text: str) -> tuple[bool, list[str], float]:
     return is_correction, signals, confidence
 
 
-DECISION_PATTERNS = [
+DECISION_PATTERNS: list[tuple[str, str]] = [
     (r"(?:I|we|they|he|she)\s+(?:decided|chose|picked|selected|went with|settled on|switched to)\s+(.{5,80})", "factual"),
     (r"(?:going to|will|shall)\s+(?:use|adopt|implement|switch to|go with)\s+(.{5,80})", "factual"),
     (r"(?:let's|lets)\s+(?:use|go with|try|switch to)\s+(.{5,80})", "factual"),
     (r"(?:the decision is|we agreed)\s+(.{5,80})", "factual"),
 ]
 
-PREFERENCE_PATTERNS = [
+PREFERENCE_PATTERNS: list[tuple[str, str]] = [
     (r"(?:I|we|they|he|she)\s+(?:prefer|like|want|love|always use|never use|hate)\s+(.{5,80})", "preference"),
     (r"(?:I'd rather|I would rather)\s+(.{5,80})", "preference"),
     (r"(?:don't|do not|doesn't|does not)\s+(?:like|want|use|prefer)\s+(.{5,80})", "preference"),
 ]
 
-FACT_PATTERNS = [
+FACT_PATTERNS: list[tuple[str, str]] = [
     (r"(\w+(?:\s+\w+)?)\s+(?:is|are|was|were)\s+(?:a|an|the)?\s*(\w+(?:\s+\w+){0,5})", "factual"),
     (r"(\w+(?:\s+\w+)?)\s+(?:uses?|runs? on|built with|depends on|requires?)\s+(.{5,60})", "relational"),
     (r"(\w+(?:\s+\w+)?)\s+(?:works? at|lives? in|manages?|owns?|leads?)\s+(.{5,60})", "factual"),
     (r"(?:the|our)\s+(\w+(?:\s+\w+)?)\s+(?:is|are)\s+(.{5,80})", "factual"),
 ]
 
-ERROR_PATTERNS = [
+ERROR_PATTERNS: list[tuple[str, str]] = [
     (r"(.{5,40})\s+(?:failed|errored|crashed|broke|doesn't work|didn't work|isn't working)", "procedural"),
     (r"(?:error|bug|issue|problem)(?:\s+\w+){0,3}:\s*(.{5,80})", "procedural"),
     (r"(?:can't|cannot|couldn't|unable to)\s+(.{5,60})", "procedural"),
     (r"(.{5,40})\s+(?:because|due to|caused by)\s+(.{5,60})", "causal"),
 ]
 
-PROCEDURE_PATTERNS = [
+PROCEDURE_PATTERNS: list[tuple[str, str]] = [
     (r"(?:to|in order to)\s+(\w+(?:\s+\w+){1,5}),?\s+(?:you need to|first|run|execute|install)\s+(.{5,80})", "procedural"),
     (r"(?:step \d|first|then|next|finally|after that),?\s+(.{5,80})", "procedural"),
     (r"(?:make sure|ensure|remember to|don't forget to)\s+(.{5,80})", "procedural"),
@@ -138,7 +140,7 @@ def classify_text(text: str) -> tuple[str, float]:
     """Classify text into a belief type via keyword scoring."""
     text_lower = text.lower()
 
-    scores = {
+    scores: dict[str, int] = {
         "decision": sum(1 for kw in DECISION_KEYWORDS if kw in text_lower),
         "preference": sum(1 for kw in PREFERENCE_KEYWORDS if kw in text_lower),
         "factual": sum(1 for kw in FACT_KEYWORDS if kw in text_lower),
@@ -150,11 +152,11 @@ def classify_text(text: str) -> tuple[str, float]:
     if total == 0:
         return "unstructured", 0.0
 
-    best = max(scores, key=scores.get)
+    best = max(scores, key=lambda k: scores[k])
     confidence = scores[best] / max(total, 1)
 
     # Map decision/error to belief types
-    type_map = {"decision": "factual", "error": "procedural"}
+    type_map: dict[str, str] = {"decision": "factual", "error": "procedural"}
     belief_type = type_map.get(best, best)
 
     return belief_type, confidence
@@ -164,10 +166,10 @@ def classify_text(text: str) -> tuple[str, float]:
 
 def extract_beliefs(text: str) -> list[ExtractedBelief]:
     """Extract beliefs from a single conversation turn."""
-    beliefs = []
-    seen_contents = set()  # dedup within a single turn
+    beliefs: list[ExtractedBelief] = []
+    seen_contents: set[str] = set()  # dedup within a single turn
 
-    all_patterns = (
+    all_patterns: list[tuple[str, str]] = (
         DECISION_PATTERNS +
         PREFERENCE_PATTERNS +
         FACT_PATTERNS +
@@ -254,7 +256,7 @@ def extract_beliefs(text: str) -> list[ExtractedBelief]:
 
 # --- Sample Data for Testing ---
 
-SAMPLE_TURNS = [
+SAMPLE_TURNS: list[dict[str, str]] = [
     {
         "id": "turn_001",
         "speaker": "user",
@@ -308,15 +310,15 @@ SAMPLE_TURNS = [
 ]
 
 
-def run_on_samples():
+def run_on_samples() -> None:
     """Run extraction on sample data and print results for review."""
     print(f"Running extraction on {len(SAMPLE_TURNS)} sample turns\n", file=sys.stderr)
 
-    all_results = []
+    all_results: list[dict[str, Any]] = []
 
     for turn in SAMPLE_TURNS:
         beliefs = extract_beliefs(turn["text"])
-        result = {
+        result: dict[str, Any] = {
             "turn_id": turn["id"],
             "speaker": turn["speaker"],
             "text": turn["text"],

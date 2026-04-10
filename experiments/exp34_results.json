@@ -18,7 +18,7 @@
   "test_b": {
     "single_hop_recall": "5/5",
     "two_hop_targets": 3,
-    "two_hop_found": 1
+    "two_hop_found": 0
   },
   "test_c": {}
 }

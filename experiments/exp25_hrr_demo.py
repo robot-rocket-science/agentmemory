@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Experiment 25: HRR Operations Demo
 
@@ -16,6 +18,7 @@ Run with: uv run python experiments/exp25_hrr_demo.py
 """
 
 import numpy as np
+import numpy.typing as npt
 
 DIM = 1024
 SEP = "=" * 60
@@ -25,31 +28,33 @@ SEP = "=" * 60
 # Core HRR operations
 # ---------------------------------------------------------------------------
 
-def make_vector(rng: np.random.Generator, label: str = "") -> np.ndarray:
+def make_vector(rng: np.random.Generator, label: str = "") -> npt.NDArray[np.float64]:
     """Random unit vector in DIM dimensions."""
     v = rng.standard_normal(DIM)
     v /= np.linalg.norm(v)
     return v
 
 
-def convolve(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+def convolve(a: npt.NDArray[np.float64], b: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
     """Circular convolution: bind two vectors. O(n log n)."""
-    return np.real(np.fft.ifft(np.fft.fft(a) * np.fft.fft(b)))
+    result = np.real(np.fft.ifft(np.fft.fft(a) * np.fft.fft(b)))
+    return result  # type: ignore[no-any-return]
 
 
-def correlate(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+def correlate(a: npt.NDArray[np.float64], b: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
     """Circular correlation: approximate inverse of convolution. O(n log n)."""
-    return np.real(np.fft.ifft(np.conj(np.fft.fft(a)) * np.fft.fft(b)))
+    result = np.real(np.fft.ifft(np.conj(np.fft.fft(a)) * np.fft.fft(b)))
+    return result  # type: ignore[no-any-return]
 
 
-def cos_sim(a: np.ndarray, b: np.ndarray) -> float:
-    na, nb = np.linalg.norm(a), np.linalg.norm(b)
+def cos_sim(a: npt.NDArray[np.float64], b: npt.NDArray[np.float64]) -> float:
+    na, nb = float(np.linalg.norm(a)), float(np.linalg.norm(b))
     if na == 0 or nb == 0:
         return 0.0
     return float(np.dot(a, b) / (na * nb))
 
 
-def nearest_neighbor(query: np.ndarray, memory: dict[str, np.ndarray]) -> tuple[str, float]:
+def nearest_neighbor(query: npt.NDArray[np.float64], memory: dict[str, npt.NDArray[np.float64]]) -> tuple[str, float]:
     """Cleanup memory: return (label, similarity) of best-matching vector."""
     best_label, best_sim = "", -2.0
     for label, vec in memory.items():
@@ -64,7 +69,7 @@ def nearest_neighbor(query: np.ndarray, memory: dict[str, np.ndarray]) -> tuple[
 # Demo 1: Circular convolution properties
 # ---------------------------------------------------------------------------
 
-def demo_convolution(rng):
+def demo_convolution(rng: np.random.Generator) -> None:
     print(SEP)
     print("DEMO 1: Circular Convolution (Binding)")
     print(SEP)
@@ -80,30 +85,30 @@ def demo_convolution(rng):
     # c should be approximately orthogonal to both a and b
     sim_ca = cos_sim(c, a)
     sim_cb = cos_sim(c, b)
-    print(f"  cos(c, a) = {sim_ca:+.4f}   (expected ≈ 0: result is orthogonal to inputs)")
-    print(f"  cos(c, b) = {sim_cb:+.4f}   (expected ≈ 0)")
+    print(f"  cos(c, a) = {sim_ca:+.4f}   (expected ~ 0: result is orthogonal to inputs)")
+    print(f"  cos(c, b) = {sim_cb:+.4f}   (expected ~ 0)")
 
     # Commutativity
     c2 = convolve(b, a)
     print(f"\n  Commutativity: convolve(a,b) == convolve(b,a)?")
-    print(f"  Max absolute difference: {np.max(np.abs(c - c2)):.2e}  (expected ≈ 0)")
+    print(f"  Max absolute difference: {np.max(np.abs(c - c2)):.2e}  (expected ~ 0)")
 
     # Associativity
     d = make_vector(rng)
     lhs = convolve(convolve(a, b), d)
     rhs = convolve(a, convolve(b, d))
     print(f"\n  Associativity: (a*b)*d == a*(b*d)?")
-    print(f"  Max absolute difference: {np.max(np.abs(lhs - rhs)):.2e}  (expected ≈ 0)")
+    print(f"  Max absolute difference: {np.max(np.abs(lhs - rhs)):.2e}  (expected ~ 0)")
 
-    # Result has same norm ≈ 1
-    print(f"\n  Norm of c = convolve(a, b): {np.linalg.norm(c):.4f}  (expected ≈ 1.0)")
+    # Result has same norm ~ 1
+    print(f"\n  Norm of c = convolve(a, b): {np.linalg.norm(c):.4f}  (expected ~ 1.0)")
 
 
 # ---------------------------------------------------------------------------
 # Demo 2: Circular correlation (unbinding)
 # ---------------------------------------------------------------------------
 
-def demo_unbinding(rng):
+def demo_unbinding(rng: np.random.Generator) -> None:
     print(f"\n{SEP}")
     print("DEMO 2: Circular Correlation (Approximate Unbinding)")
     print(SEP)
@@ -122,8 +127,8 @@ def demo_unbinding(rng):
     print(f"  b_recovered = correlate(a, c)")
     print()
     print(f"  cos(b_recovered, b)     = {sim_to_b:+.4f}   (expected >> 0: we recovered b)")
-    print(f"  cos(b_recovered, a)     = {sim_to_a:+.4f}   (expected ≈ 0: not a)")
-    print(f"  cos(b_recovered, noise) = {sim_to_noise:+.4f}   (expected ≈ 0)")
+    print(f"  cos(b_recovered, a)     = {sim_to_a:+.4f}   (expected ~ 0: not a)")
+    print(f"  cos(b_recovered, noise) = {sim_to_noise:+.4f}   (expected ~ 0)")
     print(f"\n  Signal-to-noise ratio: {sim_to_b / max(abs(sim_to_noise), 1e-6):.1f}x")
 
     # Reverse direction: given c and b, recover a
@@ -142,13 +147,13 @@ def demo_unbinding(rng):
 # Demo 3: Superposition capacity
 # ---------------------------------------------------------------------------
 
-def demo_superposition(rng):
+def demo_superposition(rng: np.random.Generator) -> None:
     print(f"\n{SEP}")
     print("DEMO 3: Superposition Capacity")
     print(SEP)
-    print(f"\n  Superpose k bindings into one vector S.")
+    print(f"\n  Superpose k bindings into one vector s_vec.")
     print(f"  Then try to recover each individual binding.")
-    print(f"  SNR degrades as k increases: SNR ≈ sqrt(n/k)")
+    print(f"  SNR degrades as k increases: SNR ~ sqrt(n/k)")
     print()
 
     keys = [make_vector(rng) for _ in range(200)]
@@ -159,12 +164,12 @@ def demo_superposition(rng):
 
     for k in [1, 5, 10, 25, 50, 100, 150, 200]:
         # Build superposition of k bindings
-        S = np.zeros(DIM)
+        s_vec = np.zeros(DIM)
         for i in range(k):
-            S += convolve(keys[i], values[i])
+            s_vec += convolve(keys[i], values[i])
 
-        # Try to recover value[0] from S using key[0]
-        recovered = correlate(keys[0], S)
+        # Try to recover value[0] from s_vec using key[0]
+        recovered = correlate(keys[0], s_vec)
         sim_target = cos_sim(recovered, values[0])
         sim_noise  = cos_sim(recovered, make_vector(rng))
         snr = sim_target / max(abs(sim_noise), 1e-6)
@@ -173,37 +178,37 @@ def demo_superposition(rng):
         print(f"  {k:>12}  {sim_target:>+14.4f}  {sim_noise:>+13.4f}  {snr:>6.1f}  {ok}")
 
     theoretical_capacity = DIM // 9
-    print(f"\n  Theoretical reliable capacity ≈ n/9 = {theoretical_capacity} bindings at n={DIM}")
+    print(f"\n  Theoretical reliable capacity ~ n/9 = {theoretical_capacity} bindings at n={DIM}")
 
 
 # ---------------------------------------------------------------------------
 # Demo 4: Multi-hop graph traversal
 # ---------------------------------------------------------------------------
 
-def demo_multihop(rng):
+def demo_multihop(rng: np.random.Generator) -> None:
     print(f"\n{SEP}")
     print("DEMO 4: Multi-Hop Graph Traversal in Vector Space")
     print(SEP)
 
     # Nodes
-    node = {name: make_vector(rng) for name in ["A", "B", "C", "D", "X"]}
+    node: dict[str, npt.NDArray[np.float64]] = {name: make_vector(rng) for name in ["A", "B", "C", "D", "X"]}
 
     # Edge types
-    edge = {name: make_vector(rng) for name in ["SUPPORTS", "CITES", "CONTRADICTS"]}
+    edge: dict[str, npt.NDArray[np.float64]] = {name: make_vector(rng) for name in ["SUPPORTS", "CITES", "CONTRADICTS"]}
 
     # Encode graph edges into a single superposition:
     #   A -[SUPPORTS]-> B
     #   B -[CITES]->    C
     #   A -[CITES]->    D
     #   X -[SUPPORTS]-> C   (distractor)
-    S = np.zeros(DIM)
-    S += convolve(convolve(node["A"], edge["SUPPORTS"]), node["B"])
-    S += convolve(convolve(node["B"], edge["CITES"]),    node["C"])
-    S += convolve(convolve(node["A"], edge["CITES"]),    node["D"])
-    S += convolve(convolve(node["X"], edge["SUPPORTS"]), node["C"])
+    s_vec = np.zeros(DIM)
+    s_vec = s_vec + convolve(convolve(node["A"], edge["SUPPORTS"]), node["B"])
+    s_vec = s_vec + convolve(convolve(node["B"], edge["CITES"]),    node["C"])
+    s_vec = s_vec + convolve(convolve(node["A"], edge["CITES"]),    node["D"])
+    s_vec = s_vec + convolve(convolve(node["X"], edge["SUPPORTS"]), node["C"])
 
     # Cleanup memory: all node vectors
-    memory = {name: vec for name, vec in node.items()}
+    memory: dict[str, npt.NDArray[np.float64]] = {name: vec for name, vec in node.items()}
 
     print(f"\n  Graph encoded as superposition of 4 edges:")
     print(f"    A -[SUPPORTS]-> B")
@@ -214,7 +219,7 @@ def demo_multihop(rng):
     # 1-hop: A --SUPPORTS--> ?
     print(f"\n  Query 1-hop: A -[SUPPORTS]-> ?")
     q = convolve(node["A"], edge["SUPPORTS"])
-    recovered = correlate(q, S)
+    recovered = correlate(q, s_vec)
     label, sim = nearest_neighbor(recovered, memory)
     sims = {n: cos_sim(recovered, v) for n, v in memory.items()}
     print(f"    Result: {label} (cos={sim:+.4f})")
@@ -223,7 +228,7 @@ def demo_multihop(rng):
     # 1-hop: A --CITES--> ?
     print(f"\n  Query 1-hop: A -[CITES]-> ?")
     q = convolve(node["A"], edge["CITES"])
-    recovered = correlate(q, S)
+    recovered = correlate(q, s_vec)
     label, sim = nearest_neighbor(recovered, memory)
     sims = {n: cos_sim(recovered, v) for n, v in memory.items()}
     print(f"    Result: {label} (cos={sim:+.4f})")
@@ -233,7 +238,7 @@ def demo_multihop(rng):
     # Expected: A->B->C
     print(f"\n  Query 2-hop: A -[SUPPORTS]-> ? -[CITES]-> ?  (expected: C)")
     q = convolve(convolve(node["A"], edge["SUPPORTS"]), edge["CITES"])
-    recovered = correlate(q, S)
+    recovered = correlate(q, s_vec)
     label, sim = nearest_neighbor(recovered, memory)
     sims = {n: cos_sim(recovered, v) for n, v in memory.items()}
     print(f"    Result: {label} (cos={sim:+.4f})")
@@ -245,32 +250,32 @@ def demo_multihop(rng):
 # Demo 5: Edge-type orthogonality (selective traversal)
 # ---------------------------------------------------------------------------
 
-def demo_edge_orthogonality(rng):
+def demo_edge_orthogonality(rng: np.random.Generator) -> None:
     print(f"\n{SEP}")
     print("DEMO 5: Edge-Type Orthogonality (Selective Traversal)")
     print(SEP)
 
-    node = {name: make_vector(rng) for name in ["A", "B", "C", "D"]}
-    edge = {name: make_vector(rng) for name in ["SUPPORTS", "CONTRADICTS", "CITES"]}
+    node: dict[str, npt.NDArray[np.float64]] = {name: make_vector(rng) for name in ["A", "B", "C", "D"]}
+    edge: dict[str, npt.NDArray[np.float64]] = {name: make_vector(rng) for name in ["SUPPORTS", "CONTRADICTS", "CITES"]}
 
     # Encode:
     #   A -[SUPPORTS]->    B
     #   A -[CONTRADICTS]-> C
     #   A -[CITES]->       D
-    S = np.zeros(DIM)
-    S += convolve(convolve(node["A"], edge["SUPPORTS"]),    node["B"])
-    S += convolve(convolve(node["A"], edge["CONTRADICTS"]), node["C"])
-    S += convolve(convolve(node["A"], edge["CITES"]),       node["D"])
+    s_vec = np.zeros(DIM)
+    s_vec = s_vec + convolve(convolve(node["A"], edge["SUPPORTS"]),    node["B"])
+    s_vec = s_vec + convolve(convolve(node["A"], edge["CONTRADICTS"]), node["C"])
+    s_vec = s_vec + convolve(convolve(node["A"], edge["CITES"]),       node["D"])
 
-    memory = {name: vec for name, vec in node.items()}
+    memory: dict[str, npt.NDArray[np.float64]] = {name: vec for name, vec in node.items()}
 
     print(f"\n  Graph: A -[SUPPORTS]-> B,  A -[CONTRADICTS]-> C,  A -[CITES]-> D")
     print(f"\n  Querying with each edge type selectively activates only that edge:")
 
     for edge_name, expected in [("SUPPORTS", "B"), ("CONTRADICTS", "C"), ("CITES", "D")]:
         q = convolve(node["A"], edge[edge_name])
-        recovered = correlate(q, S)
-        label, sim = nearest_neighbor(recovered, memory)
+        recovered = correlate(q, s_vec)
+        label, _sim = nearest_neighbor(recovered, memory)
         sims = {n: cos_sim(recovered, v) for n, v in memory.items()}
         correct = "OK" if label == expected else f"WRONG (got {label})"
         print(f"\n  A -[{edge_name}]-> ?  (expected {expected}): {correct}")
@@ -283,7 +288,7 @@ def demo_edge_orthogonality(rng):
     a_contra_c = convolve(convolve(node["A"], edge["CONTRADICTS"]), node["C"])
     interference = correlate(q_supports, a_contra_c)
     sim_to_c = cos_sim(interference, node["C"])
-    print(f"    Similarity of SUPPORTS-query to C (via CONTRADICTS edge): {sim_to_c:+.4f}  (expected ≈ 0)")
+    print(f"    Similarity of SUPPORTS-query to C (via CONTRADICTS edge): {sim_to_c:+.4f}  (expected ~ 0)")
     print(f"    Selectivity is geometric -- no filtering code needed")
 
 
@@ -291,7 +296,7 @@ def demo_edge_orthogonality(rng):
 # Main
 # ---------------------------------------------------------------------------
 
-def main():
+def main() -> None:
     rng = np.random.default_rng(42)
 
     print(f"\n{SEP}")
@@ -311,11 +316,11 @@ def main():
   1. Convolution binds two vectors into a third with the same dimensionality.
      Result is orthogonal to both inputs -- looks like noise.
 
-  2. Correlation approximately inverts convolution. Given c = a*b, correlate(a, c) ≈ b.
-     Signal-to-noise ratio ≈ sqrt(n). Both directions of a binding are recoverable.
+  2. Correlation approximately inverts convolution. Given c = a*b, correlate(a, c) ~ b.
+     Signal-to-noise ratio ~ sqrt(n). Both directions of a binding are recoverable.
 
   3. Superposition stores multiple bindings in one vector by addition.
-     Capacity ≈ n/9 reliable bindings. SNR degrades as sqrt(n/k).
+     Capacity ~ n/9 reliable bindings. SNR degrades as sqrt(n/k).
 
   4. Multi-hop traversal is successive convolution: no BFS, no intermediate node lookup.
      A -[e1]-> B -[e2]-> C  retrieved as  correlate(node_A * e1 * e2, S).

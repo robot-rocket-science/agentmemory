@@ -20,13 +20,16 @@ the D### text pattern). The interesting question is what ELSE HRR finds that
 regex misses.
 """
 
+from __future__ import annotations
+
 import re
 import sqlite3
 import sys
-from collections import defaultdict
 from pathlib import Path
+from typing import Any
 
 import numpy as np
+import numpy.typing as npt
 
 DIM = 2048
 
@@ -34,36 +37,41 @@ DB = Path("/Users/thelorax/projects/.gsd/workflows/spikes/"
           "260406-1-associative-memory-for-gsd-please-explor/"
           "sandbox/alpha-seek.db")
 
+NDArr = npt.NDArray[np.float64]
 
-def make_vec(rng):
-    v = rng.standard_normal(DIM)
+
+def make_vec(rng: np.random.Generator) -> NDArr:
+    v: NDArr = rng.standard_normal(DIM)
     return v / np.linalg.norm(v)
 
-def bind(a, b):
-    return np.real(np.fft.ifft(np.fft.fft(a) * np.fft.fft(b)))
+def bind(a: NDArr, b: NDArr) -> NDArr:
+    result: NDArr = np.real(np.fft.ifft(np.fft.fft(a) * np.fft.fft(b)))
+    return result
 
-def unbind(key, bound):
-    return np.real(np.fft.ifft(np.conj(np.fft.fft(key)) * np.fft.fft(bound)))
+def unbind(key: NDArr, bound: NDArr) -> NDArr:
+    result: NDArr = np.real(np.fft.ifft(np.conj(np.fft.fft(key)) * np.fft.fft(bound)))
+    return result
 
-def cos_sim(a, b):
-    na, nb = np.linalg.norm(a), np.linalg.norm(b)
+def cos_sim(a: NDArr, b: NDArr) -> float:
+    na: np.floating[Any] = np.linalg.norm(a)
+    nb: np.floating[Any] = np.linalg.norm(b)
     if na == 0 or nb == 0: return 0.0
     return float(np.dot(a, b) / (na * nb))
 
 
-def split_sents(text):
-    parts = re.split(r'(?<=[.!?])\s+(?=[A-Z])', text)
-    sents = []
+def split_sents(text: str) -> list[str]:
+    parts: list[str | Any] = re.split(r'(?<=[.!?])\s+(?=[A-Z])', text)
+    sents: list[str] = []
     for p in parts:
-        for sp in p.split(' | '):
+        for sp in str(p).split(' | '):
             sp = sp.strip()
             if len(sp) > 10:
                 sents.append(sp)
     return sents
 
 
-def classify(s):
-    sl = s.lower()
+def classify(s: str) -> str:
+    sl: str = s.lower()
     if any(w in sl for w in ['must', 'always', 'never', 'mandatory', 'require', 'banned', 'do not']):
         return 'constraint'
     if any(w in sl for w in ['because', 'rationale', 'reason', 'driven by']):
@@ -75,7 +83,11 @@ def classify(s):
     return 'context'
 
 
-def main():
+SentDict = dict[str, dict[str, Any]]
+GroupDict = dict[str, list[str]]
+
+
+def main() -> None:
     rng = np.random.default_rng(42)
 
     print("=" * 60, file=sys.stderr)
@@ -84,19 +96,19 @@ def main():
 
     # --- Load and decompose ---
     db = sqlite3.connect(str(DB))
-    sentences = {}
-    groups = {}
+    sentences: SentDict = {}
+    groups: GroupDict = {}
 
     for row in db.execute("SELECT id, decision, choice, rationale FROM decisions"):
-        did = row[0]
-        full = f"{row[1]}: {row[2]}"
+        did: str = str(row[0])
+        full: str = f"{row[1]}: {row[2]}"
         if row[3]:
             full += f" | {row[3]}"
 
-        sents = split_sents(full)
-        g = []
+        sents: list[str] = split_sents(full)
+        g: list[str] = []
         for i, s in enumerate(sents):
-            sid = f"{did}_s{i}"
+            sid: str = f"{did}_s{i}"
             sentences[sid] = {
                 "content": s,
                 "parent": did,
@@ -110,38 +122,39 @@ def main():
     print(f"  {len(sentences)} sentences from {len(groups)} decisions", file=sys.stderr)
 
     # --- Ground truth: regex-extracted CITES edges ---
-    d_ref = re.compile(r'\bD(\d{2,3})\b')
-    regex_edges = set()
+    d_ref: re.Pattern[str] = re.compile(r'\bD(\d{2,3})\b')
+    regex_edges: set[tuple[str, str]] = set()
     for sid, sent in sentences.items():
-        parent = sent["parent"]
-        for m in d_ref.finditer(sent["content"]):
-            target_did = f"D{m.group(1)}"
+        parent: str = sent["parent"]
+        content: str = sent["content"]
+        for m in d_ref.finditer(content):
+            target_did: str = f"D{m.group(1)}"
             if target_did != parent and target_did in groups and groups[target_did]:
-                target_sid = groups[target_did][0]
+                target_sid: str = groups[target_did][0]
                 regex_edges.add((sid, target_sid))
 
     print(f"  Regex CITES edges (ground truth): {len(regex_edges)}", file=sys.stderr)
 
     # --- HRR encoding: bind sentences with structural context ---
-    node_vecs = {sid: make_vec(rng) for sid in sentences}
-    parent_vecs = {did: make_vec(rng) for did in groups}
-    type_vecs = {t: make_vec(rng) for t in ['constraint', 'rationale', 'evidence', 'supersession', 'context']}
+    node_vecs: dict[str, NDArr] = {sid: make_vec(rng) for sid in sentences}
+    parent_vecs: dict[str, NDArr] = {did: make_vec(rng) for did in groups}
+    type_vecs: dict[str, NDArr] = {t: make_vec(rng) for t in ['constraint', 'rationale', 'evidence', 'supersession', 'context']}
 
     # Build a structural encoding for each sentence:
     # encoded[sid] = node_vec * parent_vec * type_vec
     # This captures: what sentence is this, what decision is it from, what role does it play
-    encoded = {}
+    encoded: dict[str, NDArr] = {}
     for sid, sent in sentences.items():
         encoded[sid] = bind(bind(node_vecs[sid], parent_vecs[sent["parent"]]),
                            type_vecs[sent["type"]])
 
     # Build superposition per decision: all sentences in a decision, encoded
-    decision_supers = {}
+    decision_supers: dict[str, NDArr] = {}
     for did, group in groups.items():
-        S = np.zeros(DIM)
+        superpos: NDArr = np.zeros(DIM)
         for sid in group:
-            S += encoded[sid]
-        decision_supers[did] = S
+            superpos += encoded[sid]
+        decision_supers[did] = superpos
 
     # --- HRR Edge Discovery ---
     # For each sentence, query: "which sentences in OTHER decisions are
@@ -152,29 +165,28 @@ def main():
 
     print(f"\n  Discovering edges via HRR structural similarity...", file=sys.stderr)
 
-    discovered_edges = set()
-    discovery_scores = {}
+    discovered_edges: set[tuple[str, str]] = set()
+    discovery_scores: dict[tuple[str, str], float] = {}
 
     # Focus on sentences that have regex CITES edges (so we can compare)
-    source_sids = set(src for src, _ in regex_edges)
+    source_sids: set[str] = set(src for src, _ in regex_edges)
 
     for src_sid in source_sids:
-        src_sent = sentences[src_sid]
-        src_parent = src_sent["parent"]
-        src_enc = encoded[src_sid]
+        src_sent: dict[str, Any] = sentences[src_sid]
+        src_parent: str = src_sent["parent"]
 
         # Query each other decision's superposition
-        best_targets = []
-        for did, S in decision_supers.items():
+        best_targets: list[tuple[str, float]] = []
+        for did, superpos in decision_supers.items():
             if did == src_parent:
                 continue  # skip own decision
 
             # Unbind source's type to find sentences of similar structural role
-            result = unbind(type_vecs[src_sent["type"]], S)
+            result: NDArr = unbind(type_vecs[src_sent["type"]], superpos)
 
             # Check against all sentences in this decision
             for target_sid in groups[did]:
-                sim = cos_sim(result, node_vecs[target_sid])
+                sim: float = cos_sim(result, node_vecs[target_sid])
                 if sim > 0.03:  # above noise floor
                     best_targets.append((target_sid, sim))
 
@@ -189,13 +201,13 @@ def main():
 
     # --- Compare ---
     # How many regex edges did HRR discover?
-    true_positives = regex_edges & discovered_edges
-    false_positives = discovered_edges - regex_edges
-    false_negatives = regex_edges - discovered_edges
+    true_positives: set[tuple[str, str]] = regex_edges & discovered_edges
+    false_positives: set[tuple[str, str]] = discovered_edges - regex_edges
+    false_negatives: set[tuple[str, str]] = regex_edges - discovered_edges
 
-    precision = len(true_positives) / len(discovered_edges) if discovered_edges else 0
-    recall = len(true_positives) / len(regex_edges) if regex_edges else 0
-    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
+    precision: float = len(true_positives) / len(discovered_edges) if discovered_edges else 0
+    recall: float = len(true_positives) / len(regex_edges) if regex_edges else 0
+    f1: float = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
 
     print(f"\n{'='*60}", file=sys.stderr)
     print(f"RESULTS: HRR Edge Discovery vs Regex Ground Truth", file=sys.stderr)
@@ -213,7 +225,7 @@ def main():
     if true_positives:
         print(f"\n  Sample TRUE POSITIVES (HRR found what regex found):", file=sys.stderr)
         for src, dst in list(true_positives)[:5]:
-            sim = discovery_scores.get((src, dst), 0)
+            sim: float = discovery_scores.get((src, dst), 0)
             print(f"    {src} -> {dst} (sim={sim:.4f})", file=sys.stderr)
             print(f"      src: {sentences[src]['content'][:60]}", file=sys.stderr)
             print(f"      dst: {sentences[dst]['content'][:60]}", file=sys.stderr)
@@ -222,7 +234,7 @@ def main():
     if false_positives:
         print(f"\n  Sample FALSE POSITIVES (HRR found, regex didn't -- are these real?):",
               file=sys.stderr)
-        fps = sorted(false_positives, key=lambda e: discovery_scores.get(e, 0), reverse=True)
+        fps: list[tuple[str, str]] = sorted(false_positives, key=lambda e: discovery_scores.get(e, 0), reverse=True)
         for src, dst in fps[:5]:
             sim = discovery_scores.get((src, dst), 0)
             print(f"    {src} -> {dst} (sim={sim:.4f})", file=sys.stderr)

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Experiment 5: Exploration-Exploitation Strategy Comparison
 
@@ -16,17 +18,15 @@ Protocol: EXPERIMENTS.md, Experiment 5
 import json
 import sys
 from dataclasses import dataclass
-from math import lgamma, log
+from typing import Any, Literal
 
 import numpy as np
-from scipy.stats import spearmanr
 
 from experiments.exp2_bayesian_calibration import (
     ExperimentConfig,
     Belief,
     compute_calibration,
     compute_rank_correlation,
-    _digamma,
 )
 
 
@@ -41,9 +41,9 @@ class StrategyResult:
 
 def create_beliefs(config: ExperimentConfig) -> list[Belief]:
     """All beliefs start with uniform priors (Exp 2 showed source-informed are harmful)."""
-    beliefs = []
+    beliefs: list[Belief] = []
     bid = 0
-    sources = [
+    sources: list[tuple[str, int, float]] = [
         ("user_stated", config.n_user_stated, config.true_rate_user),
         ("document", config.n_document, config.true_rate_document),
         ("agent_inferred", config.n_agent_inferred, config.true_rate_agent),
@@ -60,7 +60,7 @@ def create_beliefs(config: ExperimentConfig) -> list[Belief]:
     return beliefs
 
 
-def simulate_outcome(belief: Belief, rng: np.random.Generator) -> str:
+def simulate_outcome(belief: Belief, rng: np.random.Generator) -> Literal["used", "harmful", "ignored"]:
     if rng.random() < 0.30:
         return "ignored"
     elif rng.random() < belief.true_usefulness_rate:
@@ -69,7 +69,7 @@ def simulate_outcome(belief: Belief, rng: np.random.Generator) -> str:
         return "harmful"
 
 
-def apply_outcome(belief: Belief, outcome: str) -> None:
+def apply_outcome(belief: Belief, outcome: Literal["used", "harmful", "ignored"]) -> None:
     belief.retrieval_count += 1
     belief.update(outcome)
 
@@ -85,8 +85,9 @@ def compute_metrics(beliefs: list[Belief], exploration_retrievals: int,
 
     expl_frac = exploration_retrievals / total_retrievals if total_retrievals > 0 else 0
 
+    ece_val: float = cal["ece"]
     return StrategyResult(
-        ece=cal["ece"],
+        ece=ece_val,
         exploration_fraction=round(expl_frac, 4),
         rank_correlation=rank,
         convergence_rate=round(conv_rate, 4),
@@ -98,23 +99,22 @@ def compute_metrics(beliefs: list[Belief], exploration_retrievals: int,
 
 def run_phased(config: ExperimentConfig, rng: np.random.Generator) -> StrategyResult:
     beliefs = create_beliefs(config)
-    median_entropy_samples = []
     exploration_count = 0
     total_count = 0
 
-    for session in range(config.n_sessions):
+    for _session in range(config.n_sessions):
         # Decay exploration weight: 0.50 -> 0.05 over 30 sessions
-        ew = max(0.05, 0.50 * (1.0 - session / 30.0))
+        ew = max(0.05, 0.50 * (1.0 - _session / 30.0))
         phase_config = ExperimentConfig(exploration_weight=ew, failure_cost_weight=0.3)
 
         # Track median entropy for exploration measurement
-        entropies = [b.entropy for b in beliefs]
+        entropies: list[float] = [b.entropy for b in beliefs]
         median_ent = float(np.median(entropies)) if entropies else 0
 
         for _ in range(config.n_retrievals_per_session):
-            scores = [(b, b.expected_utility(1.0, phase_config)) for b in beliefs]
+            scores: list[tuple[Belief, float]] = [(b, b.expected_utility(1.0, phase_config)) for b in beliefs]
             scores.sort(key=lambda x: x[1], reverse=True)
-            retrieved = [b for b, _ in scores[:config.n_beliefs_per_retrieval]]
+            retrieved: list[Belief] = [b for b, _ in scores[:config.n_beliefs_per_retrieval]]
 
             for b in retrieved:
                 total_count += 1
@@ -134,15 +134,15 @@ def run_decoupled(config: ExperimentConfig, rng: np.random.Generator) -> Strateg
 
     exploit_config = ExperimentConfig(exploration_weight=0.05, failure_cost_weight=0.3)
 
-    for session in range(config.n_sessions):
-        entropies = [b.entropy for b in beliefs]
+    for _session in range(config.n_sessions):
+        entropies: list[float] = [b.entropy for b in beliefs]
         median_ent = float(np.median(entropies)) if entropies else 0
 
         # Task channel: 10 retrievals, low exploration
         for _ in range(config.n_retrievals_per_session):
-            scores = [(b, b.expected_utility(1.0, exploit_config)) for b in beliefs]
+            scores: list[tuple[Belief, float]] = [(b, b.expected_utility(1.0, exploit_config)) for b in beliefs]
             scores.sort(key=lambda x: x[1], reverse=True)
-            retrieved = [b for b, _ in scores[:config.n_beliefs_per_retrieval]]
+            retrieved: list[Belief] = [b for b, _ in scores[:config.n_beliefs_per_retrieval]]
 
             for b in retrieved:
                 total_count += 1
@@ -169,19 +169,19 @@ def run_thompson(config: ExperimentConfig, rng: np.random.Generator) -> Strategy
     exploration_count = 0
     total_count = 0
 
-    for session in range(config.n_sessions):
-        entropies = [b.entropy for b in beliefs]
+    for _session in range(config.n_sessions):
+        entropies: list[float] = [b.entropy for b in beliefs]
         median_ent = float(np.median(entropies)) if entropies else 0
 
         for _ in range(config.n_retrievals_per_session):
             # Sample from each belief's Beta distribution
-            samples = []
+            samples: list[tuple[Belief, float]] = []
             for b in beliefs:
-                s = rng.beta(b.alpha, b.beta_param)
+                s = float(rng.beta(b.alpha, b.beta_param))
                 samples.append((b, s))
 
             samples.sort(key=lambda x: x[1], reverse=True)
-            retrieved = [b for b, _ in samples[:config.n_beliefs_per_retrieval]]
+            retrieved: list[Belief] = [b for b, _ in samples[:config.n_beliefs_per_retrieval]]
 
             for b in retrieved:
                 total_count += 1
@@ -201,14 +201,14 @@ def run_static(config: ExperimentConfig, rng: np.random.Generator) -> StrategyRe
 
     static_config = ExperimentConfig(exploration_weight=0.50, failure_cost_weight=0.3)
 
-    for session in range(config.n_sessions):
-        entropies = [b.entropy for b in beliefs]
+    for _session in range(config.n_sessions):
+        entropies: list[float] = [b.entropy for b in beliefs]
         median_ent = float(np.median(entropies)) if entropies else 0
 
         for _ in range(config.n_retrievals_per_session):
-            scores = [(b, b.expected_utility(1.0, static_config)) for b in beliefs]
+            scores: list[tuple[Belief, float]] = [(b, b.expected_utility(1.0, static_config)) for b in beliefs]
             scores.sort(key=lambda x: x[1], reverse=True)
-            retrieved = [b for b, _ in scores[:config.n_beliefs_per_retrieval]]
+            retrieved: list[Belief] = [b for b, _ in scores[:config.n_beliefs_per_retrieval]]
 
             for b in retrieved:
                 total_count += 1
@@ -221,7 +221,9 @@ def run_static(config: ExperimentConfig, rng: np.random.Generator) -> StrategyRe
 
 # --- Main ---
 
-STRATEGIES = {
+StrategyFn = type[None]  # placeholder, real type below
+
+STRATEGIES: dict[str, Any] = {
     "A_phased": run_phased,
     "B_decoupled": run_decoupled,
     "C_thompson": run_thompson,
@@ -229,7 +231,12 @@ STRATEGIES = {
 }
 
 
-def main():
+def _rng_seed(rng: np.random.Generator) -> int:
+    raw: Any = rng.integers(0, 2**32)
+    return int(raw)
+
+
+def main() -> None:
     config = ExperimentConfig(n_trials=100)
     rng_base = np.random.default_rng(config.seed)
 
@@ -239,16 +246,16 @@ def main():
           f"{config.n_trials} trials per strategy", file=sys.stderr)
     print("=" * 60, file=sys.stderr)
 
-    all_results = {}
+    all_results: dict[str, dict[str, Any]] = {}
 
     for name, strategy_fn in STRATEGIES.items():
         print(f"\nRunning {name}...", file=sys.stderr)
 
-        trial_results = []
+        trial_results: list[dict[str, Any]] = []
         for trial in range(config.n_trials):
-            seed = rng_base.integers(0, 2**32)
+            seed: int = _rng_seed(rng_base)
             rng = np.random.default_rng(seed)
-            result = strategy_fn(config, rng)
+            result: StrategyResult = strategy_fn(config, rng)
             trial_results.append({
                 "ece": result.ece,
                 "exploration": result.exploration_fraction,
@@ -259,13 +266,13 @@ def main():
             if (trial + 1) % 25 == 0:
                 print(f"  Trial {trial + 1}/{config.n_trials}", file=sys.stderr)
 
-        eces = [r["ece"] for r in trial_results]
-        expls = [r["exploration"] for r in trial_results]
-        convs = [r["convergence"] for r in trial_results]
-        ranks = [r["rank_corr"] for r in trial_results]
-        retrievals = trial_results[0]["total_retrievals"]
+        eces: list[float] = [r["ece"] for r in trial_results]
+        expls: list[float] = [r["exploration"] for r in trial_results]
+        convs: list[float] = [r["convergence"] for r in trial_results]
+        ranks: list[float] = [r["rank_corr"] for r in trial_results]
+        retrievals: int = trial_results[0]["total_retrievals"]
 
-        summary = {
+        summary: dict[str, Any] = {
             "ece_mean": round(float(np.mean(eces)), 4),
             "ece_std": round(float(np.std(eces)), 4),
             "ece_p5": round(float(np.percentile(eces, 5)), 4),
@@ -321,13 +328,13 @@ def main():
               f"({s['exploration_mean']:.4f})", file=sys.stderr)
 
     # Winner selection
-    passing = {k: v for k, v in all_results.items() if v["both_pass"]}
+    passing: dict[str, dict[str, Any]] = {k: v for k, v in all_results.items() if v["both_pass"]}
     if passing:
-        winner = min(passing.items(), key=lambda x: x[1]["ece_mean"])
+        winner = min(passing.items(), key=lambda x: float(x[1]["ece_mean"]))
         print(f"\nWINNER: {winner[0]} (lowest ECE among passing strategies)", file=sys.stderr)
     else:
         closest = min(all_results.items(),
-                      key=lambda x: x[1]["ece_mean"] + abs(0.25 - x[1]["exploration_mean"]))
+                      key=lambda x: float(x[1]["ece_mean"]) + abs(0.25 - float(x[1]["exploration_mean"])))
         print(f"\nNo strategy passes both. Closest: {closest[0]}", file=sys.stderr)
 
     print(json.dumps(all_results, indent=2))
