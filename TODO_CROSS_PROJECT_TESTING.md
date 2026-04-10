@@ -36,7 +36,7 @@ The open question from HRR_FINDINGS.md: does HRR's value increase for graphs wit
 | **alpha-seek-memtest** | Same as alpha-seek + mempalace rooms | Tests mempalace-to-graph bridge: can mempalace room structure inform HRR subgraph partitioning? |
 | **jose-bully** | Incident -> evidence -> meeting -> escalation path | Unique: narrative graph with temporal and evidentiary relationships. No code, pure documentation. Tests graph construction from unstructured narrative. |
 
-### Tier 3: Limited structure, low priority
+### Tier 3: Limited structure, low priority (personal)
 
 | Project | Notes |
 |---------|-------|
@@ -47,6 +47,111 @@ The open question from HRR_FINDINGS.md: does HRR's value increase for graphs wit
 | **stash** | Media metadata + GraphQL. Could test: plugin hook dependency graph. |
 | **statistics** | Jupyter notebooks, linear progression. Minimal graph. |
 | **archive / codex-setup-package / gsd-agent-framework** | Templates, learning projects, config-only. No useful graph. |
+
+---
+
+### Public GitHub Repos (clone to archon with full git history)
+
+Organized by discipline. Each chosen for a distinct graph shape that tests different aspects of automatic type discovery, graph construction, and retrieval.
+
+#### Web Framework
+| Repo | Stars | Language | Graph Shape |
+|------|-------|----------|-------------|
+| [saleor/saleor](https://github.com/saleor/saleor) | ~22.8K | Python/Django | Entity-relationship (Django models) + GraphQL API schema + plugin architecture. Three overlapping graph topologies from one codebase. |
+| [blitz-js/blitz](https://github.com/blitz-js/blitz) | ~14.1K | TypeScript | Cross-package monorepo + Prisma entity graph. Tests cross-package dependency extraction. |
+
+#### AI/ML Pipeline
+| Repo | Stars | Language | Graph Shape |
+|------|-------|----------|-------------|
+| [ludwig-ai/ludwig](https://github.com/ludwig-ai/ludwig) | ~11.7K | Python | Config-to-code mapping (YAML -> Python modules) + deep module hierarchy (data types -> encoders -> combiners -> decoders). Tests implicit pipeline DAG discovery from config files. |
+| [mlflow/mlflow](https://github.com/mlflow/mlflow) | ~25.3K | Python | Multi-component layered architecture. REST API -> backend stores -> artifact stores. Cross-cutting concerns (tracking touches everything). |
+
+#### Controls/Robotics
+| Repo | Stars | Language | Graph Shape |
+|------|-------|----------|-------------|
+| [PX4/PX4-Autopilot](https://github.com/PX4/PX4-Autopilot) | ~11.5K | C++ | uORB pub/sub message bus overlaying module dependency graph. Sensor fusion pipeline, flight mode state machines, HAL layers. Multi-layer graph. |
+| [ros2/rclcpp](https://github.com/ros2/rclcpp) | ~740 | C++ | Clean layered architecture. Typed pub/sub (topics, services, actions). Small enough to verify graph construction correctness. |
+
+#### Physics Simulation
+| Repo | Stars | Language | Graph Shape |
+|------|-------|----------|-------------|
+| [bulletphysics/bullet3](https://github.com/bulletphysics/bullet3) | ~14.4K | C++ | Pipeline graph (broadphase -> narrowphase -> constraint solving -> integration) + class hierarchy for shapes/constraints/solvers. |
+| [taichi-dev/taichi](https://github.com/taichi-dev/taichi) | ~28.1K | C++/Python | Dual graph: compiler pipeline (frontend -> IR -> optimization -> backend codegen) AND physics simulation abstractions. Bridges compiler and physics categories. |
+
+#### DevOps/Infrastructure-as-Code
+| Repo | Stars | Language | Graph Shape |
+|------|-------|----------|-------------|
+| [hashicorp/terraform](https://github.com/hashicorp/terraform) | ~48.1K | Go | Resource dependency DAG is the core abstraction. The code IS about graph construction (config -> graph building -> graph walking -> provider RPC). Meta-test. |
+| [pulumi/pulumi](https://github.com/pulumi/pulumi) | ~25.0K | Go | Cross-language SDK graph (same concepts in Go/Python/TS/C#) + resource dependency graph + plugin system. Tests structural parallels across language boundaries. |
+
+#### Compiler/Language Tooling
+| Repo | Stars | Language | Graph Shape |
+|------|-------|----------|-------------|
+| [boa-dev/boa](https://github.com/boa-dev/boa) | ~7.2K | Rust | Deep linear pipeline: lexer -> parser -> AST -> bytecode compiler -> VM. ECMAScript spec compliance creates code-to-spec cross-references. |
+| [babel/babel](https://github.com/babel/babel) | ~43.9K | TypeScript | ~150 internal packages, plugin composition, monorepo. Tests graph construction at scale with many small interconnected packages. Also serves as monorepo test case. |
+
+#### Game Engine
+| Repo | Stars | Language | Graph Shape |
+|------|-------|----------|-------------|
+| [bevyengine/bevy](https://github.com/bevyengine/bevy) | ~45.5K | Rust | ECS architecture (components orthogonal, systems create implicit dependency via queries) + explicit render graph DAG + plugin dependency layer. Multiple overlapping topologies. |
+
+#### Database/Storage Engine
+| Repo | Stars | Language | Graph Shape |
+|------|-------|----------|-------------|
+| [duckdb/duckdb](https://github.com/duckdb/duckdb) | ~37.3K | C++ | Query pipeline (parser -> binder -> optimizer -> physical planner -> executor) + storage layer (buffer manager, WAL, catalog). Operator trees are literal graph structures. |
+| [cockroachdb/cockroach](https://github.com/cockroachdb/cockroach) | ~32.0K | Go | Distributed layered: SQL -> distribution -> replication (Raft) -> storage. Inter-node communication graphs on top of code dependency graphs. |
+
+#### Embedded Systems/Firmware
+| Repo | Stars | Language | Graph Shape |
+|------|-------|----------|-------------|
+| [espressif/esp-idf](https://github.com/espressif/esp-idf) | ~17.8K | C | HAL layers + Kconfig build configuration dependency graph + peripheral bus topology (SPI, I2C sharing). Strict layered graph + config graph. |
+| [micropython/micropython](https://github.com/micropython/micropython) | ~21.6K | C | Port x module matrix (each port selects from shared modules) + compiler pipeline. Tests graph construction with conditional compilation / platform variants. |
+
+#### Data Engineering/ETL
+| Repo | Stars | Language | Graph Shape |
+|------|-------|----------|-------------|
+| [apache/airflow](https://github.com/apache/airflow) | ~45.0K | Python | Core abstraction IS a DAG. ~80 provider packages form plugin graph. Executor/scheduler/worker communication adds runtime topology. |
+| [dagster-io/dagster](https://github.com/dagster-io/dagster) | ~15.3K | Python | Software-defined asset dependency graph (first-class). Resource injection graph. More structured than Airflow -- better for typed edge extraction. |
+
+#### Scientific Computing
+| Repo | Stars | Language | Graph Shape |
+|------|-------|----------|-------------|
+| [dealii/dealii](https://github.com/dealii/dealii) | ~1.65K | C++ | Deep class hierarchy (base -> lac -> fe -> dofs -> grid -> numerics). Solver-preconditioner composition graph. Tutorial-to-code cross-references. |
+| [su2code/SU2](https://github.com/su2code/SU2) | ~1.67K | C++ | Multi-physics coupling with bidirectional solver data exchange. Config-driven solver selection creates config-to-code mapping. |
+
+#### Networking/Protocol
+| Repo | Stars | Language | Graph Shape |
+|------|-------|----------|-------------|
+| [quinn-rs/quinn](https://github.com/quinn-rs/quinn) | ~5.0K | Rust | QUIC protocol state machines (connection + stream states) + layered architecture (quinn -> quinn-proto -> rustls). |
+| [smoltcp-rs/smoltcp](https://github.com/smoltcp-rs/smoltcp) | ~4.4K | Rust | Network protocol layer cake (Ethernet -> ARP -> IP -> TCP/UDP). Small (~200 files) -- can manually verify graph construction correctness. |
+
+#### Security/Cryptography
+| Repo | Stars | Language | Graph Shape |
+|------|-------|----------|-------------|
+| [openssl/openssl](https://github.com/openssl/openssl) | ~29.9K | C | Algorithm dispatch via provider system (indirection graph). Certificate chain validation is literal graph traversal. Protocol state machines. |
+| [rustls/rustls](https://github.com/rustls/rustls) | ~7.3K | Rust | TLS handshake state machine + cipher suite selection matrix + certificate chain. Smaller/cleaner than OpenSSL -- same graph shape, easier to verify. |
+
+#### Documentation/Specification (pure text)
+| Repo | Stars | Language | Graph Shape |
+|------|-------|----------|-------------|
+| [joelparkerhenderson/architecture-decision-record](https://github.com/joelparkerhenderson/architecture-decision-record) | ~14.3K | Markdown | Pure documentation graph. Decisions reference other decisions, templates reference concepts. Tests graph construction from Markdown with semantic cross-references. No code. |
+| [commonmark/commonmark-spec](https://github.com/commonmark/commonmark-spec) | ~5.1K | Mixed | Three-layer cross-reference: spec sections <-> test cases <-> reference implementations. |
+
+#### Monorepo
+| Repo | Stars | Language | Graph Shape |
+|------|-------|----------|-------------|
+| [nrwl/nx](https://github.com/nrwl/nx) | ~28.5K | TypeScript | Nx IS a graph tool -- it builds and visualizes dependency graphs. The repo itself is a monorepo of many packages. Meta-test: can our graph construction match what Nx computes? |
+
+### Corpus Summary
+
+| Dimension | Count |
+|-----------|-------|
+| Personal projects (Tier 1-2) | 11 |
+| Public repos | 26 unique (27 slots, Babel counts in 2 categories) |
+| **Total test corpus** | **37 projects** |
+| Languages | Python, TypeScript, Rust, Go, C++, C, Markdown |
+| Graph shapes | Import/dependency, entity-relationship, pub/sub, state machine, pipeline/DAG, config-to-code, plugin/provider, class hierarchy, protocol layers, cross-language parallel, pure text semantic |
+| Size range | ~200 files (smoltcp) to 100K+ files (cockroach, airflow) |
 
 ---
 
@@ -89,6 +194,7 @@ Edge types:
 3. Co-occurrence statistics: entities appearing in same section/file/commit -> RELATES_TO edges
 4. LLM-assisted classification: given a pair of nodes, propose edge type (expensive but accurate)
 5. Clustering: group nodes by structural similarity, name clusters, derive types from cluster membership
+6. Git history analysis: co-change -> coupling edges, commit messages -> belief nodes, issue refs -> citation edges, temporal ordering -> SUPERSEDES edges
 
 **Key constraint:** This must work zero-LLM for the common cases (structural patterns, imports, co-occurrence) with optional LLM enrichment for semantic edges. Per the project's design principle.
 
@@ -108,8 +214,24 @@ Can we build sentence-level belief graphs from projects that DON'T have explicit
 | Planning doc structure (requirement -> phase mapping) | bigtime, debserver, code-monkey (have .planning/) | Projects without structured planning |
 | Import/dependency parsing | code-monkey (Python imports), gsd-2 (TypeScript), evolve (Rust use statements) | Non-code projects |
 | Config/YAML relationship extraction | debserver (docker-compose, ansible), stash (plugin hooks) | Code-only projects |
+| **Git history: co-change analysis** | All projects with commits | New/empty repos |
+| **Git history: commit message decomposition** | All projects (commit msgs are universal) | Repos with empty/unhelpful commit msgs |
+| **Git history: issue/PR references** | Projects using #123/fixes #N conventions | Projects without issue trackers |
+| **Git history: temporal supersession** | Projects with long history, evolving decisions | Single-commit repos |
 
-**Experiment idea:** For each Tier 1 project, attempt graph construction using all applicable methods. Measure edge count, precision (sampled), and overlap between methods.
+**Git history as a universal graph construction signal:**
+
+Git history is the one data source every project has (if it uses version control). Unlike D### citations or .planning/ docs, commits are project-agnostic. Key edge types derivable from history:
+
+- **CO_CHANGED**: files modified in the same commit. Stronger coupling signal than directory co-location. Weighted by frequency (files changed together 10 times > 1 time).
+- **SUPERSEDES_TEMPORAL**: same file/section modified at T2 after T1. The T2 content supersedes T1. Commit message explains why.
+- **REFERENCES_ISSUE**: commit message contains #123, "fixes #456", "closes #789". Edges to issue/PR nodes.
+- **AUTHORED_BY**: who wrote/modified what. Irrelevant for solo projects, critical for multi-contributor repos.
+- **COMMIT_BELIEF**: each commit message is a sentence-level belief node. "Fix race condition in scheduler by adding mutex" asserts: (1) there was a race condition, (2) it was in the scheduler, (3) a mutex fixes it. Three beliefs from one commit.
+
+This means even a repo with zero documentation still produces a graph from its commit history alone.
+
+**Experiment idea:** For each Tier 1 project, attempt graph construction using all applicable methods including git history. Measure edge count, precision (sampled), and overlap between methods. Specifically measure how much the git-history-derived edges overlap with edges from other methods (high overlap = redundant, low overlap = complementary).
 
 ### T2: HRR Vocabulary Bridge Across Graph Shapes
 
@@ -199,6 +321,67 @@ HRR requires subgraph partitioning to stay within capacity (k < n/9). Different 
 - [ ] Which graph shapes are fully served by FTS5 + BFS?
 - [ ] What is the minimum graph density/heterogeneity where HRR adds measurable value?
 - [ ] Does mempalace room structure improve subgraph partitioning?
+
+---
+
+## Infrastructure
+
+**Research corpus host: archon** (192.168.1.169 / Tailscale 100.115.33.31)
+- CachyOS (Arch-based), development workstation
+- More disk and CPU than local machine
+- Access via SSH over Tailscale
+- Clone ALL repos here with full git history (no shallow clones -- we need commit history for temporal graph construction)
+- Run extraction scripts and experiments here
+
+**Corpus layout on archon:**
+```
+~/agentmemory-corpus/
+  personal/          # mirror of ~/projects/ Tier 1-2 (full git history)
+    alpha-seek/
+    optimus-prime/
+    gsd-2/
+    debserver/
+    code-monkey/
+    evolve/
+    bigtime/
+    email-secretary/
+    sports-betting-arbitrage/
+    alpha-seek-memtest/
+    jose-bully/
+  public/            # full clones from GitHub
+    web/saleor/
+    web/blitz/
+    aiml/ludwig/
+    aiml/mlflow/
+    controls/px4-autopilot/
+    controls/rclcpp/
+    physics/bullet3/
+    physics/taichi/
+    devops/terraform/
+    devops/pulumi/
+    compiler/boa/
+    compiler/babel/
+    game/bevy/
+    database/duckdb/
+    database/cockroach/
+    embedded/esp-idf/
+    embedded/micropython/
+    etl/airflow/
+    etl/dagster/
+    scicomp/dealii/
+    scicomp/su2/
+    networking/quinn/
+    networking/smoltcp/
+    security/openssl/
+    security/rustls/
+    docs/architecture-decision-record/
+    docs/commonmark-spec/
+    monorepo/nx/
+  extracted/          # output: normalized graphs, FTS5 indexes, HRR encodings
+  results/            # experiment results per project
+```
+
+Both personal and public projects get the same extraction pipeline. Unified corpus, unified experiments.
 
 ---
 
