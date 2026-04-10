@@ -377,6 +377,258 @@ This is the same fundamental failure as CS-002 (premature implementation push de
 
 ---
 
+## CS-010: Happy-Path Testing Bias
+
+**Source:** alpha-seek exit pricing bug (DAMAGE-ASSESSMENT-exit-pricing-bug.md, KNOWLEDGE.md line 1037)
+**Agent:** Claude (via GSD auto-mode)
+
+### The Problem
+
+The agent wrote 426 tests covering planners, generators, chain adapters, exit detectors, and trajectory parsing -- but zero tests for `run_signal_backtest.py`, the component that produces every PnL number. The exit pricing bug (`handle_expiry()` never called, options priced at spot after expiration) survived for months, invalidating all fixed-planner call-only returns (+227%, +474% were 100% phantom).
+
+### Root Cause
+
+Agents test what is interesting to write tests for, not what is most likely to fail silently. The signal runner was a "boring" orchestration script. The planners and generators had complex logic that naturally attracted testing. The critical path -- how results are actually produced -- was untested.
+
+### What Agentmemory Would Provide
+
+- **TESTS edges** in the graph: the memory system tracks which code has tests and which doesn't. A TEST_COVERAGE_GAP composite edge type (from EDGE_TYPE_TAXONOMY.md) flags source files with no TESTS edges pointing to them.
+- **COMMIT_BELIEF** from the bug fix commit: "exit pricing bug survived because signal runner had zero tests" is a belief that should inform future test planning.
+- **Retrieval at test-writing time:** when the agent is asked to write tests, the memory system surfaces which critical-path components lack coverage.
+
+**Acceptance test:** Ask the agent to write tests for a project. The agent must prioritize untested critical-path code over already-tested utility code.
+
+---
+
+## CS-011: Scale Before Validate
+
+**Source:** alpha-seek GCP dispatch (KNOWLEDGE.md line 901), archon saturation (KNOWLEDGE.md line 1029)
+**Agent:** Claude (via GSD auto-mode)
+
+### The Problem
+
+Two incidents:
+1. M018-S02 dispatched 16 GCP VMs without running one config locally first. 14 never started (missing dirs), 2 failed with CLI argument errors, 0 completed.
+2. 12 parallel `scan_universe.py` processes (~1.3GB RAM each) saturated archon, making SSH unresponsive. The machine had to be manually recovered.
+
+### Root Cause
+
+The agent's default behavior is to parallelize and dispatch for throughput. It does not have a "validate one first" heuristic. This is an efficiency bias: agents optimize for speed over correctness.
+
+### What Agentmemory Would Provide
+
+- **COMMIT_BELIEF** from the fix: "Before dispatching any multi-run sweep, always run one config end-to-end locally" is a behavioral constraint that should be loaded before any dispatch operation.
+- **SUPERSEDES** edge: the "dispatch 16" approach was superseded by "validate 1, then dispatch."
+- **Resource constraints as beliefs:** "archon: never run more than 4 concurrent DuckDB-heavy processes" is a machine-specific constraint that should be retrieved when planning work on archon.
+
+**Acceptance test:** Agent is asked to run a parameter sweep. It must first run a single configuration locally before dispatching the full sweep.
+
+---
+
+## CS-012: Duplicate Code Corruption by Auto-Mode Agent
+
+**Source:** alpha-seek (KNOWLEDGE.md line 1430)
+**Agent:** Claude (via GSD auto-mode)
+
+### The Problem
+
+A prior auto-mode agent silently appended a second `main()` call with bad indentation to the end of `run_signal_backtest.py`. This caused `IndentationError` whenever another module imported from it. The corruption was not caught until the import failed at runtime.
+
+### Root Cause
+
+Auto-mode agents operate without human review. When an agent's edit fails partway through (context exhaustion, timeout), the partial edit may leave the file in a corrupted state. Without a post-edit validation step (syntax check, import check), the corruption persists.
+
+### What Agentmemory Would Provide
+
+- **COMMIT_BELIEF** about the file's state: "this file was last edited by auto-mode and has not been human-reviewed" is a metadata flag that should trigger extra validation.
+- **SUPERSEDES_TEMPORAL** edge: the corrupted version supersedes the clean version. If the memory system tracks file versions, it can detect when a file regresses.
+- Post-edit validation should be a behavioral belief loaded at L0: "after editing any Python file, verify it parses without SyntaxError."
+
+**Acceptance test:** Auto-mode agent edits a Python file. The system must verify the file parses correctly after every edit.
+
+---
+
+## CS-013: Plausible-But-Wrong Syntax from Training Data
+
+**Source:** alpha-seek gcloud filter (KNOWLEDGE.md line 915)
+**Agent:** Claude
+
+### The Problem
+
+The agent used `name~wf-r12\|wf-f4` as a gcloud filter for OR. The correct syntax is space-separated: `--filter='name~wf-r12 OR name~wf-f4'`. The backslash-pipe variant is standard regex/shell syntax but not gcloud syntax. The command silently returned empty results, causing verification to pass/fail incorrectly.
+
+### Root Cause
+
+The agent's training data contains far more examples of pipe-OR (`|`) than gcloud's space-OR. When the agent encounters an unfamiliar tool, it applies the most common syntax pattern from training, which may be wrong. The failure is silent -- the command succeeds with wrong results rather than failing with an error.
+
+### What Agentmemory Would Provide
+
+- **COMMIT_BELIEF** from the fix: "gcloud filter OR syntax is space-separated, not pipe" is a tool-specific fact that should be retrieved when the agent writes gcloud commands.
+- **CITES** edge: links the correction to the gcloud documentation.
+- **Retrieval at command-writing time:** when the agent is about to write a gcloud filter, the memory system surfaces the known gotcha.
+
+**Acceptance test:** Agent is asked to write a gcloud filter with OR. It must use space-separated OR, not pipe.
+
+---
+
+## CS-014: Research-Execution Divergence Within Same Milestone
+
+**Source:** alpha-seek M031 (KNOWLEDGE.md line 1642-1646)
+**Agent:** Claude (via GSD auto-mode)
+
+### The Problem
+
+Research phase concluded "maximize N (trade count)." Execution phase omitted a flag (`--delta-lo 0.10`) that reduced trades by 28-31%. The agent's own research findings were contradicted by its own execution within the same milestone.
+
+### Root Cause
+
+The research and execution phases run in different sessions or different context windows. The research findings are stored in documents, but the execution agent doesn't consult them precisely enough -- it follows the general direction ("run config B") without checking every flag against the research output.
+
+### What Agentmemory Would Provide
+
+- **IMPLEMENTS** edge: links execution commands to the research findings they implement. If the execution command doesn't match the research specification, the discrepancy is detectable.
+- **COMMIT_BELIEF** from research: "maximize N requires --delta-lo 0.10" is a specific constraint that must be preserved through to execution.
+- **BFS traversal** at execution time: starting from the milestone research document, traverse IMPLEMENTS edges to verify the execution command includes all required flags.
+
+**Acceptance test:** Research phase outputs a configuration with 5 flags. Execution phase must include all 5 flags. If any are missing, the system must flag the discrepancy before execution.
+
+---
+
+## CS-015: Dead Approaches Re-Proposed Across Sessions
+
+**Source:** alpha-seek CLAUDE.md line 26-27, optimus-prime CLAUDE.md
+**Agent:** Claude
+
+### The Problem
+
+Agents repeatedly re-proposed approaches that had been tested and found to fail: price filters, DTE floors >20, highvol gate, learned classifiers, regime overseers, exit rules, universe expansion. Each re-proposal wasted session time and required user correction. The CLAUDE.md had to explicitly list dead approaches with "do not re-propose."
+
+### Root Cause
+
+Same as CS-009. The agent's training data contains these as "reasonable" approaches for options trading. Without memory of prior failures, the agent's prior probability wins over undocumented project history.
+
+### What Agentmemory Would Provide
+
+- **SUPERSEDES** edges: "price filters SUPERSEDED_BY no-filter approach (D183)" makes the failure explicit in the graph.
+- **Typed query:** "what approaches were tried and abandoned for this problem?" traverses SUPERSEDES and DECIDED_IN edges to surface the full history.
+- **FTS5 + HRR:** keyword search finds "price filter" in the decision log; HRR bridges vocabulary if the user asks about "filtering by price" (different terms, same concept).
+
+**Acceptance test:** Agent proposes an approach. System checks the approach against known dead approaches. If it matches, system surfaces the decision that killed it, including rationale.
+
+---
+
+## CS-016: Settled Decision Repeatedly Questioned
+
+**Source:** alpha-seek CLAUDE.md lines 108-114 (calls and puts rule)
+**Agent:** Claude
+
+### The Problem
+
+The agent repeatedly questioned whether puts should be in the strategy, despite it being a settled decision (D073: "calls and puts are equal citizens"). The CLAUDE.md had to use emphatic language: "This is not a question, not a hypothesis, not open for discussion. The agent must NEVER suggest reconsidering either direction."
+
+### Root Cause
+
+The agent's training data contains many examples of options strategies that are calls-only or puts-only. The asymmetric market data (calls often outperform puts in bull markets) gives the agent "evidence" to question puts. Without memory of D073 and its rationale, the agent follows its training priors.
+
+### Distinction from CS-015
+
+CS-015 is about re-proposing dead approaches (things that were tried and failed). CS-016 is about questioning settled axioms (things that were decided and are not up for discussion). The memory system needs to distinguish "failed approach" (don't try again) from "locked decision" (don't question).
+
+### What Agentmemory Would Provide
+
+- **Locked behavioral belief:** D073 stored with a LOCKED flag that prevents questioning without explicit user override.
+- **Typed query:** queries that touch "calls" or "puts" or "direction" should surface D073 as a constraint, not as a discussion topic.
+- **Enforcement, not just retrieval:** per CS-006, retrieval alone is insufficient. The constraint must gate output.
+
+**Acceptance test:** Present the agent with data showing puts underperforming calls. The agent must acknowledge the data without suggesting removing puts from the strategy. It must cite D073 if asked why.
+
+---
+
+## CS-017: Configuration Drift from Implicit Defaults
+
+**Source:** alpha-seek CAPITAL-CORRECTION-AUDIT.md
+**Agent:** Claude (via GSD auto-mode)
+
+### The Problem
+
+A commit changed the default `initial_capital` parameter from $100K to $5K. GCP dispatch scripts never specified `--initial-capital` explicitly, relying on the default. Docker images built before the commit used $100K; after used $5K. Results from different batches used different capital bases, making all cross-batch comparisons invalid. Simple rescaling doesn't work because the capital constraint is active (different trades get rejected at different capital levels).
+
+### Root Cause
+
+The agent changed a default value without auditing all call sites. The system relied on implicit defaults rather than explicit configuration. No one noticed because each batch's results looked internally consistent -- the inconsistency was only visible across batches.
+
+### What Agentmemory Would Provide
+
+- **CO_CHANGED edges** would flag that changing the default parameter file should trigger review of all scripts that import it.
+- **COMMIT_BELIEF:** "changed default capital from 100K to 5K" should propagate to all downstream consumers.
+- **SUPERSEDES_TEMPORAL:** the new default supersedes the old one, but existing dispatched runs still use the old one -- the memory system should track which runs used which configuration.
+
+**Acceptance test:** Agent changes a default parameter. System identifies all call sites that rely on that default and flags them for review.
+
+---
+
+## CS-018: Dual-Source-of-Truth State Machine Bug
+
+**Source:** alpha-seek DEBUG-M005-dispatch-skip-S02-S03.md, DEBUG-M008-M006-dispatch-guard-conflict.md
+**Agent:** GSD framework (agent orchestration)
+
+### The Problem
+
+Two incidents from the same root cause:
+
+1. GSD auto-mode completed milestone M005 after only S01, skipping S02 and S03. S02/S03 existed in ROADMAP.md but were never inserted into the DB. The state machine checked only the DB, saw "all slices done," and declared the milestone complete.
+
+2. The state machine sorted milestones by numeric ID (M006 before M008). The dispatch guard sorted by queue order (M008 before M006). Result: deadlock. State machine said "work on M006," dispatch guard said "M008 must finish first."
+
+### Root Cause
+
+Two representations of state (DB tables and markdown files) that diverge. The system has no reconciliation mechanism. Different subsystems read different sources, leading to contradictory decisions.
+
+### What Agentmemory Would Provide
+
+- **Single-source-of-truth principle:** the graph database is the canonical state. Markdown files are views, not sources.
+- **IMPLEMENTS edges:** ROADMAP.md entries must have corresponding DB entries. A missing IMPLEMENTS edge (roadmap item with no DB row) is a detectable gap.
+- **Consistency checks** as behavioral beliefs: "before declaring a milestone complete, verify DB slice count matches ROADMAP."
+
+**Acceptance test:** Create a milestone with 3 slices in the roadmap. Insert only 1 in the DB. System must detect the discrepancy before declaring completion.
+
+---
+
+## CS-019: Death by a Thousand Cuts in Agent-Built Pipeline
+
+**Source:** optimus-prime .planning/debug/overnight-training-run.md
+**Agent:** Claude (via GSD auto-mode)
+
+### The Problem
+
+The overnight training pipeline had 8 independent bugs that combined to make it completely non-functional across 15+ attempts:
+
+1. Runner script was deleted -- no entry point existed
+2. Generate stage was a computational bomb (500K states x 1s = 139 hours sequential)
+3. Ray distributed mode had two broken paths (no PYTHONPATH, relative DB paths)
+4. Missing plot script referenced in runner
+5. DB path env var empty, fell back to relative path that didn't exist
+6. Cascade failures from early stage crashes
+7. Config dimension mismatch (config said 72, DB had 38 features producing 76 dims)
+8. OOM from unbounded SQL window function on 158M rows
+
+No single bug was catastrophic. The accumulated unverified assumptions made the entire pipeline non-functional. 15+ overnight runs failed, each hitting a different bug.
+
+### Root Cause
+
+The agent built each pipeline stage in isolation during different sessions. No end-to-end test was ever run. Each stage passed its own unit tests, but the interfaces between stages were never validated. This is CS-011 (scale before validate) at the pipeline level.
+
+### What Agentmemory Would Provide
+
+- **CALLS and PASSES_DATA edges** (from Exp 37 control flow extraction) would map the pipeline's data flow. Missing or broken connections would be detectable in the graph.
+- **COMMIT_BELIEF** from each failed overnight run: "stage 3 failed because PYTHONPATH not set" accumulates into a checklist.
+- **BFS traversal** from the entry point through all pipeline stages would reveal which stages have never been tested together.
+- **CO_CHANGED analysis** would show which stages have never been modified in the same commit -- a signal of untested interfaces.
+
+**Acceptance test:** Agent builds a multi-stage pipeline. Before declaring it complete, system must verify that an end-to-end test has been run (not just per-stage tests).
+
+---
+
 ## How to Use These Case Studies
 
 Each case study is a concrete acceptance test for the memory system:
@@ -393,5 +645,15 @@ Each case study is a concrete acceptance test for the memory system:
 8. **CS-008 test:** Run an experiment with one strong and one weak metric. Agent must lead with scope/limitations, present both metrics together, not inflate the strong one.
 
 9. **CS-009 test:** Issue correction "use approach B, not A." End session. Start new session on same task. Agent must retrieve that A failed, B was the correction, and start with B. Must hold across unlimited session boundaries.
+10. **CS-010 test:** Ask agent to write tests. It must prioritize untested critical-path code over already-tested utility code.
+11. **CS-011 test:** Ask agent to run a parameter sweep. It must validate one config locally before dispatching the full sweep.
+12. **CS-012 test:** Auto-mode agent edits a Python file. System must verify the file parses correctly after every edit.
+13. **CS-013 test:** Agent writes a gcloud filter with OR. Must use the correct syntax, not the plausible-but-wrong training prior.
+14. **CS-014 test:** Research phase outputs 5 flags. Execution must include all 5. Missing flags must be flagged before execution.
+15. **CS-015 test:** Agent proposes an approach. System checks against known dead approaches and surfaces the decision that killed it.
+16. **CS-016 test:** Present data that seems to argue against a locked decision. Agent must acknowledge data without questioning the decision.
+17. **CS-017 test:** Agent changes a default parameter. System identifies all call sites relying on that default and flags them for review.
+18. **CS-018 test:** Create a milestone with 3 slices in roadmap, 1 in DB. System must detect discrepancy before declaring completion.
+19. **CS-019 test:** Agent builds a multi-stage pipeline. System must verify end-to-end test was run, not just per-stage tests.
 
 These are more valuable than synthetic benchmarks because they test the exact failure modes we're building the system to prevent.
