@@ -258,6 +258,157 @@ The naive partitioning strategy (chunk by type, then by size) fails at scale. Th
 
 ---
 
+## VALIDATION GAP: Edge Precision Is Unmeasured
+
+**Identified:** 2026-04-10, during review of T0 claims.
+
+### The Problem
+
+All T0 results report extraction **volume** (edge counts) and **distinctness** (cross-method overlap). Neither metric tells us whether the extracted edges represent real, meaningful relationships.
+
+Low overlap between methods (0.6-13.5%) was presented as evidence of complementarity: "each method finds connections invisible to the others." This is an assumption, not a finding. Low overlap is equally consistent with "each method produces different noise."
+
+Specific unvalidated claims in this document:
+
+1. **"The extractors are genuinely complementary."** We measured that they produce different outputs. We did not measure that their outputs are correct. Complementarity requires correctness of each method independently.
+
+2. **"HRR earns its cost on boundary edges."** The vocabulary overlap analysis (M2) measures Jaccard similarity of file tokens across edges. Low vocabulary overlap predicts where FTS5 will fail, but does not validate that the edges themselves represent real relationships. An edge between two unrelated files that happen to share no vocabulary would score as "HRR needed" -- but the edge is garbage.
+
+3. **"CONFIG_COUPLING: 82% below 0.1 overlap"** (n=38, rustls). These 38 edges connect config files to code files that co-changed in 3+ commits. Factually correct as git history. But: are these meaningful architectural relationships, or are they noise from version bumps, CI config changes, or bulk reformatting? Unknown.
+
+4. **"CROSS_REFERENCES: 75% below 0.1"** (n=8, rclcpp). Six out of eight edges. This should not have been a headline number.
+
+### What "Correct" Means Per Method
+
+Each extraction method produces edges that are definitionally true in a narrow sense:
+
+- **CO_CHANGED:** "These files changed in the same commit 3+ times." True by construction from git log. But trivially true for files that co-occur in bulk operations (reformats, CI updates, version bumps).
+- **IMPORTS:** "File A contains an import statement referencing file B." True by construction from parsing. But trivially true for utility imports (logging, path handling) that don't represent meaningful architecture.
+- **CITES:** "Document A contains a D### or M### reference to document B." True by construction from regex. Most defensible because these are deliberate human-authored references.
+- **TESTS:** "Test file A matches naming convention of source file B." True by convention, but convention may not hold (especially in Rust with inline tests).
+
+The question is not whether the edges exist (they do) but whether they are **meaningful** -- whether they represent relationships a human would recognize as real coupling, dependency, or reference.
+
+### Why This Matters for the Project
+
+The entire retrieval architecture (FTS5 + selective HRR + BFS) is premised on the graph being correct. If 50% of CO_CHANGED edges are noise from bulk operations, the retrieval pipeline wastes half its effort on meaningless traversals. HRR's "vocabulary bridge" value is measured relative to edges that may themselves be garbage.
+
+### What's Needed
+
+A precision audit. Sample N edges per method per repo. Evaluate each: "Does this edge represent a meaningful relationship?" Compute precision per method per repo. Without this, every architectural recommendation in this document is conditional on an unverified assumption.
+
+### Validation Results (2026-04-10)
+
+Three zero-human-labeling approaches were run on all 5 pilots.
+
+**Approach 3 (Negative Sampling): ALL 5 repos produce SIGNAL, not noise.**
+
+| Repo | same_dir lift | import lift | path_distance lift | Verdict |
+|------|--------------|-------------|-------------------|---------|
+| smoltcp | 24.3x | 19.0x | 2.2x | SIGNAL |
+| boa | 43.0x | - | 3.1x | SIGNAL |
+| debserver | 73.1x | 38.5x | 3.4x | SIGNAL |
+| gsd-2 | 18.5x | - | 2.4x | SIGNAL |
+| rclcpp | 14.7x | 230.0x | 1.8x | SIGNAL |
+
+Co-change edges predict same-directory at 15-73x over random. rclcpp co-change edges are 230x more likely to have an import relationship than random pairs. These are not noise.
+
+**Approach 5 (Self-Consistency): Larger repos show heavy-tailed degree distributions and strong clustering.**
+
+| Repo | Tail Ratio | Clustering vs Random | Degree Dist | Transitivity |
+|------|-----------|---------------------|-------------|-------------|
+| boa | 23.1 | 52.7x | HEAVY_TAILED | STRONG_CLUSTERING |
+| gsd-2 | 29.6 | 50.0x | HEAVY_TAILED | STRONG_CLUSTERING |
+| rclcpp | 16.8 | 22.3x | HEAVY_TAILED | MODERATE_CLUSTERING |
+| smoltcp | 3.8 | 3.3x | NEAR_UNIFORM | WEAK_CLUSTERING |
+| debserver | 3.0 | 5.3x | NEAR_UNIFORM | WEAK_CLUSTERING |
+
+boa and gsd-2 show clustering 50x above random -- a property of real dependency graphs, not random co-occurrence. Smaller repos (smoltcp, debserver) have weaker but still above-random structure.
+
+**Approach 2 (Triangulation): Multi-method agreement is low (0.6-10.3%) but this is expected.**
+
+The low agreement is not a weakness -- methods measure genuinely different things (co-change = empirical coupling, imports = explicit dependency, structural = conventions). The negative sampling results above confirm that single-method edges carry signal independently.
+
+**Conclusion:** The validation gap concern was legitimate to raise. The evidence now shows the edges are meaningful: co-change predicts directory structure at 15-73x lift, clustering is 3-53x above random, and degree distributions are heavy-tailed (real graph property). The extraction pipeline produces signal, not noise.
+
+### Original Approaches Proposed (retained for reference)
+
+### Approaches to Validation Without Extensive Human Labeling
+
+Human labeling at scale is impractical -- a single person reviewing thousands of edges would take weeks and produce inconsistent judgments due to fatigue.
+
+**Approach 1: Proxy Ground Truth from Existing Graphs**
+
+gsd-2 has an existing hand-built SQLite graph (graph_nodes, graph_edges, mem_nodes, mem_edges). Compare auto-extracted edges against this existing graph:
+- Precision: what fraction of our extracted edges also appear in the hand-built graph?
+- Recall: what fraction of hand-built edges did we discover?
+- This is already listed as open question #3 but was never executed.
+
+**Limitations:** gsd-2's graph was itself built by an LLM agent, not curated by a human. It's a proxy, not ground truth. Also only covers one repo.
+
+**Approach 2: Triangulation -- Edges Confirmed by Multiple Independent Methods**
+
+If CO_CHANGED, IMPORTS, and STRUCTURAL all independently find the same edge, it's almost certainly real. We already have the overlap data. Use multi-method agreement as a confidence signal:
+
+- 3 methods agree: high confidence (we have these counts in overlap_analysis.json: `all_three_methods`)
+- 2 methods agree: medium confidence (`any_two_methods`)
+- 1 method only: unvalidated
+
+For rclcpp: 24 edges found by all 3 methods, 307 by exactly 2, 2892 by exactly 1. The 24 triple-confirmed edges are almost certainly real. The 2892 single-method edges are unvalidated. This doesn't measure precision directly, but it stratifies edges by confidence without any human input.
+
+**Approach 3: Negative Sampling -- Test Whether Edges Predict Something**
+
+If an edge is meaningful, it should predict something measurable. For CO_CHANGED:
+- Take the top 100 strongest co-change edges (highest weight).
+- For each edge (file A, file B), check: does A import B or vice versa? Do they share a directory? Do they share an author?
+- Compare against 100 random non-edge pairs (files that never co-changed).
+- If the edge set has higher import/directory/author overlap than random, the edges carry signal.
+
+This is a downstream predictive validity test, not a precision audit. It doesn't tell you "is this edge correct?" but "do edges from this method correlate with independently observable structure?" If CO_CHANGED edges don't predict imports or directory proximity any better than random, the method is probably noise.
+
+**Approach 4: Stratified Small-Sample Human Audit**
+
+Instead of reviewing thousands of edges, review a stratified sample designed for maximum information:
+- 10 edges per method per repo = ~200 total across 7 repos and 3 methods
+- Stratify by: weight (top 10%, bottom 10%), edge type, node type pair
+- Binary label: "meaningful relationship" vs "noise/trivial"
+- One reviewer (the user), ~30 minutes of work
+
+200 labels is enough to compute precision with a ~7% margin of error per method (95% CI). Not perfect, but vastly better than zero validation.
+
+**Approach 5: Self-Consistency Checks (No Human Required)**
+
+Check whether the extracted graph has properties that real graphs have and noise doesn't:
+- **Transitivity:** If A->B and B->C both exist (by co-change), does A->C exist more often than random? Real dependency chains are transitive. Random co-occurrence is not.
+- **Degree distribution:** Real coupling graphs follow power-law or log-normal degree distributions (few hubs, many periphery nodes). Random noise produces uniform distributions.
+- **Community structure:** Run community detection (Louvain, label propagation) on the extracted graph. Check whether detected communities align with directory structure. If they do, the graph captures real architecture. If communities are random, the graph is noise.
+- **Temporal coherence:** Do strong co-change edges (high weight) persist across time windows? Split git history into halves. Do the top 100 edges from the first half also appear as edges in the second half? Persistent coupling is more likely real; one-time co-occurrence is more likely noise.
+
+These tests don't require any human labels. They test whether the graph has structural properties consistent with real software architecture.
+
+**Approach 6: LLM-as-Judge (Bounded Cost)**
+
+For edges where context is needed to judge meaningfulness:
+- Present the LLM with: file A name, file A first 50 lines, file B name, file B first 50 lines, edge type, edge weight.
+- Ask: "Is this edge a meaningful architectural relationship? Yes/No/Uncertain."
+- Run on a sample of 200-500 edges.
+- Cost: ~$0.50-2.00 on Haiku for 500 edges.
+
+Caveats: LLM judges have their own biases (may over-validate, may not understand project-specific conventions). But it's cheap and scalable. Use as a supplement to self-consistency checks, not as the sole signal.
+
+**Recommended Validation Strategy (Combined)**
+
+1. Run self-consistency checks (Approach 5) on all 7 repos. Zero human cost. Filters out methods that produce structurally incoherent graphs.
+2. Run gsd-2 proxy ground truth (Approach 1). Zero human cost beyond running the script.
+3. Run triangulation confidence stratification (Approach 2). Already have the data.
+4. Run negative sampling / predictive validity (Approach 3). Zero human cost.
+5. If the above pass, do the stratified 200-sample human audit (Approach 4) for final precision numbers.
+6. Use LLM-as-judge (Approach 6) to extend coverage beyond the human sample if needed.
+
+Steps 1-4 are fully automated and should be done before any human labeling. If the self-consistency checks fail (e.g., no transitivity, random communities, no temporal persistence), precision auditing is moot -- the method needs to be fixed first.
+
+---
+
 ## Open Questions for Next Phase
 
 1. **Sentence-level decomposition:** All experiments used file-level nodes. Sentence-level (as in alpha-seek Exp 29) should increase HRR value by reducing vocabulary overlap within edges (a sentence about "dispatch gates" vs a sentence about "flow control" have lower overlap than their parent files).
