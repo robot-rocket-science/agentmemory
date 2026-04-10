@@ -9,3 +9,12 @@ dependencies = [
     "numpy>=2.4.4",
     "scipy>=1.17.1",
 ]
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.408",
+]
+
+[tool.pyright]
+pythonVersion = "3.12"
+typeCheckingMode = "strict"
