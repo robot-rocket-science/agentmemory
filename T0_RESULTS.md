@@ -256,6 +256,21 @@ The naive partitioning strategy (chunk by type, then by size) fails at scale. Th
 
 **The debserver result validates HRR's core capability.** When the graph fits within capacity (126 edges, 3 partitions), retrieval is excellent (R@10=0.880). The challenge is making it work at scale, which is an engineering problem (partition routing), not a mathematical limitation.
 
+### P1: Partition Routing Results
+
+Added a partition-to-node index. At query time, only correlate against partitions containing the source node's edges. Eliminates noise from irrelevant partitions.
+
+| Repo | Partitions | Avg Partitions/Node | R@10 (ALL) | R@10 (ROUTED) | Improvement |
+|------|-----------|-------------------|-----------|--------------|-------------|
+| boa | 54 | 4.3 | 0.074 | **0.189** | **2.6x** |
+| gsd-2 | 18 | 1.9 | 0.166 | **0.406** | **2.4x** |
+| smoltcp | 10 | 5.4 | 0.378 | **0.431** | 1.1x |
+| debserver | 3 | 1.1 | 0.880 | **0.900** | 1.0x |
+
+Routing helps most where partition count is highest. boa went from 54 noise-contributing partitions to avg 4.3 relevant ones. gsd-2 went from 18 to avg 1.9.
+
+boa's 0.189 is still not ideal. Hub nodes (avg 4.3 partitions) still query too many partitions because the co-change graph is dense. Next step: locality-sensitive partitioning (group by neighborhood rather than type-then-chunk) to keep a node's edges in fewer partitions.
+
 ---
 
 ## VALIDATION GAP: Edge Precision Is Unmeasured

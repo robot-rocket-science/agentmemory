@@ -216,6 +216,12 @@ class HRRGraph:
         # Superpositions (one per partition)
         self.partitions: list[dict[str, Any]] = []
 
+        # Partition routing index: node_id -> set of partition indices
+        self.node_to_partitions: dict[str, set[int]] = defaultdict(set)
+
+        # Routing mode: "all" queries every partition, "routed" queries only relevant ones
+        self.routing: str = "routed"
+
     def _get_node_vector(self, node_id: str) -> Vector:
         """Get or create a random vector for a node."""
         if node_id not in self.node_vectors:
@@ -255,12 +261,29 @@ class HRRGraph:
             # Superpose into single vector
             S: Vector = superpose(bound_triples)
 
+            partition_idx: int = len(self.partitions)
+
+            # Build routing index: which nodes appear in this partition
+            nodes_in_partition: set[str] = set()
+            for e in part_edges:
+                nodes_in_partition.add(e.source)
+                nodes_in_partition.add(e.target)
+                self.node_to_partitions[e.source].add(partition_idx)
+                self.node_to_partitions[e.target].add(partition_idx)
+
             self.partitions.append({
                 "superposition": S,
                 "edge_count": len(part_edges),
                 "edge_types": dict(edge_types_in_partition),
                 "capacity_usage": round(len(part_edges) / self.capacity, 3),
+                "nodes": nodes_in_partition,
             })
+
+    def _get_relevant_partitions(self, node_id: str) -> list[int]:
+        """Get partition indices relevant to a node query."""
+        if self.routing == "all" or node_id not in self.node_to_partitions:
+            return list(range(len(self.partitions)))
+        return sorted(self.node_to_partitions[node_id])
 
     def query_forward(self, source: str, edge_type: str, top_k: int = 10) -> list[tuple[str, float]]:
         """Single-hop forward query: 'What does source connect to via edge_type?'"""
@@ -273,9 +296,11 @@ class HRRGraph:
         etype_vec: Vector = self.edge_type_vectors[edge_type]
         query_vec: Vector = bind(src_vec, etype_vec)
 
-        # Query each partition and aggregate
+        # Query only relevant partitions (routing)
+        relevant_indices: list[int] = self._get_relevant_partitions(source)
         all_results: dict[str, float] = {}
-        for partition in self.partitions:
+        for idx in relevant_indices:
+            partition: dict[str, Any] = self.partitions[idx]
             S: Vector = partition["superposition"]
             result_vec: Vector = unbind(query_vec, S)
             matches: list[tuple[str, float]] = self.cleanup.query(result_vec, top_k=top_k)
@@ -299,8 +324,10 @@ class HRRGraph:
         etype_vec: Vector = self.edge_type_vectors[edge_type]
         query_vec: Vector = bind(tgt_vec, etype_vec)
 
+        relevant_indices: list[int] = self._get_relevant_partitions(target)
         all_results: dict[str, float] = {}
-        for partition in self.partitions:
+        for idx in relevant_indices:
+            partition: dict[str, Any] = self.partitions[idx]
             S: Vector = partition["superposition"]
             result_vec: Vector = unbind(query_vec, S)
             matches: list[tuple[str, float]] = self.cleanup.query(result_vec, top_k=top_k)
@@ -314,17 +341,26 @@ class HRRGraph:
 
     def summary(self) -> dict[str, Any]:
         """Return encoding summary."""
+        # Routing stats
+        partitions_per_node: list[int] = [len(v) for v in self.node_to_partitions.values()]
+        avg_partitions: float = sum(partitions_per_node) / max(len(partitions_per_node), 1)
+        max_partitions: int = max(partitions_per_node) if partitions_per_node else 0
+
         return {
             "dim": self.dim,
             "capacity_per_partition": self.capacity,
             "total_nodes": len(self.node_vectors),
             "edge_types": list(self.edge_type_vectors.keys()),
             "num_partitions": len(self.partitions),
+            "routing": self.routing,
+            "avg_partitions_per_node": round(avg_partitions, 1),
+            "max_partitions_per_node": max_partitions,
             "partitions": [
                 {
                     "edge_count": p["edge_count"],
                     "edge_types": p["edge_types"],
                     "capacity_usage": p["capacity_usage"],
+                    "node_count": len(p["nodes"]),
                 }
                 for p in self.partitions
             ],
@@ -403,6 +439,7 @@ def main() -> None:
     repo_name: str = sys.argv[2]
     dim: int = 2048
     output_path: Path | None = None
+    routing: str = "routed"
 
     args: list[str] = sys.argv[3:]
     i: int = 0
@@ -413,6 +450,9 @@ def main() -> None:
         elif args[i] == "--output" and i + 1 < len(args):
             output_path = Path(args[i + 1])
             i += 2
+        elif args[i] == "--routing" and i + 1 < len(args):
+            routing = args[i + 1]
+            i += 2
         else:
             i += 1
 
@@ -421,7 +461,7 @@ def main() -> None:
         output_dir.mkdir(exist_ok=True)
         output_path = output_dir / f"{repo_name}.json"
 
-    print(f"[encode] {repo_name} DIM={dim}", file=sys.stderr)
+    print(f"[encode] {repo_name} DIM={dim} routing={routing}", file=sys.stderr)
 
     # Load edges
     edges: list[Edge] = load_edges(extracted_dir, repo_name)
@@ -437,12 +477,12 @@ def main() -> None:
 
     # Encode
     graph: HRRGraph = HRRGraph(dim=dim)
+    graph.routing = routing
     graph.encode(edges)
 
     summary: dict[str, Any] = graph.summary()
     print(f"  encoded: {summary['total_nodes']} nodes, {summary['num_partitions']} partitions", file=sys.stderr)
-    for p in summary["partitions"]:
-        print(f"    partition: {p['edge_count']} edges, {p['capacity_usage']:.1%} capacity, types={p['edge_types']}", file=sys.stderr)
+    print(f"  routing: {routing}, avg {summary['avg_partitions_per_node']} partitions/node, max {summary['max_partitions_per_node']}", file=sys.stderr)
 
     # Evaluate
     print(f"\n  evaluating retrieval (50 random queries)...", file=sys.stderr)
