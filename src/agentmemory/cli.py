@@ -64,56 +64,56 @@ _COMMAND_DEFS: dict[str, dict[str, str]] = {
         "argument_hint": "Path to project directory (e.g. . or ~/projects/myapp)",
         "tools": "Bash",
         "objective": "Onboard a project into agentmemory by scanning its directory.",
-        "process": "Run: `agentmemory onboard $ARGUMENTS`\nDisplay the output. Do not add commentary.",
+        "process": "Run: `uv run agentmemoryonboard $ARGUMENTS`\nDisplay the output. Do not add commentary.",
     },
     "stats": {
         "description": "Show detailed agentmemory analytics: confidence distribution, beliefs by type, age.",
         "argument_hint": "",
         "tools": "Bash",
         "objective": "Show detailed memory system analytics.",
-        "process": "Run: `agentmemory stats`\nDisplay the output. Do not add commentary.",
+        "process": "Run: `uv run agentmemorystats`\nDisplay the output. Do not add commentary.",
     },
     "health": {
         "description": "Run agentmemory diagnostics.",
         "argument_hint": "",
         "tools": "Bash",
         "objective": "Run memory system diagnostics.",
-        "process": "Run: `agentmemory health`\nDisplay the output. Do not add commentary.",
+        "process": "Run: `uv run agentmemoryhealth`\nDisplay the output. Do not add commentary.",
     },
     "core": {
         "description": "Show the top N highest-confidence beliefs.",
         "argument_hint": "Optional: number of beliefs to show (default 10)",
         "tools": "Bash",
         "objective": "Show the most important beliefs the system holds.",
-        "process": "Run: `agentmemory core --top ${ARGUMENTS:-10}`\nDisplay the output. Do not add commentary.",
+        "process": "Run: `uv run agentmemorycore --top ${ARGUMENTS:-10}`\nDisplay the output. Do not add commentary.",
     },
     "search": {
         "description": "Search agentmemory beliefs for a query.",
         "argument_hint": "Search query",
         "tools": "Bash",
         "objective": "Search memory for relevant beliefs.",
-        "process": "Run: `agentmemory search $ARGUMENTS`\nDisplay the output. Do not add commentary.",
+        "process": "Run: `uv run agentmemorysearch $ARGUMENTS`\nDisplay the output. Do not add commentary.",
     },
     "locked": {
         "description": "Show all locked beliefs (non-negotiable constraints).",
         "argument_hint": "",
         "tools": "Bash",
         "objective": "Show all locked beliefs.",
-        "process": "Run: `agentmemory locked`\nDisplay the output. Do not add commentary.",
+        "process": "Run: `uv run agentmemorylocked`\nDisplay the output. Do not add commentary.",
     },
     "new-belief": {
         "description": "Store a new belief in agentmemory.",
         "argument_hint": "The belief text to store",
         "tools": "Bash",
         "objective": "Store a new belief.",
-        "process": "Run: `agentmemory remember \"$ARGUMENTS\"`\nDisplay the output. Do not add commentary.",
+        "process": "Run: `uv run agentmemoryremember \"$ARGUMENTS\"`\nDisplay the output. Do not add commentary.",
     },
     "lock": {
         "description": "Create a locked belief (non-negotiable constraint).",
         "argument_hint": "The constraint text to lock",
         "tools": "Bash",
         "objective": "Create a locked belief.",
-        "process": "Run: `agentmemory lock \"$ARGUMENTS\"`\nDisplay the output. Do not add commentary.",
+        "process": "Run: `uv run agentmemorylock \"$ARGUMENTS\"`\nDisplay the output. Do not add commentary.",
     },
     "wonder": {
         "description": "Deep-dive research on a hypothesis, question, or topic using memory graph context.",
@@ -121,8 +121,8 @@ _COMMAND_DEFS: dict[str, dict[str, str]] = {
         "tools": "Bash, Read, WebSearch, Agent",
         "objective": "Gather all beliefs and associations connected to the query, then spawn parallel subagents for deep research.",
         "process": (
-            "1. Run: `agentmemory wonder \"$ARGUMENTS\"` to get belief context.\n"
-            "2. Run: `agentmemory settings` to read wonder.max_agents (default 4).\n"
+            "1. Run: `uv run agentmemorywonder \"$ARGUMENTS\"` to get belief context.\n"
+            "2. Run: `uv run agentmemorysettings` to read wonder.max_agents (default 4).\n"
             "3. Parse the belief context output into themes or angles.\n"
             "4. Spawn up to max_agents subagents in parallel using the Agent tool. "
             "Each subagent gets:\n"
@@ -149,7 +149,7 @@ _COMMAND_DEFS: dict[str, dict[str, str]] = {
         "tools": "Bash, AskUserQuestion",
         "objective": "View or interactively configure agentmemory settings.",
         "process": (
-            "Run: `agentmemory settings`\n"
+            "Run: `uv run agentmemorysettings`\n"
             "Display the current settings.\n"
             "If the user wants to change something, use AskUserQuestion to present options, "
             "then run `agentmemory settings --<key> <value>` to update."
@@ -171,7 +171,7 @@ _COMMAND_DEFS: dict[str, dict[str, str]] = {
         "argument_hint": "Optional: --count N (default 5)",
         "tools": "Bash",
         "objective": "Demote the least-relevant locked beliefs.",
-        "process": "Run: `agentmemory demote --count ${ARGUMENTS:-5}`\nDisplay the output. Do not add commentary.",
+        "process": "Run: `uv run agentmemorydemote --count ${ARGUMENTS:-5}`\nDisplay the output. Do not add commentary.",
     },
     "enable": {
         "description": "Re-enable agentmemory after /mem:disable.",
