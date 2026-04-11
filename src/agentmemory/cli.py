@@ -228,12 +228,12 @@ _COMMAND_DEFS: dict[str, dict[str, str]] = {
             "Do not search, observe, ingest, or call any agentmemory tools until /mem:enable is invoked."
         ),
     },
-    "demote": {
-        "description": "Demote least-relevant locked beliefs to regular beliefs.",
+    "unlock": {
+        "description": "Unlock least-relevant locked beliefs back to regular beliefs.",
         "argument_hint": "Optional: --count N (default 5)",
         "tools": "Bash",
-        "objective": "Demote the least-relevant locked beliefs.",
-        "process": "Run: `uv run agentmemory demote --count ${ARGUMENTS:-5}`\nDisplay the output. Do not add commentary.",
+        "objective": "Unlock the least-relevant locked beliefs.",
+        "process": "Run: `uv run agentmemory unlock --count ${ARGUMENTS:-5}`\nDisplay the output. Do not add commentary.",
     },
     "enable": {
         "description": "Re-enable agentmemory after /mem:disable.",
@@ -423,6 +423,20 @@ def cmd_onboard(args: argparse.Namespace) -> None:
         if ingested % 500 == 0:
             print(f"  ...{ingested}/{total}")
 
+    # Store structural edges for HRR graph encoding
+    edge_count: int = 0
+    for edge in scan.edges:
+        store.insert_graph_edge(
+            from_id=edge.src,
+            to_id=edge.tgt,
+            edge_type=edge.edge_type,
+            weight=edge.weight,
+            reason="scanner",
+        )
+        edge_count += 1
+    if edge_count > 0:
+        print(f"  Stored {edge_count} structural edges")
+
     store.close()
 
     timing_parts: list[str] = [f"{k}={v:.2f}s" for k, v in scan.timings.items()]
@@ -430,6 +444,7 @@ def cmd_onboard(args: argparse.Namespace) -> None:
     print(f"  Observations: {aggregate.observations_created}")
     print(f"  Beliefs: {aggregate.beliefs_created}")
     print(f"  Corrections: {aggregate.corrections_detected}")
+    print(f"  Edges: {edge_count}")
     print(f"  Timing: {', '.join(timing_parts)}")
 
 
@@ -619,8 +634,8 @@ def cmd_locked(args: argparse.Namespace) -> None:
 
     if len(beliefs) >= warn_at:
         print(f"\n  WARNING: {len(beliefs)} locked beliefs (warn threshold: {warn_at}, cap: {max_cap})")
-        print("  Consider demoting least-relevant locked beliefs to regular beliefs.")
-        print("  Run: agentmemory demote [--count N] to demote the N least-relevant.")
+        print("  Consider unlocking least-relevant locked beliefs.")
+        print("  Run: agentmemory unlock [--count N] to unlock the N least-relevant.")
 
 
 # ---------------------------------------------------------------------------
@@ -842,23 +857,23 @@ def cmd_reason(args: argparse.Namespace) -> None:
 
 
 # ---------------------------------------------------------------------------
-# demote
+# unlock
 # ---------------------------------------------------------------------------
 
 
-def cmd_demote(args: argparse.Namespace) -> None:
-    """Demote the least-relevant locked beliefs to regular beliefs."""
+def cmd_unlock(args: argparse.Namespace) -> None:
+    """Unlock the least-relevant locked beliefs back to regular beliefs."""
     count: int = args.count
     store: MemoryStore = _get_store()
     beliefs: list[Belief] = store.get_locked_beliefs()
 
     if not beliefs:
-        print("No locked beliefs to demote.")
+        print("No locked beliefs to unlock.")
         store.close()
         return
 
     if len(beliefs) <= count:
-        print(f"Only {len(beliefs)} locked beliefs exist. Nothing to demote.")
+        print(f"Only {len(beliefs)} locked beliefs exist. Nothing to unlock.")
         store.close()
         return
 
@@ -870,19 +885,19 @@ def cmd_demote(args: argparse.Namespace) -> None:
         scored.append((b, s))
 
     scored.sort(key=lambda x: x[1])
-    to_demote: list[tuple[Belief, float]] = scored[:count]
+    to_unlock: list[tuple[Belief, float]] = scored[:count]
 
-    print(f"Demoting {len(to_demote)} least-relevant locked beliefs:")
-    for b, s in to_demote:
+    print(f"Unlocking {len(to_unlock)} least-relevant locked beliefs:")
+    for b, s in to_unlock:
         store._conn.execute(  # pyright: ignore[reportPrivateUsage]
             "UPDATE beliefs SET locked = 0, updated_at = ? WHERE id = ?",
             (current_time, b.id),
         )
         store._conn.commit()  # pyright: ignore[reportPrivateUsage]
-        print(f"  Demoted: [{b.confidence:.0%}] {b.content} (ID: {b.id}, score: {s:.3f})")
+        print(f"  Unlocked: [{b.confidence:.0%}] {b.content} (ID: {b.id}, score: {s:.3f})")
 
     store.close()
-    print(f"\n{len(to_demote)} beliefs demoted from locked to regular.")
+    print(f"\n{len(to_unlock)} beliefs unlocked.")
 
 
 def _now_iso() -> str:
@@ -1204,13 +1219,13 @@ def main() -> None:
                           help="Token budget for retrieval (default: 4000)")
     p_reason.set_defaults(func=cmd_reason)
 
-    # demote
-    p_demote: argparse.ArgumentParser = subparsers.add_parser(
-        "demote", help="Demote least-relevant locked beliefs to regular"
+    # unlock
+    p_unlock: argparse.ArgumentParser = subparsers.add_parser(
+        "unlock", help="Unlock least-relevant locked beliefs"
     )
-    p_demote.add_argument("--count", type=int, default=5,
-                          help="Number of beliefs to demote (default: 5)")
-    p_demote.set_defaults(func=cmd_demote)
+    p_unlock.add_argument("--count", type=int, default=5,
+                          help="Number of beliefs to unlock (default: 5)")
+    p_unlock.set_defaults(func=cmd_unlock)
 
     # settings
     p_settings: argparse.ArgumentParser = subparsers.add_parser(

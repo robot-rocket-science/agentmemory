@@ -269,6 +269,16 @@ def onboard(project_path: str) -> str:
         )
         aggregate.merge(turn_result)
 
+    # Store structural edges for HRR graph encoding
+    for edge in scan.edges:
+        store.insert_graph_edge(
+            from_id=edge.src,
+            to_id=edge.tgt,
+            edge_type=edge.edge_type,
+            weight=edge.weight,
+            reason="scanner",
+        )
+
     # Build summary
     node_types: dict[str, int] = {}
     for n in scan.nodes:

@@ -120,6 +120,20 @@ CREATE TABLE IF NOT EXISTS audit_log (
     created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS graph_edges (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    from_id TEXT NOT NULL,
+    to_id TEXT NOT NULL,
+    edge_type TEXT NOT NULL,
+    weight REAL NOT NULL DEFAULT 1.0,
+    reason TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_graph_edges_from ON graph_edges(from_id);
+CREATE INDEX IF NOT EXISTS idx_graph_edges_to ON graph_edges(to_id);
+CREATE INDEX IF NOT EXISTS idx_graph_edges_type ON graph_edges(edge_type);
+
 CREATE VIRTUAL TABLE IF NOT EXISTS search_index USING fts5(
     id,
     content,
@@ -548,12 +562,41 @@ class MemoryStore:
 
     # --- HRR graph ---
 
+    def insert_graph_edge(
+        self,
+        from_id: str,
+        to_id: str,
+        edge_type: str,
+        weight: float = 1.0,
+        reason: str = "",
+    ) -> int:
+        """Insert a structural graph edge (no FK constraints). For scanner/HRR use."""
+        ts: str = _now()
+        cursor: sqlite3.Cursor = self._conn.execute(
+            """INSERT INTO graph_edges (from_id, to_id, edge_type, weight, reason, created_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (from_id, to_id, edge_type, weight, reason, ts),
+        )
+        self._conn.commit()
+        row_id: int | None = cursor.lastrowid
+        if row_id is None:
+            raise RuntimeError("graph_edge insert did not return a rowid")
+        return row_id
+
     def get_all_edge_triples(self) -> list[tuple[str, str, str]]:
-        """Return all edges as (from_id, to_id, edge_type) triples for HRR encoding."""
+        """Return all edges (belief + graph) as triples for HRR encoding."""
+        triples: list[tuple[str, str, str]] = []
+        # Belief edges (SUPERSEDES, etc.)
         rows: list[sqlite3.Row] = self._conn.execute(
             "SELECT from_id, to_id, edge_type FROM edges"
         ).fetchall()
-        return [(str(r["from_id"]), str(r["to_id"]), str(r["edge_type"])) for r in rows]
+        triples.extend((str(r["from_id"]), str(r["to_id"]), str(r["edge_type"])) for r in rows)
+        # Graph edges (CITES, CALLS, CONTAINS, etc.)
+        g_rows: list[sqlite3.Row] = self._conn.execute(
+            "SELECT from_id, to_id, edge_type FROM graph_edges"
+        ).fetchall()
+        triples.extend((str(r["from_id"]), str(r["to_id"]), str(r["edge_type"])) for r in g_rows)
+        return triples
 
     # --- Search ---
 
