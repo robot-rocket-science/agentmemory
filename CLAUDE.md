@@ -1,0 +1,63 @@
+# Agentmemory Project Instructions
+
+## Memory System: agentmemory MCP Server
+
+This project has a persistent memory system running as an MCP server. You MUST use it.
+
+### Mandatory Behaviors
+
+1. **At session start:** Call `mcp__agentmemory__status` to see what's in memory. Call `mcp__agentmemory__get_locked` to load active constraints. Obey all locked beliefs without exception.
+
+2. **Before answering questions about past work, decisions, or project history:** Call `mcp__agentmemory__search` with relevant keywords. Do not guess or rely on training data for project-specific context.
+
+3. **When the user corrects you:** Call `mcp__agentmemory__correct` with the correction text. If it replaces something specific, use the `replaces` parameter. This creates a locked belief that persists forever.
+
+4. **When the user states a permanent rule or preference:** Call `mcp__agentmemory__remember` with the statement. This creates a locked belief.
+
+5. **When you learn something new about the project:** Call `mcp__agentmemory__observe` to record it as an observation.
+
+6. **When processing conversation turns for the pipeline:** Call `mcp__agentmemory__ingest` with the text and source.
+
+### Available Tools
+
+| Tool | When to Use | Example |
+|---|---|---|
+| `mcp__agentmemory__search` | Before answering questions about project context | `search("retrieval architecture")` |
+| `mcp__agentmemory__remember` | When user states a rule or decision | `remember("always use uv for Python")` |
+| `mcp__agentmemory__correct` | When user corrects you | `correct("use B not A", replaces="approach A")` |
+| `mcp__agentmemory__observe` | When you learn something notable | `observe("user prefers terse responses")` |
+| `mcp__agentmemory__ingest` | To process conversation text through classification pipeline | `ingest("the full turn text", source="user")` |
+| `mcp__agentmemory__onboard` | To bulk-ingest conversation logs | `onboard("~/.claude/conversation-logs/turns.jsonl")` |
+| `mcp__agentmemory__status` | To check memory system health | `status()` |
+| `mcp__agentmemory__get_locked` | To load all active constraints | `get_locked()` |
+
+### What NOT to Do
+
+- Do not ignore locked beliefs. They are non-negotiable constraints.
+- Do not store ephemeral content (greetings, status updates, "ok", "proceed"). Only persist decisions, corrections, facts, requirements, preferences.
+- Do not re-ask the user for information that might be in memory. Search first.
+
+## Emergency: Disable Memory System
+
+If the memory system causes a context loop, hallucination spiral, or other problems:
+
+1. The user can say "disable agentmemory" -- stop calling all agentmemory tools for the rest of the session.
+2. The data is still accessible via direct SQLite at `~/.agentmemory/memory.db`. The user can query it manually.
+3. To fully remove: delete `.mcp.json` from the project root and remove the SessionStart hook from `~/.claude/settings.json`.
+
+To re-enable after disabling: the user says "enable agentmemory" and you resume calling tools.
+
+## Coding Guidelines
+
+- All code must use strict static typing (pyright strict mode)
+- Use `from __future__ import annotations` in every Python file
+- Use uv for all package management
+- Commits should be atomic and concise
+- Do not commit large data files or results
+- Do not use em dashes
+
+## Project Context
+
+This IS the agentmemory project -- a persistent memory system for AI coding agents. The system you are using (the MCP server) is the artifact this project builds. Testing the system on itself is intentional.
+
+Research phase: 60 experiments completed. Phase 2 MVP built and tested (115 tests, all passing). The memory system is now in live testing mode.
