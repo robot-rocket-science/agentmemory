@@ -366,6 +366,22 @@ Input (conversation turn, file change, error, user statement, document)
 [6. Audit Log]            -- every mutation logged
 ```
 
+### Primary Ingestion: Conversation Turns
+
+The primary source of new knowledge is live conversation turns with the AI. Decisions,
+assumptions, corrections, and preferences emerge during conversation -- not through
+pre-written documentation. The system monitors conversation turns and extracts atomic
+beliefs in real time.
+
+This is distinct from archiving conversations (MemPalace approach). We extract WHAT WAS
+DECIDED, not the conversation itself. The conversation is provenance (stored as an
+observation), but the belief extracted from it is what gets indexed, connected, and
+retrieved.
+
+The onboarding pipeline (A031) is the secondary pathway: it bootstraps the graph from
+existing project files when encountering a project for the first time. After that initial
+scan, ongoing knowledge accumulation comes from conversation turns.
+
 ### Zero-LLM Belief Extraction Pipeline
 
 The GSD prototype extracted edges via D###/M### regex patterns. General conversation

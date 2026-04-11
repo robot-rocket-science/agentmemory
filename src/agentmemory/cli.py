@@ -995,9 +995,13 @@ def cmd_commit_check(args: argparse.Namespace) -> None:
     """
     project_dir: Path = Path(args.project_dir).expanduser().resolve()
     result: CommitCheckResult = check_commit_status(project_dir)
-    output: str = format_status(result)
-    if output:
-        print(output)
+    if args.nudge_only:
+        if result.nudge:
+            print(result.nudge)
+    else:
+        output: str = format_status(result)
+        if output:
+            print(output)
 
 
 # ---------------------------------------------------------------------------
@@ -1267,6 +1271,10 @@ def main() -> None:
     )
     p_commit_check.add_argument(
         "--project-dir", default=".", help="Git repo to check (default: cwd)"
+    )
+    p_commit_check.add_argument(
+        "--nudge-only", action="store_true", default=False,
+        help="Only print output when a nudge threshold is exceeded"
     )
     p_commit_check.set_defaults(func=cmd_commit_check)
 

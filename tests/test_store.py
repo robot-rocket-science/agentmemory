@@ -451,6 +451,136 @@ def test_checkpoint_write_latency_p95(store: MemoryStore) -> None:
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# 11a. Temporal date passthrough
+# ---------------------------------------------------------------------------
+
+
+def test_belief_created_at_passthrough(store: MemoryStore) -> None:
+    """Inserting a belief with a historical created_at should preserve that timestamp."""
+    historical_ts: str = "2024-01-15T10:30:00+00:00"
+    belief = store.insert_belief(
+        content="Project started with SQLite",
+        belief_type=BELIEF_FACTUAL,
+        source_type=BSRC_USER_STATED,
+        created_at=historical_ts,
+    )
+    assert belief.created_at == historical_ts
+
+    # Verify via raw SQL too
+    rows: list[sqlite3.Row] = store.query(
+        "SELECT created_at FROM beliefs WHERE id = ?", (belief.id,)
+    )
+    assert len(rows) == 1
+    assert rows[0][0] == historical_ts
+
+
+def test_decay_factor_old_factual_belief(store: MemoryStore) -> None:
+    """An old factual belief should have decay_factor < 1.0."""
+    from agentmemory.scoring import decay_factor
+
+    historical_ts: str = "2024-01-01T00:00:00+00:00"
+    belief = store.insert_belief(
+        content="Old factual belief for decay test",
+        belief_type=BELIEF_FACTUAL,
+        source_type=BSRC_USER_STATED,
+        created_at=historical_ts,
+    )
+    # Current time is ~2 years after creation; factual half-life is 336h (14 days)
+    current_ts: str = "2026-04-11T00:00:00+00:00"
+    d: float = decay_factor(belief, current_ts)
+    assert d < 1.0, f"Expected decay < 1.0 for old factual belief, got {d}"
+    # After 2 years the decay should be extremely small
+    assert d < 0.01, f"Expected near-zero decay for 2-year-old factual belief, got {d}"
+
+
+def test_decay_factor_locked_belief_always_one(store: MemoryStore) -> None:
+    """A locked belief should always return decay_factor 1.0 regardless of age."""
+    from agentmemory.scoring import decay_factor
+
+    historical_ts: str = "2020-01-01T00:00:00+00:00"
+    belief = store.insert_belief(
+        content="Locked belief should not decay",
+        belief_type=BELIEF_FACTUAL,
+        source_type=BSRC_USER_STATED,
+        locked=True,
+        created_at=historical_ts,
+    )
+    current_ts: str = "2026-04-11T00:00:00+00:00"
+    d: float = decay_factor(belief, current_ts)
+    assert d == 1.0, f"Expected decay=1.0 for locked belief, got {d}"
+
+
+# ---------------------------------------------------------------------------
+# 11b. Session metrics increment
+# ---------------------------------------------------------------------------
+
+
+def test_increment_session_metrics(store: MemoryStore) -> None:
+    """increment_session_metrics should add to existing counters, not replace."""
+    session = store.create_session(model="test-model")
+
+    store.increment_session_metrics(
+        session.id,
+        retrieval_tokens=100,
+        classification_tokens=50,
+        beliefs_created=3,
+        corrections_detected=1,
+        searches_performed=2,
+        feedback_given=1,
+    )
+
+    s1 = store.get_session(session.id)
+    assert s1 is not None
+    assert s1.retrieval_tokens == 100
+    assert s1.classification_tokens == 50
+    assert s1.beliefs_created == 3
+    assert s1.corrections_detected == 1
+    assert s1.searches_performed == 2
+    assert s1.feedback_given == 1
+
+    # Increment again -- values should accumulate
+    store.increment_session_metrics(
+        session.id,
+        retrieval_tokens=200,
+        classification_tokens=75,
+        beliefs_created=2,
+        corrections_detected=0,
+        searches_performed=1,
+        feedback_given=3,
+    )
+
+    s2 = store.get_session(session.id)
+    assert s2 is not None
+    assert s2.retrieval_tokens == 300
+    assert s2.classification_tokens == 125
+    assert s2.beliefs_created == 5
+    assert s2.corrections_detected == 1
+    assert s2.searches_performed == 3
+    assert s2.feedback_given == 4
+
+
+def test_increment_session_metrics_partial(store: MemoryStore) -> None:
+    """Incrementing only some counters should leave others at zero."""
+    session = store.create_session()
+
+    store.increment_session_metrics(session.id, beliefs_created=7)
+
+    s = store.get_session(session.id)
+    assert s is not None
+    assert s.beliefs_created == 7
+    assert s.retrieval_tokens == 0
+    assert s.classification_tokens == 0
+    assert s.corrections_detected == 0
+    assert s.searches_performed == 0
+    assert s.feedback_given == 0
+
+
+# ---------------------------------------------------------------------------
+# 12. Status counts
+# ---------------------------------------------------------------------------
+
+
 def test_status_counts(store: MemoryStore) -> None:
     store.insert_observation("obs1", OBS_TYPE_USER_STATEMENT, SRC_USER)
     store.insert_observation("obs2", OBS_TYPE_DECISION, SRC_AGENT)

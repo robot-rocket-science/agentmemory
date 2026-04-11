@@ -147,8 +147,8 @@ def ingest_turn(
 
         belief_type: str = _TYPE_TO_BELIEF.get(cs.sentence_type, "factual")
 
-        # Step 6: corrections are high-confidence but NOT locked.
-        # Only /mem:lock creates locked beliefs.
+        # Step 6: corrections are locked (permanent constraints).
+        # User-stated beliefs from remember() are also locked at the server layer.
         is_correction: bool = cs.sentence_type == "CORRECTION"
 
         belief = store.insert_belief(
@@ -157,7 +157,7 @@ def ingest_turn(
             source_type=belief_source,
             alpha=cs.alpha,
             beta_param=cs.beta_param,
-            locked=False,
+            locked=is_correction,
             observation_id=observation.id,
             created_at=created_at,
         )
@@ -193,7 +193,7 @@ def ingest_turn(
                         break
 
     # If the full turn was flagged as a correction but no sentence was classified
-    # as CORRECTION, insert the full text as a high-confidence belief (NOT locked).
+    # as CORRECTION, insert the full text as a locked high-confidence belief.
     if full_text_is_correction and result.sentences_persisted == 0:
         prior_alpha: float = 9.0
         prior_beta: float = 1.0
@@ -203,7 +203,7 @@ def ingest_turn(
             source_type=BSRC_USER_CORRECTED,
             alpha=prior_alpha,
             beta_param=prior_beta,
-            locked=False,
+            locked=True,
             observation_id=observation.id,
             created_at=created_at,
         )

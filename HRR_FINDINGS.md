@@ -164,13 +164,13 @@ These are open questions without experimental evidence:
 
 2. **Sentence-level HRR at full scale.** We tested on D195's 18-node neighborhood. The full sentence graph is 1,195 nodes / 1,485 edges partitioned into 27 subgraphs. We haven't tested retrieval quality across subgraph boundaries.
 
-3. **HRR + FTS5 combined pipeline.** Exp 25 showed they were redundant, but that was BoW-HRR (not real HRR). With real HRR doing typed traversal and FTS5 doing keyword search, they should be complementary. Not tested as a combined pipeline.
+3. ~~**HRR + FTS5 combined pipeline.**~~ TESTED in Exp 40. Full end-to-end pipeline on 586 alpha-seek beliefs. FTS5 finds D188 from "agent behavior instructions," HRR walks AGENT_CONSTRAINT edge to recover D157 (sim=0.2487). Combined coverage: 100% (13/13), matching hand-crafted 3-query baseline. Max result inflation 2.1x (precision held). Zero regressions. The hybrid architecture is validated. See HRR_VOCABULARY_BRIDGE.md and experiments/exp40_hybrid_pipeline.py.
 
 4. **Bootstrap iteration.** We tested one round of bootstrap (partial graph -> propose candidates). We haven't tested the iterative loop (propose -> verify -> encode -> propose again).
 
 5. **HRR on non-GSD documents.** All tests used alpha-seek decisions with D### citation syntax. Documents without explicit citations would rely more heavily on co-occurrence and bootstrap. Not tested.
 
-6. **Vocabulary bridge via shared edge types.** D157 ("ban async_bash") and D188 ("don't elaborate") could be connected via a shared AGENT_CONSTRAINT edge type. If both are in the same subgraph superposition, querying one with AGENT_CONSTRAINT should surface the other. Not tested.
+6. ~~**Vocabulary bridge via shared edge types.**~~ TESTED in Exp 34 Test A. D157 ("ban async_bash") and D188 ("don't elaborate") connected via AGENT_CONSTRAINT edge. 184x separation between behavioral beliefs and distractors. See HRR_VOCABULARY_BRIDGE.md for full analysis and connection to the Exp 39 FTS5 vocabulary gap finding.
 
 ---
 

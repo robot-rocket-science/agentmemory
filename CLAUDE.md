@@ -18,6 +18,8 @@ This project has a persistent memory system running as an MCP server. You MUST u
 
 6. **When processing conversation turns for the pipeline:** Call `mcp__agentmemory__ingest` with the text and source.
 
+7. **After using or rejecting a retrieved belief:** Call `mcp__agentmemory__feedback` with the belief ID and outcome ("used", "ignored", or "harmful"). This closes the Bayesian feedback loop -- beliefs that help get stronger over time, beliefs that hurt get weaker. You do not need to call this for every belief in every search result; focus on beliefs you explicitly acted on or deliberately rejected.
+
 ### Available Tools
 
 | Tool | When to Use | Example |
@@ -28,6 +30,7 @@ This project has a persistent memory system running as an MCP server. You MUST u
 | `mcp__agentmemory__observe` | When you learn something notable | `observe("user prefers terse responses")` |
 | `mcp__agentmemory__ingest` | To process conversation text through classification pipeline | `ingest("the full turn text", source="user")` |
 | `mcp__agentmemory__onboard` | To bulk-ingest conversation logs | `onboard("~/.claude/conversation-logs/turns.jsonl")` |
+| `mcp__agentmemory__feedback` | After using or rejecting a retrieved belief | `feedback("a1b2c3d4e5f6", "used")` |
 | `mcp__agentmemory__status` | To check memory system health | `status()` |
 | `mcp__agentmemory__get_locked` | To load all active constraints | `get_locked()` |
 

@@ -35,7 +35,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     classification_tokens INTEGER NOT NULL DEFAULT 0,
     beliefs_created INTEGER NOT NULL DEFAULT 0,
     corrections_detected INTEGER NOT NULL DEFAULT 0,
-    searches_performed INTEGER NOT NULL DEFAULT 0
+    searches_performed INTEGER NOT NULL DEFAULT 0,
+    feedback_given INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS observations (
@@ -218,6 +219,7 @@ def _row_to_session(row: sqlite3.Row) -> Session:
         beliefs_created=int(row["beliefs_created"]) if "beliefs_created" in keys else 0,
         corrections_detected=int(row["corrections_detected"]) if "corrections_detected" in keys else 0,
         searches_performed=int(row["searches_performed"]) if "searches_performed" in keys else 0,
+        feedback_given=int(row["feedback_given"]) if "feedback_given" in keys else 0,
     )
 
 
@@ -784,6 +786,7 @@ class MemoryStore:
         beliefs_created: int = 0,
         corrections_detected: int = 0,
         searches_performed: int = 0,
+        feedback_given: int = 0,
     ) -> None:
         """Atomically increment session token/correction counters."""
         self._conn.execute(
@@ -792,12 +795,13 @@ class MemoryStore:
                 classification_tokens = classification_tokens + ?,
                 beliefs_created = beliefs_created + ?,
                 corrections_detected = corrections_detected + ?,
-                searches_performed = searches_performed + ?
+                searches_performed = searches_performed + ?,
+                feedback_given = feedback_given + ?
                WHERE id = ?""",
             (
                 retrieval_tokens, classification_tokens,
                 beliefs_created, corrections_detected,
-                searches_performed, session_id,
+                searches_performed, feedback_given, session_id,
             ),
         )
         self._conn.commit()

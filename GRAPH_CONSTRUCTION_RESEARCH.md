@@ -412,21 +412,27 @@ The edge weights feed into this: the weighted BFS finds the traversal path with 
 
 ### REQ-028: Epistemic State Tagging on Retrieval Results
 
+**Status:** Deferred to implementation phase. Schema requirement -- testable only when retrieval pipeline exists.
+
 **Requirement:** Every `search` MCP response must include an `epistemic_state` field (ABSENT | VERY_UNCERTAIN | UNCERTAIN | UNTESTED | CONFLICTED | GROUNDED) and an `action` field when escalation is warranted.
 
 **Rationale:** The LLM client needs a machine-readable signal, not just natural language, to decide whether to proceed or escalate. Without this, the client has to parse the confidence numbers itself.
 
-### REQ-029: Uncertainty-Triggered Clarification Questions
+### ~~REQ-029~~ Design Guideline: Uncertainty-Triggered Clarification Questions
 
-**Requirement:** When `epistemic_state` is ABSENT or VERY_UNCERTAIN for a preference/behavioral query, the system must generate a specific, answerable clarification question and surface it to the user. The question must be stored alongside the belief it was designed to clarify.
+**Status:** Pruned as standalone requirement (2026-04-10). No grounding case study or experiment. Retained as design guideline.
 
-**Rationale:** The GSD interview pattern. Structured gap-filling beats open-ended "what do you want?" and beats hallucinating an answer from training data.
+**Guideline:** When `epistemic_state` is ABSENT or VERY_UNCERTAIN for a preference/behavioral query, the system should generate a specific, answerable clarification question and surface it to the user.
 
-### REQ-030: Edge Weights Populated from Belief Confidence
+**Origin:** The GSD interview pattern. Structured gap-filling beats open-ended "what do you want?" and beats hallucinating an answer from training data. Good principle, but not testable pre-implementation and not tied to an observed failure.
 
-**Requirement:** All edges must have non-null weights derived from endpoint belief confidence at write time. Traversal must use these weights for path scoring.
+### ~~REQ-030~~ Implementation Note: Edge Weights from Belief Confidence
 
-**Rationale:** Unweighted traversal treats a highly-confident citation and a speculative citation identically. Path weight is a proxy for epistemic reliability of the reasoning chain.
+**Status:** Folded into REQ-007 (retrieval precision) and REQ-009 (Bayesian calibration) as an implementation mechanism (2026-04-10). Not a standalone requirement.
+
+**Mechanism:** All edges should have non-null weights derived from endpoint belief confidence at write time. Traversal uses these weights for path scoring. This is how REQ-007 (precision) and REQ-009 (calibration) propagate through graph traversal -- not a separate testable requirement.
+
+**Origin:** Unweighted traversal treats a highly-confident citation and a speculative citation identically. Path weight is a proxy for epistemic reliability of the reasoning chain.
 
 ---
 

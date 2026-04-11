@@ -136,6 +136,7 @@ class Session:
     beliefs_created: int = 0        # beliefs stored this session
     corrections_detected: int = 0   # user corrections detected this session
     searches_performed: int = 0     # search/retrieve calls this session
+    feedback_given: int = 0         # feedback events (auto + explicit) this session
 
 
 @dataclass

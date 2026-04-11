@@ -199,3 +199,130 @@ Current exploration branches:
 6. **Requirements traceability** (aerospace-style linking as graph structure)
 
 Each can be explored to exhaustion, then return to the main stem with findings.
+
+---
+
+## Full-Monty Graph: Multi-Layer Ingestion From All Available Signals
+
+**Date added:** 2026-04-10
+**Status:** Design direction -- not yet scheduled
+
+### The Idea
+
+Assemble a complete project knowledge graph by extracting every available signal source and combining them into a single queryable structure. Each layer captures a different kind of relationship; no single layer is sufficient.
+
+### Validated Layers (extractors exist and produce real data)
+
+| Layer | Source | Edge/Node Types | Validated On |
+|-------|--------|----------------|-------------|
+| Code structure | Python `ast` / tree-sitter | CALLS, PASSES_DATA, CONTAINS | agentmemory (48 files), alpha-seek (289 files) |
+| Git history | `git log` | CO_CHANGED, COMMIT_BELIEF, SUPERSEDES_TEMPORAL | 7 T0 pilot repos + alpha-seek |
+| Imports | AST import parsing | IMPORTS | 5 T0 repos (Rust, TS, Python, C++) |
+| Documentation refs | D###/REQ/CS regex | CITES, CROSS_REFERENCES | alpha-seek (1,742 citations, 154 decisions) |
+| Node classification | File structure + naming | Automatic node typing | 5 T0 repos |
+
+### Designed but Not Yet Extracted
+
+| Layer | Source | Edge/Node Types | Difficulty |
+|-------|--------|----------------|-----------|
+| Cloud deploys | GCP dispatch logs, plist configs | DEPLOYS_TO, DISPATCHES | Low |
+| Test coverage | pytest + test file structure | TESTS, VALIDATES | Low |
+| Directives | CLAUDE.md, hooks, project configs | BEHAVIORAL_CONSTRAINT, LOCKED_BELIEF | Low |
+| Issue tracking | GitHub/Gitea issues, `#\d+` in commits | REFERENCES_ISSUE, RESOLVES | Low |
+| Local vs remote | Reflog + remote comparison | LOCAL_COMMIT_BELIEF, REMOTE_COMMIT_BELIEF | Medium |
+| Cross-machine | Gitea + lorax/archon reflogs | AUTHORED_ON, PUSHED_TO | Medium |
+| Type resolution | pyright/LSP batch mode | Resolved CALLS, OVERRIDES, IMPLEMENTS | Medium |
+| Backtest results | Results CSV/JSON, metrics files | PRODUCES, MEASURES, SCORED_AT | Medium |
+| Multi-project | Cross-repo shared concepts | SHARED_CONCEPT, CROSS_PROJECT_CITE | Hard |
+
+### Key Findings From Initial Synthesis (Exp 37b)
+
+Three validated layers (CALLS, CO_CHANGED, CITES) on alpha-seek show **near-zero overlap** (Jaccard 0.000-0.012). Each layer captures genuinely different relationships. No file pair appeared in all three layers. This strongly suggests that adding more layers will continue to reveal new structure, not redundantly rediscover the same edges.
+
+### Target Projects
+
+1. **Alpha-seek** -- richest signal diversity: 552 commits, 289 Python files, 154 decisions, GCP dispatches, paper trading, backtest results, structured tests, CLAUDE.md directives, multi-machine dev (lorax + archon via Gitea).
+2. **A second project with maximal sparsity and depth** -- thin documentation, deep call chains, minimal decision history. Tests generalization. Candidates: smoltcp (Rust, protocols), debserver (Python, infra), or a local project with sparse history.
+
+### What This Would Demonstrate
+
+A full-monty graph on alpha-seek would be the first concrete instance of the memory system's ingestion pipeline producing a multi-layer knowledge graph from a real project. It would answer:
+
+- What is the total node and edge count across all layers?
+- What is the per-layer coverage (which files/functions/decisions are visible in which layers)?
+- What is the connected component structure (one giant component, or fragmented clusters)?
+- Where are the coverage gaps (files with no edges in any layer)?
+- What queries become trivially answerable that are currently hard?
+
+### Not Scheduled Because
+
+Research queue has higher-priority items that inform the architecture. The full-monty experiment is a validation exercise: it proves the pipeline works end-to-end but doesn't advance the theory. Schedule it when core architecture decisions are settled and we need a proof-of-concept demonstration.
+
+---
+
+## Conversation Turns as Primary Ingestion Pathway
+
+**Date added:** 2026-04-10
+**Status:** Adopted design direction
+
+### The Insight
+
+Decisions, requirements, assumptions, and preferences almost never originate in pre-written documentation. They emerge during conversation turns with the AI. A user doesn't write a spec saying "use PostgreSQL" -- they say it during a conversation, the AI acts on it, and the decision is made. By the time the context window rolls over, the decision is gone.
+
+MemPalace recognized this: it stores entire conversations. The reasoning is sound -- conversations ARE where knowledge originates. But bulk conversation storage doesn't solve the problem. You end up with an archive of old chat fragments. When you search, you get "here's a conversation from March where you talked about databases" instead of "you decided to use PostgreSQL because of X, and that decision is still active."
+
+### Our Approach: Extract, Don't Archive
+
+The conversation turn is the primary observation source, but what gets stored is not the conversation -- it's what was decided, assumed, corrected, or learned during that conversation.
+
+```
+Conversation turn (raw observation)
+  |
+  v
+Sentence decomposition (atomic claims)
+  |
+  v
+Classification (decision / assumption / preference / correction / fact)
+  |
+  v
+Graph insertion (nodes with typed edges to existing beliefs)
+  |
+  v
+Holographic encoding (for retrieval without full graph traversal)
+```
+
+The conversation itself is provenance, not content. It's the observation layer in the scientific method model. The beliefs extracted from it are what matter.
+
+### What This Changes
+
+1. **Primary ingestion pathway is live conversation monitoring, not batch project scanning.** The onboarding pipeline (A031) becomes the secondary pathway for bootstrapping from existing project files. Day-to-day knowledge accumulation happens turn by turn.
+
+2. **Extraction must be fast and incremental.** Each conversation turn produces 0-5 new beliefs. The pipeline processes one turn at a time, not a batch of documents. Latency budget: under 100ms per turn (zero-LLM path) to avoid slowing the conversation.
+
+3. **The feedback loop is immediate.** When a belief is retrieved and the user says "no, that's wrong" in the next turn, that correction IS an observation that triggers belief revision. The conversation IS the feedback loop -- no separate testing mechanism needed for the most common case.
+
+4. **Session boundaries matter.** A conversation session is a coherent unit of work. Beliefs extracted within a session share context. Cross-session belief linking (this contradicts what you said last week) requires the graph structure, not conversation proximity.
+
+5. **The "always-loaded" context (L0) becomes a live summary.** Instead of static anchor nodes, L0 is rebuilt each session from the most relevant active beliefs. It's the system's current understanding of who you are, what you're working on, and what constraints apply -- updated every session.
+
+### Why This Beats MemPalace
+
+MemPalace stores 59,000 drawers of conversation chunks. Searching returns fragments with similarity scores. Our approach would store the 500-2,000 atomic beliefs that actually matter, each with:
+- Explicit confidence (how sure are we this is still true?)
+- Evidence chain (which conversations produced this belief?)
+- Typed connections (what does this relate to, contradict, or supersede?)
+- Retrieval via graph structure (find beliefs by what they connect to, not just what words they contain)
+
+The goal: when the system retrieves context for a new session, it delivers the specific beliefs that matter for this task -- not conversation fragments that might contain something relevant.
+
+### Relationship to Existing Architecture
+
+The write path in PLAN.md already lists "conversation turn" as an input source. This direction elevates it from one-of-many to the primary pathway. The extraction pipeline, Bayesian confidence, typed edges, and holographic retrieval all apply unchanged. What changes is the priority ordering: conversations first, project files second.
+
+The onboarding pipeline (A031) still matters for bootstrapping. When the system encounters a new project for the first time, it scans the directory to build an initial graph. But after that first scan, ongoing knowledge accumulation comes from conversation turns, not repeated directory scans.
+
+### Open Questions
+
+1. **How to intercept conversation turns?** MCP hook on conversation events? Post-response hook that feeds the turn to the extraction pipeline? Platform-specific integration (Claude Code hooks vs API streaming)?
+2. **What about conversations that happen outside the system?** Slack discussions, email threads, meeting notes. These are also observation sources but arrive differently (batch import, not live streaming).
+3. **Privacy and consent.** Storing beliefs extracted from conversations requires clear user consent. The user should know what's being remembered and have the ability to review, correct, or delete.

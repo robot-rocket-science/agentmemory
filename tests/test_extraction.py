@@ -281,8 +281,8 @@ def test_ingest_turn_empty_text(store: MemoryStore) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_correction_creates_high_confidence_belief(store: MemoryStore) -> None:
-    """A user correction turn produces high-confidence beliefs that are NOT locked."""
+def test_correction_creates_locked_belief(store: MemoryStore) -> None:
+    """A user correction turn produces locked, high-confidence beliefs."""
     text: str = "do not use async_bash, always use the regular bash tool instead"
     result: IngestResult = ingest_turn(
         store=store,
@@ -294,9 +294,9 @@ def test_correction_creates_high_confidence_belief(store: MemoryStore) -> None:
     assert result.corrections_detected >= 1
     assert result.beliefs_created >= 1
 
-    # But ingest_turn never creates locked beliefs
+    # Corrections are locked (permanent constraints)
     locked = store.get_locked_beliefs()
-    assert len(locked) == 0
+    assert len(locked) >= 1
 
 
 def test_correction_detection_count(store: MemoryStore) -> None:

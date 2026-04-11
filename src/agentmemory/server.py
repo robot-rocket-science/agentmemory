@@ -5,6 +5,8 @@ Uses a single lazily-initialized MemoryStore backed by ~/.agentmemory/memory.db.
 """
 from __future__ import annotations
 
+import re
+from datetime import datetime, timezone
 from pathlib import Path
 
 import os
@@ -19,10 +21,16 @@ from agentmemory.models import (
     BSRC_USER_STATED,
     BELIEF_FACTUAL,
     BELIEF_CORRECTION,
+    LAYER_EXPLICIT,
+    LAYER_IMPLICIT,
     OBS_TYPE_USER_STATEMENT,
+    OUTCOME_HARMFUL,
+    OUTCOME_IGNORED,
+    OUTCOME_USED,
     Belief,
     Observation,
     Session,
+    TestResult,
 )
 from agentmemory.retrieval import RetrievalResult, retrieve
 from agentmemory.store import MemoryStore
@@ -33,6 +41,113 @@ from agentmemory.store import MemoryStore
 
 _store: MemoryStore | None = None
 _session_id: str | None = None
+
+# Retrieval tracking: maps session_id -> list of (belief_id, timestamp) tuples.
+# Populated by search(), consumed by feedback() and auto-feedback.
+_retrieval_buffer: dict[str, list[tuple[str, str]]] = {}
+
+# Ingest buffer: text ingested since the last auto-feedback processing.
+# Populated by ingest(), consumed by _process_auto_feedback().
+_ingest_buffer: list[str] = []
+
+# Belief IDs that already received explicit feedback this session.
+# Auto-feedback skips these (explicit always wins).
+_explicit_feedback_ids: set[str] = set()
+
+# ---------------------------------------------------------------------------
+# Auto-feedback: key-term extraction and matching
+# ---------------------------------------------------------------------------
+
+_STOPWORDS: frozenset[str] = frozenset({
+    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
+    "have", "has", "had", "do", "does", "did", "will", "would", "shall",
+    "should", "may", "might", "must", "can", "could", "of", "in", "to",
+    "for", "with", "on", "at", "by", "from", "as", "into", "through",
+    "that", "this", "these", "those", "it", "its", "not", "no", "all",
+    "and", "or", "but", "if", "then", "than", "when", "where", "how",
+    "what", "which", "who", "whom", "use", "using", "used",
+})
+
+# Minimum unique term matches to infer "used". From validation experiments:
+# min_unique=2 gives 100% precision, 75% recall on realistic scenarios.
+_AUTO_FEEDBACK_MIN_MATCHES: int = 2
+
+
+def _extract_key_terms(text: str) -> list[str]:
+    """Extract meaningful terms from text, filtering stopwords."""
+    words: list[str] = re.findall(r"[a-zA-Z0-9_]+", text.lower())
+    return [w for w in words if w not in _STOPWORDS and len(w) >= 2]
+
+
+def _process_auto_feedback(session_id: str) -> int:
+    """Process the previous retrieval batch: infer used/ignored from ingested text.
+
+    Returns the number of auto-feedback events recorded.
+    """
+    global _ingest_buffer
+
+    buffer: list[tuple[str, str]] | None = _retrieval_buffer.pop(session_id, None)
+    if not buffer:
+        return 0
+
+    # Combine all ingested text since the retrieval
+    combined_ingested: str = " ".join(_ingest_buffer).lower()
+    _ingest_buffer = []
+
+    if not combined_ingested.strip():
+        # No ingested text -- everything is "ignored"
+        store: MemoryStore = _get_store()
+        count: int = 0
+        for belief_id, _ts in buffer:
+            if belief_id in _explicit_feedback_ids:
+                continue
+            store.record_test_result(
+                belief_id=belief_id,
+                session_id=session_id,
+                outcome=OUTCOME_IGNORED,
+                detection_layer=LAYER_IMPLICIT,
+                outcome_detail="auto: no ingested text since retrieval",
+            )
+            count += 1
+        if count > 0:
+            store.increment_session_metrics(session_id, feedback_given=count)
+        return count
+
+    store = _get_store()
+    count = 0
+    for belief_id, _ts in buffer:
+        if belief_id in _explicit_feedback_ids:
+            continue
+
+        belief: Belief | None = store.get_belief(belief_id)
+        if belief is None:
+            continue
+
+        # Key-term overlap check
+        terms: list[str] = _extract_key_terms(belief.content)
+        if not terms:
+            continue
+
+        unique_terms: set[str] = set(terms)
+        unique_matches: int = sum(1 for t in unique_terms if t in combined_ingested)
+
+        outcome: str = OUTCOME_USED if unique_matches >= _AUTO_FEEDBACK_MIN_MATCHES else OUTCOME_IGNORED
+        detail: str = (
+            f"auto: {unique_matches}/{len(unique_terms)} key terms matched"
+        )
+
+        store.record_test_result(
+            belief_id=belief_id,
+            session_id=session_id,
+            outcome=outcome,
+            detection_layer=LAYER_IMPLICIT,
+            outcome_detail=detail,
+        )
+        count += 1
+
+    if count > 0:
+        store.increment_session_metrics(session_id, feedback_given=count)
+    return count
 
 
 def _resolve_server_db() -> Path:
@@ -67,9 +182,12 @@ def _get_store() -> MemoryStore:
 
 def _set_store(store: MemoryStore) -> None:  # pyright: ignore[reportUnusedFunction]
     """Override the module-level store. Used by tests."""
-    global _store, _session_id
+    global _store, _session_id, _ingest_buffer
     _store = store
     _session_id = None
+    _retrieval_buffer.clear()
+    _ingest_buffer = []
+    _explicit_feedback_ids.clear()
 
 
 def _ensure_session() -> str:
@@ -107,6 +225,10 @@ def search(query: str, budget: int = 2000) -> str:
     """
     store: MemoryStore = _get_store()
     session_id: str = _ensure_session()
+
+    # Process auto-feedback for the previous retrieval batch before this search
+    _process_auto_feedback(session_id)
+
     result: RetrievalResult = retrieve(store, query, budget=budget)
 
     store.increment_session_metrics(
@@ -117,6 +239,13 @@ def search(query: str, budget: int = 2000) -> str:
 
     if not result.beliefs:
         return "No beliefs found matching your query."
+
+    # Track which beliefs were retrieved for feedback loop
+    ts: str = datetime.now(timezone.utc).isoformat()
+    if session_id not in _retrieval_buffer:
+        _retrieval_buffer[session_id] = []
+    for belief in result.beliefs:
+        _retrieval_buffer[session_id].append((belief.id, ts))
 
     lines: list[str] = [
         f"Found {len(result.beliefs)} belief(s) ({result.total_tokens} tokens, "
@@ -375,6 +504,9 @@ def ingest(text: str, source: str = "user") -> str:
         use_llm = False
     result: IngestResult = ingest_turn(store, text, source, session_id=session_id, use_llm=use_llm)
 
+    # Feed ingested text into the auto-feedback buffer
+    _ingest_buffer.append(text)
+
     # Estimate classification tokens: ~50 tokens/sentence for Haiku prompt+response
     est_classification_tokens: int = result.sentences_extracted * 50 if use_llm else 0
     store.increment_session_metrics(
@@ -392,6 +524,58 @@ def ingest(text: str, source: str = "user") -> str:
         f"  Corrections: {result.corrections_detected}\n"
         f"  Sentences: {result.sentences_extracted} extracted, "
         f"{result.sentences_persisted} persisted"
+    )
+
+
+_VALID_OUTCOMES: frozenset[str] = frozenset({OUTCOME_USED, OUTCOME_IGNORED, OUTCOME_HARMFUL})
+
+
+@mcp.tool
+def feedback(belief_id: str, outcome: str, detail: str = "") -> str:
+    """Record whether a retrieved belief was useful, ignored, or harmful.
+
+    Call this after using (or deciding not to use) a belief from search results.
+    This closes the feedback loop: beliefs that help get stronger, beliefs that
+    hurt get weaker (unless locked).
+
+    Args:
+        belief_id: The belief ID from search results (e.g. "a1b2c3d4e5f6").
+        outcome: One of "used", "ignored", or "harmful".
+        detail: Optional context about why (e.g. "contradicted by user correction").
+    """
+    if outcome not in _VALID_OUTCOMES:
+        return f"Invalid outcome '{outcome}'. Must be one of: {', '.join(sorted(_VALID_OUTCOMES))}"
+
+    store: MemoryStore = _get_store()
+    session_id: str = _ensure_session()
+
+    belief: Belief | None = store.get_belief(belief_id)
+    if belief is None:
+        return f"Belief {belief_id} not found."
+
+    test: TestResult = store.record_test_result(
+        belief_id=belief_id,
+        session_id=session_id,
+        outcome=outcome,
+        detection_layer=LAYER_EXPLICIT,
+        outcome_detail=detail or None,
+    )
+
+    # Mark as explicitly rated so auto-feedback skips it
+    _explicit_feedback_ids.add(belief_id)
+    store.increment_session_metrics(session_id, feedback_given=1)
+
+    # Re-read to get updated confidence
+    updated: Belief | None = store.get_belief(belief_id)
+    if updated is None:
+        return f"Feedback recorded (test #{test.id}) but belief disappeared."
+
+    lock_note: str = " (locked, beta unchanged)" if updated.locked and outcome == OUTCOME_HARMFUL else ""
+    return (
+        f"Feedback recorded for {belief_id}: {outcome}{lock_note}\n"
+        f"  confidence: {belief.confidence:.3f} -> {updated.confidence:.3f}\n"
+        f"  alpha: {belief.alpha} -> {updated.alpha}, "
+        f"beta: {belief.beta_param} -> {updated.beta_param}"
     )
 
 
