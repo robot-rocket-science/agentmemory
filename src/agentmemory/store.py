@@ -415,15 +415,32 @@ class MemoryStore:
 
     # --- Search ---
 
+    @staticmethod
+    def _sanitize_fts5_query(query: str) -> str:
+        """Sanitize a query for FTS5 MATCH.
+
+        FTS5 treats hyphens as NOT, quotes as phrase delimiters, etc.
+        Split into words, quote each term, join with OR for broad matching.
+        """
+        import re
+        # Strip FTS5 operators and punctuation, keep alphanumeric and spaces
+        words: list[str] = re.findall(r"[a-zA-Z0-9]+", query)
+        if not words:
+            return '""'
+        # Quote each term and join with OR for broad matching
+        quoted: list[str] = [f'"{w}"' for w in words]
+        return " OR ".join(quoted)
+
     def search(self, query: str, top_k: int = 30) -> list[Belief]:
         """FTS5 BM25 search on beliefs. Excludes superseded (valid_to IS NOT NULL)."""
+        safe_query: str = self._sanitize_fts5_query(query)
         rows: list[sqlite3.Row] = self._conn.execute(
             """SELECT id, content, type, bm25(search_index) AS score
                FROM search_index
                WHERE search_index MATCH ? AND type = 'belief'
                ORDER BY bm25(search_index)
                LIMIT ?""",
-            (query, top_k),
+            (safe_query, top_k),
         ).fetchall()
 
         beliefs: list[Belief] = []
@@ -438,13 +455,14 @@ class MemoryStore:
 
     def search_observations(self, query: str, top_k: int = 15) -> list[Observation]:
         """FTS5 BM25 search on observations."""
+        safe_query: str = self._sanitize_fts5_query(query)
         rows: list[sqlite3.Row] = self._conn.execute(
             """SELECT id, content, type, bm25(search_index) AS score
                FROM search_index
                WHERE search_index MATCH ? AND type = 'observation'
                ORDER BY bm25(search_index)
                LIMIT ?""",
-            (query, top_k),
+            (safe_query, top_k),
         ).fetchall()
 
         observations: list[Observation] = []
