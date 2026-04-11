@@ -143,6 +143,32 @@ def core_score(belief: Belief, current_time_iso: str | None = None) -> float:
     return type_w * source_w * length_w * lock_w * decay_w
 
 
+def retrieval_frequency_boost(retrieval_count: int, used_count: int) -> float:
+    """Tier 3: Boost beliefs that are frequently retrieved and used.
+
+    Returns 1.0 when no retrieval data exists (no-op until system is used).
+    Penalizes high-retrieval-low-use (noise). Boosts high-retrieval-high-use (proven).
+    """
+    if retrieval_count == 0:
+        return 1.0
+
+    use_rate: float = used_count / retrieval_count
+
+    # Penalize beliefs retrieved often but rarely used (noise)
+    if retrieval_count > 20 and use_rate < 0.3:
+        return 0.5
+
+    # Boost beliefs with strong usage track record
+    if retrieval_count > 10 and use_rate > 0.7:
+        return 1.5
+
+    # Mild boost for any usage
+    if used_count > 0:
+        return 1.0 + (use_rate * 0.3)
+
+    return 1.0
+
+
 def recency_boost(belief: Belief, current_time_iso: str, half_life_hours: float = 24.0) -> float:
     """Boost recently created beliefs so new information can surface.
 
@@ -159,15 +185,13 @@ def recency_boost(belief: Belief, current_time_iso: str, half_life_hours: float 
 
 
 def score_belief(belief: Belief, query: str, current_time_iso: str) -> float:
-    """Combined scoring: type weight * source weight * decay * recency * lock boost * Thompson.
+    """Combined scoring using decay, lock boost, and Thompson sampling.
 
     Superseded beliefs always score 0.01.
     Locked beliefs: score = lock_boost_typed * thompson_sample (always elevated).
-    Normal beliefs: score = type_w * source_w * recency * thompson_sample * decay.
+    Normal beliefs: score = thompson_sample * decay_factor.
 
-    Incorporates type and source weights (previously only used by core_score)
-    so that requirements/corrections rank above factual in retrieval, not just
-    in the /mem:core display. Per Exp 62-64 findings.
+    query_terms are derived by splitting the query on whitespace.
     """
     if belief.superseded_by is not None or belief.valid_to is not None:
         return 0.01
@@ -176,11 +200,10 @@ def score_belief(belief: Belief, query: str, current_time_iso: str) -> float:
     decay: float = decay_factor(belief, current_time_iso)
     boost: float = lock_boost_typed(belief, query_terms)
     sample: float = thompson_sample(belief.alpha, belief.beta_param)
-    type_w: float = _TYPE_WEIGHTS.get(belief.belief_type, 1.0)
-    source_w: float = _SOURCE_WEIGHTS.get(belief.source_type, 1.0)
-    recency: float = recency_boost(belief, current_time_iso)
 
     if belief.locked:
-        return boost * sample * type_w
+        # Lock boost already includes the relevance premium; multiply by sample
+        # so confident locked beliefs rank higher than uncertain ones.
+        return boost * sample
 
-    return sample * decay * type_w * source_w * recency
+    return sample * decay

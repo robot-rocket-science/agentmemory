@@ -632,6 +632,32 @@ class MemoryStore:
             created_at=ts,
         )
 
+    # --- Retrieval stats (Tier 3) ---
+
+    def get_retrieval_stats(self, belief_id: str) -> dict[str, int]:
+        """Return retrieval count and use rate for a belief.
+
+        Queries the tests table for outcome history. Returns zeros if no
+        retrieval data exists yet (Tier 3 activates once beliefs are tested).
+        """
+        row: sqlite3.Row | None = self._conn.execute(
+            """SELECT
+                COUNT(*) as total,
+                SUM(CASE WHEN outcome = 'used' THEN 1 ELSE 0 END) as used,
+                SUM(CASE WHEN outcome = 'ignored' THEN 1 ELSE 0 END) as ignored,
+                SUM(CASE WHEN outcome = 'harmful' THEN 1 ELSE 0 END) as harmful
+            FROM tests WHERE belief_id = ?""",
+            (belief_id,),
+        ).fetchone()
+        if row is None or row["total"] == 0:
+            return {"retrieval_count": 0, "used": 0, "ignored": 0, "harmful": 0}
+        return {
+            "retrieval_count": int(str(row["total"])),
+            "used": int(str(row["used"])),
+            "ignored": int(str(row["ignored"])),
+            "harmful": int(str(row["harmful"])),
+        }
+
     # --- Test results ---
 
     def record_test_result(
