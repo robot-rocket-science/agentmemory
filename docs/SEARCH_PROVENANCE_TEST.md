@@ -64,13 +64,13 @@ Test whether mem:search can reconstruct a project's self-provenance -- its ident
 - GCP Artifact Registry: `us-central1-docker.pkg.dev/secretary-487605/optimus-training/alpha-seek`
 - Project root: `/Users/thelorax/projects/alpha-seek-memtest`
 
-**Verdict:** The system reconstructed the complete **optimus-prime -> alpha-seek -> alpha-seek-memtest** lineage from scattered beliefs across commit messages, decision docs, and CLAUDE.md entries. No single document states this lineage explicitly -- the system assembled it from fragments.
+**Verdict:** Given all three project names in the query, the system returned detailed evidence of their relationship from commit messages, decision docs, and CLAUDE.md entries. This is retrieval of known relationships, not autonomous discovery -- the user provided the project names, and the system found confirming evidence. Still, it surfaced thorough, actionable detail (D090, migration steps, infrastructure) that would otherwise require reading hundreds of docs.
 
 ## Analysis
 
 ### What works
 - **Domain-specific keyword search**: queries with project-specific terms (alpha-seek, optimus-prime, trading, options) return highly relevant results
-- **Provenance reconstruction**: the system can piece together project lineage from commit messages, decision records, and infrastructure docs
+- **Provenance retrieval**: given project names, the system finds detailed evidence of relationships from commit messages, decision records, and infrastructure docs. It does not discover lineage autonomously -- the user must supply the project names.
 - **Operational knowledge**: file paths, deployment configs, infrastructure details are well-captured
 - **Decision traceability**: D090, D002, D099 and other decision IDs surface as anchor points
 
@@ -81,6 +81,6 @@ Test whether mem:search can reconstruct a project's self-provenance -- its ident
 
 ### Implications for product
 1. **Search is a retrieval tool, not an answer tool.** It surfaces relevant fragments. Synthesis is a separate step.
-2. **Project onboarding captures provenance implicitly.** Git commit messages and doc sentences contain enough lineage information to reconstruct project relationships.
+2. **Project onboarding captures provenance implicitly.** Git commit messages and doc sentences contain lineage information, but the user must know what to search for. The system retrieves evidence of relationships; it does not discover them.
 3. **Domain vocabulary is the key to good search.** Users who know their project's terms get good results. New users who don't know the vocabulary need a different entry point (like /mem:core or /mem:wonder).
 4. **Decision IDs (D###) are powerful anchors.** They connect scattered beliefs about the same topic across different documents and time periods.
