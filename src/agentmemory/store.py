@@ -16,6 +16,7 @@ from typing import Final
 from agentmemory.models import (
     Belief,
     Checkpoint,
+    Edge,
     Evidence,
     Observation,
     Session,
@@ -416,6 +417,134 @@ class MemoryStore:
         if row_id is None:
             raise RuntimeError("Edge insert did not return a rowid")
         return row_id
+
+    def get_neighbors(
+        self,
+        belief_id: str,
+        edge_types: list[str] | None = None,
+        direction: str = "both",
+    ) -> list[tuple[Belief, Edge]]:
+        """Get beliefs connected to belief_id via edges.
+
+        Args:
+            belief_id: The belief to find neighbors of.
+            edge_types: If provided, only return edges of these types.
+            direction: "outgoing" (from_id=belief_id), "incoming" (to_id=belief_id),
+                       or "both".
+
+        Returns list of (neighbor_belief, connecting_edge) pairs.
+        Excludes superseded beliefs (valid_to IS NOT NULL).
+        """
+        results: list[tuple[Belief, Edge]] = []
+        directions: list[tuple[str, str]] = []
+        if direction in ("outgoing", "both"):
+            directions.append(("from_id", "to_id"))
+        if direction in ("incoming", "both"):
+            directions.append(("to_id", "from_id"))
+
+        for match_col, neighbor_col in directions:
+            sql: str = (
+                f"SELECT e.id AS eid, e.from_id, e.to_id, e.edge_type, "
+                f"e.weight, e.reason, e.created_at AS ecreated, "
+                f"b.* FROM edges e "
+                f"JOIN beliefs b ON b.id = e.{neighbor_col} "
+                f"WHERE e.{match_col} = ? AND b.valid_to IS NULL"
+            )
+            params: list[object] = [belief_id]
+            if edge_types:
+                placeholders: str = ", ".join("?" for _ in edge_types)
+                sql += f" AND e.edge_type IN ({placeholders})"
+                params.extend(edge_types)
+            sql += " ORDER BY e.weight DESC, e.created_at ASC"
+
+            rows: list[sqlite3.Row] = self._conn.execute(sql, tuple(params)).fetchall()
+            for row in rows:
+                belief: Belief = _row_to_belief(row)
+                edge: Edge = Edge(
+                    id=row["eid"],
+                    from_id=row["from_id"],
+                    to_id=row["to_id"],
+                    edge_type=row["edge_type"],
+                    weight=row["weight"],
+                    reason=row["reason"],
+                    created_at=row["ecreated"],
+                )
+                results.append((belief, edge))
+
+        return results
+
+    def expand_graph(
+        self,
+        seed_ids: list[str],
+        depth: int = 2,
+        edge_types: list[str] | None = None,
+        max_nodes: int = 50,
+    ) -> dict[str, list[tuple[Belief, str, int]]]:
+        """BFS expansion from seed beliefs along edges.
+
+        Args:
+            seed_ids: Starting belief IDs.
+            depth: Maximum number of hops (1, 2, or 3).
+            edge_types: If provided, only traverse these edge types.
+                        SUPERSEDES edges are always excluded.
+            max_nodes: Cap on total expanded nodes to prevent blowup.
+
+        Returns dict mapping belief_id to list of
+        (neighbor_belief, edge_type, hop_distance) tuples.
+        Deterministic: neighbors processed by weight DESC, created_at ASC.
+        """
+        from collections import deque
+
+        # Exclude SUPERSEDES edges (point to dead beliefs)
+        excluded: frozenset[str] = frozenset({"SUPERSEDES"})
+        effective_types: list[str] | None = None
+        if edge_types is not None:
+            effective_types = [t for t in edge_types if t not in excluded]
+        # When no explicit types, we filter SUPERSEDES in post-processing
+
+        visited: set[str] = set(seed_ids)
+        result: dict[str, list[tuple[Belief, str, int]]] = {}
+        queue: deque[tuple[str, int]] = deque()
+
+        for sid in seed_ids:
+            queue.append((sid, 0))
+
+        total_expanded: int = 0
+
+        while queue and total_expanded < max_nodes:
+            current_id, current_depth = queue.popleft()
+            if current_depth >= depth:
+                continue
+
+            neighbors: list[tuple[Belief, Edge]] = self.get_neighbors(
+                current_id,
+                edge_types=effective_types,
+                direction="both",
+            )
+
+            for neighbor_belief, edge in neighbors:
+                # Skip SUPERSEDES when no explicit type filter
+                if edge_types is None and edge.edge_type in excluded:
+                    continue
+
+                if neighbor_belief.id in visited:
+                    continue
+                if total_expanded >= max_nodes:
+                    break
+
+                visited.add(neighbor_belief.id)
+                hop: int = current_depth + 1
+
+                if neighbor_belief.id not in result:
+                    result[neighbor_belief.id] = []
+                result[neighbor_belief.id].append(
+                    (neighbor_belief, edge.edge_type, hop)
+                )
+
+                queue.append((neighbor_belief.id, hop))
+                total_expanded += 1
+
+        return result
 
     # --- Search ---
 

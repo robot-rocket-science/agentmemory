@@ -88,6 +88,21 @@ def thompson_sample(alpha: float, beta_param: float) -> float:
     return random.betavariate(alpha, beta_param)
 
 
+def uncertainty_score(alpha: float, beta_param: float) -> float:
+    """How uncertain the system is about this belief.
+
+    Based on normalized variance of Beta(alpha, beta_param).
+    Returns 0.0 when confident (one parameter dominates).
+    Returns 1.0 at maximum ignorance (alpha ~ beta_param, few observations).
+    """
+    total: float = alpha + beta_param
+    if total <= 0.0:
+        return 1.0
+    variance: float = (alpha * beta_param) / (total * total * (total + 1.0))
+    # Max variance for Jeffreys prior Beta(0.5, 0.5) = 0.125
+    return min(1.0, variance / 0.125)
+
+
 # Core ranking weights (from CORE_RANKING.md, validated by Exp 38/61 research).
 _TYPE_WEIGHTS: dict[str, float] = {
     "requirement": 2.5,

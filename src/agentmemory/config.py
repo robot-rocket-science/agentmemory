@@ -15,6 +15,10 @@ _DEFAULTS: dict[str, dict[str, int]] = {
     "wonder": {
         "max_agents": 4,
     },
+    "reason": {
+        "max_agents": 3,
+        "depth": 2,
+    },
     "core": {
         "default_top": 10,
     },

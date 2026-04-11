@@ -38,9 +38,9 @@ from agentmemory.commit_tracker import (
     save_config as save_commit_config,
 )
 from agentmemory.ingest import IngestResult, ingest_turn
-from agentmemory.models import Belief
+from agentmemory.models import Belief, Edge
 from agentmemory.retrieval import RetrievalResult, retrieve
-from agentmemory.scoring import score_belief
+from agentmemory.scoring import score_belief, uncertainty_score
 from agentmemory.scanner import ScanResult, scan_project
 from agentmemory.store import MemoryStore
 
@@ -181,6 +181,40 @@ _COMMAND_DEFS: dict[str, dict[str, str]] = {
             "Display the current settings.\n"
             "If the user wants to change something, use AskUserQuestion to present options, "
             "then run `agentmemory settings --<key> <value>` to update."
+        ),
+    },
+    "reason": {
+        "description": "Focused reasoning about a problem using graph-aware retrieval and uncertainty analysis.",
+        "argument_hint": "A statement or topic to reason about",
+        "tools": "Bash, Read, WebSearch, Agent",
+        "objective": "Use multi-hop graph retrieval and uncertainty signals to reason deeply about the given topic.",
+        "process": (
+            "1. Run: `uv run agentmemory reason \"$ARGUMENTS\"` to get structured evidence context.\n"
+            "2. Run: `uv run agentmemory settings` to read reason.max_agents and reason.depth.\n"
+            "3. Analyze the structured output. It contains:\n"
+            "   - DIRECT EVIDENCE: FTS5 matches with confidence scores\n"
+            "   - CONNECTED EVIDENCE: Graph-expanded beliefs with edge types and hop distance\n"
+            "   - HIGH-UNCERTAINTY BELIEFS: Beliefs where the system has insufficient evidence\n"
+            "   - CONTRADICTIONS: Pairs of beliefs that contradict each other\n"
+            "4. Build a reasoning chain:\n"
+            "   - Start from the highest-confidence direct evidence\n"
+            "   - Follow graph connections to build supporting arguments\n"
+            "   - Note where the chain relies on high-uncertainty beliefs\n"
+            "   - Note where contradictions block a clear conclusion\n"
+            "5. If the reasoning chain has gaps or relies on uncertain beliefs, spawn up to "
+            "max_agents subagents using the Agent tool. Each subagent gets:\n"
+            "   - The original reason query\n"
+            "   - ONE specific investigation task (not the full evidence dump)\n"
+            "   - Assign roles based on need: Verifier (check uncertain belief), "
+            "Gap-filler (research missing info), Contradiction-resolver (which is correct?)\n"
+            "   If the evidence is sufficient, skip subagent dispatch entirely.\n"
+            "6. Collect subagent results (if any).\n"
+            "7. Present the reasoned analysis:\n"
+            "   - ANSWER: Direct response based on evidence\n"
+            "   - EVIDENCE CHAIN: Beliefs and connections supporting the answer\n"
+            "   - CONFIDENCE: How confident the reasoning is, citing uncertain links\n"
+            "   - OPEN QUESTIONS: Anything that could not be resolved\n"
+            "   - SUGGESTED UPDATES: Beliefs whose confidence should change based on findings\n"
         ),
     },
     "disable": {
@@ -673,6 +707,141 @@ def cmd_wonder(args: argparse.Namespace) -> None:
 
 
 # ---------------------------------------------------------------------------
+# reason
+# ---------------------------------------------------------------------------
+
+
+def cmd_reason(args: argparse.Namespace) -> None:
+    """Graph-aware reasoning with uncertainty analysis.
+
+    Retrieves beliefs via FTS5, expands along graph edges (BFS),
+    computes uncertainty scores, detects contradictions, and outputs
+    structured evidence for LLM reasoning.
+    """
+    query: str = " ".join(args.query)
+    if not query.strip():
+        print("Error: empty query", file=sys.stderr)
+        sys.exit(1)
+
+    depth: int = args.depth if args.depth is not None else int(
+        get_setting("reason", "depth") or 2
+    )
+    budget: int = args.budget
+
+    store: MemoryStore = _get_store()
+
+    # Step 1: FTS5 retrieval
+    result: RetrievalResult = retrieve(store, query, budget=budget, top_k=30)
+
+    if not result.beliefs:
+        print("No beliefs found matching your query.")
+        store.close()
+        return
+
+    # Step 2: Graph expansion from top 10 seeds
+    seed_ids: list[str] = [b.id for b in result.beliefs[:10]]
+    expanded: dict[str, list[tuple[Belief, str, int]]] = store.expand_graph(
+        seed_ids, depth=depth,
+    )
+
+    # Step 3: Merge and deduplicate
+    all_beliefs: dict[str, Belief] = {}
+    belief_hops: dict[str, int] = {}  # belief_id -> min hop distance
+    belief_edges: dict[str, str] = {}  # belief_id -> edge type that found it
+
+    for b in result.beliefs:
+        all_beliefs[b.id] = b
+        belief_hops[b.id] = 0
+
+    for _bid, exp_neighbors in expanded.items():
+        for neighbor_belief, edge_type, hop in exp_neighbors:
+            if neighbor_belief.id not in all_beliefs:
+                all_beliefs[neighbor_belief.id] = neighbor_belief
+            if neighbor_belief.id not in belief_hops or hop < belief_hops[neighbor_belief.id]:
+                belief_hops[neighbor_belief.id] = hop
+                belief_edges[neighbor_belief.id] = edge_type
+
+    # Step 4: Compute uncertainty for each belief
+    belief_uncertainty: dict[str, float] = {}
+    for bid, b in all_beliefs.items():
+        belief_uncertainty[bid] = uncertainty_score(b.alpha, b.beta_param)
+
+    # Step 5: Detect contradictions
+    contradictions: list[tuple[Belief, Belief]] = []
+    result_ids: set[str] = set(all_beliefs.keys())
+    for bid in result_ids:
+        neighbors: list[tuple[Belief, Edge]] = store.get_neighbors(
+            bid, edge_types=["CONTRADICTS"], direction="both",
+        )
+        for neighbor_belief, _edge in neighbors:
+            if neighbor_belief.id in result_ids and neighbor_belief.id > bid:
+                contradictions.append(
+                    (all_beliefs[bid], neighbor_belief)
+                )
+
+    store.close()
+
+    # Step 6: Format structured output
+    direct: list[Belief] = [
+        b for b in result.beliefs if belief_hops.get(b.id, 0) == 0
+    ]
+    connected: list[tuple[Belief, str, int]] = []
+    for bid, b in all_beliefs.items():
+        hop: int = belief_hops.get(bid, 0)
+        if hop > 0:
+            etype: str = belief_edges.get(bid, "RELATES_TO")
+            connected.append((b, etype, hop))
+    connected.sort(key=lambda x: (x[2], -x[0].confidence))
+
+    high_uncertainty: list[tuple[Belief, float]] = [
+        (b, belief_uncertainty[bid])
+        for bid, b in all_beliefs.items()
+        if belief_uncertainty[bid] > 0.7
+    ]
+    high_uncertainty.sort(key=lambda x: x[1], reverse=True)
+
+    # Print
+    print(f"QUERY: {query}")
+    print(f"  Depth: {depth}, Direct hits: {len(direct)}, "
+          f"Graph-expanded: {len(connected)}, "
+          f"High-uncertainty: {len(high_uncertainty)}, "
+          f"Contradictions: {len(contradictions)}")
+
+    print(f"\nDIRECT EVIDENCE (Level 1 -- {len(direct)} beliefs):")
+    for b in direct:
+        locked_str: str = " [LOCKED]" if b.locked else ""
+        unc: float = belief_uncertainty.get(b.id, 0.0)
+        print(f"  [{b.confidence:.0%}]{locked_str} {b.content}")
+        print(f"    type: {b.belief_type}, uncertainty: {unc:.2f}, id: {b.id}")
+
+    if connected:
+        print(f"\nCONNECTED EVIDENCE (Level 2-3 -- {len(connected)} beliefs):")
+        for b, etype, hop in connected:
+            locked_str = " [LOCKED]" if b.locked else ""
+            print(f"  [hop {hop}] [{b.confidence:.0%}]{locked_str} {b.content}")
+            print(f"    via {etype}, type: {b.belief_type}, id: {b.id}")
+
+    if high_uncertainty:
+        print(f"\nHIGH-UNCERTAINTY BELIEFS ({len(high_uncertainty)} beliefs):")
+        for b, unc in high_uncertainty:
+            hop = belief_hops.get(b.id, 0)
+            print(f"  [{b.confidence:.0%}, uncertainty: {unc:.2f}] {b.content}")
+            print(f"    alpha: {b.alpha}, beta: {b.beta_param}, hop: {hop}, id: {b.id}")
+
+    if contradictions:
+        print(f"\nCONTRADICTIONS ({len(contradictions)} pairs):")
+        for a, b in contradictions:
+            print(f"  \"{a.content[:80]}\"")
+            print(f"    CONTRADICTS")
+            print(f"  \"{b.content[:80]}\"")
+            print()
+
+    if not connected and not high_uncertainty and not contradictions:
+        print("\n  (No graph edges, uncertainty flags, or contradictions found.)")
+        print("  Reason output is equivalent to a standard search at this graph density.")
+
+
+# ---------------------------------------------------------------------------
 # demote
 # ---------------------------------------------------------------------------
 
@@ -751,6 +920,16 @@ def cmd_settings(args: argparse.Namespace) -> None:
         locked_section2["warn_at"] = args.locked_warn_at
         config["locked"] = locked_section2
         changed = True
+    if args.reason_max_agents is not None:
+        reason_section: dict[str, Any] = cast("dict[str, Any]", config.get("reason", {}))
+        reason_section["max_agents"] = args.reason_max_agents
+        config["reason"] = reason_section
+        changed = True
+    if args.reason_depth is not None:
+        reason_section2: dict[str, Any] = cast("dict[str, Any]", config.get("reason", {}))
+        reason_section2["depth"] = args.reason_depth
+        config["reason"] = reason_section2
+        changed = True
 
     if changed:
         cfg_path: Path = save_mem_config(config)
@@ -759,10 +938,13 @@ def cmd_settings(args: argparse.Namespace) -> None:
         print("agentmemory settings:")
 
     w: dict[str, Any] = cast("dict[str, Any]", config.get("wonder", {}))
+    r: dict[str, Any] = cast("dict[str, Any]", config.get("reason", {}))
     c: dict[str, Any] = cast("dict[str, Any]", config.get("core", {}))
     lk: dict[str, Any] = cast("dict[str, Any]", config.get("locked", {}))
 
     print(f"  wonder.max_agents:  {w.get('max_agents', 4)}")
+    print(f"  reason.max_agents:  {r.get('max_agents', 3)}")
+    print(f"  reason.depth:       {r.get('depth', 2)}")
     print(f"  core.default_top:   {c.get('default_top', 10)}")
     print(f"  locked.max_cap:     {lk.get('max_cap', 100)}")
     print(f"  locked.warn_at:     {lk.get('warn_at', 80)}")
@@ -1011,6 +1193,17 @@ def main() -> None:
     p_wonder.add_argument("query", nargs="+", help="Research topic or question")
     p_wonder.set_defaults(func=cmd_wonder)
 
+    # reason
+    p_reason: argparse.ArgumentParser = subparsers.add_parser(
+        "reason", help="Graph-aware reasoning with uncertainty analysis"
+    )
+    p_reason.add_argument("query", nargs="+", help="Statement or topic to reason about")
+    p_reason.add_argument("--depth", type=int, default=None,
+                          help="Graph expansion depth 1-3 (default: from config, usually 2)")
+    p_reason.add_argument("--budget", type=int, default=4000,
+                          help="Token budget for retrieval (default: 4000)")
+    p_reason.set_defaults(func=cmd_reason)
+
     # demote
     p_demote: argparse.ArgumentParser = subparsers.add_parser(
         "demote", help="Demote least-relevant locked beliefs to regular"
@@ -1031,6 +1224,10 @@ def main() -> None:
                             help="Max locked beliefs in retrieve (default: 100)")
     p_settings.add_argument("--locked-warn-at", type=int, default=None,
                             help="Warn when locked beliefs exceed this (default: 80)")
+    p_settings.add_argument("--reason-max-agents", type=int, default=None,
+                            help="Max subagents for /mem:reason (default: 3)")
+    p_settings.add_argument("--reason-depth", type=int, default=None,
+                            help="Graph expansion depth for /mem:reason (default: 2)")
     p_settings.set_defaults(func=cmd_settings)
 
     # commit-check
