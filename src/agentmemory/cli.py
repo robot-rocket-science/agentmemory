@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from agentmemory.config import (
+    get_setting,
     load_config as load_mem_config,
     save_config as save_mem_config,
 )
@@ -39,6 +40,7 @@ from agentmemory.commit_tracker import (
 from agentmemory.ingest import IngestResult, ingest_turn
 from agentmemory.models import Belief
 from agentmemory.retrieval import RetrievalResult, retrieve
+from agentmemory.scoring import score_belief
 from agentmemory.scanner import ScanResult, scan_project
 from agentmemory.store import MemoryStore
 
@@ -149,6 +151,13 @@ _COMMAND_DEFS: dict[str, dict[str, str]] = {
             "Stop calling ALL mcp__agentmemory__* tools for the rest of this session. "
             "Do not search, observe, ingest, or call any agentmemory tools until /mem:enable is invoked."
         ),
+    },
+    "demote": {
+        "description": "Demote least-relevant locked beliefs to regular beliefs.",
+        "argument_hint": "Optional: --count N (default 5)",
+        "tools": "Bash",
+        "objective": "Demote the least-relevant locked beliefs.",
+        "process": "Run: `agentmemory demote --count ${ARGUMENTS:-5}`\nDisplay the output. Do not add commentary.",
     },
     "enable": {
         "description": "Re-enable agentmemory after /mem:disable.",
@@ -472,9 +481,17 @@ def cmd_locked(args: argparse.Namespace) -> None:
         print("No locked beliefs.")
         return
 
+    warn_at: int = get_setting("locked", "warn_at")
+    max_cap: int = get_setting("locked", "max_cap")
+
     print(f"Locked beliefs ({len(beliefs)}):")
     for b in beliefs:
         print(f"  [{b.confidence:.0%}] {b.content} (ID: {b.id})")
+
+    if len(beliefs) >= warn_at:
+        print(f"\n  WARNING: {len(beliefs)} locked beliefs (warn threshold: {warn_at}, cap: {max_cap})")
+        print("  Consider demoting least-relevant locked beliefs to regular beliefs.")
+        print("  Run: agentmemory demote [--count N] to demote the N least-relevant.")
 
 
 # ---------------------------------------------------------------------------
@@ -558,6 +575,55 @@ def cmd_wonder(args: argparse.Namespace) -> None:
         locked_str: str = " [LOCKED]" if belief.locked else ""
         print(f"  [{belief.confidence:.0%}]{locked_str} {belief.content}")
     print("\n--- Graph context above. Deep research prompt template: TODO ---")
+
+
+# ---------------------------------------------------------------------------
+# demote
+# ---------------------------------------------------------------------------
+
+
+def cmd_demote(args: argparse.Namespace) -> None:
+    """Demote the least-relevant locked beliefs to regular beliefs."""
+    count: int = args.count
+    store: MemoryStore = _get_store()
+    beliefs: list[Belief] = store.get_locked_beliefs()
+
+    if not beliefs:
+        print("No locked beliefs to demote.")
+        store.close()
+        return
+
+    if len(beliefs) <= count:
+        print(f"Only {len(beliefs)} locked beliefs exist. Nothing to demote.")
+        store.close()
+        return
+
+    # Score all locked beliefs and pick the lowest-scoring ones
+    current_time: str = _now_iso()
+    scored: list[tuple[Belief, float]] = []
+    for b in beliefs:
+        s: float = score_belief(b, "", current_time)
+        scored.append((b, s))
+
+    scored.sort(key=lambda x: x[1])
+    to_demote: list[tuple[Belief, float]] = scored[:count]
+
+    print(f"Demoting {len(to_demote)} least-relevant locked beliefs:")
+    for b, s in to_demote:
+        store._conn.execute(  # pyright: ignore[reportPrivateUsage]
+            "UPDATE beliefs SET locked = 0, updated_at = ? WHERE id = ?",
+            (current_time, b.id),
+        )
+        store._conn.commit()  # pyright: ignore[reportPrivateUsage]
+        print(f"  Demoted: [{b.confidence:.0%}] {b.content} (ID: {b.id}, score: {s:.3f})")
+
+    store.close()
+    print(f"\n{len(to_demote)} beliefs demoted from locked to regular.")
+
+
+def _now_iso() -> str:
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).isoformat()
 
 
 # ---------------------------------------------------------------------------
@@ -808,6 +874,14 @@ def main() -> None:
     )
     p_wonder.add_argument("query", nargs="+", help="Research topic or question")
     p_wonder.set_defaults(func=cmd_wonder)
+
+    # demote
+    p_demote: argparse.ArgumentParser = subparsers.add_parser(
+        "demote", help="Demote least-relevant locked beliefs to regular"
+    )
+    p_demote.add_argument("--count", type=int, default=5,
+                          help="Number of beliefs to demote (default: 5)")
+    p_demote.set_defaults(func=cmd_demote)
 
     # settings
     p_settings: argparse.ArgumentParser = subparsers.add_parser(
