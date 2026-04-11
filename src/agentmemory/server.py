@@ -7,8 +7,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import os
+
 from fastmcp import FastMCP
 
+from agentmemory.config import get_bool_setting
 from agentmemory.ingest import IngestResult, ingest_turn
 from agentmemory.scanner import ScanResult, scan_project
 from agentmemory.models import (
@@ -19,15 +22,17 @@ from agentmemory.models import (
     OBS_TYPE_USER_STATEMENT,
     Belief,
     Observation,
+    Session,
 )
 from agentmemory.retrieval import RetrievalResult, retrieve
 from agentmemory.store import MemoryStore
 
 # ---------------------------------------------------------------------------
-# Store singleton
+# Store singleton + session tracking
 # ---------------------------------------------------------------------------
 
 _store: MemoryStore | None = None
+_session_id: str | None = None
 
 
 def _resolve_server_db() -> Path:
@@ -62,8 +67,19 @@ def _get_store() -> MemoryStore:
 
 def _set_store(store: MemoryStore) -> None:  # pyright: ignore[reportUnusedFunction]
     """Override the module-level store. Used by tests."""
-    global _store
+    global _store, _session_id
     _store = store
+    _session_id = None
+
+
+def _ensure_session() -> str:
+    """Return the current session ID, creating a new session if needed."""
+    global _session_id
+    if _session_id is None:
+        store: MemoryStore = _get_store()
+        session: Session = store.create_session()
+        _session_id = session.id
+    return _session_id
 
 
 # ---------------------------------------------------------------------------
@@ -90,7 +106,14 @@ def search(query: str, budget: int = 2000) -> str:
     Uses the retrieval pipeline (FTS5 + scoring + packing).
     """
     store: MemoryStore = _get_store()
+    session_id: str = _ensure_session()
     result: RetrievalResult = retrieve(store, query, budget=budget)
+
+    store.increment_session_metrics(
+        session_id,
+        retrieval_tokens=result.total_tokens,
+        searches_performed=1,
+    )
 
     if not result.beliefs:
         return "No beliefs found matching your query."
@@ -108,21 +131,24 @@ def search(query: str, budget: int = 2000) -> str:
 
 @mcp.tool
 def remember(text: str) -> str:
-    """Create a high-confidence belief from a user statement.
+    """Create a locked, high-confidence belief from a user statement.
 
-    Sets source_type='user_stated', alpha=9.0, beta_param=0.5.
-    NOT locked -- only /mem:lock creates locked beliefs.
+    Sets source_type='user_stated', alpha=9.0, beta_param=0.5, locked=True.
+    User-stated beliefs are permanent constraints that persist across sessions.
     Returns confirmation with belief ID.
     """
     store: MemoryStore = _get_store()
+    session_id: str = _ensure_session()
     belief: Belief = store.insert_belief(
         content=text,
         belief_type=BELIEF_FACTUAL,
         source_type=BSRC_USER_STATED,
         alpha=9.0,
         beta_param=0.5,
-        locked=False,
+        locked=True,
     )
+    store.checkpoint(session_id, "remember", belief.content, [belief.id])
+    store.increment_session_metrics(session_id, beliefs_created=1)
     return (
         f"Remembered (ID: {belief.id}): {belief.content} "
         f"[confidence: {belief.confidence:.0%}, locked: {belief.locked}]"
@@ -131,21 +157,22 @@ def remember(text: str) -> str:
 
 @mcp.tool
 def correct(text: str, replaces: str | None = None) -> str:
-    """Record a user correction.
+    """Record a user correction as a locked belief.
 
-    Creates a high-confidence belief with source_type='user_corrected'.
-    NOT locked -- only /mem:lock creates locked beliefs.
+    Creates a locked, high-confidence belief with source_type='user_corrected'.
+    Corrections are permanent constraints that persist across sessions.
     If replaces is provided (a search query), finds the best matching
     existing belief and supersedes it.
     """
     store: MemoryStore = _get_store()
+    session_id: str = _ensure_session()
     belief: Belief = store.insert_belief(
         content=text,
         belief_type=BELIEF_CORRECTION,
         source_type=BSRC_USER_CORRECTED,
         alpha=9.0,
         beta_param=0.5,
-        locked=False,
+        locked=True,
     )
 
     superseded_msg: str = ""
@@ -166,6 +193,10 @@ def correct(text: str, replaces: str | None = None) -> str:
             superseded_msg = f" Superseded belief ID: {candidate.id}."
             break
 
+    store.checkpoint(session_id, "correct", belief.content, [belief.id])
+    store.increment_session_metrics(
+        session_id, beliefs_created=1, corrections_detected=1,
+    )
     return (
         f"Correction recorded (ID: {belief.id}): {belief.content} "
         f"[confidence: {belief.confidence:.0%}, locked: {belief.locked}]."
@@ -180,11 +211,13 @@ def observe(text: str, source: str = "user") -> str:
     Returns the observation ID.
     """
     store: MemoryStore = _get_store()
+    session_id: str = _ensure_session()
     obs: Observation = store.insert_observation(
         content=text,
         observation_type=OBS_TYPE_USER_STATEMENT,
         source_type=source,
         source_id=source,
+        session_id=session_id,
     )
     return f"Observation recorded (ID: {obs.id}): {obs.content}"
 
@@ -194,13 +227,25 @@ def status() -> str:
     """Return memory system status.
 
     Reports counts of observations, beliefs, locked beliefs, superseded
-    beliefs, edges, and sessions.
+    beliefs, edges, and sessions. Includes current session token metrics.
     """
     store: MemoryStore = _get_store()
     counts: dict[str, int] = store.status()
     lines: list[str] = ["Memory system status:"]
     for key, value in counts.items():
         lines.append(f"  {key}: {value}")
+
+    # Current session metrics
+    if _session_id is not None:
+        session: Session | None = store.get_session(_session_id)
+        if session is not None:
+            lines.append("Current session:")
+            lines.append(f"  retrieval_tokens: {session.retrieval_tokens}")
+            lines.append(f"  classification_tokens: {session.classification_tokens}")
+            lines.append(f"  beliefs_created: {session.beliefs_created}")
+            lines.append(f"  corrections_detected: {session.corrections_detected}")
+            lines.append(f"  searches_performed: {session.searches_performed}")
+
     return "\n".join(lines)
 
 
@@ -323,10 +368,25 @@ def ingest(text: str, source: str = "user") -> str:
     Use source='user' for user messages, source='assistant' for agent messages.
     """
     store: MemoryStore = _get_store()
-    result: IngestResult = ingest_turn(store, text, source, use_llm=False)
+    session_id: str = _ensure_session()
+    use_llm: bool = get_bool_setting("ingest", "use_llm")
+    # LLM classification requires ANTHROPIC_API_KEY
+    if use_llm and not os.environ.get("ANTHROPIC_API_KEY"):
+        use_llm = False
+    result: IngestResult = ingest_turn(store, text, source, session_id=session_id, use_llm=use_llm)
 
+    # Estimate classification tokens: ~50 tokens/sentence for Haiku prompt+response
+    est_classification_tokens: int = result.sentences_extracted * 50 if use_llm else 0
+    store.increment_session_metrics(
+        session_id,
+        classification_tokens=est_classification_tokens,
+        beliefs_created=result.beliefs_created,
+        corrections_detected=result.corrections_detected,
+    )
+
+    classifier: str = "haiku" if use_llm else "offline"
     return (
-        f"Ingested {source} turn:\n"
+        f"Ingested {source} turn ({classifier} classifier):\n"
         f"  Observations: {result.observations_created}\n"
         f"  Beliefs: {result.beliefs_created}\n"
         f"  Corrections: {result.corrections_detected}\n"

@@ -30,7 +30,12 @@ CREATE TABLE IF NOT EXISTS sessions (
     completed_at TEXT,
     model TEXT,
     project_context TEXT,
-    summary TEXT
+    summary TEXT,
+    retrieval_tokens INTEGER NOT NULL DEFAULT 0,
+    classification_tokens INTEGER NOT NULL DEFAULT 0,
+    beliefs_created INTEGER NOT NULL DEFAULT 0,
+    corrections_detected INTEGER NOT NULL DEFAULT 0,
+    searches_performed INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS observations (
@@ -200,6 +205,7 @@ def _row_to_belief(row: sqlite3.Row) -> Belief:
 
 
 def _row_to_session(row: sqlite3.Row) -> Session:
+    keys: list[str] = list(row.keys())
     return Session(
         id=row["id"],
         started_at=row["started_at"],
@@ -207,6 +213,11 @@ def _row_to_session(row: sqlite3.Row) -> Session:
         model=row["model"],
         project_context=row["project_context"],
         summary=row["summary"],
+        retrieval_tokens=int(row["retrieval_tokens"]) if "retrieval_tokens" in keys else 0,
+        classification_tokens=int(row["classification_tokens"]) if "classification_tokens" in keys else 0,
+        beliefs_created=int(row["beliefs_created"]) if "beliefs_created" in keys else 0,
+        corrections_detected=int(row["corrections_detected"]) if "corrections_detected" in keys else 0,
+        searches_performed=int(row["searches_performed"]) if "searches_performed" in keys else 0,
     )
 
 
@@ -237,6 +248,24 @@ class MemoryStore:
     def _init_schema(self) -> None:
         """Create all tables and FTS5 index if they don't exist."""
         self._conn.executescript(_SCHEMA)
+        self._conn.commit()
+        self._migrate_sessions()
+
+    def _migrate_sessions(self) -> None:
+        """Add token tracking columns to sessions if missing (existing DBs)."""
+        cols: list[sqlite3.Row] = self._conn.execute(
+            "PRAGMA table_info(sessions)"
+        ).fetchall()
+        col_names: set[str] = {row["name"] for row in cols}
+        new_cols: list[str] = [
+            "retrieval_tokens", "classification_tokens",
+            "beliefs_created", "corrections_detected", "searches_performed",
+        ]
+        for col in new_cols:
+            if col not in col_names:
+                self._conn.execute(
+                    f"ALTER TABLE sessions ADD COLUMN {col} INTEGER NOT NULL DEFAULT 0"
+                )
         self._conn.commit()
 
     # --- Observations (immutable) ---
@@ -746,6 +775,39 @@ class MemoryStore:
             (ts, summary if summary else None, session_id),
         )
         self._conn.commit()
+
+    def increment_session_metrics(
+        self,
+        session_id: str,
+        retrieval_tokens: int = 0,
+        classification_tokens: int = 0,
+        beliefs_created: int = 0,
+        corrections_detected: int = 0,
+        searches_performed: int = 0,
+    ) -> None:
+        """Atomically increment session token/correction counters."""
+        self._conn.execute(
+            """UPDATE sessions SET
+                retrieval_tokens = retrieval_tokens + ?,
+                classification_tokens = classification_tokens + ?,
+                beliefs_created = beliefs_created + ?,
+                corrections_detected = corrections_detected + ?,
+                searches_performed = searches_performed + ?
+               WHERE id = ?""",
+            (
+                retrieval_tokens, classification_tokens,
+                beliefs_created, corrections_detected,
+                searches_performed, session_id,
+            ),
+        )
+        self._conn.commit()
+
+    def get_session(self, session_id: str) -> Session | None:
+        """Get a session by ID."""
+        row: sqlite3.Row | None = self._conn.execute(
+            "SELECT * FROM sessions WHERE id = ?", (session_id,)
+        ).fetchone()
+        return _row_to_session(row) if row is not None else None
 
     def find_incomplete_sessions(self) -> list[Session]:
         """Find sessions where completed_at IS NULL (crashed or interrupted)."""

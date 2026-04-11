@@ -130,6 +130,12 @@ class Session:
     model: str | None
     project_context: str | None
     summary: str | None
+    # Token and correction burden tracking (REQ-024, amortization hypothesis)
+    retrieval_tokens: int = 0       # tokens injected via search/retrieve
+    classification_tokens: int = 0  # tokens consumed by Haiku classification
+    beliefs_created: int = 0        # beliefs stored this session
+    corrections_detected: int = 0   # user corrections detected this session
+    searches_performed: int = 0     # search/retrieve calls this session
 
 
 @dataclass
