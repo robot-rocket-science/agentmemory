@@ -277,11 +277,15 @@ class MemoryStore:
         beta_param: float = 0.5,
         locked: bool = False,
         observation_id: str | None = None,
+        created_at: str | None = None,
     ) -> Belief:
         """Insert a belief with optional evidence link. Content-hash dedup.
 
         Also inserts into FTS5 search_index. If the same content hash already
         exists, returns the existing belief without modification.
+
+        If created_at is provided, uses that timestamp instead of now().
+        This enables source-truth dating (e.g., git commit dates).
         """
         ch: str = _content_hash(content)
         existing: sqlite3.Row | None = self._conn.execute(
@@ -291,7 +295,7 @@ class MemoryStore:
             return _row_to_belief(existing)
 
         belief_id: str = _new_id()
-        ts: str = _now()
+        ts: str = created_at if created_at is not None else _now()
         confidence: float = alpha / (alpha + beta_param)
         locked_int: int = 1 if locked else 0
 

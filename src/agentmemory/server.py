@@ -9,14 +9,6 @@ from pathlib import Path
 
 from fastmcp import FastMCP
 
-from agentmemory.commit_tracker import (
-    CommitCheckResult,
-    CommitTrackerConfig,
-    check_commit_status,
-    format_status,
-    load_config as load_commit_config,
-    save_config as save_commit_config,
-)
 from agentmemory.ingest import IngestResult, ingest_turn
 from agentmemory.scanner import ScanResult, scan_project
 from agentmemory.models import (
@@ -254,6 +246,7 @@ def onboard(project_path: str) -> str:
             source=source,
             session_id=None,
             use_llm=False,
+            created_at=node.date,
         )
         aggregate.merge(turn_result)
 
@@ -310,63 +303,6 @@ def ingest(text: str, source: str = "user") -> str:
         f"  Corrections: {result.corrections_detected}\n"
         f"  Sentences: {result.sentences_extracted} extracted, "
         f"{result.sentences_persisted} persisted"
-    )
-
-
-@mcp.tool
-def commit_check(project_dir: str = ".") -> str:
-    """Check time since last git commit and number of uncommitted changes.
-
-    Returns a nudge message if either threshold is exceeded, or a quiet
-    status summary if everything is within bounds. Deterministic -- no LLM
-    involved in the check logic.
-
-    Configure thresholds with commit_config tool.
-    """
-    result: CommitCheckResult = check_commit_status(Path(project_dir))
-    return format_status(result)
-
-
-@mcp.tool
-def commit_config(
-    enabled: bool | None = None,
-    max_minutes: int | None = None,
-    max_changes: int | None = None,
-) -> str:
-    """View or update commit tracker configuration.
-
-    Call with no arguments to view current config.
-    Pass any combination of parameters to update.
-
-    Args:
-        enabled: Turn commit tracking on or off.
-        max_minutes: Minutes before nudging to commit (default 15).
-        max_changes: Number of uncommitted changes before nudging (default 10).
-    """
-    config: CommitTrackerConfig = load_commit_config()
-
-    if enabled is None and max_minutes is None and max_changes is None:
-        return (
-            f"Commit tracker config:\n"
-            f"  enabled: {config.enabled}\n"
-            f"  max_minutes: {config.max_seconds // 60}\n"
-            f"  max_changes: {config.max_changes}\n"
-            f"  config file: {Path.home() / '.agentmemory' / 'commit_tracker.json'}"
-        )
-
-    if enabled is not None:
-        config.enabled = enabled
-    if max_minutes is not None:
-        config.max_seconds = max_minutes * 60
-    if max_changes is not None:
-        config.max_changes = max_changes
-
-    path: Path = save_commit_config(config)
-    return (
-        f"Commit tracker config updated ({path}):\n"
-        f"  enabled: {config.enabled}\n"
-        f"  max_minutes: {config.max_seconds // 60}\n"
-        f"  max_changes: {config.max_changes}"
     )
 
 

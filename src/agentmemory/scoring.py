@@ -120,12 +120,12 @@ def _length_multiplier(content: str) -> float:
     return 1.6
 
 
-def core_score(belief: Belief) -> float:
+def core_score(belief: Belief, current_time_iso: str | None = None) -> float:
     """Composite ranking score for /mem:core.
 
-    Uses type, source, and content length to differentiate beliefs
-    when confidence is flat. Pure retrieval-time, no storage changes.
-    Score range: ~0.5 (short factual fragment) to ~6.0 (long user-corrected requirement).
+    Tier 1: type * source * length (works on flat data)
+    Tier 2: decay factor from source dates (when available)
+    Score range: ~0 (old superseded fragment) to ~6+ (recent long user-corrected requirement).
     """
     if belief.superseded_by is not None or belief.valid_to is not None:
         return 0.0
@@ -133,21 +133,41 @@ def core_score(belief: Belief) -> float:
     type_w: float = _TYPE_WEIGHTS.get(belief.belief_type, 1.0)
     source_w: float = _SOURCE_WEIGHTS.get(belief.source_type, 1.0)
     length_w: float = _length_multiplier(belief.content)
-
-    # Locked beliefs get a flat boost on top
     lock_w: float = 2.0 if belief.locked else 1.0
 
-    return type_w * source_w * length_w * lock_w
+    # Tier 2: temporal decay (when timestamps have variance)
+    decay_w: float = 1.0
+    if current_time_iso is not None:
+        decay_w = decay_factor(belief, current_time_iso)
+
+    return type_w * source_w * length_w * lock_w * decay_w
+
+
+def recency_boost(belief: Belief, current_time_iso: str, half_life_hours: float = 24.0) -> float:
+    """Boost recently created beliefs so new information can surface.
+
+    Exp 63 showed new beliefs cannot penetrate existing top-k at uniform
+    confidence. This gives a multiplicative bonus to beliefs created within
+    the last half_life_hours, tapering to 1.0 for older beliefs.
+
+    Returns a value in [1.0, 2.0]: 2.0 for brand-new, 1.0 at +inf age.
+    """
+    current: datetime = _parse_iso(current_time_iso)
+    created: datetime = _parse_iso(belief.created_at)
+    age_hours: float = max(0.0, (current - created).total_seconds() / 3600.0)
+    return 1.0 + math.pow(0.5, age_hours / half_life_hours)
 
 
 def score_belief(belief: Belief, query: str, current_time_iso: str) -> float:
-    """Combined scoring using decay, lock boost, and Thompson sampling.
+    """Combined scoring: type weight * source weight * decay * recency * lock boost * Thompson.
 
     Superseded beliefs always score 0.01.
     Locked beliefs: score = lock_boost_typed * thompson_sample (always elevated).
-    Normal beliefs: score = thompson_sample * decay_factor.
+    Normal beliefs: score = type_w * source_w * recency * thompson_sample * decay.
 
-    query_terms are derived by splitting the query on whitespace.
+    Incorporates type and source weights (previously only used by core_score)
+    so that requirements/corrections rank above factual in retrieval, not just
+    in the /mem:core display. Per Exp 62-64 findings.
     """
     if belief.superseded_by is not None or belief.valid_to is not None:
         return 0.01
@@ -156,10 +176,11 @@ def score_belief(belief: Belief, query: str, current_time_iso: str) -> float:
     decay: float = decay_factor(belief, current_time_iso)
     boost: float = lock_boost_typed(belief, query_terms)
     sample: float = thompson_sample(belief.alpha, belief.beta_param)
+    type_w: float = _TYPE_WEIGHTS.get(belief.belief_type, 1.0)
+    source_w: float = _SOURCE_WEIGHTS.get(belief.source_type, 1.0)
+    recency: float = recency_boost(belief, current_time_iso)
 
     if belief.locked:
-        # Lock boost already includes the relevance premium; multiply by sample
-        # so confident locked beliefs rank higher than uncertain ones.
-        return boost * sample
+        return boost * sample * type_w
 
-    return sample * decay
+    return sample * decay * type_w * source_w * recency

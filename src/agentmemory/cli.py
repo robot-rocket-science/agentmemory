@@ -333,6 +333,7 @@ def cmd_onboard(args: argparse.Namespace) -> None:
             source=source,
             session_id=None,
             use_llm=False,
+            created_at=node.date,
         )
         aggregate.merge(turn_result)
         ingested += 1
@@ -430,9 +431,13 @@ def cmd_health(args: argparse.Namespace) -> None:
 
 def cmd_core(args: argparse.Namespace) -> None:
     """Show top N beliefs by composite core score."""
+    from datetime import datetime as dt
+    from datetime import timezone as tz
+
     from agentmemory.scoring import core_score
 
     top_n: int = args.top
+    now_iso: str = dt.now(tz.utc).isoformat()
     store: MemoryStore = _get_store()
 
     # Fetch all active beliefs and score them
@@ -464,7 +469,7 @@ def cmd_core(args: argparse.Namespace) -> None:
             created_at=str(row["created_at"]),
             updated_at=str(row["updated_at"]),
         )
-        scored.append((b, core_score(b)))
+        scored.append((b, core_score(b, now_iso)))
 
     scored.sort(key=lambda x: x[1], reverse=True)
     top: list[tuple[Belief, float]] = scored[:top_n]
