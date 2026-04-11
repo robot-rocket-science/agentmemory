@@ -795,3 +795,75 @@ Results logged to: `experiments/exp36_results/`
 5. **Statistical rigor.** Sample sizes are small (20-50 per experiment). We use non-parametric tests (Wilcoxon, permutation tests) instead of assuming normality. We report effect sizes and confidence intervals, not just p-values.
 
 6. **Blinding.** Where human judgment is involved (labeling, rating), the evaluator does not know which condition produced which result. Results are shuffled and anonymized before evaluation.
+
+---
+
+## Experiment Index (Exp 6-46)
+
+Full protocols and results are in individual files under `experiments/`. This index provides the experiment ID, question, result, and file location.
+
+| Exp | Question | Result | Files |
+|-----|----------|--------|-------|
+| 6A | Alpha-seek timeline extraction | 1,790 events, 173 decisions, 775 edges | exp6_build_timeline.py, exp6_historical_analysis.md |
+| 6B | Memory failure pattern detection | 38 overrides, 66% in 6 clusters (revised from 79%) | exp6_detect_failures.py, exp6_cluster_audit.md |
+| 6C | Before/after manual CLAUDE.md enforcement | 49% override reduction, plateau at 1.8/day | exp6_before_after.py |
+| 6D | Derive requirements from failures | REQ-019, 020, 021 added | exp6_derive_requirements.md |
+| 7 | Variable-relevance Thompson sampling | PASSES: ECE=0.053, exploration=0.250 | exp7_variable_relevance.py |
+| 8 | Temporal quality mapping | Feature count correlates with overrides (rho=+0.637) | exp8_temporal_quality.py |
+| 9 | Retrieval improvements (FTS5 baseline) | 3 query formulations = 100% coverage. MinHash alone = 31% | exp9_retrieval_improvements.py |
+| 10 | Cross-model MCP behavior | ChatGPT won't call tools proactively. Server must be model-agnostic | exp10_cross_model_mcp.md |
+| 11 | Scientific method model vs alternatives | Advantage is feedback loop, not category names | exp11_model_comparison_design.md |
+| 12 | Context compression survival | Hybrid: CLAUDE.md + status injection + compactPrompt | exp12_context_compression.md |
+| 13 | Self-referential state management | Meta-beliefs for system's own state | exp13_self_referential_state.md |
+| 14 | Acceptance tests from case studies | CS-001 to CS-004 as formal tests | exp14_acceptance_tests.md |
+| 15 | Scaling behavior (1K-10K beliefs) | Degrades at 10K; hierarchical helps (ECE 0.169->0.133) | exp15_scaling.py |
+| 16 | Granular sentence decomposition | 1,195 nodes from 173 decisions. 86% token reduction | exp16_granular_decomposition.py |
+| 17 | Requirements traceability research | DO-178C/MIL-STD-498 mapped. Regex extraction viable | exp17_traceability_research.md |
+| 18 | Query expansion research (literature) | PMI + PRF recommended. No LLM needed | exp18_query_expansion_research.md |
+| 19 | Time as graph dimension | Model 3 adopted: TEMPORAL_NEXT + content-aware decay | exp19_time_dimension.md |
+| 20 | Information bottleneck (theory) | Type-aware heuristic captures ~90% of IB benefit | exp20_information_bottleneck.md |
+| 21 | Multi-project belief isolation (design) | Single DB + project_id. Behavioral=global, domain=scoped | exp21_multi_project.md |
+| 22 | Real topology hierarchical confidence | No difference at 586 nodes. Matters at 5K+ | exp22_hierarchical_confidence.py (unused -- superseded by Exp 26) |
+| 23 | Gray code / SimHash research | Theory: SimHash on TF-IDF, 128-bit codes, brute-force Hamming | exp23_gray_code_research.md |
+| 24 | HRR prototype (actually BoW cosine) | Matched FTS5 because it was the same thing | exp24_hrr_prototype.py |
+| 25 | HRR demo (synthetic data) | Bind/unbind works. 2-hop fails due to SNR degradation | exp25_hrr_demo.py, exp25_combined_retrieval.py |
+| 26 | Real topology hierarchical confidence | No difference at 586 nodes | exp26_real_topology_hierarchical.py |
+| 27 | Epistemic schema design | Schema for REQ-023-026. Rigor tiers, provenance, velocity | exp27_epistemic_schema.md |
+| 28 | Directive detection (LLM-in-loop) | LLM solves vocab mismatch. `directive` tool with `related_concepts` | exp28_directive_detection.md |
+| 29 | Sentence vs decision retrieval | Windowed sentences win: 12/12 vs 11/12, more breadth | exp29_granularity_comparison.py |
+| 30 | Real HRR on decision-level nodes | FAILED global (over capacity). PARTIAL on focused subgraph | exp30_real_hrr_sentences.py, exp30_results.md |
+| 31 | Sentence-level HRR with typed edges | 5/5 single-hop on D195 neighborhood (DIM=2048) | exp31_sentence_hrr.py |
+| 32 | HRR autonomous edge discovery | FAILED: precision 0.001, recall 0.005 | exp32_hrr_edge_discovery.py, exp32_results.md |
+| 33 | HRR bootstrap edge proposal | PARTIAL: D097 at rank 2 via bootstrap from D174 | exp33_bootstrap_results.md |
+| 34 | Closing HRR tests | Vocabulary bridge 184x separation. Multi-hop iterative: D097 rank 1 | exp34_hrr_closing_tests.py, exp34_results.md |
+| 35 | Multi-hop improvements | Weighting + beam search don't improve recall (1/3). SNR limit fundamental | exp35_multihop_test.py, exp35_results.md |
+| 36 | Hook injection for behavioral constraints | 3 conditions tested. Condition C (per-turn injection) = 0% violation rate | exp36_results/ |
+| 37 | Control/data flow extraction (AST) | 3 layers genuinely disjoint (Jaccard 0.000-0.012). CALLS + PASSES_DATA adopted | exp37_control_data_flow.py, exp37_alpha_seek_synthesis.py |
+| 38 | Feedback loop scaling | Source-stratified priors dominate: 21x ranking quality at 50K | exp38_feedback_scaling.py |
+| 39 | Query expansion (empirical) | PMI hurts FTS5, PRF safe. 92% irreducible. 8% gap = graph traversal | exp39_query_expansion.py |
+| 40 | FTS5+HRR hybrid pipeline (end-to-end) | 100% coverage (13/13). D157 rescued via AGENT_CONSTRAINT walk | exp40_hybrid_pipeline.py |
+| 41 | Traceability graph extraction | 101 entities, 1,761 edges, 10 benign gaps remain | exp41_traceability_extraction.py |
+| 42 | IB compression (empirical) | 55% token savings, 100% retrieval preserved. Full IB not justified | exp42_ib_compression.py |
+| 43 | Multi-project isolation (empirical) | 47% classification accuracy. Pre-filter only safe option | exp43_multi_project_isolation.py |
+| 44 | Meta-cognition design | 15 triggered beliefs. FOK protocol: 50ms. 2-level cap confirmed | exp44_metacognition_design.md |
+| 45 | HRR belief prototype (sentence-level) | Decision-neighborhood partition: 100% recall. DIM=2048 sufficient | exp45_hrr_belief_prototype.py |
+| 46 | SimHash binary encoding | **NEGATIVE.** 1.04x separation. Not viable for retrieval or drift | exp46_simhash_prototype.py |
+| 47 | Baseline comparison (grep vs FTS5 vs HRR) | **GREP WINS** at 586 nodes: 92% vs 85%. HRR over capacity (18 behavioral, 306 edges). Null not rejected | exp47_baseline_comparison.py |
+| 48 | Multi-layer extraction + retrieval at scale | **ALL METHODS DEGRADED.** Grep 85%, FTS5 69%, HRR 69% at 16K nodes. Type-blind retrieval drowns belief nodes (3.6% of graph). Temporal edges provide 0 unique signal. Cross-layer edges missing. | exp48_multilayer_extraction.py |
+| 49 | Onboarding pipeline validation (parallel session) | H1 PASS: 3 cross-level edge types raised LCC from 1-12% to 69-97% | exp49_onboarding_validation.py |
+| 49b | Retrieval validation H2/H3 (parallel session) | H2 PASS: graph FTS5 87-93% vs raw FTS5. Dual-mode needed | exp49b_retrieval_validation.py |
+| 49c | Entity edges + H3 HRR retest (parallel session) | 2,734 cross-doc entity edges on jose-bully. HRR 20% added value | exp49c_entity_edges.py |
+| 49d | Precision audit + correction burden (parallel session) | 1.8% FP on sentences, 0% on commits/calls. Correction burden reframed as core metric | exp49d_precision_audit.py |
+| 50 | LLM classification prompts (parallel session) | Heuristic 30-47% on hard cases. LLM-verify (A032): 2,650 tokens, 11.5x ROI | exp50_llm_classification.py |
+| 51 | Triggered belief simulation (parallel session) | TB simulation against CS-003, CS-005, CS-020, CS-021 case studies | exp51_tb_simulation.py |
+| 52 | Type-filtered FTS5 (isolated worktree test) | Filtering to belief+sentence+heading recovers FTS5 from 69%->77% (+7.7pp). Grep unchanged at 85%. D137/D100/D157 still missing -- lexical gaps, not dilution | exp52_type_filtered_fts5.py |
+| 53 | Vocabulary gap prevalence across 5 projects | **31% of directives have vocabulary gaps.** 1,030/3,321 across alpha-seek/optimus-prime/debserver/jose-bully/code-monkey. 99.5% HRR-bridgeable. Null (gap<3%) REJECTED. HRR is essential infrastructure. | exp53_vocab_gap_prevalence.py |
+| 54 | Mutual information scoring for retrieval | **REJECTED.** PMI -12.4% MRR, NMI -4.4% vs BM25. BM25 near-ceiling (0.843). Short docs make MI no better than IDF | exp54_mutual_information_scoring.py |
+| 55 | Rate-distortion token budget allocation | **REJECTED.** 0.0% NDCG improvement at all budgets. Budget never binds at 1K nodes (~450 of 2000 tokens used). Fixed-ratio heuristic is near-optimal | exp55_rate_distortion_budget.py |
+| 56 | Conversation extraction (keyword classifier) | Keyword classifier extracts 76 beliefs from 159 sentences (48%). 91% from assistant, 9% from user. Classifier misses short user statements. Superseded by Exp 61 | exp56_conversation_extraction.py |
+| 57 | Dumb extraction + Bayesian scoring | Source priors alone (user Beta(9,1), assistant Beta(1,1)) fully separate signal from noise. Top 20 = 100% user, bottom 20 = 100% assistant. But source-only priors are too coarse | exp57_dumb_extraction.py |
+| 61 | Classification pipeline (LLM + type priors) | **ADOPTED.** Haiku classifies 381 sentences at $0.001/batch. Statement TYPE is primary signal, not source. 47% persist-worthy. Empirical prior model derived. Full replicable pipeline documented | exp61_classification_pipeline.md |
+| 62 | Minimal viable hologram | **H1 REJECTED.** No knee in coverage curve. Global scoring uncorrelated with query retrieval. Only requirement type is load-bearing (-11.1pp on removal). Full graph ceiling 86.1%. Composition works (no interference). | exp62_minimal_hologram.py |
+| 63 | Hologram profiles (type-weight) | **DIVERGENT BUT INSUFFICIENT.** Profiles produce Jaccard 1.0 between opposed postures but coverage 11-22% without FTS5. Dynamic shaping zero at scale. Serialization sub-ms. | exp63_hologram_profiles.py |
+| 64 | Pre-prompt compilation pipeline | **REJECTED.** Compiled 23.1% vs on-demand 69.2% vs random 33.1%. No cage. Compilation adds zero unique coverage. FTS5 on-demand is strictly better. Latency 22ms (fine but pointless). | exp64_preprompt_compilation.py |
+| 65 | Hologram diffing and drift detection | **DIFFING WORKS, TOP-K USELESS AT UNIFORM PRIORS.** Diff p50=17ms, zero noise floor. Corrections produce clean single-belief diffs, enter top-100 at 94.7%. But 50 new beliefs at 0.9 produce zero turnover (saturation). | exp65_hologram_diffing.py |
