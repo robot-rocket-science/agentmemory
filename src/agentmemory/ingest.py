@@ -147,10 +147,8 @@ def ingest_turn(
 
         belief_type: str = _TYPE_TO_BELIEF.get(cs.sentence_type, "factual")
 
-        # Step 6: corrections are locked automatically.
-        # Exp 62-64 showed 2,592 unlocked corrections were invisible to
-        # scoring. Corrections represent user intent to override; they
-        # should be elevated in retrieval unconditionally.
+        # Step 6: corrections are high-confidence but NOT locked.
+        # Only /mem:lock creates locked beliefs.
         is_correction: bool = cs.sentence_type == "CORRECTION"
 
         belief = store.insert_belief(
@@ -159,7 +157,7 @@ def ingest_turn(
             source_type=belief_source,
             alpha=cs.alpha,
             beta_param=cs.beta_param,
-            locked=is_correction,
+            locked=False,
             observation_id=observation.id,
             created_at=created_at,
         )
