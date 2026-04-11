@@ -429,13 +429,15 @@ def cmd_health(args: argparse.Namespace) -> None:
 
 
 def cmd_core(args: argparse.Namespace) -> None:
-    """Show top N beliefs by confidence."""
+    """Show top N beliefs by composite core score."""
+    from agentmemory.scoring import core_score
+
     top_n: int = args.top
     store: MemoryStore = _get_store()
+
+    # Fetch all active beliefs and score them
     rows: list[sqlite3.Row] = store.query(
-        "SELECT * FROM beliefs WHERE valid_to IS NULL "
-        "ORDER BY confidence DESC LIMIT ?",
-        (top_n,),
+        "SELECT * FROM beliefs WHERE valid_to IS NULL"
     )
     store.close()
 
@@ -443,11 +445,35 @@ def cmd_core(args: argparse.Namespace) -> None:
         print("No beliefs found.")
         return
 
+    # Convert rows to Belief objects for scoring
+    scored: list[tuple[Belief, float]] = []
+    for row in rows:
+        b: Belief = Belief(
+            id=str(row["id"]),
+            content_hash=str(row["content_hash"]),
+            content=str(row["content"]),
+            belief_type=str(row["belief_type"]),
+            alpha=float(str(row["alpha"])),
+            beta_param=float(str(row["beta_param"])),
+            confidence=float(str(row["confidence"])),
+            source_type=str(row["source_type"]),
+            locked=bool(row["locked"]),
+            valid_from=str(row["valid_from"]) if row["valid_from"] else None,
+            valid_to=str(row["valid_to"]) if row["valid_to"] else None,
+            superseded_by=str(row["superseded_by"]) if row["superseded_by"] else None,
+            created_at=str(row["created_at"]),
+            updated_at=str(row["updated_at"]),
+        )
+        scored.append((b, core_score(b)))
+
+    scored.sort(key=lambda x: x[1], reverse=True)
+    top: list[tuple[Belief, float]] = scored[:top_n]
+
     print(f"Top {top_n} core beliefs:")
-    for i, row in enumerate(rows, 1):
-        locked_str: str = " [LOCKED]" if row["locked"] else ""
-        print(f"  {i}. [{row['confidence']:.0%}]{locked_str} {row['content']}")
-        print(f"     type: {row['belief_type']}, source: {row['source_type']}, id: {row['id']}")
+    for i, (b, s) in enumerate(top, 1):
+        locked_str: str = " [LOCKED]" if b.locked else ""
+        print(f"  {i}. [score {s:.2f}]{locked_str} {b.content}")
+        print(f"     type: {b.belief_type}, source: {b.source_type}, id: {b.id}")
 
 
 # ---------------------------------------------------------------------------
