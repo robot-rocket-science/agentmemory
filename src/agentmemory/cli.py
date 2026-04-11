@@ -118,15 +118,29 @@ _COMMAND_DEFS: dict[str, dict[str, str]] = {
     "wonder": {
         "description": "Deep-dive research on a hypothesis, question, or topic using memory graph context.",
         "argument_hint": "A hypothesis, question, or research topic",
-        "tools": "Bash, Read, WebSearch",
-        "objective": "Gather all beliefs and associations connected to the query, then do deep research and hypothesizing.",
+        "tools": "Bash, Read, WebSearch, Agent",
+        "objective": "Gather all beliefs and associations connected to the query, then spawn parallel subagents for deep research.",
         "process": (
-            "Run: `agentmemory wonder \"$ARGUMENTS\"`\n"
-            "This will output relevant beliefs and graph context.\n"
-            "Then use that context to research the topic deeply: "
-            "form hypotheses, identify gaps, suggest experiments, "
-            "and synthesize what the memory system knows with what can be found.\n"
-            "Present findings as a structured analysis."
+            "1. Run: `agentmemory wonder \"$ARGUMENTS\"` to get belief context.\n"
+            "2. Run: `agentmemory settings` to read wonder.max_agents (default 4).\n"
+            "3. Parse the belief context output into themes or angles.\n"
+            "4. Spawn up to max_agents subagents in parallel using the Agent tool. "
+            "Each subagent gets:\n"
+            "   - The original wonder query\n"
+            "   - The full belief context from step 1\n"
+            "   - A specific research angle or theme to investigate\n"
+            "   Suggested agent assignments:\n"
+            "   - Agent 1: Search for prior art, related work, existing solutions\n"
+            "   - Agent 2: Identify gaps, contradictions, or weak spots in current beliefs\n"
+            "   - Agent 3: Generate hypotheses and propose experiments to test them\n"
+            "   - Agent 4: Synthesize findings and map connections to the existing graph\n"
+            "   Additional agents can explore domain-specific angles as needed.\n"
+            "5. Collect results from all subagents.\n"
+            "6. Present a structured analysis:\n"
+            "   - What the memory system already knows (from beliefs)\n"
+            "   - What was discovered (from research)\n"
+            "   - Gaps and open questions\n"
+            "   - Proposed next steps or experiments\n"
         ),
     },
     "settings": {
