@@ -272,6 +272,10 @@ class HRRGraph:
     def node_count(self) -> int:
         return len(self._node_vecs)
 
+    def edge_types(self) -> list[str]:
+        """Return all encoded edge types."""
+        return sorted(self._edge_type_vecs.keys())
+
     def edge_type_count(self) -> int:
         return len(self._edge_type_vecs)
 

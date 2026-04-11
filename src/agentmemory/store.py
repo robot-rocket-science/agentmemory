@@ -546,6 +546,15 @@ class MemoryStore:
 
         return result
 
+    # --- HRR graph ---
+
+    def get_all_edge_triples(self) -> list[tuple[str, str, str]]:
+        """Return all edges as (from_id, to_id, edge_type) triples for HRR encoding."""
+        rows: list[sqlite3.Row] = self._conn.execute(
+            "SELECT from_id, to_id, edge_type FROM edges"
+        ).fetchall()
+        return [(str(r["from_id"]), str(r["to_id"]), str(r["edge_type"])) for r in rows]
+
     # --- Search ---
 
     @staticmethod
