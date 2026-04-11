@@ -44,14 +44,42 @@ from agentmemory.scoring import score_belief
 from agentmemory.scanner import ScanResult, scan_project
 from agentmemory.store import MemoryStore
 
-_DEFAULT_DB_PATH: Path = Path.home() / ".agentmemory" / "memory.db"
+_AGENTMEMORY_HOME: Path = Path.home() / ".agentmemory"
 _COMMANDS_DIR: Path = Path.home() / ".claude" / "commands" / "mem"
 _PACKAGE_ROOT: Path = Path(__file__).parent.parent.parent
+_active_project: Path | None = None
+
+
+def _project_db_path(project_dir: Path) -> Path:
+    """Compute the isolated DB path for a project directory."""
+    import hashlib
+    abs_path: str = str(project_dir.resolve())
+    path_hash: str = hashlib.sha256(abs_path.encode()).hexdigest()[:12]
+    db_dir: Path = _AGENTMEMORY_HOME / "projects" / path_hash
+    db_dir.mkdir(parents=True, exist_ok=True)
+    # Breadcrumb to map hash -> project path
+    meta_path: Path = db_dir / "project.txt"
+    if not meta_path.exists():
+        meta_path.write_text(abs_path + "\n", encoding="utf-8")
+    return db_dir / "memory.db"
+
+
+def _resolve_db_path() -> Path:
+    """Resolve DB path: AGENTMEMORY_DB env > --project flag > cwd."""
+    import os
+    env_db: str | None = os.environ.get("AGENTMEMORY_DB")
+    if env_db:
+        p: Path = Path(env_db)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        return p
+    if _active_project is not None:
+        return _project_db_path(_active_project)
+    return _project_db_path(Path.cwd())
 
 
 def _get_store() -> MemoryStore:
-    _DEFAULT_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    return MemoryStore(_DEFAULT_DB_PATH)
+    db_path: Path = _resolve_db_path()
+    return MemoryStore(db_path)
 
 
 # ---------------------------------------------------------------------------
@@ -262,11 +290,11 @@ def cmd_setup(args: argparse.Namespace) -> None:
     print(f"  {json.dumps(mcp_config, indent=2)}")
 
     # Step 4: Verify DB is accessible
-    _DEFAULT_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    db_path: Path = _resolve_db_path()
     store: MemoryStore = _get_store()
     counts: dict[str, int] = store.status()
     store.close()
-    print(f"\n  Database: {_DEFAULT_DB_PATH}")
+    print(f"\n  Database: {db_path}")
     print(f"  Beliefs: {counts.get('beliefs', 0)}, Locked: {counts.get('locked', 0)}")
 
     # Step 5: Install commit tracker hook
@@ -357,6 +385,7 @@ def cmd_onboard(args: argparse.Namespace) -> None:
 
 def cmd_stats(args: argparse.Namespace) -> None:
     """Show detailed analytics."""
+    db_path: Path = _resolve_db_path()
     store: MemoryStore = _get_store()
     counts: dict[str, int] = store.status()
 
@@ -376,7 +405,7 @@ def cmd_stats(args: argparse.Namespace) -> None:
     )
     store.close()
 
-    print("Memory system stats:")
+    print(f"Memory system stats ({db_path}):")
     print(f"  Observations: {counts.get('observations', 0)}")
     print(f"  Beliefs: {counts.get('beliefs', 0)}")
     print(f"  Locked: {counts.get('locked', 0)}")
@@ -851,6 +880,10 @@ def main() -> None:
         prog="agentmemory",
         description="Persistent memory for AI coding agents",
     )
+    parser.add_argument(
+        "--project", type=str, default=None,
+        help="Project directory (default: cwd). Determines which isolated DB to use.",
+    )
     subparsers = parser.add_subparsers(dest="command")
 
     # setup
@@ -970,6 +1003,12 @@ def main() -> None:
     # help (just use argparse default)
 
     args: argparse.Namespace = parser.parse_args()
+
+    # Set project isolation before dispatching
+    global _active_project
+    if args.project is not None:
+        _active_project = Path(args.project).resolve()
+
     if not hasattr(args, "func"):
         parser.print_help()
         sys.exit(1)

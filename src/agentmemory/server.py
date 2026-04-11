@@ -29,15 +29,34 @@ from agentmemory.store import MemoryStore
 
 _store: MemoryStore | None = None
 
-_DEFAULT_DB_PATH: Path = Path.home() / ".agentmemory" / "memory.db"
+
+def _resolve_server_db() -> Path:
+    """Resolve DB path for the MCP server: AGENTMEMORY_DB env > cwd-based isolation."""
+    import hashlib
+    import os
+    env_db: str | None = os.environ.get("AGENTMEMORY_DB")
+    if env_db:
+        p: Path = Path(env_db)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        return p
+    # Per-project: hash of cwd
+    home: Path = Path.home() / ".agentmemory"
+    abs_path: str = str(Path.cwd().resolve())
+    path_hash: str = hashlib.sha256(abs_path.encode()).hexdigest()[:12]
+    db_dir: Path = home / "projects" / path_hash
+    db_dir.mkdir(parents=True, exist_ok=True)
+    meta_path: Path = db_dir / "project.txt"
+    if not meta_path.exists():
+        meta_path.write_text(abs_path + "\n", encoding="utf-8")
+    return db_dir / "memory.db"
 
 
 def _get_store() -> MemoryStore:
     """Return the module-level MemoryStore, creating it on first call."""
     global _store
     if _store is None:
-        _DEFAULT_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        _store = MemoryStore(_DEFAULT_DB_PATH)
+        db_path: Path = _resolve_server_db()
+        _store = MemoryStore(db_path)
     return _store
 
 
