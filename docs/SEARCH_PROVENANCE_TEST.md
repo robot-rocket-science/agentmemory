@@ -66,21 +66,66 @@ Test whether mem:search can reconstruct a project's self-provenance -- its ident
 
 **Verdict:** Given all three project names in the query, the system returned detailed evidence of their relationship from commit messages, decision docs, and CLAUDE.md entries. This is retrieval of known relationships, not autonomous discovery -- the user provided the project names, and the system found confirming evidence. Still, it surfaced thorough, actionable detail (D090, migration steps, infrastructure) that would otherwise require reading hundreds of docs.
 
+## Test 5: Blind provenance -- "where did this codebase come from"
+
+**Query:** `where did this codebase come from`
+
+**Result:** 25 beliefs. All noise. FTS5 matched "come from" broadly -- returned trading results ("the edge comes from W", "growth comes from strategy winnings"). Zero lineage information.
+
+**Verdict:** Abstract natural language questions fail completely. FTS5 keyword matching has no semantic understanding.
+
+## Test 6: Blind provenance -- "original source code migrated copied modules dependencies"
+
+**Query:** `original source code migrated copied modules dependencies`
+
+**Result:** 27 beliefs. Hit the jackpot without naming any project:
+- #1: "Migrated all optimus-prime source modules into alpha-seek as real directories (D090)"
+- Full D090 story: 5 modules (backtest, data, signal, portfolio, stats), 61 files, ~15.6K LOC
+- Decision rationale, task ID (T03a), infrastructure impact
+- "D090 eliminated an entire class of build/deploy bugs"
+
+**Verdict:** Technical vocabulary works. "migrated", "copied", "modules" are the actual terms used in the project's commit messages and docs. The system found the lineage without being given project names.
+
+## Test 7: Blind provenance -- "predecessor parent project forked inherited symlinks shared code"
+
+**Query:** `predecessor parent project forked inherited symlinks shared code`
+
+**Result:** 30 beliefs. Discovered the full lineage chain without naming any project:
+- "A prerequisite bug was fixed: hardcoded sys.path to predecessor project alpha-seek" -- names the predecessor
+- "fixed hardcoded sys.path to predecessor project" -- confirms lineage
+- "If you need code from optimus-prime, copy it into alpha-seek and adapt it -- do not create symlinks" -- surfaces the parent's parent
+- "13 decisions recorded (D001, D021-D029 plus inherited D002-D020)" -- decision inheritance
+- "sys.path hardcoded to absolute paths is a silent failure mode after project renames"
+
+**Verdict:** Relationship-pattern queries ("predecessor", "inherited", "forked") successfully discover lineage without project names. The system found **optimus-prime -> alpha-seek -> alpha-seek-memtest** from structural vocabulary alone.
+
+## Performance
+
+All searches against 65k belief corpus:
+- **Tokens returned:** 392-683 per query (within 2000 token budget)
+- **Pure search time:** 16.5ms
+- **CLI wall time:** ~680ms (includes Python startup)
+
+---
+
 ## Analysis
 
 ### What works
-- **Domain-specific keyword search**: queries with project-specific terms (alpha-seek, optimus-prime, trading, options) return highly relevant results
-- **Provenance retrieval**: given project names, the system finds detailed evidence of relationships from commit messages, decision records, and infrastructure docs. It does not discover lineage autonomously -- the user must supply the project names.
+- **Technical vocabulary queries**: "migrated", "copied", "modules", "predecessor", "inherited" find exactly the right beliefs because those are the actual terms used in commits and docs
+- **Provenance discovery**: the system CAN discover project lineage without being given project names, if the query uses structural/relationship vocabulary (tests 6, 7)
+- **Provenance retrieval**: given project names explicitly, returns thorough detail fast (test 4: 27 beliefs, 610 tokens, 16.5ms)
 - **Operational knowledge**: file paths, deployment configs, infrastructure details are well-captured
 - **Decision traceability**: D090, D002, D099 and other decision IDs surface as anchor points
 
 ### What doesn't work
-- **Abstract questions**: "what is this project about" returns structural markers, not substance
+- **Abstract natural language**: "where did this codebase come from" returns noise (test 5). FTS5 has no semantic understanding.
+- **Vague questions**: "what is this project about" returns structural markers, not substance (test 1)
 - **Synthesis**: the system returns fragments, not a coherent narrative -- synthesis requires an LLM layer on top (like /mem:wonder)
-- **FTS5 noise**: common words ("project", "about", "this") match too broadly
+- **FTS5 common word pollution**: "come", "from", "about", "this" match too broadly
 
 ### Implications for product
 1. **Search is a retrieval tool, not an answer tool.** It surfaces relevant fragments. Synthesis is a separate step.
-2. **Project onboarding captures provenance implicitly.** Git commit messages and doc sentences contain lineage information, but the user must know what to search for. The system retrieves evidence of relationships; it does not discover them.
-3. **Domain vocabulary is the key to good search.** Users who know their project's terms get good results. New users who don't know the vocabulary need a different entry point (like /mem:core or /mem:wonder).
+2. **Technical vocabulary is the key to good search.** Queries using the same terms that appear in commits and docs get excellent results. Abstract natural language fails.
+3. **Project onboarding captures provenance implicitly.** Lineage can be discovered from structural vocabulary alone ("predecessor", "migrated", "inherited") -- but not from vague questions.
 4. **Decision IDs (D###) are powerful anchors.** They connect scattered beliefs about the same topic across different documents and time periods.
+5. **The gap between tests 5 and 6 is the semantic gap.** "where did this codebase come from" and "original source code migrated copied modules" ask the same question, but only the second works. Embedding-based search would close this gap.
