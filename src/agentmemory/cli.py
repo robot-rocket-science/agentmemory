@@ -1,7 +1,7 @@
 """CLI entry point for agentmemory.
 
 Provides direct commands that execute without LLM involvement:
-  agentmemory setup              -- install commands and MCP config
+  agentmemory setup              -- install commands, MCP config, commit hook
   agentmemory onboard <path>     -- scan and ingest a project
   agentmemory stats              -- detailed analytics
   agentmemory health             -- diagnostics
@@ -10,6 +10,8 @@ Provides direct commands that execute without LLM involvement:
   agentmemory locked             -- show locked beliefs
   agentmemory remember <text>    -- store a new belief
   agentmemory lock <text>        -- create a locked belief
+  agentmemory commit-check       -- check time/changes since last commit
+  agentmemory commit-config      -- view or update commit tracker settings
   agentmemory help               -- command reference
 """
 from __future__ import annotations
@@ -20,7 +22,20 @@ import shutil
 import sqlite3
 import sys
 from pathlib import Path
+from typing import Any, cast
 
+from agentmemory.config import (
+    load_config as load_mem_config,
+    save_config as save_mem_config,
+)
+from agentmemory.commit_tracker import (
+    CommitCheckResult,
+    CommitTrackerConfig,
+    check_commit_status,
+    format_status,
+    load_config as load_commit_config,
+    save_config as save_commit_config,
+)
 from agentmemory.ingest import IngestResult, ingest_turn
 from agentmemory.models import Belief
 from agentmemory.retrieval import RetrievalResult, retrieve
@@ -112,6 +127,18 @@ _COMMAND_DEFS: dict[str, dict[str, str]] = {
             "Present findings as a structured analysis."
         ),
     },
+    "settings": {
+        "description": "View or update agentmemory settings.",
+        "argument_hint": "Optional: --key value pairs to update",
+        "tools": "Bash, AskUserQuestion",
+        "objective": "View or interactively configure agentmemory settings.",
+        "process": (
+            "Run: `agentmemory settings`\n"
+            "Display the current settings.\n"
+            "If the user wants to change something, use AskUserQuestion to present options, "
+            "then run `agentmemory settings --<key> <value>` to update."
+        ),
+    },
     "disable": {
         "description": "Disable agentmemory for the rest of this session.",
         "argument_hint": "",
@@ -149,6 +176,7 @@ _COMMAND_DEFS: dict[str, dict[str, str]] = {
             "  /mem:new-belief <text>  Store a new belief\n"
             "  /mem:lock <text>        Create a locked belief\n"
             "  /mem:wonder <topic>     Deep research from graph context\n"
+            "  /mem:settings           View or update settings\n"
             "  /mem:disable            Stop agentmemory for this session\n"
             "  /mem:enable             Resume agentmemory\n"
             "  /mem:help               This reference\n"
@@ -217,6 +245,9 @@ def cmd_setup(args: argparse.Namespace) -> None:
     store.close()
     print(f"\n  Database: {_DEFAULT_DB_PATH}")
     print(f"  Beliefs: {counts.get('beliefs', 0)}, Locked: {counts.get('locked', 0)}")
+
+    # Step 5: Install commit tracker hook
+    _install_commit_hook(agentmemory_bin)
 
     print(f"\nDone. Restart Claude Code, then run /mem:onboard . on your project.")
 
@@ -530,6 +561,176 @@ def cmd_wonder(args: argparse.Namespace) -> None:
 
 
 # ---------------------------------------------------------------------------
+# settings
+# ---------------------------------------------------------------------------
+
+
+def cmd_settings(args: argparse.Namespace) -> None:
+    """View or update agentmemory settings."""
+    config: dict[str, Any] = load_mem_config()
+
+    changed: bool = False
+    if args.wonder_max_agents is not None:
+        wonder_section: dict[str, Any] = cast("dict[str, Any]", config.get("wonder", {}))
+        wonder_section["max_agents"] = args.wonder_max_agents
+        config["wonder"] = wonder_section
+        changed = True
+    if args.core_default_top is not None:
+        core_section: dict[str, Any] = cast("dict[str, Any]", config.get("core", {}))
+        core_section["default_top"] = args.core_default_top
+        config["core"] = core_section
+        changed = True
+    if args.locked_max_cap is not None:
+        locked_section: dict[str, Any] = cast("dict[str, Any]", config.get("locked", {}))
+        locked_section["max_cap"] = args.locked_max_cap
+        config["locked"] = locked_section
+        changed = True
+    if args.locked_warn_at is not None:
+        locked_section2: dict[str, Any] = cast("dict[str, Any]", config.get("locked", {}))
+        locked_section2["warn_at"] = args.locked_warn_at
+        config["locked"] = locked_section2
+        changed = True
+
+    if changed:
+        cfg_path: Path = save_mem_config(config)
+        print(f"Settings updated ({cfg_path}):")
+    else:
+        print("agentmemory settings:")
+
+    w: dict[str, Any] = cast("dict[str, Any]", config.get("wonder", {}))
+    c: dict[str, Any] = cast("dict[str, Any]", config.get("core", {}))
+    lk: dict[str, Any] = cast("dict[str, Any]", config.get("locked", {}))
+
+    print(f"  wonder.max_agents:  {w.get('max_agents', 4)}")
+    print(f"  core.default_top:   {c.get('default_top', 10)}")
+    print(f"  locked.max_cap:     {lk.get('max_cap', 100)}")
+    print(f"  locked.warn_at:     {lk.get('warn_at', 80)}")
+
+
+# ---------------------------------------------------------------------------
+# commit-check
+# ---------------------------------------------------------------------------
+
+
+def cmd_commit_check(args: argparse.Namespace) -> None:
+    """Check time since last commit and uncommitted changes.
+
+    Prints a nudge if thresholds exceeded, or a quiet status if not.
+    Designed for use as a Claude Code hook target.
+    Exit code is always 0 so hooks never block.
+    """
+    project_dir: Path = Path(args.project_dir).expanduser().resolve()
+    result: CommitCheckResult = check_commit_status(project_dir)
+    output: str = format_status(result)
+    if output:
+        print(output)
+
+
+# ---------------------------------------------------------------------------
+# commit-config
+# ---------------------------------------------------------------------------
+
+
+def cmd_commit_config(args: argparse.Namespace) -> None:
+    """View or update commit tracker settings."""
+    config: CommitTrackerConfig = load_commit_config()
+
+    changed: bool = False
+    if args.enable:
+        config.enabled = True
+        changed = True
+    if args.disable:
+        config.enabled = False
+        changed = True
+    if args.max_minutes is not None:
+        config.max_seconds = args.max_minutes * 60
+        changed = True
+    if args.max_changes is not None:
+        config.max_changes = args.max_changes
+        changed = True
+
+    if changed:
+        path: Path = save_commit_config(config)
+        print(f"Config updated: {path}")
+
+    print("Commit tracker config:")
+    print(f"  enabled: {config.enabled}")
+    print(f"  max_minutes: {config.max_seconds // 60}")
+    print(f"  max_changes: {config.max_changes}")
+
+
+# ---------------------------------------------------------------------------
+# hook installer
+# ---------------------------------------------------------------------------
+
+_HOOK_MATCHER: str = "agentmemory commit-check"
+
+_SETTINGS_PATH: Path = Path.home() / ".claude" / "settings.json"
+
+
+def _install_commit_hook(agentmemory_bin: str | None) -> None:
+    """Add a PreToolUse hook to Claude Code settings.json.
+
+    The hook calls `agentmemory commit-check` before each tool use.
+    If the hook already exists, it is left as-is. Idempotent.
+    """
+    cmd: str = "agentmemory" if agentmemory_bin else "uv run agentmemory"
+
+    hook_entry: dict[str, object] = {
+        "hooks": {
+            "PreToolUse": [
+                {
+                    "type": "command",
+                    "command": f"{cmd} commit-check",
+                }
+            ]
+        }
+    }
+
+    if not _SETTINGS_PATH.exists():
+        _SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
+        _SETTINGS_PATH.write_text(json.dumps(hook_entry, indent=2) + "\n")
+        print(f"  Installed commit tracker hook in {_SETTINGS_PATH}")
+        return
+
+    try:
+        settings: dict[str, Any] = json.loads(_SETTINGS_PATH.read_text())
+    except (json.JSONDecodeError, ValueError):
+        print(
+            f"  Warning: could not parse {_SETTINGS_PATH}, skipping hook install",
+            file=sys.stderr,
+        )
+        return
+
+    hooks: dict[str, Any] = cast(
+        dict[str, Any],
+        settings.get("hooks") if isinstance(settings.get("hooks"), dict) else {},
+    )
+
+    pre_tool: list[Any] = cast(
+        list[Any],
+        hooks.get("PreToolUse") if isinstance(hooks.get("PreToolUse"), list) else [],
+    )
+
+    # Check if already installed
+    for entry in pre_tool:
+        if isinstance(entry, dict):
+            cmd_val: str = str(cast(dict[str, Any], entry).get("command", ""))
+            if _HOOK_MATCHER in cmd_val:
+                print("  Commit tracker hook already installed")
+                return
+
+    pre_tool.append({
+        "type": "command",
+        "command": f"{cmd} commit-check",
+    })
+    hooks["PreToolUse"] = pre_tool
+    settings["hooks"] = hooks
+    _SETTINGS_PATH.write_text(json.dumps(settings, indent=2) + "\n")
+    print(f"  Installed commit tracker hook in {_SETTINGS_PATH}")
+
+
+# ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
 
@@ -607,6 +808,45 @@ def main() -> None:
     )
     p_wonder.add_argument("query", nargs="+", help="Research topic or question")
     p_wonder.set_defaults(func=cmd_wonder)
+
+    # settings
+    p_settings: argparse.ArgumentParser = subparsers.add_parser(
+        "settings", help="View or update agentmemory settings"
+    )
+    p_settings.add_argument("--wonder-max-agents", type=int, default=None,
+                            help="Max subagents for /mem:wonder (default: 4)")
+    p_settings.add_argument("--core-default-top", type=int, default=None,
+                            help="Default N for /mem:core (default: 10)")
+    p_settings.add_argument("--locked-max-cap", type=int, default=None,
+                            help="Max locked beliefs in retrieve (default: 100)")
+    p_settings.add_argument("--locked-warn-at", type=int, default=None,
+                            help="Warn when locked beliefs exceed this (default: 80)")
+    p_settings.set_defaults(func=cmd_settings)
+
+    # commit-check
+    p_commit_check: argparse.ArgumentParser = subparsers.add_parser(
+        "commit-check", help="Check time/changes since last commit"
+    )
+    p_commit_check.add_argument(
+        "--project-dir", default=".", help="Git repo to check (default: cwd)"
+    )
+    p_commit_check.set_defaults(func=cmd_commit_check)
+
+    # commit-config
+    p_commit_config: argparse.ArgumentParser = subparsers.add_parser(
+        "commit-config", help="View or update commit tracker settings"
+    )
+    p_commit_config.add_argument("--enable", action="store_true", help="Enable tracker")
+    p_commit_config.add_argument("--disable", action="store_true", help="Disable tracker")
+    p_commit_config.add_argument(
+        "--max-minutes", type=int, default=None,
+        help="Minutes before nudge (default: 15)",
+    )
+    p_commit_config.add_argument(
+        "--max-changes", type=int, default=None,
+        help="Uncommitted changes before nudge (default: 10)",
+    )
+    p_commit_config.set_defaults(func=cmd_commit_config)
 
     # help (just use argparse default)
 
