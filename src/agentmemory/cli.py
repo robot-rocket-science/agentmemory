@@ -92,56 +92,56 @@ _COMMAND_DEFS: dict[str, dict[str, str]] = {
         "argument_hint": "Path to project directory (e.g. . or ~/projects/myapp)",
         "tools": "Bash",
         "objective": "Onboard a project into agentmemory by scanning its directory.",
-        "process": "Run: `uv run agentmemoryonboard $ARGUMENTS`\nDisplay the output. Do not add commentary.",
+        "process": "Run: `uv run agentmemory onboard $ARGUMENTS`\nDisplay the output. Do not add commentary.",
     },
     "stats": {
         "description": "Show detailed agentmemory analytics: confidence distribution, beliefs by type, age.",
         "argument_hint": "",
         "tools": "Bash",
         "objective": "Show detailed memory system analytics.",
-        "process": "Run: `uv run agentmemorystats`\nDisplay the output. Do not add commentary.",
+        "process": "Run: `uv run agentmemory stats`\nDisplay the output. Do not add commentary.",
     },
     "health": {
         "description": "Run agentmemory diagnostics.",
         "argument_hint": "",
         "tools": "Bash",
         "objective": "Run memory system diagnostics.",
-        "process": "Run: `uv run agentmemoryhealth`\nDisplay the output. Do not add commentary.",
+        "process": "Run: `uv run agentmemory health`\nDisplay the output. Do not add commentary.",
     },
     "core": {
         "description": "Show the top N highest-confidence beliefs.",
         "argument_hint": "Optional: number of beliefs to show (default 10)",
         "tools": "Bash",
         "objective": "Show the most important beliefs the system holds.",
-        "process": "Run: `uv run agentmemorycore --top ${ARGUMENTS:-10}`\nDisplay the output. Do not add commentary.",
+        "process": "Run: `uv run agentmemory core --top ${ARGUMENTS:-10}`\nDisplay the output. Do not add commentary.",
     },
     "search": {
         "description": "Search agentmemory beliefs for a query.",
         "argument_hint": "Search query",
         "tools": "Bash",
         "objective": "Search memory for relevant beliefs.",
-        "process": "Run: `uv run agentmemorysearch $ARGUMENTS`\nDisplay the output. Do not add commentary.",
+        "process": "Run: `uv run agentmemory search $ARGUMENTS`\nDisplay the output. Do not add commentary.",
     },
     "locked": {
         "description": "Show all locked beliefs (non-negotiable constraints).",
         "argument_hint": "",
         "tools": "Bash",
         "objective": "Show all locked beliefs.",
-        "process": "Run: `uv run agentmemorylocked`\nDisplay the output. Do not add commentary.",
+        "process": "Run: `uv run agentmemory locked`\nDisplay the output. Do not add commentary.",
     },
     "new-belief": {
         "description": "Store a new belief in agentmemory.",
         "argument_hint": "The belief text to store",
         "tools": "Bash",
         "objective": "Store a new belief.",
-        "process": "Run: `uv run agentmemoryremember \"$ARGUMENTS\"`\nDisplay the output. Do not add commentary.",
+        "process": "Run: `uv run agentmemory remember \"$ARGUMENTS\"`\nDisplay the output. Do not add commentary.",
     },
     "lock": {
         "description": "Create a locked belief (non-negotiable constraint).",
         "argument_hint": "The constraint text to lock",
         "tools": "Bash",
         "objective": "Create a locked belief.",
-        "process": "Run: `uv run agentmemorylock \"$ARGUMENTS\"`\nDisplay the output. Do not add commentary.",
+        "process": "Run: `uv run agentmemory lock \"$ARGUMENTS\"`\nDisplay the output. Do not add commentary.",
     },
     "wonder": {
         "description": "Deep-dive research on a hypothesis, question, or topic using memory graph context.",
@@ -149,8 +149,8 @@ _COMMAND_DEFS: dict[str, dict[str, str]] = {
         "tools": "Bash, Read, WebSearch, Agent",
         "objective": "Gather all beliefs and associations connected to the query, then spawn parallel subagents for deep research.",
         "process": (
-            "1. Run: `uv run agentmemorywonder \"$ARGUMENTS\"` to get belief context.\n"
-            "2. Run: `uv run agentmemorysettings` to read wonder.max_agents (default 4).\n"
+            "1. Run: `uv run agentmemory wonder \"$ARGUMENTS\"` to get belief context.\n"
+            "2. Run: `uv run agentmemory settings` to read wonder.max_agents (default 4).\n"
             "3. Parse the belief context output into themes or angles.\n"
             "4. Spawn up to max_agents subagents in parallel using the Agent tool. "
             "Each subagent gets:\n"
@@ -177,7 +177,7 @@ _COMMAND_DEFS: dict[str, dict[str, str]] = {
         "tools": "Bash, AskUserQuestion",
         "objective": "View or interactively configure agentmemory settings.",
         "process": (
-            "Run: `uv run agentmemorysettings`\n"
+            "Run: `uv run agentmemory settings`\n"
             "Display the current settings.\n"
             "If the user wants to change something, use AskUserQuestion to present options, "
             "then run `agentmemory settings --<key> <value>` to update."
@@ -199,7 +199,7 @@ _COMMAND_DEFS: dict[str, dict[str, str]] = {
         "argument_hint": "Optional: --count N (default 5)",
         "tools": "Bash",
         "objective": "Demote the least-relevant locked beliefs.",
-        "process": "Run: `uv run agentmemorydemote --count ${ARGUMENTS:-5}`\nDisplay the output. Do not add commentary.",
+        "process": "Run: `uv run agentmemory demote --count ${ARGUMENTS:-5}`\nDisplay the output. Do not add commentary.",
     },
     "enable": {
         "description": "Re-enable agentmemory after /mem:disable.",
@@ -268,26 +268,33 @@ def cmd_setup(args: argparse.Namespace) -> None:
         cmd_path.write_text(_render_command_md(name, defn))
     print(f"  Created {len(_COMMAND_DEFS)} commands in {_COMMANDS_DIR}")
 
-    # Step 2: Ensure agentmemory CLI is accessible
+    # Step 2: Clean up old skill-based commands (legacy)
+    old_skills_dir: Path = Path.home() / ".claude" / "skills"
+    old_prefixes: list[str] = [
+        "mem-correct", "mem-ingest", "mem-locked", "mem-observe",
+        "mem-onboard", "mem-remember", "mem-search", "mem-status",
+    ]
+    cleaned: int = 0
+    for prefix in old_prefixes:
+        old_path: Path = old_skills_dir / prefix
+        if old_path.is_dir():
+            shutil.rmtree(old_path)
+            cleaned += 1
+    # Also clean old project-level commands
+    old_project_cmds: Path = Path.cwd() / ".claude" / "commands"
+    for old_file in ["onboard.md", "mem-status.md", "mem-search.md", "mem-locked.md"]:
+        old_cmd: Path = old_project_cmds / old_file
+        if old_cmd.exists():
+            old_cmd.unlink()
+            cleaned += 1
+    if cleaned > 0:
+        print(f"  Cleaned {cleaned} legacy skill/command files")
+
+    # Step 3: Ensure agentmemory CLI is accessible
     agentmemory_bin: str | None = shutil.which("agentmemory")
     if agentmemory_bin is None:
         print("  Warning: 'agentmemory' not found on PATH.", file=sys.stderr)
-        print("  Commands will try 'uv run agentmemory' as fallback.", file=sys.stderr)
-
-    # Step 3: Write MCP config hint
-    mcp_config: dict[str, object] = {
-        "mcpServers": {
-            "agentmemory": {
-                "type": "stdio",
-                "command": "agentmemory" if agentmemory_bin else "uv",
-                "args": ["mcp"] if agentmemory_bin else [
-                    "tool", "run", "agentmemory", "mcp",
-                ],
-            }
-        }
-    }
-    print(f"\n  MCP server config (add to your project's .mcp.json):")
-    print(f"  {json.dumps(mcp_config, indent=2)}")
+        print("  Commands will use 'uv run agentmemory' as fallback.", file=sys.stderr)
 
     # Step 4: Verify DB is accessible
     db_path: Path = _resolve_db_path()
@@ -299,6 +306,20 @@ def cmd_setup(args: argparse.Namespace) -> None:
 
     # Step 5: Install commit tracker hook
     _install_commit_hook(agentmemory_bin)
+
+    # Step 6: Smoke test
+    print("\n  Smoke test...")
+    import subprocess
+    smoke: subprocess.CompletedProcess[str] = subprocess.run(
+        ["uv", "run", "agentmemory", "stats"],
+        capture_output=True, text=True, timeout=10,
+    )
+    if smoke.returncode == 0:
+        print("  OK: CLI works")
+    else:
+        print(f"  FAIL: agentmemory stats returned exit code {smoke.returncode}", file=sys.stderr)
+        if smoke.stderr:
+            print(f"  {smoke.stderr[:200]}", file=sys.stderr)
 
     print(f"\nDone. Restart Claude Code, then run /mem:onboard . on your project.")
 
@@ -871,6 +892,43 @@ def _install_commit_hook(agentmemory_bin: str | None) -> None:
 
 
 # ---------------------------------------------------------------------------
+# mcp
+# ---------------------------------------------------------------------------
+
+
+def cmd_mcp(args: argparse.Namespace) -> None:
+    """Start the MCP server (stdio transport)."""
+    from agentmemory.server import mcp
+    mcp.run()
+
+
+# ---------------------------------------------------------------------------
+# uninstall
+# ---------------------------------------------------------------------------
+
+
+def cmd_uninstall(args: argparse.Namespace) -> None:
+    """Remove agentmemory commands and config."""
+    print("Uninstalling agentmemory...")
+
+    # Remove command .md files
+    if _COMMANDS_DIR.is_dir():
+        shutil.rmtree(_COMMANDS_DIR)
+        print(f"  Removed {_COMMANDS_DIR}")
+
+    # Remove old skills
+    old_skills_dir: Path = Path.home() / ".claude" / "skills"
+    for prefix in ["mem-correct", "mem-ingest", "mem-locked", "mem-observe",
+                    "mem-onboard", "mem-remember", "mem-search", "mem-status"]:
+        old_path: Path = old_skills_dir / prefix
+        if old_path.is_dir():
+            shutil.rmtree(old_path)
+
+    print("  Removed legacy skills")
+    print("\nDone. Data is preserved at ~/.agentmemory/. To delete data: rm -rf ~/.agentmemory/")
+
+
+# ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
 
@@ -1000,7 +1058,17 @@ def main() -> None:
     )
     p_commit_config.set_defaults(func=cmd_commit_config)
 
-    # help (just use argparse default)
+    # mcp (start MCP server)
+    p_mcp: argparse.ArgumentParser = subparsers.add_parser(
+        "mcp", help="Start the MCP server (stdio transport)"
+    )
+    p_mcp.set_defaults(func=cmd_mcp)
+
+    # uninstall
+    p_uninstall: argparse.ArgumentParser = subparsers.add_parser(
+        "uninstall", help="Remove agentmemory commands and config"
+    )
+    p_uninstall.set_defaults(func=cmd_uninstall)
 
     args: argparse.Namespace = parser.parse_args()
 
