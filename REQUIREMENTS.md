@@ -134,6 +134,8 @@ Each requirement has:
 
 **Acceptance threshold:** Precision@15 >= 0.50 (hybrid method). If hybrid doesn't reach 0.50, the best-performing method must.
 
+**Implementation note:** Graph edge weights should be derived from endpoint belief confidence (formerly REQ-030, folded in). Weighted traversal ensures high-confidence citations rank above speculative ones.
+
 **Plan trace:** Phase 2 (retrieval pipeline)
 **Experiment trace:** Experiment 3
 **Status:** Not started
@@ -167,6 +169,8 @@ Each requirement has:
 **Verification method:** Experiment 2 (Bayesian calibration simulation) for initial validation. Phase 5 calibration test against real usage data for production validation.
 
 **Acceptance threshold:** Expected Calibration Error (ECE) < 0.10 in simulation. ECE < 0.15 in production validation (real data is noisier).
+
+**Implementation note:** Calibrated confidence propagates through graph edges via weighted traversal (formerly REQ-030, folded in). Path scoring uses endpoint confidence as edge weight, so calibration quality directly affects multi-hop retrieval quality.
 
 **Plan trace:** Phase 3 (Bayesian updating), Phase 5 (calibration test)
 **Experiment trace:** Experiment 2, 2b, 2c
@@ -234,9 +238,11 @@ Each requirement has:
 
 **Verification method:** Code review + automated test. Attempt UPDATE and DELETE on observations table. Both must fail or be blocked at the application layer.
 
-**Acceptance threshold:** No code path exists that modifies or deletes an observation record.
+**Acceptance threshold:** No code path exists that modifies or deletes an observation record -- except the REQ-028 purge paths, which are the sole authorized exceptions.
 
-**Plan trace:** Phase 2 (schema invariants)
+**Amendment (REQ-028):** The purge tool (REQ-028) creates a controlled exception to observation immutability. See REQ-028 for full specification. No automated process may invoke either purge path.
+
+**Plan trace:** Phase 2 (schema invariants), amended by Phase TBD (purge tool)
 **Experiment trace:** Unit tests
 **Status:** Not started
 **Evidence:** --
@@ -319,9 +325,10 @@ The correction creates a belief with source_type = user_corrected (highest Bayes
 **Acceptance threshold:** >= 90% of second-and-subsequent corrections prevented across any LLM backend.
 
 **Plan trace:** Phase 3 (feedback loop, belief promotion)
-**Experiment trace:** Exp 6 Phase D
+**Experiment trace:** Experiment 6 (override detection and clustering), Experiment 1 (correction detection V2 at 92%)
+**Case study trace:** CS-002 (premature implementation push -- 3+ corrections on same topic), CS-004 (context drift within session), CS-020 (ignoring task ID present in instruction)
 **Status:** Not started
-**Evidence:** Exp 6: 30/38 overrides (79%) cluster into 6 topics. Auto-promotion after override #2 would have prevented most of overrides #3-13.
+**Evidence:** Exp 6: 30/38 overrides (79%) cluster into 6 topics. Auto-promotion after override #2 would have prevented most of overrides #3-13. Exp 1 V2: correction detection at 92% without LLM.
 
 ### REQ-020: Locked Beliefs
 
@@ -498,9 +505,96 @@ The memory system CANNOT guarantee (not under our control):
 - Tier 6: Track compliance rate. If below 95%, the directive injection format needs revision (stronger wording, different position in context, etc.)
 
 **Plan trace:** Phase 1 (storage, persistence), Phase 3 (detection), Phase 4 (MCP enforcement, hooks)
-**Experiment trace:** CS-002, CS-004 acceptance tests, alpha-seek override replay
+**Experiment trace:** Experiment 6 (override detection/clustering), Experiment 1 (correction detection V2 at 92%), Experiment 36 (hook injection for behavioral constraints), Experiment 40 (hybrid FTS5+HRR pipeline recovers behavioral beliefs end-to-end)
+**Case study trace:** CS-002 (3+ corrections on same directive), CS-004 (directive lost to context drift), CS-020 (instruction-embedded ID ignored)
+**Status:** Not started (component evidence exists; end-to-end integration test requires implementation)
+**Evidence:** Exp 6: 30/38 overrides (66%) are repeated directives. Exp 1 V2: 92% correction detection without LLM. Exp 36: hook injection enforces behavioral constraints. Exp 40: hybrid pipeline achieves 100% coverage including vocabulary-gap beliefs (D157 rescued via HRR walk).
+
+---
+
+## R14: User-Controlled Erasure
+
+### REQ-028: Purge Tool
+
+**Requirement:** The system must provide a CLI tool that allows the user to search for and delete memory content. Two deletion modes:
+
+**Mode A -- Tombstone (default):** Overwrites observation/belief content with `[REDACTED]`. The row, timestamps, and structural edges are preserved. Beliefs derived from tombstoned observations are flagged with `evidence_status: redacted`. The provenance chain survives structurally but the content is irrecoverable.
+
+**Mode B -- Hard delete (requires extra confirmation):** Deletes the observation row and cascades: all beliefs whose sole evidence traces to the deleted observation are also deleted. Edges referencing deleted nodes are removed. This breaks provenance chains. The system warns the user exactly what will be deleted (node count, edge count, affected beliefs) and requires explicit confirmation before executing.
+
+**Orphaned subgraph handling is a design consideration, not a hard requirement.** After a hard delete, beliefs that lose their only evidence become orphans. Options include: (a) delete them in the cascade, (b) flag them as `evidence_lost` and let the user decide, (c) keep them as ungrounded beliefs with reduced confidence. The choice affects graph integrity but does not block the privacy requirement. Privacy and security are the hard requirements; graph cleanliness is secondary.
+
+**CLI interface:**
+- `purge search <query>` -- searches observations and beliefs matching the query, displays results with IDs. Claude-assisted search is available: the user can describe what they want to find in natural language and the system narrows results interactively.
+- `purge tombstone <id> [<id> ...]` -- tombstones the specified items (Mode A). No extra confirmation needed.
+- `purge delete <id> [<id> ...]` -- hard deletes with cascade (Mode B). Displays cascade impact (what will be deleted), requires explicit `--confirm` flag or interactive yes/no.
+- `purge audit` -- shows the purge audit trail (what was purged, when, by whom, which mode).
+
+**Use cases driving this requirement:**
+1. User accidentally pastes a secret (API key, password, PII) into a conversation. The secret must be permanently and irrecoverably removed from all future contexts.
+2. User wants to firewall projects -- works on Project A daily but occasionally checks status on Project B. Beliefs from Project B should not leak into Project A's context. The purge tool allows removing cross-contamination after the fact.
+3. GDPR Article 17 right to erasure. Whether tombstoning satisfies Article 17 is a legal question requiring qualified counsel. Hard delete is available as the strictest interpretation.
+
+**Rationale:** PRIVACY_THREAT_MODEL.md open question #4 identified the tension between REQ-013 (observation immutability) and erasure rights. This requirement resolves it: immutability is the default, purge is the controlled exception.
+
+**Invariants:**
+- Both purge modes are user-initiated only. No automated process, agent, or scheduled job may invoke purge.
+- Every purge operation is logged in the audit trail with: timestamp, user ID, item IDs affected, mode (tombstone/delete), and cascade details for hard delete.
+- Purged content must not appear in any future retrieval, context injection, or search result. This applies to FTS5 indexes, HRR encodings, cached contexts, and any other derived data structures. A purge that removes the source row but leaves the content in a search index is a bug.
+- Hard delete must also scrub WAL and any SQLite journaling artifacts that could contain the deleted content. If SQLite VACUUM is required to reclaim pages, the system should advise the user.
+
+**Verification method:**
+1. Insert an observation containing a known secret string. Tombstone it. Verify the secret string is not retrievable via any search method (FTS5, HRR, direct SELECT, glob on DB file).
+2. Insert an observation. Hard delete it. Verify the row is gone, derived beliefs are cascaded, edges are removed, and the secret string does not appear in a raw hex dump of the SQLite file (post-VACUUM).
+3. Purge audit trail contains complete records for both operations.
+
+**Acceptance threshold:** Zero retrievability of purged content via any system interface. Audit trail 100% complete.
+
+**Plan trace:** Phase TBD
+**Experiment trace:** Dedicated purge verification tests
 **Status:** Not started
-**Evidence:** Exp 6: 30/38 overrides (66%) are repeated directives. This is the #1 problem.
+**Evidence:** --
+
+### REQ-029: Manual Classification Pipeline
+
+**Requirement:** The system must provide a CLI interface for the user to manually classify, rank, and override the automated classification of observations and beliefs. The user's manual classifications take precedence over all automated classification.
+
+**Operations:**
+- `classify <id> --type <type>` -- set or override the type/category of an observation or belief (e.g., behavioral, factual, procedural, domain-specific)
+- `classify <id> --irrelevant` -- mark an item as irrelevant. Irrelevant items are excluded from retrieval, context injection, and ranking. They remain in storage (queryable via explicit audit) but are invisible to the normal pipeline.
+- `classify <id> --project <project>` -- assign an item to a specific project scope. Items scoped to Project A are not retrieved when working in Project B unless the user explicitly requests cross-project search.
+- `classify <id> --lock` -- lock the classification so automated reclassification cannot override it (extends REQ-020 locked beliefs concept to classification metadata)
+- `classify <id> --connect <target_id> --edge-type <type>` -- manually create an edge between two nodes. The user can establish ground-truth relationships that the automated extraction missed.
+- `classify <id> --rank <priority>` -- manually set retrieval priority (high/medium/low). High-priority items are promoted in ranking; low-priority items are demoted.
+- `classify list --manual-only` -- list all items with manual classifications, for review and audit.
+
+**Use cases driving this requirement:**
+1. User knows that two decisions are related but the automated extraction didn't create an edge between them. Manual connection establishes ground truth.
+2. User is working on multiple projects and wants to prevent cross-contamination without purging. Scoping items to projects keeps them separate in retrieval.
+3. Automated classifier gets it wrong -- marks a behavioral directive as factual, or marks a critical decision as low-confidence. User overrides with correct classification.
+4. User wants to suppress a noisy belief that keeps surfacing but isn't worth deleting. Marking it irrelevant removes it from retrieval without destroying the data.
+
+**Rationale:** Automated classification (zero-LLM extraction, Bayesian confidence, type heuristics) is the default path. But the user is the ultimate authority on what their data means. When the automated system gets it wrong, the user needs a direct correction mechanism that the automated system cannot override.
+
+**Invariants:**
+- Manual classifications are stored with `source: user_manual` and cannot be overridden by any automated process.
+- Irrelevant-marked items are excluded from all retrieval paths (FTS5, HRR, BFS, progressive loading). They do not consume token budget.
+- Project scoping is enforced at retrieval time, not storage time. The data exists in one store; the scoping is a retrieval filter.
+- Manual edges are first-class graph citizens -- they participate in BFS, HRR encoding, and all traversal algorithms identically to automated edges.
+- All manual classifications are logged in the audit trail.
+
+**Verification method:**
+1. Manually classify 5 items across all operations (type, irrelevant, project, lock, connect, rank). Verify each classification persists, is respected by retrieval, and cannot be overridden by automated processes.
+2. Mark an item irrelevant. Run 10 retrieval queries where the item would otherwise rank in top-5. Verify it never appears.
+3. Scope 3 items to Project A. Switch to Project B context. Verify those items are not retrieved. Switch back to Project A. Verify they are retrieved.
+4. Create a manual edge. Run a BFS traversal that should follow it. Verify it is followed.
+
+**Acceptance threshold:** 100% of manual classifications respected by retrieval. Zero automated overrides of locked manual classifications. Audit trail complete.
+
+**Plan trace:** Phase TBD
+**Experiment trace:** Dedicated manual classification tests
+**Status:** Not started
+**Evidence:** --
 
 ---
 
@@ -526,7 +620,7 @@ The memory system CANNOT guarantee (not under our control):
 | REQ-016 | Documented limitations | Phase 5 | All | Zero undocumented limitations |
 | REQ-017 | Fully local operation | All phases | Phase 5 audit + offline test | Zero network calls for memory ops |
 | REQ-018 | No telemetry or data collection | All phases | Phase 5 audit | Zero telemetry code paths |
-| REQ-019 | Single-override learning (promote to L0 on first correction) | Phase 3 | Exp 6 simulation | >= 90% of 2nd+ overrides prevented, zero topics need 3+ |
+| REQ-019 | Single-override learning (promote to L0 on first correction) | Phase 3 | Experiment 6, Experiment 1 | >= 90% of 2nd+ overrides prevented, zero topics need 3+ |
 | REQ-020 | Locked beliefs (user-only override) | Phase 3 | Unit tests | Zero automated changes to locked beliefs |
 | REQ-021 | Behavioral beliefs always in L0 | Phase 2, 3 | Unit + integration tests | 100% behavioral beliefs in L0 across all tasks |
 | REQ-022 | Locked beliefs survive context compression | All phases | CS-004 acceptance test | Locked beliefs present after context window compression |
@@ -534,3 +628,6 @@ The memory system CANNOT guarantee (not under our control):
 | REQ-024 | Session velocity tracking | Phase 1, 2 | CS-005 acceptance test | Session records include elapsed time + item count; status reports include velocity |
 | REQ-025 | Methodological confidence layer (rigor tier) | Phase 2, 3 | CS-005 acceptance test | All 4 tiers classified; hypothesis-tier findings use hedged language |
 | REQ-026 | Calibrated status reporting | Phase 2, 5 | CS-005 acceptance test | New-agent status query produces calibrated summary in >= 90% of test runs |
+| REQ-027 | Zero-repeat directive guarantee | Phase 1, 3, 4 | Experiment 6, 1, 36, 40 | Tiers 1-4: 100% automated; Tier 5: 100% where hooks exist; Tier 6: >= 95% compliance |
+| REQ-028 | Purge tool (tombstone default, hard delete with confirmation) | Phase TBD | Purge verification tests | Zero retrievability of purged content; audit trail 100% complete |
+| REQ-029 | Manual classification pipeline | Phase TBD | Manual classification tests | 100% manual classifications respected; zero automated overrides of locked classifications |
