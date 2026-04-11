@@ -676,6 +676,15 @@ class MemoryStore:
             return None
         return _row_to_belief(row)
 
+    def get_belief_by_hash(self, content_hash: str) -> Belief | None:
+        """Get a belief by content hash. Used to bridge scanner node IDs to belief IDs."""
+        row: sqlite3.Row | None = self._conn.execute(
+            "SELECT * FROM beliefs WHERE content_hash = ?", (content_hash,)
+        ).fetchone()
+        if row is None:
+            return None
+        return _row_to_belief(row)
+
     # --- Sessions ---
 
     def create_session(

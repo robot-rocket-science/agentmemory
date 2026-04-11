@@ -396,6 +396,10 @@ def cmd_onboard(args: argparse.Namespace) -> None:
     store: MemoryStore = _get_store()
     aggregate: IngestResult = IngestResult()
 
+    # Map scanner node IDs to belief IDs via content hash
+    import hashlib as _hashlib
+    node_to_belief: dict[str, str] = {}
+
     ingested: int = 0
     total: int = sum(1 for n in scan.nodes if n.node_type != "file")
     for node in scan.nodes:
@@ -419,16 +423,28 @@ def cmd_onboard(args: argparse.Namespace) -> None:
             created_at=node.date,
         )
         aggregate.merge(turn_result)
+
+        # Look up the belief created from this node's content
+        content_hash: str = _hashlib.sha256(node.content.encode()).hexdigest()[:12]
+        belief: Belief | None = store.get_belief_by_hash(content_hash)
+        if belief is not None:
+            node_to_belief[node.id] = belief.id
+
         ingested += 1
         if ingested % 500 == 0:
             print(f"  ...{ingested}/{total}")
 
-    # Store structural edges for HRR graph encoding
+    print(f"  Mapped {len(node_to_belief)} scanner nodes to belief IDs")
+
+    # Store structural edges, translating scanner IDs to belief IDs where possible
     edge_count: int = 0
     for edge in scan.edges:
+        # Use belief IDs if we have them, otherwise keep scanner IDs
+        src: str = node_to_belief.get(edge.src, edge.src)
+        tgt: str = node_to_belief.get(edge.tgt, edge.tgt)
         store.insert_graph_edge(
-            from_id=edge.src,
-            to_id=edge.tgt,
+            from_id=src,
+            to_id=tgt,
             edge_type=edge.edge_type,
             weight=edge.weight,
             reason="scanner",
