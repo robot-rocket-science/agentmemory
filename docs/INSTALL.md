@@ -1,113 +1,71 @@
 # Installing agentmemory
 
-## Fresh Environment Setup
+## Quick Start
 
 ```bash
-# 1. Clone the project
-git clone <repo-url> agentmemory
-cd agentmemory
+# Install
+pip install agentmemory    # or: uv tool install agentmemory
 
-# 2. Install dependencies
-uv sync
+# Setup (writes commands, hooks, verifies CLI)
+agentmemory setup
 
-# 3. Verify tests pass
-uv run pytest tests/ -v
-
-# 4. Register MCP server with Claude Code (project-scoped)
-claude mcp add agentmemory --scope project -- \
-  uv run --project /path/to/agentmemory fastmcp run src/agentmemory/server.py
-
-# 5. Add SessionStart hook for locked belief injection
-# Add this to ~/.claude/settings.json under hooks.SessionStart:
-#
-# {
-#   "hooks": [{
-#     "type": "command",
-#     "command": "/path/to/agentmemory/.claude/hooks/agentmemory-inject.sh",
-#     "statusMessage": "Loading agentmemory locked beliefs..."
-#   }]
-# }
-#
-# Or copy the hook script:
-cp src/agentmemory/hooks/session_start.sh ~/.claude/hooks/agentmemory-inject.sh
-chmod +x ~/.claude/hooks/agentmemory-inject.sh
-
-# 6. Verify MCP server loads
-uv run python -c "from agentmemory.server import mcp; print(f'Server: {mcp.name}')"
+# Restart Claude Code, then:
+/mem:onboard .
 ```
 
-The database is created automatically at `~/.agentmemory/memory.db` on first use.
+## What setup does
 
-## Onboarding a Project
+`agentmemory setup` performs these steps automatically:
 
-Start a new Claude Code session in the project directory. The MCP server will be available.
+1. Creates `~/.claude/commands/mem/*.md` (14 slash commands)
+2. Removes legacy `~/.claude/skills/mem-*` files if present
+3. Installs commit tracker hook in `~/.claude/settings.json`
+4. Verifies database access
+5. Runs a smoke test
 
-```
-# In Claude Code conversation:
+After setup, restart Claude Code. Commands appear as `/mem:*`.
 
-> onboard the conversation logs
-# Claude calls: agentmemory_onboard("~/.claude/conversation-logs/turns.jsonl")
-
-> remember: always use uv for package management
-# Claude calls: agentmemory_remember("always use uv for package management")
-
-> remember: this project uses PostgreSQL, not MySQL
-# Claude calls: agentmemory_remember("this project uses PostgreSQL, not MySQL")
-
-> status
-# Claude calls: agentmemory_status()
-```
-
-## Verifying the System Works
+## Commands
 
 ```
-# Check locked beliefs are injected at session start:
-# Start a new session. You should see "Loading agentmemory locked beliefs..."
-# in the status area, and locked beliefs will appear in the context.
-
-# Check search works:
-> search for our database decision
-# Claude calls: agentmemory_search("database decision")
-# Should return the PostgreSQL belief.
-
-# Check corrections work:
-> correct: we switched to SQLite, not PostgreSQL
-# Claude calls: agentmemory_correct("we switched to SQLite, not PostgreSQL", replaces="PostgreSQL")
-# Old belief superseded. New belief locked.
+/mem:onboard <path>     Scan and ingest a project
+/mem:stats              Detailed analytics
+/mem:health             Diagnostics
+/mem:core [N]           Top N beliefs by confidence
+/mem:search <query>     Search beliefs
+/mem:locked             Show locked beliefs
+/mem:new-belief <text>  Store a new belief
+/mem:lock <text>        Create a locked belief
+/mem:wonder <topic>     Deep research from graph context
+/mem:settings           View or update settings
+/mem:demote             Demote least-relevant locked beliefs
+/mem:disable            Stop agentmemory for this session
+/mem:enable             Resume agentmemory
+/mem:help               Command reference
 ```
 
-## Disabling the System
+## Per-project isolation
 
-If the system causes problems:
+Each project gets its own database at `~/.agentmemory/projects/<hash>/memory.db`. The hash is derived from the project's absolute path. The CLI auto-detects the project from cwd.
+
+Override with `--project /path/to/project` or `AGENTMEMORY_DB=/path/to/db.sqlite`.
+
+## Disabling
 
 ```bash
-# Option 1: Remove the MCP server registration
-rm .mcp.json
-
-# Option 2: Disable the SessionStart hook (comment out in settings.json)
-
-# Option 3: In conversation, say "disable agentmemory"
-# The LLM will stop calling tools for the rest of the session.
+# In session: /mem:disable (stops tool calls for this session)
+# Permanently: agentmemory uninstall (removes commands, keeps data)
+# Nuclear: rm -rf ~/.agentmemory/ (deletes all data)
 ```
 
-The database remains at `~/.agentmemory/memory.db` and can be queried directly:
+## Direct CLI usage
+
+All commands work from the terminal without Claude Code:
 
 ```bash
-# View all locked beliefs
-sqlite3 ~/.agentmemory/memory.db "SELECT content FROM beliefs WHERE locked = 1 AND valid_to IS NULL"
-
-# View all beliefs
-sqlite3 ~/.agentmemory/memory.db "SELECT id, belief_type, locked, content FROM beliefs WHERE valid_to IS NULL ORDER BY created_at DESC LIMIT 20"
-
-# View status
-sqlite3 ~/.agentmemory/memory.db "SELECT 'beliefs' as type, count(*) FROM beliefs UNION SELECT 'locked', count(*) FROM beliefs WHERE locked=1 UNION SELECT 'observations', count(*) FROM observations"
-```
-
-## Resetting the System
-
-```bash
-# Full reset (lose all data)
-rm ~/.agentmemory/memory.db
-
-# The database is recreated automatically on next MCP server start.
+agentmemory onboard /path/to/project
+agentmemory search "query terms"
+agentmemory core --top 10
+agentmemory stats
+agentmemory lock "always use strict typing"
 ```
