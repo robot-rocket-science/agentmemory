@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "agentmemory": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "run",
+        "--project",
+        "/Users/thelorax/projects/agentmemory",
+        "python",
+        "-m",
+        "agentmemory.server"
+      ],
+      "env": {}
+    }
+  }
+}
