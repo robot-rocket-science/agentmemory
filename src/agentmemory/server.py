@@ -9,6 +9,14 @@ from pathlib import Path
 
 from fastmcp import FastMCP
 
+from agentmemory.commit_tracker import (
+    CommitCheckResult,
+    CommitTrackerConfig,
+    check_commit_status,
+    format_status,
+    load_config as load_commit_config,
+    save_config as save_commit_config,
+)
 from agentmemory.ingest import IngestResult, ingest_turn
 from agentmemory.scanner import ScanResult, scan_project
 from agentmemory.models import (
@@ -89,9 +97,10 @@ def search(query: str, budget: int = 2000) -> str:
 
 @mcp.tool
 def remember(text: str) -> str:
-    """Create a locked, high-confidence belief from a user statement.
+    """Create a high-confidence belief from a user statement.
 
-    Sets source_type='user_stated', alpha=9.0, beta_param=0.5, locked=True.
+    Sets source_type='user_stated', alpha=9.0, beta_param=0.5.
+    NOT locked -- only /mem:lock creates locked beliefs.
     Returns confirmation with belief ID.
     """
     store: MemoryStore = _get_store()
@@ -101,7 +110,7 @@ def remember(text: str) -> str:
         source_type=BSRC_USER_STATED,
         alpha=9.0,
         beta_param=0.5,
-        locked=True,
+        locked=False,
     )
     return (
         f"Remembered (ID: {belief.id}): {belief.content} "
@@ -113,9 +122,10 @@ def remember(text: str) -> str:
 def correct(text: str, replaces: str | None = None) -> str:
     """Record a user correction.
 
-    Creates a locked belief with source_type='user_corrected'. If replaces
-    is provided (a search query), finds the best matching existing belief and
-    supersedes it.
+    Creates a high-confidence belief with source_type='user_corrected'.
+    NOT locked -- only /mem:lock creates locked beliefs.
+    If replaces is provided (a search query), finds the best matching
+    existing belief and supersedes it.
     """
     store: MemoryStore = _get_store()
     belief: Belief = store.insert_belief(
@@ -124,7 +134,7 @@ def correct(text: str, replaces: str | None = None) -> str:
         source_type=BSRC_USER_CORRECTED,
         alpha=9.0,
         beta_param=0.5,
-        locked=True,
+        locked=False,
     )
 
     superseded_msg: str = ""
@@ -300,6 +310,63 @@ def ingest(text: str, source: str = "user") -> str:
         f"  Corrections: {result.corrections_detected}\n"
         f"  Sentences: {result.sentences_extracted} extracted, "
         f"{result.sentences_persisted} persisted"
+    )
+
+
+@mcp.tool
+def commit_check(project_dir: str = ".") -> str:
+    """Check time since last git commit and number of uncommitted changes.
+
+    Returns a nudge message if either threshold is exceeded, or a quiet
+    status summary if everything is within bounds. Deterministic -- no LLM
+    involved in the check logic.
+
+    Configure thresholds with commit_config tool.
+    """
+    result: CommitCheckResult = check_commit_status(Path(project_dir))
+    return format_status(result)
+
+
+@mcp.tool
+def commit_config(
+    enabled: bool | None = None,
+    max_minutes: int | None = None,
+    max_changes: int | None = None,
+) -> str:
+    """View or update commit tracker configuration.
+
+    Call with no arguments to view current config.
+    Pass any combination of parameters to update.
+
+    Args:
+        enabled: Turn commit tracking on or off.
+        max_minutes: Minutes before nudging to commit (default 15).
+        max_changes: Number of uncommitted changes before nudging (default 10).
+    """
+    config: CommitTrackerConfig = load_commit_config()
+
+    if enabled is None and max_minutes is None and max_changes is None:
+        return (
+            f"Commit tracker config:\n"
+            f"  enabled: {config.enabled}\n"
+            f"  max_minutes: {config.max_seconds // 60}\n"
+            f"  max_changes: {config.max_changes}\n"
+            f"  config file: {Path.home() / '.agentmemory' / 'commit_tracker.json'}"
+        )
+
+    if enabled is not None:
+        config.enabled = enabled
+    if max_minutes is not None:
+        config.max_seconds = max_minutes * 60
+    if max_changes is not None:
+        config.max_changes = max_changes
+
+    path: Path = save_commit_config(config)
+    return (
+        f"Commit tracker config updated ({path}):\n"
+        f"  enabled: {config.enabled}\n"
+        f"  max_minutes: {config.max_seconds // 60}\n"
+        f"  max_changes: {config.max_changes}"
     )
 
 
