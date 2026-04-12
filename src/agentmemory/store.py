@@ -802,6 +802,15 @@ class MemoryStore:
                 observations.append(_row_to_observation(obs))
         return observations
 
+    def get_observation(self, observation_id: str) -> Observation | None:
+        """Get a single observation by ID."""
+        row: sqlite3.Row | None = self._conn.execute(
+            "SELECT * FROM observations WHERE id = ?", (observation_id,)
+        ).fetchone()
+        if row is None:
+            return None
+        return _row_to_observation(row)
+
     def get_locked_beliefs(self) -> list[Belief]:
         """Return all locked beliefs (for L0 context injection)."""
         rows: list[sqlite3.Row] = self._conn.execute(

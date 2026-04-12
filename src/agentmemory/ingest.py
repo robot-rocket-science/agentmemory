@@ -1,8 +1,11 @@
 """End-to-end ingest pipeline: extraction -> classification -> store.
 
-Connects extract_sentences, classify_sentences_offline, detect_correction, and MemoryStore
-into a single call per conversation turn. Also handles JSONL batch ingestion from
-the conversation-logger.sh hook output format.
+Provides two paths:
+- ingest_turn(): Fast path for live conversation turns (offline classification).
+- extract_turn() + create_beliefs_from_classified(): Two-phase path for batch
+  operations like onboard, where LLM subagents classify before belief creation.
+
+Also handles JSONL batch ingestion from conversation-logger.sh hook output.
 """
 from __future__ import annotations
 
@@ -22,13 +25,14 @@ from agentmemory.models import (
     BSRC_USER_CORRECTED,
     BSRC_USER_STATED,
     OBS_TYPE_CONVERSATION,
+    Observation,
 )
 from agentmemory.store import MemoryStore
 from agentmemory.supersession import check_temporal_supersession
 
 
 # ---------------------------------------------------------------------------
-# Result dataclass
+# Result dataclasses
 # ---------------------------------------------------------------------------
 
 
@@ -47,6 +51,16 @@ class IngestResult:
         self.corrections_detected += other.corrections_detected
         self.sentences_extracted += other.sentences_extracted
         self.sentences_persisted += other.sentences_persisted
+
+
+@dataclass
+class ExtractedTurn:
+    """Result of extract_turn(): observation created, sentences ready for classification."""
+    observation: Observation
+    sentences: list[tuple[str, str]]  # (text, source) pairs
+    full_text_is_correction: bool
+    source: str
+    created_at: str | None
 
 
 # ---------------------------------------------------------------------------
@@ -69,38 +83,27 @@ _TYPE_TO_BELIEF: dict[str, str] = {
 
 
 # ---------------------------------------------------------------------------
-# Single turn ingest
+# Phase 1: Extract (observation + sentences, no beliefs)
 # ---------------------------------------------------------------------------
 
 
-def ingest_turn(
+def extract_turn(
     store: MemoryStore,
     text: str,
     source: str,
     session_id: str | None = None,
     created_at: str | None = None,
     source_path: str = "",
-) -> IngestResult:
-    """Process a single conversation turn end-to-end.
+) -> ExtractedTurn:
+    """Extract observations and sentences from a conversation turn.
 
-    Uses offline classification only. LLM-quality classification is handled
-    externally by spawning Haiku subagents and calling the reclassify MCP tool.
-    See build_classification_prompt() in classification.py.
+    Creates an observation in the store and extracts sentences for classification.
+    Does NOT create beliefs -- that happens in create_beliefs_from_classified()
+    after LLM classification, or via ingest_turn() for the fast offline path.
 
-    Steps:
-    1. Insert raw text as observation
-    2. Extract sentences
-    3. Run correction detector on full text (if source == 'user')
-    4. Classify sentences (offline heuristics)
-    5. For each PERSIST sentence: insert as belief with type-based prior
-    6. For corrections: create locked belief, attempt to find and supersede existing
-
-    Returns IngestResult with counts.
+    Returns ExtractedTurn with observation, sentences, and correction flags.
     """
-    result: IngestResult = IngestResult()
-
-    # Step 1: insert raw text as observation
-    observation = store.insert_observation(
+    observation: Observation = store.insert_observation(
         content=text,
         observation_type=OBS_TYPE_CONVERSATION,
         source_type=source,
@@ -108,33 +111,54 @@ def ingest_turn(
         source_path=source_path,
         session_id=session_id,
     )
-    result.observations_created = 1
 
-    # Step 2: extract sentences
     sentences: list[str] = extract_sentences(text)
-    result.sentences_extracted = len(sentences)
+    sentence_pairs: list[tuple[str, str]] = [(s, source) for s in sentences]
 
-    if not sentences:
-        return result
-
-    # Step 3: run correction detector on full text (user turns only)
     full_text_is_correction: bool = False
     if source == "user":
         is_corr, _signals, _conf = detect_correction(text)
         if is_corr:
             full_text_is_correction = True
-            result.corrections_detected += 1
 
-    # Step 4: classify sentences (offline heuristics)
-    sentence_pairs: list[tuple[str, str]] = [(s, source) for s in sentences]
-    classified: list[ClassifiedSentence] = classify_sentences_offline(sentence_pairs)
+    return ExtractedTurn(
+        observation=observation,
+        sentences=sentence_pairs,
+        full_text_is_correction=full_text_is_correction,
+        source=source,
+        created_at=created_at,
+    )
 
-    # Step 5: insert PERSIST sentences as beliefs
+
+# ---------------------------------------------------------------------------
+# Phase 2: Create beliefs from pre-classified sentences
+# ---------------------------------------------------------------------------
+
+
+def create_beliefs_from_classified(
+    store: MemoryStore,
+    observation: Observation,
+    classified: list[ClassifiedSentence],
+    source: str,
+    full_text_is_correction: bool = False,
+    full_text: str = "",
+    created_at: str | None = None,
+) -> IngestResult:
+    """Create beliefs from pre-classified sentences.
+
+    Accepts ClassifiedSentence objects (from either offline or LLM classification)
+    and creates beliefs with appropriate types and priors. Handles correction
+    supersession.
+
+    This is the second phase of the two-phase ingest path:
+    extract_turn() -> classify (LLM or offline) -> create_beliefs_from_classified()
+    """
+    result: IngestResult = IngestResult()
+
     for cs in classified:
         if not cs.persist:
             continue
 
-        # Determine belief source type based on sentence type and source
         belief_source: str
         if cs.sentence_type == "CORRECTION":
             belief_source = BSRC_USER_CORRECTED
@@ -144,11 +168,6 @@ def ingest_turn(
             belief_source = BSRC_AGENT_INFERRED
 
         belief_type: str = _TYPE_TO_BELIEF.get(cs.sentence_type, "factual")
-
-        # Step 6: corrections are locked (permanent constraints).
-        # User-stated beliefs from remember() are also locked at the server layer.
-        # Corrections get high confidence but are NOT auto-locked.
-        # Only explicit user confirmation via lock() creates locked beliefs.
 
         belief = store.insert_belief(
             content=cs.text,
@@ -163,14 +182,9 @@ def ingest_turn(
         result.beliefs_created += 1
         result.sentences_persisted += 1
 
-        # Temporal supersession: check if this belief supersedes an older
-        # one about the same topic (time + term overlap).
         check_temporal_supersession(store, belief)
 
-        # For corrections: search for existing beliefs that might be superseded
         if cs.sentence_type == "CORRECTION":
-            # Extract key words from the correction sentence to search.
-            # Strip non-word characters so FTS5 does not choke on punctuation.
             raw_words: list[str] = [
                 re.sub(r"[^\w]", "", w) for w in cs.text.split() if len(w) > 3
             ]
@@ -179,14 +193,12 @@ def ingest_turn(
                 query_str: str = " ".join(search_terms[:5])
                 existing_beliefs = store.search(query_str, top_k=5)
                 for existing in existing_beliefs:
-                    # Skip the belief we just created and already-superseded beliefs
                     if existing.id == belief.id:
                         continue
                     if existing.valid_to is not None:
                         continue
                     if existing.superseded_by is not None:
                         continue
-                    # Only supersede beliefs with the same type (corrections override corrections)
                     if existing.belief_type == belief_type:
                         store.supersede_belief(
                             old_id=existing.id,
@@ -195,24 +207,70 @@ def ingest_turn(
                         )
                         break
 
-    # If the full turn was flagged as a correction but no sentence was classified
-    # as CORRECTION, insert the full text as a high-confidence belief (unlocked).
-    # Locking requires explicit user confirmation via the lock() tool.
-    if full_text_is_correction and result.sentences_persisted == 0:
-        prior_alpha: float = 9.0
-        prior_beta: float = 1.0
+    # Fallback: full turn flagged as correction but no sentence classified as such
+    if full_text_is_correction and result.sentences_persisted == 0 and full_text:
         store.insert_belief(
-            content=text,
+            content=full_text,
             belief_type="correction",
             source_type=BSRC_USER_CORRECTED,
-            alpha=prior_alpha,
-            beta_param=prior_beta,
+            alpha=9.0,
+            beta_param=1.0,
             locked=False,
             observation_id=observation.id,
             created_at=created_at,
         )
         result.beliefs_created += 1
         result.sentences_persisted += 1
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Combined path: extract + offline classify + create beliefs (live turns)
+# ---------------------------------------------------------------------------
+
+
+def ingest_turn(
+    store: MemoryStore,
+    text: str,
+    source: str,
+    session_id: str | None = None,
+    created_at: str | None = None,
+    source_path: str = "",
+) -> IngestResult:
+    """Process a single conversation turn end-to-end (fast path).
+
+    Uses offline classification for speed. Suitable for live conversation
+    turns via hooks. For batch operations (onboard), use extract_turn()
+    + LLM classification + create_beliefs_from_classified() instead.
+    """
+    extracted: ExtractedTurn = extract_turn(
+        store, text, source, session_id, created_at, source_path,
+    )
+
+    result: IngestResult = IngestResult()
+    result.observations_created = 1
+    result.sentences_extracted = len(extracted.sentences)
+    if extracted.full_text_is_correction:
+        result.corrections_detected += 1
+
+    if not extracted.sentences:
+        return result
+
+    classified: list[ClassifiedSentence] = classify_sentences_offline(
+        extracted.sentences,
+    )
+
+    belief_result: IngestResult = create_beliefs_from_classified(
+        store=store,
+        observation=extracted.observation,
+        classified=classified,
+        source=source,
+        full_text_is_correction=extracted.full_text_is_correction,
+        full_text=text,
+        created_at=created_at,
+    )
+    result.merge(belief_result)
 
     return result
 
@@ -252,9 +310,6 @@ def ingest_jsonl(
             if not text_val.strip():
                 continue
 
-            # NOTE: session_val is a Claude Code session ID, not an agentmemory session ID.
-            # Pass None to avoid FK constraint violation. Observations are linked to
-            # agentmemory sessions only when created during a live agentmemory session.
             turn_result: IngestResult = ingest_turn(
                 store=store,
                 text=text_val,

@@ -13,9 +13,16 @@ from fastmcp import FastMCP
 
 from agentmemory.classification import (
     BATCH_SIZE,
+    ClassifiedSentence,
     TYPE_PRIORS,
 )
-from agentmemory.ingest import IngestResult, ingest_turn
+from agentmemory.ingest import (
+    ExtractedTurn,
+    IngestResult,
+    create_beliefs_from_classified,
+    extract_turn,
+    ingest_turn,
+)
 from agentmemory.scanner import ScanResult, scan_project
 from agentmemory.models import (
     BSRC_USER_CORRECTED,
@@ -434,13 +441,17 @@ def get_locked() -> str:
 def onboard(project_path: str) -> str:
     """Onboard a project by scanning its directory for signals.
 
-    Detects available signals (git history, docs, source code, directives,
-    citations) and extracts content into observations and beliefs.
+    Extracts content into observations and returns sentences for LLM
+    classification. Does NOT create beliefs -- the calling agent should:
+    1. Parse the returned sentences JSON
+    2. Spawn Haiku subagents to classify batches of 20
+    3. Call create_beliefs() with the classification results
 
-    Point this at a project root directory to populate the memory store
-    with the project's knowledge graph. No LLM cost -- uses offline
-    classification for bulk ingestion.
+    This separation ensures beliefs are created with LLM-quality types
+    and priors from the start, rather than relying on offline heuristics.
     """
+    import json as _json
+
     path: Path = Path(project_path).expanduser().resolve()
     if not path.is_dir():
         return f"Not a directory: {path}"
@@ -448,16 +459,15 @@ def onboard(project_path: str) -> str:
     # Scan the project
     scan: ScanResult = scan_project(path)
 
-    # Feed extracted nodes through the ingest pipeline
+    # Extract observations and sentences (no beliefs)
     store: MemoryStore = _get_store()
-    aggregate: IngestResult = IngestResult()
+    observations_created: int = 0
+    all_sentences: list[dict[str, str]] = []
 
     for node in scan.nodes:
-        # Skip file nodes (structural only, not meaningful text)
         if node.node_type == "file":
             continue
 
-        # Determine source type from node type
         source: str = "document"
         if node.node_type == "commit_belief":
             source = "git"
@@ -466,7 +476,7 @@ def onboard(project_path: str) -> str:
         elif node.node_type == "callable":
             source = "code"
 
-        turn_result: IngestResult = ingest_turn(
+        extracted: ExtractedTurn = extract_turn(
             store=store,
             text=node.content,
             source=source,
@@ -474,7 +484,17 @@ def onboard(project_path: str) -> str:
             created_at=node.date,
             source_path=node.file or "",
         )
-        aggregate.merge(turn_result)
+        observations_created += 1
+
+        for text, src in extracted.sentences:
+            all_sentences.append({
+                "text": text,
+                "source": src,
+                "observation_id": extracted.observation.id,
+                "created_at": node.date or "",
+                "is_correction": str(extracted.full_text_is_correction),
+                "full_text": node.content,
+            })
 
     # Store structural edges for HRR graph encoding
     for edge in scan.edges:
@@ -507,16 +527,108 @@ def onboard(project_path: str) -> str:
     lines.append(f"  Edges extracted: {len(scan.edges)}")
     for etype, count in sorted(edge_types.items()):
         lines.append(f"    {etype}: {count}")
-    lines.append(f"  Observations created: {aggregate.observations_created}")
-    lines.append(f"  Beliefs created: {aggregate.beliefs_created}")
-    lines.append(f"  Corrections detected: {aggregate.corrections_detected}")
+    lines.append(f"  Observations created: {observations_created}")
+    lines.append(f"  Sentences for classification: {len(all_sentences)}")
 
     timing_parts: list[str] = [
         f"{k}={v:.2f}s" for k, v in scan.timings.items()
     ]
     lines.append(f"  Timing: {', '.join(timing_parts)}")
 
+    summary: str = "\n".join(lines)
+
+    if not all_sentences:
+        return summary + "\n\nNo sentences to classify."
+
+    lines.append(f"\n  Batch size: {BATCH_SIZE} sentences per subagent")
+    lines.append(f"  Estimated batches: {(len(all_sentences) + BATCH_SIZE - 1) // BATCH_SIZE}")
+    lines.append("")
+    lines.append("SENTENCES_JSON_START")
+    lines.append(_json.dumps(all_sentences))
+    lines.append("SENTENCES_JSON_END")
+
     return "\n".join(lines)
+
+
+@mcp.tool
+def create_beliefs(classified_json: str) -> str:
+    """Create beliefs from LLM-classified sentences.
+
+    Accepts a JSON string: [{"text": "...", "source": "user", "observation_id": "...",
+    "type": "REQUIREMENT", "persist": "PERSIST", "created_at": "", "is_correction": "False",
+    "full_text": "..."}]
+
+    This is the second phase of the onboard pipeline:
+    1. onboard() extracts observations and returns sentences
+    2. The calling agent classifies via Haiku subagents
+    3. create_beliefs() stores the results with correct types and priors
+
+    Each item must have at minimum: text, source, observation_id, type, persist.
+    """
+    import json as _json
+
+    store: MemoryStore = _get_store()
+    items: list[dict[str, str]] = _json.loads(classified_json)
+
+    total_created: int = 0
+    total_skipped: int = 0
+
+    # Group by observation_id for efficient processing
+    by_obs: dict[str, list[dict[str, str]]] = {}
+    for item in items:
+        obs_id: str = item.get("observation_id", "")
+        if obs_id not in by_obs:
+            by_obs[obs_id] = []
+        by_obs[obs_id].append(item)
+
+    for obs_id, obs_items in by_obs.items():
+        obs = store.get_observation(obs_id) if obs_id else None
+        if obs is None:
+            total_skipped += len(obs_items)
+            continue
+
+        classified: list[ClassifiedSentence] = []
+        source: str = obs_items[0].get("source", "document")
+        full_text_is_correction: bool = obs_items[0].get("is_correction", "False") == "True"
+        full_text: str = obs_items[0].get("full_text", "")
+        created_at: str | None = obs_items[0].get("created_at") or None
+
+        for item in obs_items:
+            sentence_type: str = item.get("type", "FACT").upper()
+            persist_label: str = item.get("persist", "PERSIST").upper()
+
+            prior: tuple[float, float] | None = TYPE_PRIORS.get(sentence_type)
+            should_persist: bool = persist_label == "PERSIST" and prior is not None
+
+            alpha: float = 2.0
+            beta_val: float = 1.0
+            if prior is not None:
+                alpha, beta_val = prior
+
+            classified.append(ClassifiedSentence(
+                text=item.get("text", ""),
+                source=item.get("source", "document"),
+                persist=should_persist,
+                sentence_type=sentence_type,
+                alpha=alpha,
+                beta_param=beta_val,
+            ))
+
+        result: IngestResult = create_beliefs_from_classified(
+            store=store,
+            observation=obs,
+            classified=classified,
+            source=source,
+            full_text_is_correction=full_text_is_correction,
+            full_text=full_text,
+            created_at=created_at,
+        )
+        total_created += result.beliefs_created
+
+    return (
+        f"Created {total_created} belief(s) from {len(items)} classified sentence(s).\n"
+        f"Skipped: {total_skipped} (missing observation)"
+    )
 
 
 @mcp.tool

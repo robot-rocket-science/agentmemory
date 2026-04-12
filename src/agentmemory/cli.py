@@ -91,22 +91,27 @@ _COMMAND_DEFS: dict[str, dict[str, str]] = {
     "onboard": {
         "description": "Scan a project directory and ingest it into agentmemory.",
         "argument_hint": "Path to project directory (e.g. . or ~/projects/myapp)",
-        "tools": "Bash, Agent",
-        "objective": "Onboard a project into agentmemory with optional LLM reclassification.",
+        "tools": "Agent",
+        "objective": "Onboard a project into agentmemory with LLM classification.",
         "process": (
-            "1. Run: `uv run agentmemory onboard $ARGUMENTS` to scan and ingest with offline classification.\n"
-            "2. Display the onboard summary.\n"
-            "3. Call the MCP tool `mcp__agentmemory__get_unclassified` with limit=200 to get beliefs eligible for LLM reclassification.\n"
-            "4. If there are beliefs to reclassify, batch them into groups of 20.\n"
+            "1. Call MCP tool `mcp__agentmemory__onboard` with the project path.\n"
+            "   This extracts observations and returns sentences as JSON (no beliefs created yet).\n"
+            "2. Display the onboard summary (node counts, edge counts, timing).\n"
+            "3. Parse sentences from the JSON between SENTENCES_JSON_START and SENTENCES_JSON_END markers.\n"
+            "4. Batch sentences into groups of 20.\n"
             "5. For each batch, spawn a Haiku subagent (model=haiku) with this prompt:\n"
-            '   "Classify each sentence. For EACH, output JSON: [{id, persist, type}].\n'
-            '   persist: PERSIST or EPHEMERAL. type: one of REQUIREMENT, CORRECTION, PREFERENCE, FACT, ASSUMPTION, DECISION, ANALYSIS, COORDINATION, QUESTION, META.\n'
-            '   Be conservative: when in doubt, EPHEMERAL.\n'
-            '   Sentences:\\n{numbered list of sentences with their belief IDs}"\n'
-            "   Spawn batches in parallel (up to 5 concurrent subagents).\n"
-            "6. Collect JSON results from all subagents.\n"
-            "7. Call `mcp__agentmemory__reclassify` with the combined JSON mappings.\n"
-            "8. Display the reclassification summary.\n"
+            '   "Classify each sentence for a memory system.\n'
+            "   For EACH sentence, classify:\n"
+            "   - persist: PERSIST (remember across sessions) or EPHEMERAL (discard)\n"
+            "   - type: REQUIREMENT, CORRECTION, PREFERENCE, FACT, ASSUMPTION, DECISION, ANALYSIS, COORDINATION, QUESTION, or META\n"
+            "   Be conservative: when in doubt, EPHEMERAL.\n"
+            "   Sentences:\\n{numbered list}\\n\n"
+            '   Respond as JSON array: [{id, persist, type}]"\n'
+            "   Spawn up to 5 batches in parallel.\n"
+            "6. Collect classification results from all subagents.\n"
+            "7. Merge classification results back into the sentence objects (add type and persist fields).\n"
+            "8. Call `mcp__agentmemory__create_beliefs` with the classified JSON.\n"
+            "9. Display the belief creation summary.\n"
         ),
     },
     "stats": {
