@@ -26,13 +26,13 @@ _BATCH_SIZE: int = 20
 # Type-to-prior mapping from Exp 61.
 # None means "don't store" (Coordination, Question, Meta).
 TYPE_PRIORS: dict[str, tuple[float, float] | None] = {
-    "REQUIREMENT":  (9.0, 1.0),
-    "CORRECTION":   (9.0, 1.0),
-    "PREFERENCE":   (9.0, 1.0),
-    "FACT":         (9.0, 1.0),
-    "ASSUMPTION":   (9.0, 1.0),
-    "DECISION":     (5.0, 1.0),
-    "ANALYSIS":     (2.0, 1.0),
+    "REQUIREMENT":  (9.0, 0.5),   # 94.7% -- hard constraints
+    "CORRECTION":   (9.0, 0.5),   # 94.7% -- user corrections
+    "PREFERENCE":   (7.0, 1.0),   # 87.5% -- user preferences
+    "FACT":         (3.0, 1.0),   # 75.0% -- stated facts
+    "ASSUMPTION":   (2.0, 1.0),   # 66.7% -- taken as true without evidence
+    "DECISION":     (5.0, 1.0),   # 83.3% -- choices made
+    "ANALYSIS":     (2.0, 1.0),   # 66.7% -- derived conclusions
     "COORDINATION": None,
     "QUESTION":     None,
     "META":         None,
@@ -269,7 +269,9 @@ def classify_sentences_offline(
             ]
         ):
             sentence_type = "REQUIREMENT"
-            alpha, beta_val = 9.0, 1.0
+            _req_prior = TYPE_PRIORS["REQUIREMENT"]
+            assert _req_prior is not None
+            alpha, beta_val = _req_prior
             results.append(
                 ClassifiedSentence(
                     text=text,
@@ -286,15 +288,16 @@ def classify_sentences_offline(
         # from directive keywords like "must" that also appear in requirements)
         is_correction, _signals, _conf = detect_correction(text)
         if is_correction:
-            prior: tuple[float, float] = (9.0, 1.0)
+            _cor_prior = TYPE_PRIORS["CORRECTION"]
+            assert _cor_prior is not None
             results.append(
                 ClassifiedSentence(
                     text=text,
                     source=source,
                     persist=True,
                     sentence_type="CORRECTION",
-                    alpha=prior[0],
-                    beta_param=prior[1],
+                    alpha=_cor_prior[0],
+                    beta_param=_cor_prior[1],
                 )
             )
             continue
@@ -313,7 +316,9 @@ def classify_sentences_offline(
             ]
         ):
             sentence_type = "PREFERENCE"
-            alpha, beta_val = 9.0, 1.0
+            _pref_prior = TYPE_PRIORS["PREFERENCE"]
+            assert _pref_prior is not None
+            alpha, beta_val = _pref_prior
         elif any(
             kw in text_lower
             for kw in [
@@ -327,23 +332,31 @@ def classify_sentences_offline(
             ]
         ):
             sentence_type = "DECISION"
-            alpha, beta_val = 5.0, 1.0
+            _dec_prior = TYPE_PRIORS["DECISION"]
+            assert _dec_prior is not None
+            alpha, beta_val = _dec_prior
         elif any(
             kw in text_lower
             for kw in ["assume", "assuming", "i think", "probably", "likely"]
         ):
             sentence_type = "ASSUMPTION"
-            alpha, beta_val = 9.0, 1.0
+            _asm_prior = TYPE_PRIORS["ASSUMPTION"]
+            assert _asm_prior is not None
+            alpha, beta_val = _asm_prior
         elif any(
             kw in text_lower
             for kw in ["because", "therefore", "causes", "results in", "analysis"]
         ):
             sentence_type = "ANALYSIS"
-            alpha, beta_val = 2.0, 1.0
+            _ana_prior = TYPE_PRIORS["ANALYSIS"]
+            assert _ana_prior is not None
+            alpha, beta_val = _ana_prior
         else:
             # Default: FACT
             sentence_type = "FACT"
-            alpha, beta_val = 9.0, 1.0
+            _fact_prior = TYPE_PRIORS["FACT"]
+            assert _fact_prior is not None
+            alpha, beta_val = _fact_prior
 
         results.append(
             ClassifiedSentence(
