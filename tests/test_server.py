@@ -15,7 +15,9 @@ from agentmemory.models import Belief
 from agentmemory.store import MemoryStore
 import agentmemory.server as server_mod
 from agentmemory.server import (
+    bulk_delete,
     correct,
+    delete,
     feedback,
     get_locked,
     ingest,
@@ -511,3 +513,96 @@ def test_auto_feedback_no_crash_on_empty_buffer() -> None:
     # First search in a fresh session -- no prior batch to process
     result: str = search("anything at all")
     assert isinstance(result, str)  # just verify no exception
+
+
+# ---------------------------------------------------------------------------
+# Delete tests
+# ---------------------------------------------------------------------------
+
+
+def test_delete_sets_valid_to() -> None:
+    """delete() should soft-delete by setting valid_to."""
+    out: str = remember("Belief to delete")
+    belief_id: str = out.split("ID: ")[1].split(")")[0]
+
+    result: str = delete(belief_id)
+    assert "Deleted" in result
+    assert belief_id in result
+
+    store: MemoryStore = server_mod._get_store()  # pyright: ignore[reportPrivateUsage]
+    belief: Belief | None = store.get_belief(belief_id)
+    assert belief is not None
+    assert belief.valid_to is not None
+
+
+def test_deleted_belief_excluded_from_search() -> None:
+    """Deleted beliefs should not appear in search results."""
+    out: str = remember("Unique xylophone configuration for testing")
+    belief_id: str = out.split("ID: ")[1].split(")")[0]
+
+    # Verify it appears before deletion
+    result: str = search("xylophone configuration")
+    assert "xylophone" in result
+
+    delete(belief_id)
+
+    result = search("xylophone configuration")
+    assert "xylophone" not in result or "No beliefs found" in result
+
+
+def test_deleted_locked_belief_excluded_from_get_locked() -> None:
+    """Deleted locked beliefs should not appear in get_locked()."""
+    out: str = remember("Locked then deleted belief")
+    belief_id: str = out.split("ID: ")[1].split(")")[0]
+    lock(belief_id)
+
+    locked_before: str = get_locked()
+    assert "Locked then deleted belief" in locked_before
+
+    delete(belief_id)
+
+    locked_after: str = get_locked()
+    assert "Locked then deleted belief" not in locked_after
+
+
+def test_delete_nonexistent_returns_error() -> None:
+    """Deleting a nonexistent belief should return an error."""
+    result: str = delete("000000000000")
+    assert "Error" in result
+
+
+def test_delete_already_deleted() -> None:
+    """Deleting an already-deleted belief should report it."""
+    out: str = remember("Double delete test")
+    belief_id: str = out.split("ID: ")[1].split(")")[0]
+
+    delete(belief_id)
+    result: str = delete(belief_id)
+    assert "Already deleted" in result
+
+
+def test_bulk_delete() -> None:
+    """bulk_delete() should delete multiple beliefs at once."""
+    ids: list[str] = []
+    for text in ["Bulk one", "Bulk two", "Bulk three"]:
+        out: str = remember(text)
+        ids.append(out.split("ID: ")[1].split(")")[0])
+
+    result: str = bulk_delete(ids)
+    assert "Deleted 3 of 3" in result
+
+    store: MemoryStore = server_mod._get_store()  # pyright: ignore[reportPrivateUsage]
+    for bid in ids:
+        belief: Belief | None = store.get_belief(bid)
+        assert belief is not None
+        assert belief.valid_to is not None
+
+
+def test_bulk_delete_partial() -> None:
+    """bulk_delete() with mix of valid and invalid IDs reports correctly."""
+    out: str = remember("Valid belief for bulk")
+    valid_id: str = out.split("ID: ")[1].split(")")[0]
+
+    result: str = bulk_delete([valid_id, "000000000000"])
+    assert "Deleted 1 of 2" in result
+    assert "1 were already deleted or not found" in result

@@ -560,6 +560,50 @@ def ingest(text: str, source: str = "user") -> str:
     )
 
 
+@mcp.tool
+def delete(belief_id: str) -> str:
+    """Soft-delete a belief by setting valid_to = now.
+
+    The belief is not hard-deleted -- it remains in the database but is
+    excluded from all searches, retrieval, and locked belief injection.
+    Use this to clean up duplicate, stale, or incorrect beliefs.
+
+    Args:
+        belief_id: The belief ID to delete (e.g. "a1b2c3d4e5f6").
+    """
+    store: MemoryStore = _get_store()
+    belief: Belief | None = store.get_belief(belief_id)
+    if belief is None:
+        return f"Error: no belief found with ID {belief_id}"
+    if belief.valid_to is not None:
+        return f"Already deleted (ID: {belief.id}): {belief.content}"
+    store.delete_belief(belief_id)
+    return (
+        f"Deleted (ID: {belief.id}): {belief.content} "
+        f"[was: {belief.belief_type}, confidence: {belief.confidence:.0%}, "
+        f"locked: {belief.locked}]"
+    )
+
+
+@mcp.tool
+def bulk_delete(belief_ids: list[str]) -> str:
+    """Soft-delete multiple beliefs at once.
+
+    Use this for cleanup operations (e.g. removing duplicates identified
+    by an audit). Each belief gets valid_to set to now.
+
+    Args:
+        belief_ids: List of belief IDs to delete.
+    """
+    store: MemoryStore = _get_store()
+    deleted: int = store.bulk_delete_beliefs(belief_ids)
+    skipped: int = len(belief_ids) - deleted
+    result: str = f"Deleted {deleted} of {len(belief_ids)} beliefs."
+    if skipped > 0:
+        result += f" {skipped} were already deleted or not found."
+    return result
+
+
 _VALID_OUTCOMES: frozenset[str] = frozenset({OUTCOME_USED, OUTCOME_IGNORED, OUTCOME_HARMFUL})
 
 

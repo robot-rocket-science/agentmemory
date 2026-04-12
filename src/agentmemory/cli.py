@@ -10,6 +10,7 @@ Provides direct commands that execute without LLM involvement:
   agentmemory locked             -- show locked beliefs
   agentmemory remember <text>    -- store a new belief
   agentmemory lock <text>        -- create a locked belief
+  agentmemory delete <id> [...]   -- soft-delete beliefs by ID
   agentmemory commit-check       -- check time/changes since last commit
   agentmemory commit-config      -- view or update commit tracker settings
   agentmemory help               -- command reference
@@ -142,6 +143,13 @@ _COMMAND_DEFS: dict[str, dict[str, str]] = {
         "tools": "Bash",
         "objective": "Create a locked belief.",
         "process": "Run: `uv run agentmemory lock \"$ARGUMENTS\"`\nDisplay the output. Do not add commentary.",
+    },
+    "delete": {
+        "description": "Soft-delete beliefs by ID. Beliefs are excluded from search and retrieval but remain in the database.",
+        "argument_hint": "One or more belief IDs (space-separated)",
+        "tools": "Bash",
+        "objective": "Remove beliefs that are duplicates, stale, or incorrect.",
+        "process": "Run: `uv run agentmemory delete $ARGUMENTS`\nDisplay the output. Do not add commentary.",
     },
     "wonder": {
         "description": "Deep-dive research on a hypothesis, question, or topic using memory graph context.",
@@ -916,6 +924,33 @@ def cmd_unlock(args: argparse.Namespace) -> None:
     print(f"\n{len(to_unlock)} beliefs unlocked.")
 
 
+# ---------------------------------------------------------------------------
+# delete
+# ---------------------------------------------------------------------------
+
+
+def cmd_delete(args: argparse.Namespace) -> None:
+    """Soft-delete beliefs by ID."""
+    store: MemoryStore = _get_store()
+    ids: list[str] = args.ids
+
+    deleted: int = 0
+    for belief_id in ids:
+        belief: Belief | None = store.get_belief(belief_id)
+        if belief is None:
+            print(f"  Not found: {belief_id}")
+            continue
+        if belief.valid_to is not None:
+            print(f"  Already deleted: {belief_id}")
+            continue
+        store.delete_belief(belief_id)
+        print(f"  Deleted [{belief.confidence:.0%}] {belief.content[:80]} (ID: {belief_id})")
+        deleted += 1
+
+    store.close()
+    print(f"\n{deleted} of {len(ids)} beliefs deleted.")
+
+
 def _now_iso() -> str:
     from datetime import datetime, timezone
     return datetime.now(timezone.utc).isoformat()
@@ -1246,6 +1281,13 @@ def main() -> None:
     p_unlock.add_argument("--count", type=int, default=5,
                           help="Number of beliefs to unlock (default: 5)")
     p_unlock.set_defaults(func=cmd_unlock)
+
+    # delete
+    p_delete: argparse.ArgumentParser = subparsers.add_parser(
+        "delete", help="Soft-delete beliefs by ID"
+    )
+    p_delete.add_argument("ids", nargs="+", help="One or more belief IDs to delete")
+    p_delete.set_defaults(func=cmd_delete)
 
     # settings
     p_settings: argparse.ArgumentParser = subparsers.add_parser(

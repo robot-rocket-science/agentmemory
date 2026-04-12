@@ -429,6 +429,35 @@ class MemoryStore:
         )
         self._conn.commit()
 
+    def delete_belief(self, belief_id: str) -> bool:
+        """Soft-delete a belief by setting valid_to = now.
+
+        Returns True if the belief existed and was deleted, False if not found
+        or already deleted.
+        """
+        ts: str = _now()
+        cursor: sqlite3.Cursor = self._conn.execute(
+            "UPDATE beliefs SET valid_to = ?, updated_at = ? "
+            "WHERE id = ? AND valid_to IS NULL",
+            (ts, ts, belief_id),
+        )
+        self._conn.commit()
+        return cursor.rowcount > 0
+
+    def bulk_delete_beliefs(self, belief_ids: list[str]) -> int:
+        """Soft-delete multiple beliefs. Returns number actually deleted."""
+        ts: str = _now()
+        deleted: int = 0
+        for belief_id in belief_ids:
+            cursor: sqlite3.Cursor = self._conn.execute(
+                "UPDATE beliefs SET valid_to = ?, updated_at = ? "
+                "WHERE id = ? AND valid_to IS NULL",
+                (ts, ts, belief_id),
+            )
+            deleted += cursor.rowcount
+        self._conn.commit()
+        return deleted
+
     def supersede_belief(self, old_id: str, new_id: str, reason: str) -> None:
         """Mark old belief as superseded. Sets valid_to, creates a SUPERSEDES edge."""
         ts: str = _now()
