@@ -252,6 +252,20 @@ class MemoryStore:
         self._conn.executescript(_SCHEMA)
         self._conn.commit()
         self._migrate_sessions()
+        self._migrate_beliefs()
+
+    def _migrate_beliefs(self) -> None:
+        """One-time backfill: lock all correction-type beliefs that are unlocked."""
+        self.backfill_lock_corrections()
+
+    def backfill_lock_corrections(self) -> int:
+        """Lock all correction-type beliefs that are currently unlocked.
+        Returns the number of beliefs locked."""
+        cursor: sqlite3.Cursor = self._conn.execute(
+            "UPDATE beliefs SET locked = 1 WHERE belief_type = 'correction' AND locked = 0"
+        )
+        self._conn.commit()
+        return cursor.rowcount
 
     def _migrate_sessions(self) -> None:
         """Add token tracking columns to sessions if missing (existing DBs)."""
