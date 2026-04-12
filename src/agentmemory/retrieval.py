@@ -111,15 +111,31 @@ def retrieve(
     5. Score, sort, compress, pack into budget.
     """
     current_time: str = _now_iso()
+    query_stripped: str = query.strip()
 
-    # Step 1: locked beliefs (L0), capped.
-    locked_beliefs: list[Belief] = store.get_locked_beliefs() if include_locked else []
-    if len(locked_beliefs) > max_locked:
-        locked_beliefs = locked_beliefs[:max_locked]
+    # Step 1: locked beliefs (L0), relevance-filtered.
+    # Split into relevant (query term overlap) and irrelevant.
+    # Include all relevant locked beliefs, cap irrelevant ones to avoid noise.
+    locked_beliefs: list[Belief] = []
+    if include_locked:
+        all_locked: list[Belief] = store.get_locked_beliefs()
+        query_terms_lower: list[str] = [t.lower() for t in query_stripped.split() if len(t) >= 2]
+        relevant_locked: list[Belief] = []
+        irrelevant_locked: list[Belief] = []
+        for belief in all_locked:
+            content_lower: str = belief.content.lower()
+            if any(term in content_lower for term in query_terms_lower):
+                relevant_locked.append(belief)
+            else:
+                irrelevant_locked.append(belief)
+        # All relevant locked beliefs are included.
+        # Cap irrelevant ones to avoid budget waste (keep a small sample
+        # so truly universal constraints still surface).
+        max_irrelevant: int = min(10, max_locked - len(relevant_locked))
+        locked_beliefs = relevant_locked + irrelevant_locked[:max(0, max_irrelevant)]
 
     # Step 2: FTS5 search (L2).
     fts_beliefs: list[Belief] = []
-    query_stripped: str = query.strip()
     if query_stripped:
         fts_beliefs = store.search(query_stripped, top_k=top_k)
 
