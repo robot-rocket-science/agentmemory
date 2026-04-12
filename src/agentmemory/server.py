@@ -415,6 +415,14 @@ def status() -> str:
             lines.append(f"  corrections_detected: {session.corrections_detected}")
             lines.append(f"  searches_performed: {session.searches_performed}")
 
+    # Health metrics
+    health: dict[str, object] = store.get_health_metrics()
+    lines.append("Health:")
+    lines.append(f"  credal_gap: {health['credal_gap_count']} ({health['credal_gap_pct']}%) at type prior")
+    lines.append(f"  orphans: {health['orphan_count']} ({health['orphan_pct']}%) no edges")
+    lines.append(f"  edges: {health['contradicts_edges']} CONTRADICTS, {health['supports_edges']} SUPPORTS, {health['supersedes_edges']} SUPERSEDES")
+    lines.append(f"  feedback_coverage: {health['feedback_coverage_count']} ({health['feedback_coverage_pct']}%)")
+
     return "\n".join(lines)
 
 

@@ -1254,6 +1254,148 @@ class MemoryStore:
             "sessions": count("SELECT COUNT(*) FROM sessions"),
         }
 
+    def get_health_metrics(self) -> dict[str, object]:
+        """Return diagnostic health metrics for the memory system.
+
+        Includes credal gap (beliefs at type prior), orphan count,
+        edge type breakdown, feedback coverage, and stale sessions.
+        """
+        def count(sql: str) -> int:
+            row: sqlite3.Row = self._conn.execute(sql).fetchone()
+            val: object = row[0]
+            if not isinstance(val, int):
+                return 0
+            return val
+
+        def count_float(sql: str) -> float:
+            row: sqlite3.Row = self._conn.execute(sql).fetchone()
+            val: object = row[0]
+            if val is None:
+                return 0.0
+            return float(str(val))
+
+        active: int = count(
+            "SELECT COUNT(*) FROM beliefs WHERE valid_to IS NULL"
+        )
+
+        # Credal gap: beliefs whose (alpha, beta_param) match the most
+        # common prior for their type (within epsilon). These have never
+        # received feedback.
+        # Detect type priors by most common (alpha, beta_param) per type.
+        type_prior_rows: list[sqlite3.Row] = self._conn.execute(
+            """SELECT belief_type,
+                      ROUND(alpha, 1) AS a, ROUND(beta_param, 1) AS b,
+                      COUNT(*) AS cnt
+               FROM beliefs WHERE valid_to IS NULL
+               GROUP BY belief_type, a, b
+               ORDER BY belief_type, cnt DESC"""
+        ).fetchall()
+
+        # Pick the most common (alpha, beta) per type
+        type_priors: dict[str, tuple[float, float]] = {}
+        for row in type_prior_rows:
+            bt: str = str(row["belief_type"])
+            if bt not in type_priors:
+                type_priors[bt] = (float(str(row["a"])), float(str(row["b"])))
+
+        # Count beliefs at their type prior
+        at_prior: int = 0
+        epsilon: float = 0.15
+        belief_rows: list[sqlite3.Row] = self._conn.execute(
+            "SELECT belief_type, alpha, beta_param FROM beliefs WHERE valid_to IS NULL"
+        ).fetchall()
+        for row in belief_rows:
+            bt = str(row["belief_type"])
+            prior = type_priors.get(bt)
+            if prior is None:
+                continue
+            if (abs(float(str(row["alpha"])) - prior[0]) < epsilon
+                    and abs(float(str(row["beta_param"])) - prior[1]) < epsilon):
+                at_prior += 1
+
+        # Orphans: beliefs with no edges at all
+        orphan: int = count(
+            """SELECT COUNT(*) FROM beliefs b
+               WHERE b.valid_to IS NULL
+                 AND b.id NOT IN (SELECT from_id FROM edges)
+                 AND b.id NOT IN (SELECT to_id FROM edges)"""
+        )
+
+        # Edge type breakdown
+        contradicts: int = count(
+            "SELECT COUNT(*) FROM edges WHERE edge_type = 'CONTRADICTS'"
+        )
+        supports: int = count(
+            "SELECT COUNT(*) FROM edges WHERE edge_type = 'SUPPORTS'"
+        )
+        supersedes: int = count(
+            "SELECT COUNT(*) FROM edges WHERE edge_type = 'SUPERSEDES'"
+        )
+
+        # Feedback coverage: beliefs with at least one test result
+        with_feedback: int = count(
+            """SELECT COUNT(DISTINCT belief_id) FROM tests"""
+        )
+
+        # Average confidence
+        avg_conf: float = count_float(
+            "SELECT AVG(confidence) FROM beliefs WHERE valid_to IS NULL"
+        )
+
+        # Stale sessions
+        stale: int = count(
+            "SELECT COUNT(*) FROM sessions WHERE completed_at IS NULL"
+        )
+
+        credal_gap_pct: float = (at_prior / active * 100) if active > 0 else 0.0
+        orphan_pct: float = (orphan / active * 100) if active > 0 else 0.0
+        feedback_pct: float = (with_feedback / active * 100) if active > 0 else 0.0
+
+        return {
+            "active_beliefs": active,
+            "credal_gap_count": at_prior,
+            "credal_gap_pct": round(credal_gap_pct, 1),
+            "orphan_count": orphan,
+            "orphan_pct": round(orphan_pct, 1),
+            "contradicts_edges": contradicts,
+            "supports_edges": supports,
+            "supersedes_edges": supersedes,
+            "feedback_coverage_count": with_feedback,
+            "feedback_coverage_pct": round(feedback_pct, 1),
+            "avg_confidence": round(avg_conf, 3),
+            "stale_sessions": stale,
+            "type_priors": type_priors,
+        }
+
+    def get_snapshot(
+        self,
+        at_time: str | None = None,
+        belief_type: str | None = None,
+        limit: int = 200,
+    ) -> list[Belief]:
+        """Return beliefs that were active at a specific point in time.
+
+        If at_time is None, returns currently active beliefs.
+        Excludes superseded beliefs (valid_to <= at_time).
+        """
+        if at_time is None:
+            at_time = _now()
+
+        sql: str = """SELECT * FROM beliefs
+                      WHERE created_at <= ?
+                        AND (valid_to IS NULL OR valid_to > ?)"""
+        params: list[object] = [at_time, at_time]
+
+        if belief_type is not None:
+            sql += " AND belief_type = ?"
+            params.append(belief_type)
+
+        sql += " ORDER BY confidence DESC LIMIT ?"
+        params.append(limit)
+
+        rows: list[sqlite3.Row] = self._conn.execute(sql, tuple(params)).fetchall()
+        return [_row_to_belief(r) for r in rows]
+
     def close(self) -> None:
         """Close the database connection."""
         self._conn.close()

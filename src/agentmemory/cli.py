@@ -566,12 +566,25 @@ def cmd_health(args: argparse.Namespace) -> None:
     """Run diagnostics."""
     # Show stats first
     cmd_stats(args)
+
+    store = _get_store()
+    metrics: dict[str, object] = store.get_health_metrics()
+    store.close()
+
+    active: int = int(str(metrics["active_beliefs"]))
+
     print("\n  Diagnostics:")
-    print("    TODO: implement diagnostic checks")
-    print("    - orphaned beliefs (no observation link)")
-    print("    - graph connectivity issues")
-    print("    - stale/incomplete sessions")
-    print("    - FTS5 index integrity")
+    print(f"    Credal gap: {metrics['credal_gap_count']} / {active}"
+          f" ({metrics['credal_gap_pct']}%) beliefs at type prior (untested)")
+    print(f"    Orphans: {metrics['orphan_count']}"
+          f" ({metrics['orphan_pct']}%) beliefs with no edges")
+    print(f"    Edges: {metrics['contradicts_edges']} CONTRADICTS,"
+          f" {metrics['supports_edges']} SUPPORTS,"
+          f" {metrics['supersedes_edges']} SUPERSEDES")
+    print(f"    Feedback coverage: {metrics['feedback_coverage_count']}"
+          f" ({metrics['feedback_coverage_pct']}%) beliefs with test results")
+    print(f"    Avg confidence: {metrics['avg_confidence']}")
+    print(f"    Stale sessions: {metrics['stale_sessions']} incomplete")
 
 
 # ---------------------------------------------------------------------------
