@@ -27,6 +27,7 @@ from agentmemory.models import (
     OBS_TYPE_CONVERSATION,
     Observation,
 )
+from agentmemory.relationship_detector import detect_relationships
 from agentmemory.store import MemoryStore
 from agentmemory.supersession import check_temporal_supersession
 
@@ -193,6 +194,7 @@ def create_beliefs_from_classified(
         result.sentences_persisted += 1
 
         check_temporal_supersession(store, belief)
+        detect_relationships(store, belief)
 
         if cs.sentence_type == "CORRECTION":
             raw_words: list[str] = [
