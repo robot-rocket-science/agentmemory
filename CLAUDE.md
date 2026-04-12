@@ -27,6 +27,7 @@ This project has a persistent memory system running as an MCP server. You MUST u
 | `mcp__agentmemory__search` | Before answering questions about project context | `search("retrieval architecture")` |
 | `mcp__agentmemory__remember` | When user states a rule or decision | `remember("always use uv for Python")` |
 | `mcp__agentmemory__correct` | When user corrects you | `correct("use B not A", replaces="approach A")` |
+| `mcp__agentmemory__lock` | ONLY after user explicitly confirms locking | `lock("a1b2c3d4e5f6")` |
 | `mcp__agentmemory__observe` | When you learn something notable | `observe("user prefers terse responses")` |
 | `mcp__agentmemory__ingest` | To process conversation text through classification pipeline | `ingest("the full turn text", source="user")` |
 | `mcp__agentmemory__onboard` | To bulk-ingest conversation logs | `onboard("~/.claude/conversation-logs/turns.jsonl")` |
@@ -34,9 +35,14 @@ This project has a persistent memory system running as an MCP server. You MUST u
 | `mcp__agentmemory__status` | To check memory system health | `status()` |
 | `mcp__agentmemory__get_locked` | To load all active constraints | `get_locked()` |
 
+### Locking Workflow
+
+Beliefs created by `remember()` and `correct()` are NOT locked by default. After creating a belief, you MUST ask the user if they want to lock it. Only call `lock(belief_id)` after the user explicitly confirms. Never lock a belief without user confirmation.
+
 ### What NOT to Do
 
 - Do not ignore locked beliefs. They are non-negotiable constraints.
+- Do not call `lock()` without explicit user confirmation. This is the most important rule.
 - Do not store ephemeral content (greetings, status updates, "ok", "proceed"). Only persist decisions, corrections, facts, requirements, preferences.
 - Do not re-ask the user for information that might be in memory. Search first.
 

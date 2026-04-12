@@ -19,6 +19,7 @@ from agentmemory.server import (
     feedback,
     get_locked,
     ingest,
+    lock,
     observe,
     remember,
     search,
@@ -48,20 +49,22 @@ def test_remember_creates_high_confidence_belief() -> None:
 
     assert "Remembered" in result
     assert "ID:" in result
-    assert "locked: True" in result
+    assert "locked: False" in result
     assert "100%" in result or "95%" in result or "%" in result
 
     store: MemoryStore = server_mod._get_store()  # pyright: ignore[reportPrivateUsage]
-    locked: list[Belief] = store.get_locked_beliefs()
-    assert len(locked) == 1
 
-    # Verify the belief exists and has high confidence and IS locked
+    # remember() no longer auto-locks; belief should NOT be in locked list
+    locked: list[Belief] = store.get_locked_beliefs()
+    assert len(locked) == 0
+
+    # Verify the belief exists and has high confidence but is NOT locked
     beliefs: list[sqlite3.Row] = store.query("SELECT * FROM beliefs WHERE valid_to IS NULL")
     assert len(beliefs) == 1
     belief: Belief | None = store.get_belief(str(beliefs[0]["id"]))
     assert belief is not None
     assert belief.content == text
-    assert belief.locked is True
+    assert belief.locked is False
     assert belief.source_type == "user_stated"
     assert belief.alpha == pytest.approx(9.0)  # pyright: ignore[reportUnknownMemberType]
 
@@ -86,7 +89,7 @@ def test_correct_supersedes_existing() -> None:
     )
 
     assert "Correction recorded" in result
-    assert "locked: True" in result
+    assert "locked: False" in result
     assert "Superseded belief ID:" in result
 
     store: MemoryStore = server_mod._get_store()  # pyright: ignore[reportPrivateUsage]
@@ -101,19 +104,20 @@ def test_correct_without_replaces() -> None:
     assert "Correction recorded" in result
     assert "ID:" in result
     assert "Superseded" not in result
+    assert "Ask the user" in result
 
     store: MemoryStore = server_mod._get_store()  # pyright: ignore[reportPrivateUsage]
-    # correct() now creates locked beliefs
+    # correct() no longer auto-locks
     locked: list[Belief] = store.get_locked_beliefs()
-    assert len(locked) == 1
+    assert len(locked) == 0
 
-    # Verify locked, high-confidence correction belief
+    # Verify high-confidence but unlocked correction belief
     beliefs: list[sqlite3.Row] = store.query("SELECT * FROM beliefs WHERE valid_to IS NULL")
     assert len(beliefs) == 1
     belief: Belief | None = store.get_belief(str(beliefs[0]["id"]))
     assert belief is not None
     assert belief.source_type == "user_corrected"
-    assert belief.locked is True
+    assert belief.locked is False
     assert belief.confidence > 0.8
 
 
@@ -147,10 +151,10 @@ def test_status_returns_counts() -> None:
     assert "sessions:" in result
 
     # There should be 2 beliefs (remember + correct) and 1 observation
-    # Both remember() and correct() now create locked beliefs
+    # Neither remember() nor correct() auto-lock; locking requires user confirmation
     assert "observations: 1" in result
     assert "beliefs: 2" in result
-    assert "locked: 2" in result
+    assert "locked: 0" in result
     assert "sessions: 1" in result
 
 
@@ -195,6 +199,44 @@ def test_get_locked_returns_only_locked() -> None:
 def test_get_locked_empty() -> None:
     result: str = get_locked()
     assert "No locked beliefs found." in result
+
+
+def test_lock_requires_explicit_call() -> None:
+    """remember() + lock() workflow: belief only locked after explicit lock()."""
+    result: str = remember("Always use strict typing.")
+    # Extract belief ID from result
+    belief_id: str = result.split("ID: ")[1].split(")")[0]
+
+    store: MemoryStore = server_mod._get_store()  # pyright: ignore[reportPrivateUsage]
+    assert len(store.get_locked_beliefs()) == 0
+
+    # Now explicitly lock it
+    lock_result: str = lock(belief_id)
+    assert "Locked" in lock_result
+    assert "locked: True" in lock_result
+
+    locked: list[Belief] = store.get_locked_beliefs()
+    assert len(locked) == 1
+    assert locked[0].content == "Always use strict typing."
+
+
+def test_lock_nonexistent_belief() -> None:
+    result: str = lock("nonexistent_id_123")
+    assert "Error" in result
+
+
+def test_lock_already_locked() -> None:
+    store: MemoryStore = server_mod._get_store()  # pyright: ignore[reportPrivateUsage]
+    belief: Belief = store.insert_belief(
+        content="Already locked.",
+        belief_type="factual",
+        source_type="user_stated",
+        alpha=9.0,
+        beta_param=0.5,
+        locked=True,
+    )
+    result: str = lock(belief.id)
+    assert "Already locked" in result
 
 
 def test_search_respects_budget() -> None:

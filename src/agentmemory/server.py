@@ -260,11 +260,11 @@ def search(query: str, budget: int = 2000) -> str:
 
 @mcp.tool
 def remember(text: str) -> str:
-    """Create a locked, high-confidence belief from a user statement.
+    """Create a high-confidence belief from a user statement.
 
-    Sets source_type='user_stated', alpha=9.0, beta_param=0.5, locked=True.
-    User-stated beliefs are permanent constraints that persist across sessions.
-    Returns confirmation with belief ID.
+    Sets source_type='user_stated', alpha=9.0, beta_param=0.5, locked=False.
+    The belief is NOT locked until the user explicitly confirms via lock().
+    Returns belief ID and prompts for user confirmation before locking.
     """
     store: MemoryStore = _get_store()
     session_id: str = _ensure_session()
@@ -274,22 +274,24 @@ def remember(text: str) -> str:
         source_type=BSRC_USER_STATED,
         alpha=9.0,
         beta_param=0.5,
-        locked=True,
+        locked=False,
     )
     store.checkpoint(session_id, "remember", belief.content, [belief.id])
     store.increment_session_metrics(session_id, beliefs_created=1)
     return (
         f"Remembered (ID: {belief.id}): {belief.content} "
-        f"[confidence: {belief.confidence:.0%}, locked: {belief.locked}]"
+        f"[confidence: {belief.confidence:.0%}, locked: False] "
+        f"Ask the user: 'Lock this as a permanent belief? "
+        f"lock({belief.id})'"
     )
 
 
 @mcp.tool
 def correct(text: str, replaces: str | None = None) -> str:
-    """Record a user correction as a locked belief.
+    """Record a user correction as a high-confidence belief.
 
-    Creates a locked, high-confidence belief with source_type='user_corrected'.
-    Corrections are permanent constraints that persist across sessions.
+    Creates a high-confidence belief with source_type='user_corrected'.
+    The belief is NOT locked until the user explicitly confirms via lock().
     If replaces is provided (a search query), finds the best matching
     existing belief and supersedes it.
     """
@@ -301,7 +303,7 @@ def correct(text: str, replaces: str | None = None) -> str:
         source_type=BSRC_USER_CORRECTED,
         alpha=9.0,
         beta_param=0.5,
-        locked=True,
+        locked=False,
     )
 
     superseded_msg: str = ""
@@ -328,8 +330,38 @@ def correct(text: str, replaces: str | None = None) -> str:
     )
     return (
         f"Correction recorded (ID: {belief.id}): {belief.content} "
-        f"[confidence: {belief.confidence:.0%}, locked: {belief.locked}]."
-        f"{superseded_msg}"
+        f"[confidence: {belief.confidence:.0%}, locked: False]."
+        f"{superseded_msg} "
+        f"Ask the user: 'Lock this as a permanent correction? "
+        f"lock({belief.id})'"
+    )
+
+
+@mcp.tool
+def lock(belief_id: str) -> str:
+    """Lock a belief as a permanent constraint.
+
+    Only call this AFTER the user has explicitly confirmed they want the
+    belief locked. Locked beliefs persist across all sessions, cannot have
+    their confidence reduced, and are injected into every session context.
+
+    Returns confirmation or error if belief not found.
+    """
+    store: MemoryStore = _get_store()
+    session_id: str = _ensure_session()
+    belief: Belief | None = store.get_belief(belief_id)
+    if belief is None:
+        return f"Error: no belief found with ID {belief_id}"
+    if belief.locked:
+        return (
+            f"Already locked (ID: {belief.id}): {belief.content} "
+            f"[confidence: {belief.confidence:.0%}]"
+        )
+    store.lock_belief(belief_id)
+    store.checkpoint(session_id, "lock", belief.content, [belief.id])
+    return (
+        f"Locked (ID: {belief.id}): {belief.content} "
+        f"[confidence: {belief.confidence:.0%}, locked: True]"
     )
 
 

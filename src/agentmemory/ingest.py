@@ -193,7 +193,8 @@ def ingest_turn(
                         break
 
     # If the full turn was flagged as a correction but no sentence was classified
-    # as CORRECTION, insert the full text as a locked high-confidence belief.
+    # as CORRECTION, insert the full text as a high-confidence belief (unlocked).
+    # Locking requires explicit user confirmation via the lock() tool.
     if full_text_is_correction and result.sentences_persisted == 0:
         prior_alpha: float = 9.0
         prior_beta: float = 1.0
@@ -203,7 +204,7 @@ def ingest_turn(
             source_type=BSRC_USER_CORRECTED,
             alpha=prior_alpha,
             beta_param=prior_beta,
-            locked=True,
+            locked=False,
             observation_id=observation.id,
             created_at=created_at,
         )
