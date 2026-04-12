@@ -11,6 +11,9 @@ Provides direct commands that execute without LLM involvement:
   agentmemory remember <text>    -- store a new belief
   agentmemory lock <text>        -- create a locked belief
   agentmemory delete <id> [...]   -- soft-delete beliefs by ID
+  agentmemory timeline           -- beliefs ordered by time with filters
+  agentmemory evolution          -- trace belief/topic evolution
+  agentmemory diff <since>       -- show what changed since a time
   agentmemory commit-check       -- check time/changes since last commit
   agentmemory commit-config      -- view or update commit tracker settings
   agentmemory help               -- command reference
@@ -977,6 +980,103 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _resolve_relative_time(time_str: str) -> str:
+    """Resolve '-7d', '-24h', '-30m' to ISO 8601."""
+    import re as _re
+    from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+    match: _re.Match[str] | None = _re.match(r"^-(\d+)([dhm])$", time_str)
+    if match:
+        value: int = int(match.group(1))
+        unit: str = match.group(2)
+        delta: _td
+        if unit == "d":
+            delta = _td(days=value)
+        elif unit == "h":
+            delta = _td(hours=value)
+        else:
+            delta = _td(minutes=value)
+        return (_dt.now(_tz.utc) - delta).isoformat()
+    return time_str
+
+
+# ---------------------------------------------------------------------------
+# temporal queries (Wave 2)
+# ---------------------------------------------------------------------------
+
+
+def cmd_timeline(args: argparse.Namespace) -> None:
+    """Show beliefs ordered by time with optional filters."""
+    store: MemoryStore = _get_store()
+    start: str | None = _resolve_relative_time(args.since) if args.since else None
+    end: str | None = _resolve_relative_time(args.until) if args.until else None
+    beliefs: list[Belief] = store.timeline(
+        topic=args.topic, start=start, end=end,
+        session_id=args.session, limit=args.limit,
+    )
+    if not beliefs:
+        print("No beliefs found.")
+        store.close()
+        return
+    print(f"Timeline: {len(beliefs)} belief(s)\n")
+    for b in beliefs:
+        status: str = " [SUPERSEDED]" if b.valid_to else ""
+        lock: str = " [LOCKED]" if b.locked else ""
+        print(f"  [{b.created_at[:19]}] ({b.belief_type}){lock}{status}")
+        print(f"    {b.content[:120]}")
+    store.close()
+
+
+def cmd_evolution(args: argparse.Namespace) -> None:
+    """Trace belief or topic evolution over time."""
+    store: MemoryStore = _get_store()
+    beliefs: list[Belief] = store.evolution(
+        belief_id=args.belief_id, topic=args.topic,
+    )
+    if not beliefs:
+        print("No evolution chain found.")
+        store.close()
+        return
+    print(f"Evolution: {len(beliefs)} belief(s)\n")
+    for i, b in enumerate(beliefs):
+        marker: str = " -> " if i > 0 else "    "
+        status: str = "[SUPERSEDED]" if b.valid_to else "[CURRENT]   "
+        lock: str = " [LOCKED]" if b.locked else ""
+        print(f"  {marker}{status}{lock} ({b.id})")
+        print(f"        [{b.created_at[:19]}] {b.content[:120]}")
+    store.close()
+
+
+def cmd_diff(args: argparse.Namespace) -> None:
+    """Show what changed in the belief store over a time period."""
+    store: MemoryStore = _get_store()
+    since: str = _resolve_relative_time(args.since)
+    until: str | None = _resolve_relative_time(args.until) if args.until else None
+    changes: dict[str, list[Belief]] = store.diff(since=since, until=until)
+    added: list[Belief] = changes["added"]
+    removed: list[Belief] = changes["removed"]
+    evolved: list[Belief] = changes["evolved"]
+
+    print(f"Diff since {since[:19]}:\n")
+    print(f"  ADDED: {len(added)}")
+    for b in added[:10]:
+        print(f"    + [{b.belief_type}] {b.content[:100]}")
+    if len(added) > 10:
+        print(f"    ... and {len(added) - 10} more")
+
+    print(f"\n  REMOVED: {len(removed)}")
+    for b in removed[:10]:
+        print(f"    - [{b.belief_type}] {b.content[:100]}")
+    if len(removed) > 10:
+        print(f"    ... and {len(removed) - 10} more")
+
+    print(f"\n  EVOLVED: {len(evolved)}")
+    for b in evolved[:10]:
+        print(f"    ~ [{b.belief_type}] {b.content[:100]}")
+    if len(evolved) > 10:
+        print(f"    ... and {len(evolved) - 10} more")
+    store.close()
+
+
 # ---------------------------------------------------------------------------
 # settings
 # ---------------------------------------------------------------------------
@@ -1309,6 +1409,33 @@ def main() -> None:
     )
     p_delete.add_argument("ids", nargs="+", help="One or more belief IDs to delete")
     p_delete.set_defaults(func=cmd_delete)
+
+    # timeline
+    p_timeline: argparse.ArgumentParser = subparsers.add_parser(
+        "timeline", help="Show beliefs ordered by time"
+    )
+    p_timeline.add_argument("--topic", default=None, help="FTS5 topic filter")
+    p_timeline.add_argument("--since", default=None, help="Start time (ISO 8601 or -7d/-24h)")
+    p_timeline.add_argument("--until", default=None, help="End time (ISO 8601 or -7d/-24h)")
+    p_timeline.add_argument("--session", default=None, help="Filter by session ID")
+    p_timeline.add_argument("--limit", type=int, default=50, help="Max beliefs (default: 50)")
+    p_timeline.set_defaults(func=cmd_timeline)
+
+    # evolution
+    p_evolution: argparse.ArgumentParser = subparsers.add_parser(
+        "evolution", help="Trace belief or topic evolution"
+    )
+    p_evolution.add_argument("--belief-id", default=None, help="Follow SUPERSEDES chain for this belief")
+    p_evolution.add_argument("--topic", default=None, help="Show all beliefs about topic chronologically")
+    p_evolution.set_defaults(func=cmd_evolution)
+
+    # diff
+    p_diff: argparse.ArgumentParser = subparsers.add_parser(
+        "diff", help="Show what changed over a time period"
+    )
+    p_diff.add_argument("since", help="Start time (ISO 8601 or -7d/-24h)")
+    p_diff.add_argument("--until", default=None, help="End time (default: now)")
+    p_diff.set_defaults(func=cmd_diff)
 
     # settings
     p_settings: argparse.ArgumentParser = subparsers.add_parser(
