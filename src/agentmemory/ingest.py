@@ -27,6 +27,7 @@ from agentmemory.models import (
     OBS_TYPE_CONVERSATION,
 )
 from agentmemory.store import MemoryStore
+from agentmemory.supersession import check_temporal_supersession
 
 
 # ---------------------------------------------------------------------------
@@ -83,6 +84,7 @@ def ingest_turn(
     use_llm: bool = True,
     client: Anthropic | None = None,
     created_at: str | None = None,
+    source_path: str = "",
 ) -> IngestResult:
     """Process a single conversation turn end-to-end.
 
@@ -104,6 +106,7 @@ def ingest_turn(
         observation_type=OBS_TYPE_CONVERSATION,
         source_type=source,
         source_id=source,
+        source_path=source_path,
         session_id=session_id,
     )
     result.observations_created = 1
@@ -163,6 +166,10 @@ def ingest_turn(
         )
         result.beliefs_created += 1
         result.sentences_persisted += 1
+
+        # Temporal supersession: check if this belief supersedes an older
+        # one about the same topic (time + term overlap).
+        check_temporal_supersession(store, belief)
 
         # For corrections: search for existing beliefs that might be superseded
         if is_correction:
