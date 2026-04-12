@@ -91,9 +91,23 @@ _COMMAND_DEFS: dict[str, dict[str, str]] = {
     "onboard": {
         "description": "Scan a project directory and ingest it into agentmemory.",
         "argument_hint": "Path to project directory (e.g. . or ~/projects/myapp)",
-        "tools": "Bash",
-        "objective": "Onboard a project into agentmemory by scanning its directory.",
-        "process": "Run: `uv run agentmemory onboard $ARGUMENTS`\nDisplay the output. Do not add commentary.",
+        "tools": "Bash, Agent",
+        "objective": "Onboard a project into agentmemory with optional LLM reclassification.",
+        "process": (
+            "1. Run: `uv run agentmemory onboard $ARGUMENTS` to scan and ingest with offline classification.\n"
+            "2. Display the onboard summary.\n"
+            "3. Call the MCP tool `mcp__agentmemory__get_unclassified` with limit=200 to get beliefs eligible for LLM reclassification.\n"
+            "4. If there are beliefs to reclassify, batch them into groups of 20.\n"
+            "5. For each batch, spawn a Haiku subagent (model=haiku) with this prompt:\n"
+            '   "Classify each sentence. For EACH, output JSON: [{id, persist, type}].\n'
+            '   persist: PERSIST or EPHEMERAL. type: one of REQUIREMENT, CORRECTION, PREFERENCE, FACT, ASSUMPTION, DECISION, ANALYSIS, COORDINATION, QUESTION, META.\n'
+            '   Be conservative: when in doubt, EPHEMERAL.\n'
+            '   Sentences:\\n{numbered list of sentences with their belief IDs}"\n'
+            "   Spawn batches in parallel (up to 5 concurrent subagents).\n"
+            "6. Collect JSON results from all subagents.\n"
+            "7. Call `mcp__agentmemory__reclassify` with the combined JSON mappings.\n"
+            "8. Display the reclassification summary.\n"
+        ),
     },
     "stats": {
         "description": "Show detailed agentmemory analytics: confidence distribution, beliefs by type, age.",
@@ -427,7 +441,6 @@ def cmd_onboard(args: argparse.Namespace) -> None:
             text=node.content,
             source=source,
             session_id=None,
-            use_llm=False,
             created_at=node.date,
         )
         aggregate.merge(turn_result)

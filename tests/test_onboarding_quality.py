@@ -1,18 +1,16 @@
 """Tests for offline vs LLM classification accuracy on known sentences.
 
 Validates that classify_sentences_offline handles common sentence patterns
-correctly, and that the LLM path (mocked) would get them right.
+correctly, and that parse_classification_response handles LLM output correctly.
 """
 from __future__ import annotations
-
-from unittest.mock import MagicMock
 
 import pytest
 
 from agentmemory.classification import (
     ClassifiedSentence,
-    classify_sentences,
     classify_sentences_offline,
+    parse_classification_response,
 )
 
 
@@ -210,51 +208,37 @@ class TestLLMClassificationMocked:
             items.append({"id": i, "persist": persist_label, "type": expected_type})
         return json.dumps(items)
 
-    def test_llm_path_returns_correct_types(self) -> None:
-        """With a perfect LLM mock, all 15 sentences should be classified correctly."""
+    def test_parse_response_returns_correct_types(self) -> None:
+        """With a perfect LLM response, all 15 sentences should be classified correctly."""
         mock_response_text: str = self._build_mock_response(ALL_SENTENCES)
 
-        # Build a mock Anthropic client
-        mock_client: MagicMock = MagicMock()
-        mock_block: MagicMock = MagicMock()
-        mock_block.type = "text"
-        mock_block.text = mock_response_text
-        mock_client.messages.create.return_value.content = [mock_block]
-
         pairs: list[tuple[str, str]] = [(t, s) for t, s, _, _ in ALL_SENTENCES]
-        results: list[ClassifiedSentence] = classify_sentences(pairs, client=mock_client)
+        results: list[ClassifiedSentence] = parse_classification_response(mock_response_text, pairs)
 
         assert len(results) == 15
 
         for cs, (text, _, expected_type, expected_persist) in zip(results, ALL_SENTENCES, strict=True):
             assert cs.sentence_type == expected_type, (
-                f"LLM mock: expected {expected_type} for {text!r}, got {cs.sentence_type}"
+                f"Parse: expected {expected_type} for {text!r}, got {cs.sentence_type}"
             )
             assert cs.persist is expected_persist, (
-                f"LLM mock: expected persist={expected_persist} for {text!r}, got {cs.persist}"
+                f"Parse: expected persist={expected_persist} for {text!r}, got {cs.persist}"
             )
 
-    def test_llm_corrections_are_persist_and_high_confidence(self) -> None:
-        """Corrections from LLM path should have high alpha (9.0) and persist=True."""
+    def test_parse_corrections_are_persist_and_high_confidence(self) -> None:
+        """Corrections from parsed response should have high alpha (9.0) and persist=True."""
         mock_response_text: str = self._build_mock_response(CORRECTIONS)
 
-        mock_client: MagicMock = MagicMock()
-        mock_block: MagicMock = MagicMock()
-        mock_block.type = "text"
-        mock_block.text = mock_response_text
-        mock_client.messages.create.return_value.content = [mock_block]
-
         pairs: list[tuple[str, str]] = [(t, s) for t, s, _, _ in CORRECTIONS]
-        results: list[ClassifiedSentence] = classify_sentences(pairs, client=mock_client)
+        results: list[ClassifiedSentence] = parse_classification_response(mock_response_text, pairs)
 
         for cs in results:
             assert cs.persist is True
             assert cs.alpha == pytest.approx(9.0)  # pyright: ignore[reportUnknownMemberType]
             assert cs.sentence_type == "CORRECTION"
 
-    def test_llm_ephemeral_not_persisted(self) -> None:
-        """Ephemeral sentences from LLM should have persist=False."""
-        # Build response where ephemeral items have COORDINATION/QUESTION types
+    def test_parse_ephemeral_not_persisted(self) -> None:
+        """Ephemeral sentences from parsed response should have persist=False."""
         mock_items: list[tuple[str, str, str, bool]] = [
             ("ok", "user", "COORDINATION", False),
             ("sounds good", "user", "COORDINATION", False),
@@ -262,16 +246,10 @@ class TestLLMClassificationMocked:
         ]
         mock_response_text: str = self._build_mock_response(mock_items)
 
-        mock_client: MagicMock = MagicMock()
-        mock_block: MagicMock = MagicMock()
-        mock_block.type = "text"
-        mock_block.text = mock_response_text
-        mock_client.messages.create.return_value.content = [mock_block]
-
         pairs: list[tuple[str, str]] = [(t, s) for t, s, _, _ in mock_items]
-        results: list[ClassifiedSentence] = classify_sentences(pairs, client=mock_client)
+        results: list[ClassifiedSentence] = parse_classification_response(mock_response_text, pairs)
 
         for cs in results:
             assert cs.persist is False, (
-                f"LLM should mark '{cs.text}' as EPHEMERAL, got persist={cs.persist}"
+                f"Parse should mark '{cs.text}' as EPHEMERAL, got persist={cs.persist}"
             )

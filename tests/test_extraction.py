@@ -1,13 +1,12 @@
 """Tests for the Exp 61 extraction and classification pipeline modules."""
 from __future__ import annotations
 
-import os
 from collections.abc import Generator
 from pathlib import Path
 
 import pytest
 
-from agentmemory.classification import classify_sentences, classify_sentences_offline
+from agentmemory.classification import classify_sentences_offline
 from agentmemory.correction_detection import detect_correction
 from agentmemory.extraction import extract_sentences
 from agentmemory.ingest import IngestResult, ingest_turn
@@ -16,8 +15,6 @@ from agentmemory.store import MemoryStore
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
-
-_HAS_API_KEY: bool = bool(os.environ.get("ANTHROPIC_API_KEY"))
 
 
 @pytest.fixture()
@@ -238,8 +235,7 @@ def test_ingest_turn_creates_observation_and_beliefs(store: MemoryStore) -> None
         store=store,
         text=text,
         source="user",
-        use_llm=False,
-    )
+            )
     assert result.observations_created == 1
     assert result.sentences_extracted >= 1
     # At least one sentence should persist (strong correction signals)
@@ -252,14 +248,12 @@ def test_ingest_turn_user_vs_assistant(store: MemoryStore) -> None:
         store=store,
         text="We have decided to use PostgreSQL for the backend database.",
         source="user",
-        use_llm=False,
-    )
+            )
     assistant_result: IngestResult = ingest_turn(
         store=store,
         text="The schema migration completed successfully across all environments.",
         source="assistant",
-        use_llm=False,
-    )
+            )
     assert user_result.observations_created == 1
     assert assistant_result.observations_created == 1
 
@@ -270,8 +264,7 @@ def test_ingest_turn_empty_text(store: MemoryStore) -> None:
         store=store,
         text="",
         source="user",
-        use_llm=False,
-    )
+            )
     assert result.sentences_extracted == 0
     assert result.beliefs_created == 0
 
@@ -281,22 +274,22 @@ def test_ingest_turn_empty_text(store: MemoryStore) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_correction_creates_locked_belief(store: MemoryStore) -> None:
-    """A user correction turn produces locked, high-confidence beliefs."""
+def test_correction_creates_unlocked_belief(store: MemoryStore) -> None:
+    """A user correction turn produces high-confidence beliefs but NOT locked.
+    Locking requires explicit user confirmation via lock()."""
     text: str = "do not use async_bash, always use the regular bash tool instead"
     result: IngestResult = ingest_turn(
         store=store,
         text=text,
         source="user",
-        use_llm=False,
-    )
+            )
     # Corrections are detected and persisted as beliefs
     assert result.corrections_detected >= 1
     assert result.beliefs_created >= 1
 
-    # Corrections are locked (permanent constraints)
+    # Corrections are NOT auto-locked -- only lock() does that
     locked = store.get_locked_beliefs()
-    assert len(locked) >= 1
+    assert len(locked) == 0
 
 
 def test_correction_detection_count(store: MemoryStore) -> None:
@@ -306,40 +299,26 @@ def test_correction_detection_count(store: MemoryStore) -> None:
         store=store,
         text=text,
         source="user",
-        use_llm=False,
-    )
+            )
     assert result.corrections_detected >= 1
 
 
 # ---------------------------------------------------------------------------
-# 7. LLM classification (skipped if no API key)
+# 7. LLM classification prompt builder
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skipif(
-    not _HAS_API_KEY,
-    reason="ANTHROPIC_API_KEY not set",
-)
-def test_classify_sentences_llm() -> None:
-    """LLM classifier returns valid classifications for a small batch."""
+def test_build_classification_prompt() -> None:
+    """build_classification_prompt returns a prompt string with numbered sentences."""
+    from agentmemory.classification import build_classification_prompt
+
     pairs: list[tuple[str, str]] = [
         ("always use uv for package management", "user"),
         ("the build completed in 12 seconds", "assistant"),
-        ("what version of Python should I use?", "user"),
     ]
-    results = classify_sentences(pairs)
-    assert len(results) == len(pairs)
-    for cs in results:
-        assert isinstance(cs.persist, bool)
-        assert cs.sentence_type in {
-            "REQUIREMENT",
-            "CORRECTION",
-            "PREFERENCE",
-            "FACT",
-            "ASSUMPTION",
-            "DECISION",
-            "ANALYSIS",
-            "COORDINATION",
-            "QUESTION",
-            "META",
-        }
+    prompt: str = build_classification_prompt(pairs)
+    assert "1." in prompt
+    assert "2." in prompt
+    assert "always use uv" in prompt
+    assert "PERSIST" in prompt
+    assert "EPHEMERAL" in prompt

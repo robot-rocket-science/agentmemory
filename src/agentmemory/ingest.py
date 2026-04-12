@@ -1,6 +1,6 @@
 """End-to-end ingest pipeline: extraction -> classification -> store.
 
-Connects extract_sentences, classify_sentences, detect_correction, and MemoryStore
+Connects extract_sentences, classify_sentences_offline, detect_correction, and MemoryStore
 into a single call per conversation turn. Also handles JSONL batch ingestion from
 the conversation-logger.sh hook output format.
 """
@@ -11,11 +11,8 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from anthropic import Anthropic
-
 from agentmemory.classification import (
     ClassifiedSentence,
-    classify_sentences,
     classify_sentences_offline,
 )
 from agentmemory.correction_detection import detect_correction
@@ -81,18 +78,20 @@ def ingest_turn(
     text: str,
     source: str,
     session_id: str | None = None,
-    use_llm: bool = True,
-    client: Anthropic | None = None,
     created_at: str | None = None,
     source_path: str = "",
 ) -> IngestResult:
     """Process a single conversation turn end-to-end.
 
+    Uses offline classification only. LLM-quality classification is handled
+    externally by spawning Haiku subagents and calling the reclassify MCP tool.
+    See build_classification_prompt() in classification.py.
+
     Steps:
     1. Insert raw text as observation
     2. Extract sentences
     3. Run correction detector on full text (if source == 'user')
-    4. Classify sentences (LLM or offline)
+    4. Classify sentences (offline heuristics)
     5. For each PERSIST sentence: insert as belief with type-based prior
     6. For corrections: create locked belief, attempt to find and supersede existing
 
@@ -126,13 +125,9 @@ def ingest_turn(
             full_text_is_correction = True
             result.corrections_detected += 1
 
-    # Step 4: classify sentences
+    # Step 4: classify sentences (offline heuristics)
     sentence_pairs: list[tuple[str, str]] = [(s, source) for s in sentences]
-    classified: list[ClassifiedSentence]
-    if use_llm:
-        classified = classify_sentences(sentence_pairs, client=client)
-    else:
-        classified = classify_sentences_offline(sentence_pairs)
+    classified: list[ClassifiedSentence] = classify_sentences_offline(sentence_pairs)
 
     # Step 5: insert PERSIST sentences as beliefs
     for cs in classified:
@@ -152,7 +147,8 @@ def ingest_turn(
 
         # Step 6: corrections are locked (permanent constraints).
         # User-stated beliefs from remember() are also locked at the server layer.
-        is_correction: bool = cs.sentence_type == "CORRECTION"
+        # Corrections get high confidence but are NOT auto-locked.
+        # Only explicit user confirmation via lock() creates locked beliefs.
 
         belief = store.insert_belief(
             content=cs.text,
@@ -160,7 +156,7 @@ def ingest_turn(
             source_type=belief_source,
             alpha=cs.alpha,
             beta_param=cs.beta_param,
-            locked=is_correction,
+            locked=False,
             observation_id=observation.id,
             created_at=created_at,
         )
@@ -172,7 +168,7 @@ def ingest_turn(
         check_temporal_supersession(store, belief)
 
         # For corrections: search for existing beliefs that might be superseded
-        if is_correction:
+        if cs.sentence_type == "CORRECTION":
             # Extract key words from the correction sentence to search.
             # Strip non-word characters so FTS5 does not choke on punctuation.
             raw_words: list[str] = [
@@ -229,13 +225,11 @@ def ingest_turn(
 def ingest_jsonl(
     store: MemoryStore,
     jsonl_path: str | Path,
-    use_llm: bool = True,
-    client: Anthropic | None = None,
 ) -> IngestResult:
     """Process a JSONL file of conversation turns (from conversation-logger.sh).
 
     Each line: {"timestamp": ..., "event": "user"|"assistant", "session_id": ..., "text": ...}
-    Calls ingest_turn for each line.
+    Calls ingest_turn for each line. Uses offline classification only.
     Returns aggregate IngestResult.
     """
     path: Path = Path(jsonl_path)
@@ -266,8 +260,6 @@ def ingest_jsonl(
                 text=text_val,
                 source=event_val,
                 session_id=None,
-                use_llm=use_llm,
-                client=client,
             )
             aggregate.merge(turn_result)
 

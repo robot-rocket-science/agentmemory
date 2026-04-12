@@ -258,8 +258,10 @@ class MemoryStore:
         self._migrate_beliefs()
 
     def _migrate_beliefs(self) -> None:
-        """One-time backfill: lock all correction-type beliefs that are unlocked."""
-        self.backfill_lock_corrections()
+        """Run belief-table migrations."""
+        # NOTE: backfill_lock_corrections() was removed. The system must not
+        # auto-lock beliefs. Only explicit user confirmation via lock() is
+        # allowed to set locked=True.
         self._migrate_observations()
 
     def _migrate_observations(self) -> None:
@@ -499,6 +501,53 @@ class MemoryStore:
         self._conn.execute(
             "UPDATE beliefs SET alpha = ?, beta_param = ?, updated_at = ? WHERE id = ?",
             (alpha, beta, ts, belief_id),
+        )
+        self._conn.commit()
+
+    def get_reclassifiable(self, limit: int = 200) -> list[dict[str, str]]:
+        """Return unlocked, active beliefs eligible for LLM reclassification."""
+        rows: list[dict[str, str]] = []
+        cursor = self._conn.execute(
+            """SELECT id, content, belief_type, source_type
+               FROM beliefs
+               WHERE locked = 0
+                 AND superseded_by IS NULL
+                 AND valid_to IS NULL
+               ORDER BY created_at DESC
+               LIMIT ?""",
+            (limit,),
+        )
+        for row in cursor:
+            rows.append({
+                "id": row["id"],
+                "content": row["content"],
+                "type": row["belief_type"],
+                "source": row["source_type"],
+            })
+        return rows
+
+    def update_belief_classification(
+        self,
+        belief_id: str,
+        belief_type: str,
+        alpha: float,
+        beta_param: float,
+    ) -> None:
+        """Update a belief's type and priors (for reclassification)."""
+        ts: str = _now()
+        self._conn.execute(
+            """UPDATE beliefs SET belief_type = ?, alpha = ?, beta_param = ?,
+               updated_at = ? WHERE id = ?""",
+            (belief_type, alpha, beta_param, ts, belief_id),
+        )
+        self._conn.commit()
+
+    def soft_delete_belief(self, belief_id: str) -> None:
+        """Soft-delete a belief by setting valid_to."""
+        ts: str = _now()
+        self._conn.execute(
+            "UPDATE beliefs SET valid_to = ?, updated_at = ? WHERE id = ?",
+            (ts, ts, belief_id),
         )
         self._conn.commit()
 

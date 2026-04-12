@@ -9,8 +9,6 @@ import json
 import re
 from dataclasses import dataclass
 
-from anthropic import Anthropic
-
 from agentmemory.correction_detection import detect_correction
 
 # ---------------------------------------------------------------------------
@@ -20,8 +18,9 @@ from agentmemory.correction_detection import detect_correction
 # Haiku model identifier (cheapest available, 99% accuracy per Exp 47/50)
 _HAIKU_MODEL: str = "claude-haiku-4-5-20251001"
 
-# Batch size for LLM classification calls
-_BATCH_SIZE: int = 20
+# Batch size for LLM classification calls.
+# Public so the skill/subagent orchestrator can batch sentences correctly.
+BATCH_SIZE: int = 20
 
 # Type-to-prior mapping from Exp 61.
 # None means "don't store" (Coordination, Question, Meta).
@@ -176,49 +175,32 @@ def _fallback_batch(batch: list[tuple[str, str]]) -> list[ClassifiedSentence]:
 # ---------------------------------------------------------------------------
 
 
-def classify_sentences(
-    sentences: list[tuple[str, str]],
-    client: Anthropic | None = None,
-) -> list[ClassifiedSentence]:
-    """Classify sentences using Haiku in batches of 20.
+def build_classification_prompt(sentences: list[tuple[str, str]]) -> str:
+    """Build the Exp 61 classification prompt for a batch of sentences.
 
-    Each sentence is a (text, source) tuple where source is 'user' or 'assistant'.
+    Each sentence is a (text, source) tuple. Returns the full prompt string
+    ready to send to a Haiku subagent. Maximum batch size is 20 sentences.
 
-    Uses the prompt template from Exp 61:
-    - Classify each sentence on persist (PERSIST/EPHEMERAL) and type
-    - Conservative: when in doubt, EPHEMERAL
-
-    Returns ClassifiedSentence with prior assigned from TYPE_PRIORS.
-    Sentences classified as COORDINATION/QUESTION/META get persist=False.
-
-    If client is None, creates one. Uses claude-haiku-4-5-20251001 model.
+    This is the public API for subagent-based classification. The calling
+    agent spawns a Haiku subagent, passes this prompt, and feeds the JSON
+    response back through parse_classification_response().
     """
-    if client is None:
-        client = Anthropic()
+    batch: list[tuple[str, str]] = sentences[:BATCH_SIZE]
+    sentence_block: str = _build_sentence_block(batch)
+    return _CLASSIFICATION_PROMPT.format(sentences=sentence_block)
 
-    results: list[ClassifiedSentence] = []
 
-    for batch_start in range(0, len(sentences), _BATCH_SIZE):
-        batch: list[tuple[str, str]] = sentences[batch_start : batch_start + _BATCH_SIZE]
-        sentence_block: str = _build_sentence_block(batch)
-        prompt: str = _CLASSIFICATION_PROMPT.format(sentences=sentence_block)
+def parse_classification_response(
+    raw: str,
+    batch: list[tuple[str, str]],
+) -> list[ClassifiedSentence]:
+    """Parse a Haiku subagent's JSON classification response.
 
-        response = client.messages.create(
-            model=_HAIKU_MODEL,
-            max_tokens=1024,
-            messages=[{"role": "user", "content": prompt}],
-        )
-
-        raw: str = ""
-        for block in response.content:
-            if block.type == "text":
-                raw = block.text
-                break
-
-        batch_results: list[ClassifiedSentence] = _parse_llm_response(raw, batch)
-        results.extend(batch_results)
-
-    return results
+    Takes the raw text response from a subagent that was given a prompt from
+    build_classification_prompt(), plus the original batch of sentences.
+    Returns ClassifiedSentence objects with type-based Bayesian priors.
+    """
+    return _parse_llm_response(raw, batch)
 
 
 def classify_sentences_offline(

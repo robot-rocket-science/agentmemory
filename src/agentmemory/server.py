@@ -9,11 +9,12 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-import os
-
 from fastmcp import FastMCP
 
-from agentmemory.config import get_bool_setting
+from agentmemory.classification import (
+    BATCH_SIZE,
+    TYPE_PRIORS,
+)
 from agentmemory.ingest import IngestResult, ingest_turn
 from agentmemory.scanner import ScanResult, scan_project
 from agentmemory.models import (
@@ -470,7 +471,6 @@ def onboard(project_path: str) -> str:
             text=node.content,
             source=source,
             session_id=None,
-            use_llm=False,
             created_at=node.date,
             source_path=node.file or "",
         )
@@ -520,6 +520,114 @@ def onboard(project_path: str) -> str:
 
 
 @mcp.tool
+def get_unclassified(limit: int = 200) -> str:
+    """Return beliefs that were classified offline and may benefit from LLM reclassification.
+
+    Returns belief IDs, content, current type, and source for beliefs created
+    by the offline classifier. These can be batched and sent to Haiku subagents
+    using build_classification_prompt(), then fed back via reclassify().
+
+    The caller (a Claude Code skill) should:
+    1. Call get_unclassified() to get the batch
+    2. Group sentences into batches of 20
+    3. Spawn Haiku subagents with the classification prompt for each batch
+    4. Call reclassify() with the results
+    """
+    store: MemoryStore = _get_store()
+    rows: list[dict[str, str]] = store.get_reclassifiable(limit)
+
+    if not rows:
+        return "No beliefs available for reclassification."
+
+    lines: list[str] = [
+        f"Found {len(rows)} belief(s) for reclassification.",
+        f"Batch size: {BATCH_SIZE} sentences per subagent.",
+        "",
+    ]
+    for r in rows:
+        lines.append(f"[{r['id']}] ({r['type']}) {r['content']}")
+
+    return "\n".join(lines)
+
+
+@mcp.tool
+def reclassify(mappings: str) -> str:
+    """Apply LLM classification results to existing beliefs.
+
+    Accepts a JSON string: [{"id": "belief_id", "type": "REQUIREMENT", "persist": "PERSIST"}, ...]
+
+    For each mapping:
+    - Updates belief_type based on the LLM classification
+    - Updates alpha/beta priors from TYPE_PRIORS
+    - Beliefs classified as EPHEMERAL (persist=false) are soft-deleted (valid_to set)
+
+    This is the receiving end of subagent-based classification. The calling agent
+    spawns Haiku subagents to classify batches, then feeds results here.
+    """
+    import json as _json
+
+    store: MemoryStore = _get_store()
+    items: list[dict[str, str]] = _json.loads(mappings)
+
+    # Map from classification type to belief_type
+    type_to_belief: dict[str, str] = {
+        "REQUIREMENT": "requirement",
+        "CORRECTION": "correction",
+        "PREFERENCE": "preference",
+        "FACT": "factual",
+        "ASSUMPTION": "factual",
+        "DECISION": "factual",
+        "ANALYSIS": "factual",
+        "COORDINATION": "factual",
+        "QUESTION": "factual",
+        "META": "factual",
+    }
+
+    updated: int = 0
+    soft_deleted: int = 0
+    skipped: int = 0
+
+    for item in items:
+        belief_id: str = item.get("id", "")
+        sentence_type: str = item.get("type", "FACT").upper()
+        persist_label: str = item.get("persist", "PERSIST").upper()
+
+        belief: Belief | None = store.get_belief(belief_id)
+        if belief is None:
+            skipped += 1
+            continue
+
+        # Skip locked beliefs
+        if belief.locked:
+            skipped += 1
+            continue
+
+        prior: tuple[float, float] | None = TYPE_PRIORS.get(sentence_type)
+        should_persist: bool = persist_label == "PERSIST" and prior is not None
+
+        if not should_persist:
+            store.soft_delete_belief(belief_id)
+            soft_deleted += 1
+        else:
+            new_type: str = type_to_belief.get(sentence_type, "factual")
+            alpha: float
+            beta_val: float
+            assert prior is not None  # guarded by should_persist check
+            alpha, beta_val = prior
+            store.update_belief_classification(
+                belief_id, new_type, alpha, beta_val,
+            )
+            updated += 1
+
+    return (
+        f"Reclassification complete:\n"
+        f"  Updated: {updated}\n"
+        f"  Soft-deleted (EPHEMERAL): {soft_deleted}\n"
+        f"  Skipped (locked/missing): {skipped}"
+    )
+
+
+@mcp.tool
 def ingest(text: str, source: str = "user") -> str:
     """Ingest a conversation turn through the full pipeline.
 
@@ -531,27 +639,20 @@ def ingest(text: str, source: str = "user") -> str:
     """
     store: MemoryStore = _get_store()
     session_id: str = _ensure_session()
-    use_llm: bool = get_bool_setting("ingest", "use_llm")
-    # LLM classification requires ANTHROPIC_API_KEY
-    if use_llm and not os.environ.get("ANTHROPIC_API_KEY"):
-        use_llm = False
-    result: IngestResult = ingest_turn(store, text, source, session_id=session_id, use_llm=use_llm)
+    result: IngestResult = ingest_turn(store, text, source, session_id=session_id)
 
     # Feed ingested text into the auto-feedback buffer
     _ingest_buffer.append(text)
 
-    # Estimate classification tokens: ~50 tokens/sentence for Haiku prompt+response
-    est_classification_tokens: int = result.sentences_extracted * 50 if use_llm else 0
     store.increment_session_metrics(
         session_id,
-        classification_tokens=est_classification_tokens,
+        classification_tokens=0,
         beliefs_created=result.beliefs_created,
         corrections_detected=result.corrections_detected,
     )
 
-    classifier: str = "haiku" if use_llm else "offline"
     return (
-        f"Ingested {source} turn ({classifier} classifier):\n"
+        f"Ingested {source} turn (offline classifier):\n"
         f"  Observations: {result.observations_created}\n"
         f"  Beliefs: {result.beliefs_created}\n"
         f"  Corrections: {result.corrections_detected}\n"

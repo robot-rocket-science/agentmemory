@@ -418,7 +418,6 @@ class TestOnboardIntegration:
                     text=node.content,
                     source="document",
                     session_id=None,
-                    use_llm=False,
                 )
                 aggregate.merge(turn_result)
 
