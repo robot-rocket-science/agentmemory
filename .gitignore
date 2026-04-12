@@ -1,11 +1,46 @@
-.python-version
-.claude/settings.local.json
-.claude/prohibitions.txt
+# Python
 __pycache__/
 *.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
 .venv/
+.python-version
 
-# Large reproducible result files (regenerate from source scripts)
+# Claude Code
+.claude/settings.local.json
+.claude/prohibitions.txt
+.claude/
+
+# IDE / editor
+.obsidian/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Generated HTML reports
+*.html
+
+# Experiment result data (regenerate from source scripts)
+experiments/*_results.json
+experiments/*_results/
+experiments/exp58_batch_*.json
+experiments/exp58_classified_*.json
+experiments/exp58_annotated_turns.json
+experiments/exp41_traceability_graph.json
+experiments/exp49b_results.json
+experiments/exp49c_results.json
+experiments/exp49d_results.json
+experiments/exp37_alpha_seek_results.json
+
+# Large reproducible result files (legacy)
 experiments/exp37_results/auto_extracted/
 experiments/exp37_results/*_commit_intent.json
 experiments/exp37_results/*_doc_refs.json
@@ -16,3 +51,11 @@ experiments/exp3_demo_output.json
 experiments/exp6_failures.json
 experiments/exp1_overrides_results.json
 experiments/exp3_attribution.json
+
+# Corpus data
+corpus_manifest.json
+
+# SQLite databases (runtime data, not source)
+*.db
+*.db-wal
+*.db-shm
