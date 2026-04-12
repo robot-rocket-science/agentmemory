@@ -1,7 +1,7 @@
-# Pipeline Status: Where We Are and Shortest Path to Goal
+# Pipeline Status: Design vs Reality
 
-**Date:** 2026-04-10
-**Purpose:** Raw assessment of what exists, what's missing, and the shortest path to satisfying all requirements and case studies.
+**Date:** 2026-04-11
+**Purpose:** Honest assessment of what exists, what's validated, and what's missing.
 
 ---
 
@@ -10,180 +10,133 @@
 ```
 STAGE                          STATUS          EVIDENCE
 =====                          ======          ========
-1. Conversation capture        WORKING         Hooks active, 72 turns logged
-   (hooks -> JSONL)                            conversation-logger.sh installed
+1. Conversation capture        WORKING         Hooks active, conversation-logger.sh
+   (hooks -> JSONL)                            installed, JSONL batch ingest works
 
-2. Sentence extraction         WORKING         381 sentences from 41 turns
-   (dumb split, no LLM)                       exp57_dumb_extraction.py
+2. Sentence extraction         WORKING         extract_sentences() in extraction.py
+   (dumb split, no LLM)                       Strips code, markdown, URLs, splits on
+                                               punctuation. ~7.8 sentences/turn.
 
-3. LLM classification          WORKING         5 batches classified by Haiku
-   (type + persist/ephemeral)                  99% accuracy (Exp 50), $0.005/session
-                                               Exp 61 documents replicable process
+3. LLM classification          WORKING         classify_sentences() in classification.py
+   (type + persist/ephemeral)                  Haiku 99% accuracy (Exp 50), $0.005/session
+                                               Offline fallback at 36% accuracy
 
-4. Bayesian prior assignment   DESIGNED        Type-to-prior mapping in Exp 61
-   (type -> Beta(a,b))                         Not automated yet
+4. Bayesian prior assignment   WORKING         TYPE_PRIORS in classification.py
+   (type -> Beta(a,b))                         Differentiated priors (2026-04-11):
+                                               REQ/CORR 94.7%, PREF 87.5%, FACT 75%, ASSM 66.7%
 
-5. Belief graph insertion      NOT BUILT       SQLite schema in PLAN.md
-   (SQLite + FTS5 + edges)                     No database exists
+5. Belief graph insertion      WORKING         MemoryStore in store.py. 9-table SQLite schema.
+   (SQLite + FTS5 + edges)                     Content-hash dedup, evidence linking,
+                                               SUPERSEDES edges, locked flag. 176+ tests passing.
 
-6. FTS5 + HRR retrieval       PROTOTYPED       Exp 56: 100% coverage (13/13)
-   (query -> candidates)                       exp56_corrected_baseline.py
-                                               HRR prototypes in scripts/
+6. FTS5 + HRR retrieval       WORKING          retrieve() in retrieval.py
+   (query -> candidates)                       FTS5 BM25 + HRR vocabulary bridge
+                                               Exp 56: 100% coverage (13/13) at K=50
 
-7. Temporal re-ranking         VALIDATED        Exp 60: LOCK_BOOST_TYPED MRR 0.867
-   (decay + lock boost)                        exp60_temporal_reranking.py
+7. Temporal re-ranking         WORKING          score_belief() in scoring.py
+   (decay + lock boost +                       Type/source weights, recency boost,
+    type/source weights)                       Thompson sampling, lock boost
+                                               Exp 60: MRR 0.867 with LOCK_BOOST_TYPED
 
-8. Type-aware compression      VALIDATED        Exp 42: 55% savings, zero loss
-   (full -> compressed)                        exp42_ib_compression.py
+8. Type-aware compression      WORKING          compress_belief() + pack_beliefs()
+   (full -> compressed)                        in compression.py
+                                               Exp 42: 55% savings, zero retrieval loss
 
-9. Context injection           WORKING          Hook injection 0% violation (Exp 36)
-   (hooks inject beliefs)                      SessionStart/UserPromptSubmit hooks
+9. Context injection           WORKING          SessionStart hook loads locked beliefs
+   (hooks inject beliefs)                      via get_locked() MCP tool
+                                               Exp 36: 0% violation rate
 
-10. Correction detection       VALIDATED        Exp 1 V2: 92% on real corrections
-    (detect user corrections)                  exp1_extraction_pipeline.py
+10. Correction detection       WORKING          detect_correction() in correction_detection.py
+    (detect user corrections)                  V2: 92% accuracy, 7 signal types
+                                               Auto-locked on detection (2026-04-11 fix)
 
-11. Feedback loop              SIMULATED        Thompson sampling validated (Exp 5b/7/38)
-    (test outcomes -> conf)                    Not implemented in production
+11. Feedback loop              PARTIALLY BUILT  Auto-feedback in server.py
+    (test outcomes -> conf)                    record_test_result() exists and is called
+                                               by _process_auto_feedback() after each search.
+                                               NOT YET VALIDATED: Exp 66 will test whether
+                                               feedback improves retrieval quality over time.
 
 12. Triggered beliefs          SIMULATED        5/5 case study failures prevented (Exp 51)
     (meta-cognitive checks)                    15 TBs designed, not automated
 
-13. Output gating              TESTED           Exp 49: rule injection 60-75%,
-    (block violating output)                   behavioral needs detect->block->rewrite
+13. Output gating              NOT BUILT        No code path blocks violating agent output
+    (block violating output)                   Locked beliefs inform but don't enforce
 ```
 
 ---
 
-## Requirements Coverage
+## MCP Server Tools (10 registered)
 
-### What's Satisfied by Existing Work
-
-| REQ | Requirement | How It's Covered | Evidence |
-|---|---|---|---|
-| REQ-003 | Token budget <= 2K | Exp 42 compression + Exp 60 pipeline fits ~675 tokens | Exp 42, 55, 60 |
-| REQ-004 | Quality per token | Focused retrieval (Exp 56: 100%) beats dump | Exp 56 |
-| REQ-007 | Retrieval precision >= 50% | FTS5+HRR at K=30 achieves 100% coverage on ground truth | Exp 56 |
-| REQ-009 | Bayesian calibration ECE < 0.10 | ECE=0.066 in simulation | Exp 5b |
-| REQ-010 | Exploration 15-50% | 0.194 in simulation | Exp 5b |
-| REQ-014 | Zero-LLM extraction recall >= 40% | LLM classification at 99% replaces zero-LLM; zero-LLM V2 at 92% for corrections | Exp 1, 50 |
-| REQ-017 | Fully local operation | SQLite + local hooks, no network for memory ops | Architecture |
-| REQ-018 | No telemetry | No telemetry in any code | Architecture |
-| REQ-021 | Behavioral beliefs in L0 | Hook injection validated (0% violation) | Exp 36 |
-| REQ-023 | Provenance metadata | Exp 61 captures source, session, timestamp, type | Exp 61 |
-| REQ-025 | Rigor tiers | Type classification maps to rigor (Exp 61) | Exp 61 |
-
-### What Requires Implementation to Verify
-
-| REQ | Requirement | What's Needed | Blocking? |
-|---|---|---|---|
-| REQ-001 | Cross-session retention | SQLite store + multi-session test | **YES -- the core requirement** |
-| REQ-002 | Belief consistency | Conflict detection in graph | Phase 2 |
-| REQ-005 | Crash recovery >= 90% | Checkpoint writes + recovery path | Phase 2 |
-| REQ-006 | Checkpoint overhead < 50ms | Benchmark SQLite WAL writes | Phase 2 |
-| REQ-008 | FP rate decreasing | Feedback loop in production | Phase 3 |
-| REQ-011 | Cross-model MCP | MCP server implementation | Phase 3 |
-| REQ-012 | Write durability | SQLite WAL + crash test | Phase 2 |
-| REQ-013 | Observation immutability | Schema constraint + test | Phase 2 |
-| REQ-015 | No unverified claims | Audit at ship time | Phase 3 |
-| REQ-016 | Documented limitations | Audit at ship time | Phase 3 |
-| REQ-019 | Single-correction learning | Correction detection -> locked belief -> L0 | **Phase 2 -- highest leverage** |
-| REQ-020 | Locked beliefs | Schema + enforcement | Phase 2 |
-| REQ-022 | Locked beliefs survive compression | Hook re-injection | Phase 2 |
-| REQ-024 | Session velocity tracking | Session metadata in SQLite | Phase 2 |
-| REQ-026 | Calibrated status reporting | Rigor tier + velocity in status queries | Phase 3 |
-| REQ-027 | Zero-repeat directive guarantee | Full stack: store + inject + detect + block | Phase 2/3 |
+| Tool | Status | Notes |
+|------|--------|-------|
+| search | WORKING | FTS5 + HRR + scoring + compression. K=50 default. |
+| remember | WORKING | Creates locked high-confidence belief |
+| correct | WORKING | Creates locked correction, supersedes existing |
+| observe | WORKING | Raw observation without belief creation |
+| ingest | WORKING | Full pipeline: extract -> classify -> store |
+| onboard | WORKING | Project scanner with 9 extractors |
+| status | WORKING | Memory system health check with session metrics |
+| get_locked | WORKING | Returns all locked beliefs for context injection |
+| feedback | WORKING | Records test result, updates Bayesian confidence |
+| settings | WORKING | View/update agentmemory config |
 
 ---
 
-## Case Study Coverage by Existing Components
+## Production Modules (16 in src/agentmemory/)
 
-### Covered by stages 1-3 + 9-10 (what exists today)
-
-| CS | What's needed | Available? |
-|---|---|---|
-| CS-001 | Recent observation search | FTS5 on observations (needs store) |
-| CS-002 | Locked belief from correction | Correction detection + locked flag (needs store) |
-| CS-008 | Results-reporting behavioral rule | Hook injection (Exp 36) |
-| CS-012 | Post-edit syntax check rule | Hook injection (Exp 36) |
-| CS-013 | Tool-specific correction retrieval | FTS5 retrieval (needs store) |
-
-### Requires belief graph (stage 5)
-
-| CS | What's needed | Why stage 5 is required |
-|---|---|---|
-| CS-003 | TB-01 self-check against state docs | Need stored awareness of state docs |
-| CS-004 | Locked belief survives compression | Need persistent locked beliefs |
-| CS-005 | Velocity-calibrated status | Need session metadata + rigor tiers |
-| CS-006 | Cross-session locked enforcement | Need persistent locked beliefs + output gating |
-| CS-009 | SUPERSEDES chain across sessions | Need belief graph with edges |
-| CS-015 | Dead approach detection | Need SUPERSEDES edges + FTS5 |
-| CS-016 | Locked axiom enforcement | Need locked beliefs + output gating |
-
-### Requires full graph (stages 5-12)
-
-| CS | What's needed | Which graph components |
-|---|---|---|
-| CS-010 | Test coverage gaps | TESTS edges |
-| CS-014 | Research->execution verification | IMPLEMENTS edges |
-| CS-017 | Config change propagation | CO_CHANGED edges |
-| CS-018 | State machine consistency | IMPLEMENTS edges |
-| CS-019 | End-to-end pipeline verification | CALLS/PASSES_DATA edges |
-| CS-022 | Multi-hop operational query | File tree + COMMIT_TOUCHES + CALLS + HRR |
+| Module | LOC | Purpose |
+|--------|-----|---------|
+| store.py | ~900 | SQLite MemoryStore with WAL mode, FTS5, migrations |
+| server.py | ~600 | MCP server (FastMCP), auto-feedback loop, session tracking |
+| retrieval.py | ~180 | Full pipeline: FTS5 + HRR + scoring + compression |
+| ingest.py | ~270 | End-to-end: extraction -> classification -> store |
+| scoring.py | ~225 | Decay, lock boost, Thompson sampling, type/source weights, recency |
+| classification.py | ~360 | LLM (Haiku) + offline classifiers, Bayesian priors |
+| extraction.py | ~100 | Sentence extraction with noise stripping |
+| correction_detection.py | ~150 | Zero-LLM correction detector, 92% accuracy |
+| compression.py | ~120 | Type-aware compression, token budget packing |
+| hrr.py | ~300 | Holographic Reduced Representations for graph encoding |
+| scanner.py | ~680 | Project onboarding: git, docs, code, directives |
+| cli.py | ~800 | CLI: setup, onboard, stats, health, search, etc. |
+| config.py | ~100 | JSON configuration management |
+| commit_tracker.py | ~150 | Deterministic commit status checker |
+| models.py | ~150 | Dataclass domain models |
+| __init__.py | ~20 | Public API exports |
 
 ---
 
-## Shortest Path to Goal
+## Known Issues (2026-04-11)
 
-The acceptance tests define 3 phases. Here's what each requires:
+### Fixed This Session
+- **feedback_given migration bug** -- `_migrate_sessions()` was missing the `feedback_given` column, crashing search on existing DBs. Fixed.
+- **Unlocked corrections** -- 2,592 correction-type beliefs from bulk ingestion were not locked. Migration added to auto-lock on DB open.
+- **Uniform type priors** -- All types started at 90% confidence. Differentiated: REQ/CORR 94.7%, PREF 87.5%, FACT 75%, ASSM 66.7%.
+- **FTS5 K=30 too low** -- Default increased to K=50.
+- **Unused scoring components** -- _TYPE_WEIGHTS, _SOURCE_WEIGHTS, and recency_boost() wired into score_belief().
 
-### Phase 2 (the critical path): SQLite Store + MCP Skeleton
+### Open Issues
+- **Feedback loop unvalidated** -- Auto-feedback fires but we don't know if it improves retrieval. Exp 66 will test.
+- **Output gating not built** -- Locked beliefs inform but don't block violating output.
+- **Triggered beliefs not automated** -- 15 designs simulated, not wired to events.
+- **Contradiction detection absent** -- No semantic conflict alerting on insertion.
+- **L1 behavioral layer missing** -- Design has L0/L1/L2/L3; implementation skips L1.
 
-This is the single missing piece that unlocks everything. Every validated component (extraction, classification, retrieval, decay scoring, correction detection, hook injection) needs a persistent store to connect to.
-
-**What to build:**
-
-1. **SQLite database with the PLAN.md schema** (observations, beliefs, evidence, tests, revisions, edges, sessions, checkpoints, search_index FTS5)
-
-2. **Belief insertion pipeline** connecting stages 1-4 to stage 5:
-   - Conversation logger -> sentence extraction -> LLM classification -> prior assignment -> INSERT into beliefs table
-   - Content-hash dedup
-   - Locked flag on corrections (source_type = user_corrected)
-
-3. **Retrieval function** connecting stage 5 to stage 6:
-   - FTS5 search on beliefs table
-   - Return ranked candidates with confidence scores
-   - Apply LOCK_BOOST_TYPED re-ranking (Exp 60)
-   - Apply decay scoring (Exp 58c)
-
-4. **MCP server** exposing:
-   - `retrieve(query, budget)` -> ranked beliefs within token budget
-   - `store(text, source, type)` -> insert belief
-   - `correct(text)` -> detect correction, create locked belief
-   - `search(query)` -> raw FTS5 search
-
-5. **Session recovery** (continuous checkpoints in SQLite WAL)
-
-**What this unlocks:** CS-001 through CS-009, CS-013, CS-015, CS-016. That's 13 of 22 case studies. Plus REQ-001, REQ-002, REQ-005, REQ-006, REQ-012, REQ-013, REQ-019, REQ-020, REQ-022.
-
-### Phase 3: Full Graph + Advanced Features
-
-After Phase 2 is working:
-- Edge extraction (SUPERSEDES, CITES, CO_CHANGED, IMPLEMENTS, CALLS, PASSES_DATA)
-- HRR encoding for structural retrieval
-- Triggered belief automation
-- Output gating for behavioral constraints
-- Cross-model MCP testing
-
-**What this unlocks:** CS-010, CS-014, CS-017, CS-018, CS-019, CS-022. Plus REQ-008, REQ-011, REQ-027.
+### Research Findings That Challenge the Design (Exp 62-65)
+1. Global scoring without query produces Thompson sampling noise. FTS5 is the real signal.
+2. Pre-prompt compilation (23.1% coverage) loses to on-demand retrieval (69.2%). Don't build it.
+3. Multi-layer extraction is regressive at scale (16K nodes worse than 586). More nodes != better.
+4. New beliefs struggle to surface at scale without recency boost. Now wired (2026-04-11).
+5. FTS5 K=30 was 0.2% coverage at 15K beliefs. Now K=50.
 
 ---
 
-## The Honest Assessment
+## Requirements Coverage Summary
 
-60 experiments. 27 requirements. 22 case studies. 35 approaches cataloged. Every component of the pipeline has been individually validated on real data. The classification pipeline (Exp 61) is the final research piece -- it closes the loop from "raw conversation" to "classified belief with Bayesian prior."
+See REQUIREMENTS.md for full details. Quick status:
 
-**What's blocking us is not research. It's a database and a server.**
-
-The SQLite schema is designed (PLAN.md lines 186-323). The MCP interface is specified (REQUIREMENTS.md REQ-011). The retrieval pipeline is validated (Exp 56: 100%). The scoring stack is validated (Exp 57-60). The extraction pipeline is validated (Exp 61: 99% classification, $0.005/session). The correction detector is validated (Exp 1 V2: 92%). The hook injection is validated (Exp 36: 0% violation).
-
-The shortest path is: build the SQLite store, connect the existing pieces, and run the Phase 2 acceptance tests.
+| Status | Count | Requirements |
+|--------|-------|-------------|
+| Verified/Passing | 6 | REQ-003, REQ-007, REQ-009, REQ-010, REQ-017, REQ-018 |
+| Implemented (needs formal verification) | 8 | REQ-001, REQ-005, REQ-006, REQ-012, REQ-013, REQ-019, REQ-020, REQ-021 |
+| Partially implemented | 4 | REQ-002, REQ-008, REQ-011, REQ-027 |
+| Not started | 8 | REQ-004, REQ-014, REQ-015, REQ-016, REQ-023, REQ-024, REQ-025, REQ-026 |
