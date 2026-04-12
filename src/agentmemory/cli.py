@@ -762,7 +762,7 @@ def cmd_reason(args: argparse.Namespace) -> None:
     store: MemoryStore = _get_store()
 
     # Step 1: FTS5 retrieval
-    result: RetrievalResult = retrieve(store, query, budget=budget, top_k=30)
+    result: RetrievalResult = retrieve(store, query, budget=budget)
 
     if not result.beliefs:
         print("No beliefs found matching your query.")

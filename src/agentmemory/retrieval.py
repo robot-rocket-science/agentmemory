@@ -96,7 +96,7 @@ def retrieve(
     store: MemoryStore,
     query: str,
     budget: int = 2000,
-    top_k: int = 30,
+    top_k: int = 50,
     include_locked: bool = True,
     max_locked: int = 100,
     use_hrr: bool = True,
