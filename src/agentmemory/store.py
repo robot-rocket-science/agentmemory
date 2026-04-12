@@ -262,6 +262,7 @@ class MemoryStore:
         new_cols: list[str] = [
             "retrieval_tokens", "classification_tokens",
             "beliefs_created", "corrections_detected", "searches_performed",
+            "feedback_given",
         ]
         for col in new_cols:
             if col not in col_names:
