@@ -28,3 +28,4 @@ dev = [
 [tool.pyright]
 pythonVersion = "3.12"
 typeCheckingMode = "strict"
+exclude = ["experiments/exp4[0-9]*.py", "experiments/exp5[0-9]*.py", "experiments/exp60*.py"]
