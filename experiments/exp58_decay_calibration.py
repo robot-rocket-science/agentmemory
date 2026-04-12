@@ -27,10 +27,10 @@ import math
 import sqlite3
 import sys
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 # ============================================================
 # Config
@@ -155,7 +155,7 @@ class SweepResult:
     prevention_rate_top5: float
     prevention_rate_top10: float
     prevention_rate_top15: float
-    per_cluster: dict[str, dict[str, float]] = field(default_factory=dict)
+    per_cluster: dict[str, dict[str, float]] = field(default_factory=lambda: dict[str, dict[str, float]]())
 
 
 # ============================================================
@@ -360,24 +360,24 @@ def load_decisions(conn: sqlite3.Connection) -> list[Decision]:
 def load_correction_clusters(failures_path: Path) -> list[CorrectionCluster]:
     """Load correction clusters from exp6_failures_v2.json."""
     with failures_path.open("r", encoding="utf-8") as fh:
-        data: dict = json.load(fh)
+        data: dict[str, Any] = json.load(fh)
 
     clusters: list[CorrectionCluster] = []
-    for cluster in data.get("topic_clusters", []):
+    for cluster in list[dict[str, Any]](data.get("topic_clusters", [])):
         if not cluster.get("is_memory_failure", False):
             continue  # only use memory-failure clusters for calibration
 
         # Extract timestamps from overrides
         timestamps: list[str] = [
-            ov["timestamp"]
-            for ov in cluster.get("overrides", [])
+            str(ov["timestamp"])
+            for ov in list[dict[str, Any]](cluster.get("overrides", []))
             if "timestamp" in ov
         ]
 
         clusters.append(CorrectionCluster(
-            topic_id=cluster["topic_id"],
-            description=cluster.get("description", ""),
-            decision_refs=cluster.get("decision_refs", []),
+            topic_id=str(cluster["topic_id"]),
+            description=str(cluster.get("description", "")),
+            decision_refs=list[str](cluster.get("decision_refs", [])),
             correction_timestamps=timestamps,
             is_memory_failure=True,
         ))
@@ -627,10 +627,10 @@ def sensitivity_analysis(
     decisions: list[Decision],
     clusters: list[CorrectionCluster],
     best_per_type: dict[ContentType, float | None],
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Test 2x and 0.5x variants of best half-lives per type."""
     print("\n[sensitivity] Testing 2x and 0.5x half-lives", file=sys.stderr)
-    sensitivity_results: list[dict] = []
+    sensitivity_results: list[dict[str, Any]] = []
 
     for ct in ContentType:
         best_hl: float | None = best_per_type[ct]
@@ -643,7 +643,7 @@ def sensitivity_analysis(
                 ct, varied_hl, best_per_type
             )
             _, threshold_rates, _ = evaluate_config(decisions, clusters, config)
-            entry: dict = {
+            entry: dict[str, Any] = {
                 "content_type": ct.value,
                 "best_hl": best_hl,
                 "variant": label,
@@ -802,7 +802,7 @@ def main() -> None:
     print(f"[diagnostic] Rank distribution (combined): {rank_buckets}", file=sys.stderr)
 
     # Sensitivity analysis on combined best
-    sensitivity_results: list[dict] = sensitivity_analysis(
+    sensitivity_results: list[dict[str, Any]] = sensitivity_analysis(
         decisions, active_clusters, best_per_type
     )
 
@@ -820,7 +820,7 @@ def main() -> None:
         print(f"  {ct.value}: {hl_label}", file=sys.stderr)
 
     # Build results JSON
-    results: dict = {
+    results: dict[str, Any] = {
         "experiment": "exp58_decay_calibration",
         "date": "2026-04-10",
         "summary": {

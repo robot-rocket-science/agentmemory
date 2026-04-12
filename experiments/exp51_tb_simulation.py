@@ -12,14 +12,24 @@ from __future__ import annotations
 
 import json
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from collections.abc import Callable
+from typing import Any, TypeAlias
 
 
 # ============================================================
 # Triggered Belief definitions (from Exp 44)
 # ============================================================
+
+_CheckFn: TypeAlias = Callable[[dict[str, Any]], bool]
+
+
+def _check_directives(s: dict[str, Any]) -> bool:
+    """Check if any directive matches output."""
+    directives: list[dict[str, Any]] = list(s.get("directives", []))
+    return any(bool(d.get("matches_output", False)) for d in directives)
+
 
 @dataclass
 class TriggeredBelief:
@@ -32,18 +42,17 @@ class TriggeredBelief:
 
     def check_condition(self, state: dict[str, Any]) -> bool:
         """Evaluate condition against current state."""
-        checks: dict[str, Any] = {
-            "C-01": lambda s: s.get("state_docs_exist", False),
-            "C-03": lambda s: s.get("time_since_state_check", 0) > s.get("state_check_threshold", 300),
-            "C-04": lambda s: len(s.get("locked_beliefs", [])) > 0,
+        checks: dict[str, _CheckFn] = {
+            "C-01": lambda s: bool(s.get("state_docs_exist", False)),
+            "C-03": lambda s: int(s.get("time_since_state_check", 0)) > int(s.get("state_check_threshold", 300)),
+            "C-04": lambda s: len(list[Any](s.get("locked_beliefs", []))) > 0,
             "C-05": lambda s: s.get("task_id_in_instruction") is not None,
-            "C-06": lambda s: any(
-                d.get("matches_output", False) for d in s.get("directives", [])
-            ),
-            "C-07": lambda s: s.get("contradictions_in_results", False),
-            "C-08": lambda s: s.get("output_asks_user", False),
+            "C-06": lambda s: _check_directives(s),
+            "C-07": lambda s: bool(s.get("contradictions_in_results", False)),
+            "C-08": lambda s: bool(s.get("output_asks_user", False)),
         }
-        check_fn = checks.get(self.condition, lambda s: False)
+        default_fn: _CheckFn = lambda s: False
+        check_fn: _CheckFn = checks.get(self.condition, default_fn)
         return check_fn(state)
 
 
@@ -285,7 +294,7 @@ def test_conflict_resolution() -> dict[str, Any]:
     }
 
     events = ["PE-01", "PE-03", "PE-02", "PE-04"]
-    fired: list[dict] = []
+    fired: list[dict[str, Any]] = []
 
     for event in events:
         for tb in TB_REGISTRY:
@@ -311,7 +320,7 @@ def test_conflict_resolution() -> dict[str, Any]:
     fired.sort(key=lambda x: (x["priority"], x["tb_id"]))
 
     # Check for conflicts
-    actions = [f["action"] for f in fired]
+    actions: list[Any] = [f["action"] for f in fired]
     has_block_and_proceed = "A-04" in actions and "A-01" in actions
 
     return {

@@ -17,17 +17,14 @@ Queries are derived from actual project content -- not synthetic.
 from __future__ import annotations
 
 import json
-import re
 import sqlite3
 import sys
 from pathlib import Path
 from typing import Any
 
-import numpy as np
-
 # Reuse the Exp 45 pipeline
 from experiments.exp49_onboarding_validation import (
-    PROJECTS, SKIP_DIRS, discover, extract_file_tree, extract_git_history,
+    PROJECTS, discover, extract_file_tree, extract_git_history,
     extract_document_sentences, extract_ast_calls, extract_citations,
     extract_directives, build_fts_from_nodes, build_fts_from_raw_files,
     search_fts,
@@ -132,14 +129,14 @@ def evaluate_retrieval(
     query: str,
     must_find: list[str],
     fts_db: sqlite3.Connection,
-    all_nodes: list[dict],
+    all_nodes: list[dict[str, Any]],
     top_k: int = 5,
 ) -> dict[str, Any]:
     """Run a query and check if must_find terms appear in results."""
     results = search_fts(query, fts_db, top_k=top_k)
 
     # Build content lookup
-    node_content: dict[str, str] = {n["id"]: n.get("content", "") for n in all_nodes}
+    node_content: dict[str, str] = {str(n["id"]): str(n.get("content", "")) for n in all_nodes}
 
     # Check each must_find term
     found_terms: list[str] = []
@@ -221,34 +218,42 @@ def main() -> None:
 
         # Run extractors (reuse Exp 45 pipeline)
         manifest = discover(root)
-        all_nodes: list[dict] = []
-        all_edges: list[dict] = []
+        all_nodes: list[dict[str, Any]] = []
+        all_edges: list[dict[str, Any]] = []
 
+        ft_nodes: list[dict[str, Any]]
+        ft_edges: list[dict[str, Any]]
         ft_nodes, ft_edges = extract_file_tree(root)
         all_nodes.extend(ft_nodes)
         all_edges.extend(ft_edges)
 
         if manifest["has_git"] and manifest["commit_count"] > 0:
+            git_nodes: list[dict[str, Any]]
+            git_edges: list[dict[str, Any]]
             git_nodes, git_edges = extract_git_history(root)
             all_nodes.extend(git_nodes)
             all_edges.extend(git_edges)
 
         if manifest["doc_count"] > 0:
+            doc_nodes: list[dict[str, Any]]
+            doc_edges: list[dict[str, Any]]
             doc_nodes, doc_edges = extract_document_sentences(root, manifest["doc_files"])
             all_nodes.extend(doc_nodes)
             all_edges.extend(doc_edges)
 
         if manifest["languages"]:
+            ast_nodes: list[dict[str, Any]]
+            ast_edges: list[dict[str, Any]]
             ast_nodes, ast_edges = extract_ast_calls(root, manifest["languages"])
             all_nodes.extend(ast_nodes)
             all_edges.extend(ast_edges)
 
         if manifest["citation_regex"]:
-            cite_edges = extract_citations(root, manifest["doc_files"], manifest["citation_regex"])
+            cite_edges: list[dict[str, Any]] = extract_citations(root, manifest["doc_files"], manifest["citation_regex"])
             all_edges.extend(cite_edges)
 
         if manifest["directives"]:
-            dir_nodes = extract_directives(root, manifest["directives"])
+            dir_nodes: list[dict[str, Any]] = extract_directives(root, manifest["directives"])
             all_nodes.extend(dir_nodes)
 
         # Build both FTS5 indexes

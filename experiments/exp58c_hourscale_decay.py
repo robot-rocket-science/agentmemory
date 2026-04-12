@@ -36,7 +36,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Final
+from collections.abc import Callable
+from typing import Any, Final
 
 # ============================================================
 # Paths
@@ -193,7 +194,7 @@ class FlatSweepResult:
     prevention_rate_top5: float
     prevention_rate_top10: float
     prevention_rate_top15: float
-    per_cluster: dict[str, dict[str, float]] = field(default_factory=dict)
+    per_cluster: dict[str, dict[str, float]] = field(default_factory=lambda: dict[str, dict[str, float]]())
 
 
 @dataclass
@@ -202,9 +203,9 @@ class StrategyBResult:
     prevention_rate_top5: float
     prevention_rate_top10: float
     prevention_rate_top15: float
-    per_cluster: dict[str, dict[str, float]] = field(default_factory=dict)
-    locked_unlocked_separation: dict[str, float] = field(default_factory=dict)
-    score_distribution: dict[str, int] = field(default_factory=dict)
+    per_cluster: dict[str, dict[str, float]] = field(default_factory=lambda: dict[str, dict[str, float]]())
+    locked_unlocked_separation: dict[str, float] = field(default_factory=lambda: dict[str, float]())
+    score_distribution: dict[str, int] = field(default_factory=lambda: dict[str, int]())
 
 
 @dataclass
@@ -213,9 +214,9 @@ class StrategyCResult:
     prevention_rate_top5: float
     prevention_rate_top10: float
     prevention_rate_top15: float
-    per_cluster: dict[str, dict[str, float]] = field(default_factory=dict)
-    locked_unlocked_separation: dict[str, float] = field(default_factory=dict)
-    score_distribution: dict[str, int] = field(default_factory=dict)
+    per_cluster: dict[str, dict[str, float]] = field(default_factory=lambda: dict[str, dict[str, float]]())
+    locked_unlocked_separation: dict[str, float] = field(default_factory=lambda: dict[str, float]())
+    score_distribution: dict[str, int] = field(default_factory=lambda: dict[str, int]())
 
 
 @dataclass
@@ -581,21 +582,21 @@ def populate_velocities(
 
 def load_correction_clusters(path: Path) -> list[CorrectionCluster]:
     with path.open("r", encoding="utf-8") as fh:
-        data: dict = json.load(fh)
+        data: dict[str, Any] = json.load(fh)
 
     clusters: list[CorrectionCluster] = []
-    for cluster in data.get("topic_clusters", []):
+    for cluster in list[dict[str, Any]](data.get("topic_clusters", [])):
         timestamps: list[str] = [
-            ov["timestamp"]
-            for ov in cluster.get("overrides", [])
+            str(ov["timestamp"])
+            for ov in list[dict[str, Any]](cluster.get("overrides", []))
             if "timestamp" in ov
         ]
         clusters.append(CorrectionCluster(
-            topic_id=cluster["topic_id"],
-            description=cluster.get("description", ""),
-            decision_refs=cluster.get("decision_refs", []),
+            topic_id=str(cluster["topic_id"]),
+            description=str(cluster.get("description", "")),
+            decision_refs=list[str](cluster.get("decision_refs", [])),
             correction_timestamps=timestamps,
-            is_memory_failure=cluster.get("is_memory_failure", False),
+            is_memory_failure=bool(cluster.get("is_memory_failure", False)),
         ))
 
     total: int = sum(len(c.correction_timestamps) for c in clusters)
@@ -731,22 +732,6 @@ def _score_all_flat(
     return [decay_score_flat(d, current_time_hours, half_life_hours) for d in decisions]
 
 
-def _score_all_type_aware(
-    decisions: list[Decision],
-    current_time_hours: float,
-    base_hl: float,
-) -> list[float]:
-    return [decay_score_type_aware(d, current_time_hours, base_hl) for d in decisions]
-
-
-def _score_all_velocity(
-    decisions: list[Decision],
-    current_time_hours: float,
-    base_hl: float,
-) -> list[float]:
-    return [decay_score_velocity(d, current_time_hours, base_hl) for d in decisions]
-
-
 def evaluate_flat(
     decisions: list[Decision],
     clusters: list[CorrectionCluster],
@@ -800,7 +785,7 @@ def evaluate_typed(
     clusters: list[CorrectionCluster],
     base_hl: float,
     decision_id_set: set[str],
-    scorer_fn,  # callable[[Decision, float, float], float]
+    scorer_fn: Callable[[Decision, float, float], float],
 ) -> tuple[list[RankingResult], dict[int, float], dict[str, dict[str, float]]]:
     """Evaluate a content-type-aware or velocity scorer."""
     results: list[RankingResult] = []
@@ -1384,7 +1369,7 @@ def main() -> None:
     )
 
     # --- Build and save results JSON ---
-    results_json: dict = {
+    results_json: dict[str, Any] = {
         "experiment": "exp58c_hourscale_decay",
         "date": "2026-04-10",
         "key_change_vs_58b": "All timestamps in HOURS (not days). Adds velocity-scaled decay.",

@@ -34,7 +34,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 # ============================================================
 # Paths
@@ -161,7 +161,7 @@ class SweepResult:
     prevention_rate_top5: float
     prevention_rate_top10: float
     prevention_rate_top15: float
-    per_cluster: dict[str, dict[str, float]] = field(default_factory=dict)
+    per_cluster: dict[str, dict[str, float]] = field(default_factory=lambda: dict[str, dict[str, float]]())
 
 
 # ============================================================
@@ -223,9 +223,6 @@ def build_milestone_date_index(
     """
     # Pattern: M followed by digits, dash, 6 alphanumerics
     milestone_pattern: re.Pattern[str] = re.compile(r"M\d+-[a-z0-9]{6}", re.IGNORECASE)
-
-    # Also collect broader prefix patterns for "M006"-style refs (no hash suffix)
-    prefix_pattern: re.Pattern[str] = re.compile(r"\b(M\d+)-[a-z0-9]{6}\b", re.IGNORECASE)
 
     # milestone_id (full, e.g. "M006-wz8eaf") -> earliest date in days
     full_id_dates: dict[str, float] = {}
@@ -312,11 +309,6 @@ def _parse_decisions_md_row(line: str) -> tuple[str, ...] | None:
     )
 
 
-def _find_supersedes_in_text(text: str) -> list[str]:
-    """Extract D### references from 'Supersedes D###' patterns in free text."""
-    return re.findall(r"[Ss]upersedes?\s+(D\d+)", text)
-
-
 def load_active_decisions(
     path: Path,
     milestone_dates: dict[str, float],
@@ -338,10 +330,6 @@ def load_active_decisions(
             when_raw, milestone_dates, optimus_earliest_days, median_days
         )
 
-        # Check if superseded from text
-        superseded_by: str | None = None
-        combined_text: str = choice_text + " " + rationale_text
-        supers_refs: list[str] = _find_supersedes_in_text(combined_text)
         # This is decisions that SUPERSEDE others; the decision itself is not superseded
         # (superseded decisions are in archive). No superseded_by for active decisions.
 
@@ -533,21 +521,21 @@ def _classify(scope: str, locked: bool) -> ContentType:
 
 def load_correction_clusters(path: Path) -> list[CorrectionCluster]:
     with path.open("r", encoding="utf-8") as fh:
-        data: dict = json.load(fh)
+        data: dict[str, Any] = json.load(fh)
 
     clusters: list[CorrectionCluster] = []
-    for cluster in data.get("topic_clusters", []):
+    for cluster in list[dict[str, Any]](data.get("topic_clusters", [])):
         timestamps: list[str] = [
-            ov["timestamp"]
-            for ov in cluster.get("overrides", [])
+            str(ov["timestamp"])
+            for ov in list[dict[str, Any]](cluster.get("overrides", []))
             if "timestamp" in ov
         ]
         clusters.append(CorrectionCluster(
-            topic_id=cluster["topic_id"],
-            description=cluster.get("description", ""),
-            decision_refs=cluster.get("decision_refs", []),
+            topic_id=str(cluster["topic_id"]),
+            description=str(cluster.get("description", "")),
+            decision_refs=list[str](cluster.get("decision_refs", [])),
             correction_timestamps=timestamps,
-            is_memory_failure=cluster.get("is_memory_failure", False),
+            is_memory_failure=bool(cluster.get("is_memory_failure", False)),
         ))
 
     print(
@@ -1210,7 +1198,7 @@ def main() -> None:
     print(f"\nRank distribution (combined): {rank_buckets}", file=sys.stderr)
 
     # --- Build results JSON ---
-    results_json: dict = {
+    results_json: dict[str, Any] = {
         "experiment": "exp58b_decay_calibration_fullscale",
         "date": "2026-04-10",
         "data_sources": {

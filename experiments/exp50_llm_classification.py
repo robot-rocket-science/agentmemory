@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from collections.abc import Callable
 from typing import Any
 
 
@@ -185,7 +186,7 @@ def heuristic_directive(text: str) -> str:
 # LLM prompt construction (what would be sent)
 # ============================================================
 
-def build_entity_prompt(entities: list[dict], project_desc: str, batch_size: int = 20) -> list[dict[str, Any]]:
+def build_entity_prompt(entities: list[dict[str, str]], project_desc: str, batch_size: int = 20) -> list[dict[str, Any]]:
     """Build the prompts that would be sent for entity classification."""
     batches: list[dict[str, Any]] = []
 
@@ -218,7 +219,7 @@ Respond with just the number and classification, one per line. Example:
     return batches
 
 
-def build_directive_prompt(sentences: list[dict], project_desc: str, batch_size: int = 20) -> list[dict[str, Any]]:
+def build_directive_prompt(sentences: list[dict[str, str]], project_desc: str, batch_size: int = 20) -> list[dict[str, Any]]:
     """Build prompts for directive classification."""
     batches: list[dict[str, Any]] = []
 
@@ -255,12 +256,12 @@ Respond with just the number and classification, one per line."""
 # Analysis
 # ============================================================
 
-def score_heuristic(samples: list[dict], classify_fn, truth_key: str = "truth") -> dict[str, Any]:
+def score_heuristic(samples: list[dict[str, str]], classify_fn: Callable[[str], str], truth_key: str = "truth") -> dict[str, Any]:
     """Score the heuristic classifier against ground truth."""
-    correct = 0
-    wrong: list[dict] = []
+    correct: int = 0
+    wrong: list[dict[str, str]] = []
     for s in samples:
-        pred = classify_fn(s.get("name", s.get("text", "")))
+        pred: str = classify_fn(s.get("name", s.get("text", "")))
         if pred == s[truth_key]:
             correct += 1
         else:
