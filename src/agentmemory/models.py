@@ -79,8 +79,9 @@ class Observation:
     observation_type: str       # conversation, file_change, error, decision, user_statement, document
     source_type: str            # user, agent, system, document
     source_id: str
-    session_id: str | None
-    created_at: str             # ISO 8601
+    source_path: str = ""       # file path the content was extracted from (for doc tracing)
+    session_id: str | None = None
+    created_at: str = ""        # ISO 8601
 
 
 @dataclass

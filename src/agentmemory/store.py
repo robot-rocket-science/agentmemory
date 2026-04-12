@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS observations (
     observation_type TEXT NOT NULL,
     source_type TEXT NOT NULL,
     source_id TEXT NOT NULL DEFAULT '',
+    source_path TEXT NOT NULL DEFAULT '',
     session_id TEXT,
     created_at TEXT NOT NULL,
     FOREIGN KEY (session_id) REFERENCES sessions(id)
@@ -174,6 +175,7 @@ def _now() -> str:
 
 
 def _row_to_observation(row: sqlite3.Row) -> Observation:
+    keys: list[str] = list(row.keys())
     return Observation(
         id=row["id"],
         content_hash=row["content_hash"],
@@ -181,6 +183,7 @@ def _row_to_observation(row: sqlite3.Row) -> Observation:
         observation_type=row["observation_type"],
         source_type=row["source_type"],
         source_id=row["source_id"],
+        source_path=row["source_path"] if "source_path" in keys else "",
         session_id=row["session_id"],
         created_at=row["created_at"],
     )
@@ -257,6 +260,19 @@ class MemoryStore:
     def _migrate_beliefs(self) -> None:
         """One-time backfill: lock all correction-type beliefs that are unlocked."""
         self.backfill_lock_corrections()
+        self._migrate_observations()
+
+    def _migrate_observations(self) -> None:
+        """Add source_path column to observations if missing (existing DBs)."""
+        cols: list[sqlite3.Row] = self._conn.execute(
+            "PRAGMA table_info(observations)"
+        ).fetchall()
+        col_names: set[str] = {row["name"] for row in cols}
+        if "source_path" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE observations ADD COLUMN source_path TEXT NOT NULL DEFAULT ''"
+            )
+            self._conn.commit()
 
     def backfill_lock_corrections(self) -> int:
         """Lock all correction-type beliefs that are currently unlocked.
@@ -293,6 +309,7 @@ class MemoryStore:
         observation_type: str,
         source_type: str,
         source_id: str = "",
+        source_path: str = "",
         session_id: str | None = None,
     ) -> Observation:
         """Insert an observation. Content-hash dedup: if same hash exists, return existing."""
@@ -307,9 +324,9 @@ class MemoryStore:
         ts: str = _now()
         self._conn.execute(
             """INSERT INTO observations
-               (id, content_hash, content, observation_type, source_type, source_id, session_id, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (obs_id, ch, content, observation_type, source_type, source_id, session_id, ts),
+               (id, content_hash, content, observation_type, source_type, source_id, source_path, session_id, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (obs_id, ch, content, observation_type, source_type, source_id, source_path, session_id, ts),
         )
         self._conn.execute(
             "INSERT INTO search_index(id, content, type) VALUES (?, ?, ?)",
@@ -323,6 +340,7 @@ class MemoryStore:
             observation_type=observation_type,
             source_type=source_type,
             source_id=source_id,
+            source_path=source_path,
             session_id=session_id,
             created_at=ts,
         )
@@ -902,6 +920,26 @@ class MemoryStore:
             relationship=relationship,
             created_at=ts,
         )
+
+    # --- Document tracing ---
+
+    def get_source_documents(self, belief_ids: list[str]) -> list[str]:
+        """Trace beliefs back to source file paths via evidence -> observations.
+
+        Returns deduplicated list of source_path values for the given beliefs.
+        """
+        if not belief_ids:
+            return []
+        placeholders: str = ",".join("?" * len(belief_ids))
+        rows: list[sqlite3.Row] = self._conn.execute(
+            f"""SELECT DISTINCT o.source_path
+                FROM evidence e
+                JOIN observations o ON o.id = e.observation_id
+                WHERE e.belief_id IN ({placeholders})
+                  AND o.source_path != ''""",
+            belief_ids,
+        ).fetchall()
+        return [row["source_path"] for row in rows]
 
     # --- Retrieval stats (Tier 3) ---
 

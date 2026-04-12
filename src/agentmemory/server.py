@@ -472,6 +472,7 @@ def onboard(project_path: str) -> str:
             session_id=None,
             use_llm=False,
             created_at=node.date,
+            source_path=node.file or "",
         )
         aggregate.merge(turn_result)
 
