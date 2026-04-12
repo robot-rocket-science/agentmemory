@@ -15,7 +15,6 @@ a system where extraction is dumb and scoring is smart.
 """
 
 import json
-import math
 import re
 import sys
 from collections import Counter
@@ -112,10 +111,11 @@ class Belief:
         from scipy.special import betaln, digamma  # type: ignore[import-untyped]
         a: float = self.alpha
         b: float = self.beta_param
-        return (betaln(a, b)
-                - (a - 1) * digamma(a)
-                - (b - 1) * digamma(b)
-                + (a + b - 2) * digamma(a + b))
+        val: float = float(betaln(a, b)  # pyright: ignore[reportUnknownArgumentType]
+                          - (a - 1) * digamma(a)
+                          - (b - 1) * digamma(b)
+                          + (a + b - 2) * digamma(a + b))
+        return val
 
     def thompson_sample(self) -> float:
         """Draw from Beta posterior for Thompson sampling."""
@@ -155,14 +155,16 @@ def simulate_retrieval(
     The use_probability function takes a belief and returns P(used).
     Default: user beliefs are used 70% of the time, assistant beliefs 20%.
     """
-    if use_probability_fn is None:
-        def use_probability_fn(b: Belief) -> float:
+    _use_prob_fn: Any = use_probability_fn
+    if _use_prob_fn is None:
+        def _default_use_prob(b: Belief) -> float:
             if b.source == "user":
                 # User statements are usually relevant
                 return 0.70
             else:
                 # Most assistant text is filler
                 return 0.20
+        _use_prob_fn = _default_use_prob
 
     history: list[dict[str, Any]] = []
 
@@ -184,7 +186,7 @@ def simulate_retrieval(
 
         for idx in retrieved_indices:
             b: Belief = beliefs[idx]
-            p_use: float = use_probability_fn(b)
+            p_use: float = _use_prob_fn(b)
             if np.random.random() < p_use:
                 b.update_used()
                 session_used += 1

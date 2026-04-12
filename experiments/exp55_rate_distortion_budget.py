@@ -24,13 +24,12 @@ import math
 import re
 import sqlite3
 import sys
-from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
 import numpy as np
-from scipy import stats as scipy_stats
-from scipy.optimize import minimize as scipy_minimize
+from scipy import stats as scipy_stats  # type: ignore[import-untyped]
+from scipy.optimize import minimize as scipy_minimize  # type: ignore[import-untyped]
 
 ALPHA_SEEK_DB = Path(
     "/Users/thelorax/projects/.gsd/workflows/spikes/"
@@ -384,7 +383,7 @@ def strategy_rd_optimal(
         {"type": "ineq", "fun": budget_constraint},
     ]
 
-    result = scipy_minimize(
+    result: Any = scipy_minimize(  # pyright: ignore[reportUnknownVariableType]
         neg_objective,
         x0,
         method="SLSQP",
@@ -393,7 +392,7 @@ def strategy_rd_optimal(
         options={"maxiter": 200, "ftol": 1e-8},
     )
 
-    c_optimal: np.ndarray = result.x
+    c_optimal: np.ndarray = np.asarray(result.x, dtype=np.float64)  # pyright: ignore[reportUnknownMemberType]
 
     # Build allocated list
     allocated = []
@@ -588,13 +587,13 @@ def main() -> None:
                 # Enrich candidates with node data
                 candidates: list[dict[str, Any]] = []
                 for r in fts_results:
-                    node: SentenceNode | None = node_by_id.get(r["node_id"])
-                    if node is None:
+                    matched_node: SentenceNode | None = node_by_id.get(r["node_id"])
+                    if matched_node is None:
                         continue
                     candidates.append({
                         **r,
-                        "tokens": int(node["tokens"]),
-                        "stype": str(node["type"]),
+                        "tokens": int(matched_node["tokens"]),
+                        "stype": str(matched_node["type"]),
                     })
 
                 # Apply three strategies
@@ -649,9 +648,9 @@ def main() -> None:
         diffs: np.ndarray = r_arr - f_arr
         nonzero: np.ndarray = diffs[diffs != 0]
         if len(nonzero) >= 5:
-            w, p = scipy_stats.wilcoxon(nonzero)
+            w_result: Any = scipy_stats.wilcoxon(nonzero)  # pyright: ignore[reportUnknownMemberType]
             stat_result.update({
-                "W": float(w), "p": round(float(p), 4),
+                "W": float(w_result.statistic), "p": round(float(w_result.pvalue), 4),
                 "n_nonzero": int(len(nonzero)),
             })
         else:

@@ -43,7 +43,7 @@ ALPHA_SEEK_DB: Final[Path] = Path(
 )
 
 TOP_K: Final[int] = 15
-RNG: np.random.Generator = np.random.default_rng(42)
+_rng: np.random.Generator = np.random.default_rng(42)
 
 TOPICS: dict[str, dict[str, Any]] = {
     "dispatch_gate": {
@@ -275,7 +275,7 @@ def build_agent_constraint_edges(
 
 def make_vector(dim: int) -> np.ndarray[Any, np.dtype[np.floating[Any]]]:
     """Random unit vector."""
-    v: np.ndarray[Any, np.dtype[np.floating[Any]]] = RNG.standard_normal(dim)
+    v: np.ndarray[Any, np.dtype[np.floating[Any]]] = _rng.standard_normal(dim)
     v /= np.linalg.norm(v)
     return v
 
@@ -581,9 +581,9 @@ def main() -> None:
         label: str = cfg["name"]
         print(f"\n--- Building HRR graph: {label} ---", file=sys.stderr)
 
-        # Reset RNG for reproducibility across configs
-        global RNG
-        RNG = np.random.default_rng(42)
+        # Reset rng for reproducibility across configs
+        global _rng
+        _rng = np.random.default_rng(42)
 
         graph: HRRGraph = HRRGraph(dim=dim)
         cap: int = graph.capacity

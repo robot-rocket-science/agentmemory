@@ -123,7 +123,7 @@ class QueryResult:
     query_text: str
     category: QueryCategory
     ground_truth: list[str]
-    method_results: dict[str, MethodResult] = field(default_factory=dict)
+    method_results: dict[str, MethodResult] = field(default_factory=dict)  # type: ignore[arg-type]
     requires_structural: bool = False
     requires_supersedes: bool = False
 

@@ -33,7 +33,6 @@ from __future__ import annotations
 
 import json
 import math
-import sqlite3
 import sys
 import time
 from dataclasses import dataclass, field
@@ -97,7 +96,7 @@ class TemporalEvent:
     event_type: str             # "created", "retrieved", "superseded", "corrected", "locked"
     belief_id: str
     session_id: int
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)  # type: ignore[arg-type]
 
 
 # ============================================================
@@ -817,7 +816,7 @@ def main() -> None:
     d_pass_rate: float = sum(1 for r in d_results if r.verdict == "PASS") / len(d_results)
 
     e_results: list[ArchitectureResult] = all_results["E_event_sourced"]
-    e_pass_rate: float = sum(1 for r in e_results if r.verdict == "PASS") / len(e_results)
+    _e_pass_rate: float = sum(1 for r in e_results if r.verdict == "PASS") / len(e_results)
 
     print(f"\n  H1: Adopted (D) handles >= 80% of temporal failures", file=sys.stderr)
     print(f"      Result: {d_pass_rate:.0%} -- {'PASS' if d_pass_rate >= 0.8 else 'FAIL'}", file=sys.stderr)

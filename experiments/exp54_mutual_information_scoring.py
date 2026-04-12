@@ -21,12 +21,12 @@ import math
 import re
 import sqlite3
 import sys
-from collections import Counter, defaultdict
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
 import numpy as np
-from scipy import stats as scipy_stats
+from scipy import stats as scipy_stats  # type: ignore[import-untyped]
 
 ALPHA_SEEK_DB = Path(
     "/Users/thelorax/projects/.gsd/workflows/spikes/"
@@ -239,7 +239,7 @@ class CorpusStats:
         q_tf: Counter[str] = Counter(query_terms)
         q_total: int = len(query_terms)
         h_q: float = 0.0
-        for term, count in q_tf.items():
+        for _term, count in q_tf.items():
             p: float = count / q_total
             if p > 0:
                 h_q -= p * math.log2(p)
@@ -599,10 +599,12 @@ def main() -> None:
     nonzero_nmi: np.ndarray = diffs_nmi[diffs_nmi != 0]
 
     if len(nonzero_pmi) >= 5:
-        w_pmi, p_pmi = scipy_stats.wilcoxon(nonzero_pmi)
-        r_pmi: float = float(w_pmi) / math.sqrt(len(nonzero_pmi))
+        pmi_wres: Any = scipy_stats.wilcoxon(nonzero_pmi)  # pyright: ignore[reportUnknownMemberType]
+        w_pmi: float = float(pmi_wres.statistic)
+        p_pmi: float = float(pmi_wres.pvalue)
+        r_pmi: float = w_pmi / math.sqrt(len(nonzero_pmi))
         pmi_stat_result.update({
-            "W": float(w_pmi), "p": float(p_pmi),
+            "W": w_pmi, "p": p_pmi,
             "r_effect": round(r_pmi, 3),
             "n_nonzero_pairs": int(len(nonzero_pmi)),
         })
@@ -614,10 +616,12 @@ def main() -> None:
               f"({len(nonzero_pmi)} nonzero diffs)", file=sys.stderr)
 
     if len(nonzero_nmi) >= 5:
-        w_nmi, p_nmi = scipy_stats.wilcoxon(nonzero_nmi)
-        r_nmi: float = float(w_nmi) / math.sqrt(len(nonzero_nmi))
+        nmi_wres: Any = scipy_stats.wilcoxon(nonzero_nmi)  # pyright: ignore[reportUnknownMemberType]
+        w_nmi: float = float(nmi_wres.statistic)
+        p_nmi: float = float(nmi_wres.pvalue)
+        r_nmi: float = w_nmi / math.sqrt(len(nonzero_nmi))
         nmi_stat_result.update({
-            "W": float(w_nmi), "p": float(p_nmi),
+            "W": w_nmi, "p": p_nmi,
             "r_effect": round(r_nmi, 3),
             "n_nonzero_pairs": int(len(nonzero_nmi)),
         })

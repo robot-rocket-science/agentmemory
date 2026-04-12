@@ -12,14 +12,14 @@ from __future__ import annotations
 import json
 import re
 import sys
-from collections import Counter, defaultdict
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
 PYTHONPATH_SET = True
 from experiments.exp49_onboarding_validation import (
     PROJECTS, discover, extract_file_tree, extract_git_history,
-    extract_document_sentences, extract_ast_calls, extract_citations,
+    extract_document_sentences, extract_ast_calls,
     extract_directives,
 )
 from experiments.exp49c_entity_edges import detect_entities, build_entity_edges
@@ -29,7 +29,7 @@ from experiments.exp49c_entity_edges import detect_entities, build_entity_edges
 # Precision validators (heuristic ground truth)
 # ============================================================
 
-def validate_commit_beliefs(nodes: list[dict]) -> dict[str, Any]:
+def validate_commit_beliefs(nodes: list[dict[str, Any]]) -> dict[str, Any]:
     """Commit beliefs are verbatim git messages. FP = message that's not a meaningful belief."""
     commits = [n for n in nodes if n["type"] == "commit_belief"]
     if not commits:
@@ -42,7 +42,7 @@ def validate_commit_beliefs(nodes: list[dict]) -> dict[str, Any]:
         re.compile(r"^v?\d+\.\d+"),  # Version numbers
     ]
 
-    fps: list[dict] = []
+    fps: list[dict[str, Any]] = []
     for n in commits:
         content = n.get("content", "")
         if len(content) < 10:  # Too short to be meaningful
@@ -61,13 +61,13 @@ def validate_commit_beliefs(nodes: list[dict]) -> dict[str, Any]:
     }
 
 
-def validate_doc_sentences(nodes: list[dict]) -> dict[str, Any]:
+def validate_doc_sentences(nodes: list[dict[str, Any]]) -> dict[str, Any]:
     """Doc sentences should be meaningful assertions. FP = fragments, metadata, noise."""
     sentences = [n for n in nodes if n["type"] in ("sentence", "heading")]
     if not sentences:
         return {"total": 0, "fp": 0, "fp_rate": 0.0, "samples": []}
 
-    fps: list[dict] = []
+    fps: list[dict[str, Any]] = []
     for n in sentences:
         content = n.get("content", "").strip()
 
@@ -104,7 +104,7 @@ def validate_doc_sentences(nodes: list[dict]) -> dict[str, Any]:
     }
 
 
-def validate_calls_edges(edges: list[dict]) -> dict[str, Any]:
+def validate_calls_edges(edges: list[dict[str, Any]]) -> dict[str, Any]:
     """CALLS edges from resolved AST. FP = call to a different function with same name (shadowing)."""
     calls = [e for e in edges if e["type"] == "CALLS"]
     if not calls:
@@ -113,13 +113,13 @@ def validate_calls_edges(edges: list[dict]) -> dict[str, Any]:
     # Resolved intra-file calls have ~0% FP (syntactically verifiable).
     # We flag cases where the same function name appears in multiple files
     # (potential shadowing/misresolution).
-    target_names = Counter()
+    target_names: Counter[str] = Counter()
     for e in calls:
-        func_name = e["tgt"].split(".")[-1] if "." in e["tgt"] else e["tgt"]
+        func_name: str = e["tgt"].split(".")[-1] if "." in e["tgt"] else e["tgt"]
         target_names[func_name] += 1
 
     # Functions called from multiple files with same name = potential misresolution
-    ambiguous = {name: count for name, count in target_names.items() if count > 5}
+    ambiguous: dict[str, int] = {name: count for name, count in target_names.items() if count > 5}
 
     return {
         "total": len(calls),
@@ -132,7 +132,7 @@ def validate_calls_edges(edges: list[dict]) -> dict[str, Any]:
 
 
 def validate_entity_edges(
-    entity_edges: list[dict],
+    entity_edges: list[dict[str, Any]],
     mentions: dict[str, list[tuple[str, str]]],
 ) -> dict[str, Any]:
     """Entity edges. FP = wrong entity classification (concept as person, etc.)."""
@@ -212,10 +212,10 @@ def validate_entity_edges(
 # ============================================================
 
 def estimate_correction_burden(
-    commit_audit: dict,
-    sentence_audit: dict,
-    calls_audit: dict,
-    entity_audit: dict,
+    commit_audit: dict[str, Any],
+    sentence_audit: dict[str, Any],
+    calls_audit: dict[str, Any],
+    entity_audit: dict[str, Any],
 ) -> dict[str, Any]:
     """Estimate total wrong beliefs stored and potential corrections per session."""
 
@@ -264,8 +264,8 @@ def main() -> None:
 
         # Extract everything
         manifest = discover(root)
-        all_nodes: list[dict] = []
-        all_edges: list[dict] = []
+        all_nodes: list[dict[str, Any]] = []
+        all_edges: list[dict[str, Any]] = []
 
         ft_nodes, ft_edges = extract_file_tree(root)
         all_nodes.extend(ft_nodes)
@@ -320,15 +320,17 @@ def main() -> None:
             print(f"    Potentially ambiguous names: {calls_audit['potentially_ambiguous']}", file=sys.stderr)
 
         print(f"\n  Entity detection:", file=sys.stderr)
-        for etype, audit in entity_audit.items():
+        for etype, audit_val in entity_audit.items():
+            audit_d: dict[str, Any] = audit_val
             if etype == "entity_edges":
-                print(f"    Entity edges: {audit['total']} total, {audit['from_fp_entities']} from FP entities ({audit['fp_edge_rate']:.0%})", file=sys.stderr)
-            elif isinstance(audit, dict) and "total_entities" in audit:
-                fp_rate = audit.get("fp_rate", 0)
-                print(f"    {etype}: {audit['total_entities']} entities, FP rate {fp_rate:.0%}", file=sys.stderr)
-                if audit.get("fp_samples"):
-                    for fp in audit["fp_samples"][:5]:
-                        print(f"      FP: {fp}", file=sys.stderr)
+                print(f"    Entity edges: {audit_d['total']} total, {audit_d['from_fp_entities']} from FP entities ({audit_d['fp_edge_rate']:.0%})", file=sys.stderr)
+            elif "total_entities" in audit_d:
+                fp_rate: float = audit_d.get("fp_rate", 0)
+                print(f"    {etype}: {audit_d['total_entities']} entities, FP rate {fp_rate:.0%}", file=sys.stderr)
+                fp_samples: list[str] = audit_d.get("fp_samples", [])
+                if fp_samples:
+                    for fp_item in fp_samples[:5]:
+                        print(f"      FP: {fp_item}", file=sys.stderr)
 
         print(f"\n  CORRECTION BURDEN:", file=sys.stderr)
         print(f"    Total beliefs stored: {burden['total_beliefs_stored']}", file=sys.stderr)

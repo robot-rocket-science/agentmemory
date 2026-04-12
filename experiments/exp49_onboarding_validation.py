@@ -157,10 +157,10 @@ def discover(project_root: Path) -> dict[str, Any]:
 # Stage 2: Extract
 # ============================================================
 
-def extract_file_tree(project_root: Path) -> tuple[list[dict], list[dict]]:
+def extract_file_tree(project_root: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Extract file tree nodes and CONTAINS edges."""
-    nodes: list[dict] = []
-    edges: list[dict] = []
+    nodes: list[dict[str, Any]] = []
+    edges: list[dict[str, Any]] = []
 
     for root, dirs, files in os.walk(project_root):
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
@@ -176,7 +176,7 @@ def extract_file_tree(project_root: Path) -> tuple[list[dict], list[dict]]:
     return nodes, edges
 
 
-def extract_git_history(project_root: Path) -> tuple[list[dict], list[dict]]:
+def extract_git_history(project_root: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Extract COMMIT_BELIEF nodes and CO_CHANGED edges."""
     import subprocess
     r = subprocess.run(
@@ -184,8 +184,8 @@ def extract_git_history(project_root: Path) -> tuple[list[dict], list[dict]]:
         capture_output=True, text=True, cwd=project_root,
     )
 
-    nodes: list[dict] = []
-    edges: list[dict] = []
+    nodes: list[dict[str, Any]] = []
+    edges: list[dict[str, Any]] = []
     edges_raw: Counter[tuple[str, str]] = Counter()
     current_msg = ""
     current_date = ""
@@ -211,7 +211,7 @@ def extract_git_history(project_root: Path) -> tuple[list[dict], list[dict]]:
                 # Co-change
                 for i, a in enumerate(current_files):
                     for b in current_files[i+1:]:
-                        pair = tuple(sorted([a, b]))
+                        pair: tuple[str, str] = (sorted([a, b])[0], sorted([a, b])[1])
                         edges_raw[pair] += 1
 
             parts = line[7:].split("|", 2)
@@ -236,7 +236,7 @@ def extract_git_history(project_root: Path) -> tuple[list[dict], list[dict]]:
                           "type": "COMMIT_TOUCHES"})
         for i, a in enumerate(current_files):
             for b in current_files[i+1:]:
-                pair = tuple(sorted([a, b]))
+                pair: tuple[str, str] = (sorted([a, b])[0], sorted([a, b])[1])
                 edges_raw[pair] += 1
 
     # Threshold co-change edges and add to existing edges list
@@ -248,10 +248,10 @@ def extract_git_history(project_root: Path) -> tuple[list[dict], list[dict]]:
     return nodes, edges
 
 
-def extract_document_sentences(project_root: Path, doc_files: list[str]) -> tuple[list[dict], list[dict]]:
+def extract_document_sentences(project_root: Path, doc_files: list[str]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Split markdown docs into sentence-level nodes + cross-level edges."""
-    nodes: list[dict] = []
-    edges: list[dict] = []
+    nodes: list[dict[str, Any]] = []
+    edges: list[dict[str, Any]] = []
     sent_pattern = re.compile(r"(?<=[.!?])\s+(?=[A-Z])")
 
     for rel_path in doc_files:
@@ -326,7 +326,7 @@ def extract_document_sentences(project_root: Path, doc_files: list[str]) -> tupl
     return nodes, edges
 
 
-def extract_ast_calls(project_root: Path, languages: list[str]) -> tuple[list[dict], list[dict]]:
+def extract_ast_calls(project_root: Path, languages: list[str]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Extract CALLS edges from Python AST. Returns (callable_nodes, call_edges)."""
     if "python" not in languages:
         return [], []
@@ -340,8 +340,8 @@ def extract_ast_calls(project_root: Path, languages: list[str]) -> tuple[list[di
         "TypeError", "KeyError", "RuntimeError", "Exception",
     }
 
-    nodes: list[dict] = []
-    edges: list[dict] = []
+    nodes: list[dict[str, Any]] = []
+    edges: list[dict[str, Any]] = []
 
     for root, dirs, files in os.walk(project_root):
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
@@ -393,13 +393,13 @@ def extract_ast_calls(project_root: Path, languages: list[str]) -> tuple[list[di
 
 
 def extract_citations(project_root: Path, doc_files: list[str],
-                      citation_regex: str | None) -> list[dict]:
+                      citation_regex: str | None) -> list[dict[str, Any]]:
     """Extract CITES edges from citation patterns in documents."""
     if not citation_regex:
         return []
 
     pattern = re.compile(citation_regex)
-    edges: list[dict] = []
+    edges: list[dict[str, Any]] = []
 
     file_citations: dict[str, set[str]] = defaultdict(set)
     for rel_path in doc_files:
@@ -426,9 +426,9 @@ def extract_citations(project_root: Path, doc_files: list[str],
     return edges
 
 
-def extract_directives(project_root: Path, directive_files: list[str]) -> list[dict]:
+def extract_directives(project_root: Path, directive_files: list[str]) -> list[dict[str, Any]]:
     """Extract behavioral belief nodes from directive files."""
-    nodes: list[dict] = []
+    nodes: list[dict[str, Any]] = []
     directive_patterns = [
         re.compile(r"\bBANNED\b"),
         re.compile(r"\b[Nn]ever\s+\w+"),
@@ -468,7 +468,7 @@ def extract_directives(project_root: Path, directive_files: list[str]) -> list[d
 # Stage 3: Analyze graph properties
 # ============================================================
 
-def analyze_graph(all_nodes: list[dict], all_edges: list[dict]) -> dict[str, Any]:
+def analyze_graph(all_nodes: list[dict[str, Any]], all_edges: list[dict[str, Any]]) -> dict[str, Any]:
     """Compute graph properties: connectivity, degree distribution, etc."""
     # Build adjacency for connectivity analysis
     node_ids = {n["id"] for n in all_nodes}
@@ -516,7 +516,7 @@ def analyze_graph(all_nodes: list[dict], all_edges: list[dict]) -> dict[str, Any
 
     # Degree distribution
     degrees = [len(adjacency.get(n, set())) for n in all_graph_nodes]
-    degree_counter = Counter(degrees)
+    _degree_counter = Counter(degrees)
 
     # Edge type distribution
     edge_types = Counter(e["type"] for e in all_edges)
@@ -543,7 +543,7 @@ def analyze_graph(all_nodes: list[dict], all_edges: list[dict]) -> dict[str, Any
 # FTS5 retrieval test
 # ============================================================
 
-def build_fts_from_nodes(nodes: list[dict]) -> sqlite3.Connection:
+def build_fts_from_nodes(nodes: list[dict[str, Any]]) -> sqlite3.Connection:
     """Build FTS5 index from extracted nodes."""
     db = sqlite3.connect(":memory:")
     db.execute("CREATE VIRTUAL TABLE fts USING fts5(id, content, tokenize='porter')")
@@ -607,8 +607,8 @@ def run_project(name: str, project_root: Path) -> dict[str, Any]:
     result["manifest"]["doc_count"] = manifest["doc_count"]
 
     # Stage 2: Extract
-    all_nodes: list[dict] = []
-    all_edges: list[dict] = []
+    all_nodes: list[dict[str, Any]] = []
+    all_edges: list[dict[str, Any]] = []
 
     # file_tree (always)
     t0 = time.perf_counter()

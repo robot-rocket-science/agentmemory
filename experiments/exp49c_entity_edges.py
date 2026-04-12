@@ -33,7 +33,7 @@ import numpy as np
 PYTHONPATH_SET = True  # Run with PYTHONPATH=/Users/thelorax/projects/agentmemory
 from experiments.exp49_onboarding_validation import (
     PROJECTS, discover, extract_file_tree, extract_git_history,
-    extract_document_sentences, extract_ast_calls, extract_citations,
+    extract_document_sentences, extract_ast_calls,
     extract_directives, analyze_graph, build_fts_from_nodes, search_fts,
 )
 
@@ -42,7 +42,7 @@ from experiments.exp49_onboarding_validation import (
 # Entity detection
 # ============================================================
 
-def detect_entities(nodes: list[dict]) -> dict[str, list[tuple[str, str]]]:
+def detect_entities(nodes: list[dict[str, Any]]) -> dict[str, list[tuple[str, str]]]:
     """Detect entities in sentence nodes. Returns {entity_type: [(node_id, entity_value)]}."""
 
     # First pass: build corpus-level entity candidates
@@ -146,9 +146,9 @@ def detect_entities(nodes: list[dict]) -> dict[str, list[tuple[str, str]]]:
     return mentions
 
 
-def build_entity_edges(mentions: dict[str, list[tuple[str, str]]]) -> list[dict]:
+def build_entity_edges(mentions: dict[str, list[tuple[str, str]]]) -> list[dict[str, Any]]:
     """Build edges between nodes that share entity mentions."""
-    edges: list[dict] = []
+    edges: list[dict[str, Any]] = []
 
     for edge_type, mention_list in mentions.items():
         # Group by entity value
@@ -213,10 +213,10 @@ def cos_sim(a: np.ndarray, b: np.ndarray) -> float:
 
 
 def test_hrr_bridge(
-    all_nodes: list[dict],
-    entity_edges: list[dict],
+    all_nodes: list[dict[str, Any]],
+    entity_edges: list[dict[str, Any]],
     fts_db: sqlite3.Connection,
-    queries: list[dict],
+    queries: list[dict[str, Any]],
     project_name: str,
 ) -> dict[str, Any]:
     """Test whether HRR + entity edges finds things FTS5 misses."""
@@ -243,14 +243,14 @@ def test_hrr_bridge(
         node_vecs[nid] = make_vector()
 
     # Build superposition (single partition for simplicity -- entity edges are sparse)
-    S = np.zeros(DIM)
+    superposition = np.zeros(DIM)
     for e in entity_edges:
         if e["src"] in node_vecs and e["tgt"] in node_vecs:
-            S += bind(node_vecs[e["tgt"]], edge_type_vecs[e["type"]])
-            S += bind(node_vecs[e["src"]], edge_type_vecs[e["type"]])
+            superposition += bind(node_vecs[e["tgt"]], edge_type_vecs[e["type"]])
+            superposition += bind(node_vecs[e["src"]], edge_type_vecs[e["type"]])
 
     # Test queries
-    results: list[dict] = []
+    results: list[dict[str, Any]] = []
     for q in queries:
         # FTS5 pass
         fts_hits = search_fts(q["query"], fts_db, top_k=10)
@@ -262,7 +262,7 @@ def test_hrr_bridge(
             if seed_id not in node_vecs:
                 continue
             for et in edge_types:
-                result_vec = unbind(S, edge_type_vecs[et])
+                result_vec = unbind(superposition, edge_type_vecs[et])
                 # Score all entity-connected nodes
                 for nid, vec in node_vecs.items():
                     if nid == seed_id:
@@ -312,7 +312,7 @@ def test_hrr_bridge(
 # Test queries for H3 (vocabulary gap scenarios)
 # ============================================================
 
-H3_QUERIES: dict[str, list[dict]] = {
+H3_QUERIES: dict[str, list[dict[str, Any]]] = {
     "jose-bully": [
         {
             "query": "PR blocked merge gatekeeping",
@@ -389,8 +389,8 @@ def main() -> None:
 
         # Extract (reuse pipeline)
         manifest = discover(root)
-        all_nodes: list[dict] = []
-        all_edges: list[dict] = []
+        all_nodes: list[dict[str, Any]] = []
+        all_edges: list[dict[str, Any]] = []
 
         ft_nodes, ft_edges = extract_file_tree(root)
         all_nodes.extend(ft_nodes)
@@ -430,7 +430,7 @@ def main() -> None:
                 print(f"      {count:>4}x  {ent}", file=sys.stderr)
 
         print(f"\n    Entity edges created: {len(entity_edges)}", file=sys.stderr)
-        edge_type_counts = Counter(e["type"] for e in entity_edges)
+        edge_type_counts: Counter[str] = Counter(e["type"] for e in entity_edges)
         for et, count in edge_type_counts.most_common():
             print(f"      {et}: {count}", file=sys.stderr)
 
@@ -444,7 +444,7 @@ def main() -> None:
 
         # Build FTS5 and test HRR
         fts_db = build_fts_from_nodes(all_nodes)
-        queries = H3_QUERIES.get(name, [])
+        queries: list[dict[str, Any]] = H3_QUERIES.get(name, [])
         hrr_result = test_hrr_bridge(all_nodes, entity_edges, fts_db, queries, name)
 
         print(f"\n    HRR bridge test:", file=sys.stderr)
