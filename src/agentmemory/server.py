@@ -774,6 +774,145 @@ def ingest(text: str, source: str = "user") -> str:
 
 
 @mcp.tool
+def timeline(
+    topic: str | None = None,
+    start: str | None = None,
+    end: str | None = None,
+    session_id: str | None = None,
+    limit: int = 50,
+) -> str:
+    """Return beliefs ordered by time, filtered by topic and/or time range.
+
+    Use cases:
+      timeline(topic="deployment") -- all deployment beliefs chronologically
+      timeline(start="-7d") -- everything from the last 7 days
+      timeline(session_id="abc123") -- replay session abc123
+      timeline(topic="capital", start="2026-03-25", end="2026-03-28")
+
+    start/end accept ISO 8601 timestamps or relative offsets: "-7d", "-24h", "-30m".
+    """
+    store: MemoryStore = _get_store()
+    resolved_start: str | None = _resolve_relative_time(start) if start else None
+    resolved_end: str | None = _resolve_relative_time(end) if end else None
+    beliefs: list[Belief] = store.timeline(
+        topic=topic, start=resolved_start, end=resolved_end,
+        session_id=session_id, limit=limit,
+    )
+    if not beliefs:
+        return "No beliefs found for the given time/topic filter."
+    lines: list[str] = [f"Timeline: {len(beliefs)} belief(s)"]
+    for b in beliefs:
+        status: str = " [SUPERSEDED]" if b.valid_to else ""
+        lock: str = " [LOCKED]" if b.locked else ""
+        lines.append(
+            f"  [{b.created_at}] ({b.belief_type}){lock}{status} {b.content[:200]}"
+        )
+    return "\n".join(lines)
+
+
+@mcp.tool
+def evolution(
+    belief_id: str | None = None,
+    topic: str | None = None,
+) -> str:
+    """Trace how a belief or topic evolved over time.
+
+    Two modes:
+    1. belief_id: follow the SUPERSEDES chain in both directions.
+       Shows: original -> correction 1 -> correction 2 -> current.
+    2. topic: FTS5 search + time ordering. Shows all beliefs about
+       the topic chronologically, marking which ones superseded others.
+
+    Use cases:
+      evolution(belief_id="a1b2c3d4e5f6") -- full chain for this belief
+      evolution(topic="dispatch gate") -- how dispatch gate policy evolved
+    """
+    if not belief_id and not topic:
+        return "Error: provide either belief_id or topic."
+    store: MemoryStore = _get_store()
+    beliefs: list[Belief] = store.evolution(belief_id=belief_id, topic=topic)
+    if not beliefs:
+        return "No evolution chain found."
+    lines: list[str] = [f"Evolution: {len(beliefs)} belief(s)"]
+    for i, b in enumerate(beliefs):
+        marker: str = "->" if i > 0 else "  "
+        status: str = " [SUPERSEDED]" if b.valid_to else " [CURRENT]"
+        lock: str = " [LOCKED]" if b.locked else ""
+        lines.append(
+            f"  {marker} [{b.created_at}] (ID: {b.id}){lock}{status} {b.content[:200]}"
+        )
+    return "\n".join(lines)
+
+
+@mcp.tool
+def diff(
+    since: str | None = None,
+    until: str | None = None,
+) -> str:
+    """Show what changed in the belief store over a time period.
+
+    Returns three sections: ADDED, REMOVED, EVOLVED.
+    Accepts ISO 8601 timestamps or relative offsets: "-7d", "-24h", "-1h".
+
+    Use cases:
+      diff(since="-24h") -- what changed in the last 24 hours
+      diff(since="-7d") -- weekly diff
+      diff(since="2026-04-11T00:00:00") -- since a specific time
+    """
+    if not since:
+        return "Error: 'since' is required."
+    store: MemoryStore = _get_store()
+    resolved_since: str = _resolve_relative_time(since)
+    resolved_until: str | None = _resolve_relative_time(until) if until else None
+    changes: dict[str, list[Belief]] = store.diff(
+        since=resolved_since, until=resolved_until,
+    )
+    added: list[Belief] = changes["added"]
+    removed: list[Belief] = changes["removed"]
+    evolved: list[Belief] = changes["evolved"]
+
+    lines: list[str] = [f"Diff since {resolved_since}:"]
+    lines.append(f"\nADDED ({len(added)}):")
+    for b in added[:20]:
+        lines.append(f"  + [{b.belief_type}] {b.content[:150]}")
+    if len(added) > 20:
+        lines.append(f"  ... and {len(added) - 20} more")
+
+    lines.append(f"\nREMOVED ({len(removed)}):")
+    for b in removed[:20]:
+        lines.append(f"  - [{b.belief_type}] {b.content[:150]}")
+    if len(removed) > 20:
+        lines.append(f"  ... and {len(removed) - 20} more")
+
+    lines.append(f"\nEVOLVED ({len(evolved)}):")
+    for b in evolved[:20]:
+        lines.append(f"  ~ [{b.belief_type}] {b.content[:150]}")
+    if len(evolved) > 20:
+        lines.append(f"  ... and {len(evolved) - 20} more")
+
+    return "\n".join(lines)
+
+
+def _resolve_relative_time(time_str: str) -> str:
+    """Resolve relative time strings like '-7d', '-24h', '-30m' to ISO 8601."""
+    import re as _re
+    from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+    match: _re.Match[str] | None = _re.match(r"^-(\d+)([dhm])$", time_str)
+    if match:
+        value: int = int(match.group(1))
+        unit: str = match.group(2)
+        delta: _td
+        if unit == "d":
+            delta = _td(days=value)
+        elif unit == "h":
+            delta = _td(hours=value)
+        else:
+            delta = _td(minutes=value)
+        return (_dt.now(_tz.utc) - delta).isoformat()
+    return time_str
+
+
+@mcp.tool
 def delete(belief_id: str) -> str:
     """Soft-delete a belief by setting valid_to = now.
 

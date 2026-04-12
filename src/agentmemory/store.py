@@ -1026,6 +1026,176 @@ class MemoryStore:
         ).fetchall()
         return [_row_to_checkpoint(r) for r in rows]
 
+    # --- Temporal queries (Wave 2) ---
+
+    def timeline(
+        self,
+        topic: str | None = None,
+        start: str | None = None,
+        end: str | None = None,
+        session_id: str | None = None,
+        limit: int = 50,
+    ) -> list[Belief]:
+        """Return beliefs ordered by time, optionally filtered by topic/time/session.
+
+        Uses FTS5 for topic filtering when provided, otherwise pure SQL.
+        """
+        if topic:
+            # FTS5 search with temporal filtering
+            sql: str = """
+                SELECT b.* FROM search_index si
+                JOIN beliefs b ON b.id = si.id
+                WHERE search_index MATCH ?
+                  AND b.valid_to IS NULL
+            """
+            params: list[object] = [topic]
+            if start:
+                sql += " AND b.created_at >= ?"
+                params.append(start)
+            if end:
+                sql += " AND b.created_at <= ?"
+                params.append(end)
+            if session_id:
+                sql += " AND b.session_id = ?"
+                params.append(session_id)
+            sql += " ORDER BY b.created_at ASC LIMIT ?"
+            params.append(limit)
+        else:
+            sql = "SELECT * FROM beliefs WHERE valid_to IS NULL"
+            params = []
+            if start:
+                sql += " AND created_at >= ?"
+                params.append(start)
+            if end:
+                sql += " AND created_at <= ?"
+                params.append(end)
+            if session_id:
+                sql += " AND session_id = ?"
+                params.append(session_id)
+            sql += " ORDER BY created_at ASC LIMIT ?"
+            params.append(limit)
+
+        rows: list[sqlite3.Row] = self._conn.execute(sql, params).fetchall()
+        return [_row_to_belief(r) for r in rows]
+
+    def evolution(
+        self,
+        belief_id: str | None = None,
+        topic: str | None = None,
+        limit: int = 50,
+    ) -> list[Belief]:
+        """Trace belief evolution over time.
+
+        If belief_id: follow SUPERSEDES chain in both directions.
+        If topic: all beliefs about topic chronologically, marking superseded ones.
+        """
+        if belief_id:
+            # Walk backward to find the root
+            chain: list[Belief] = []
+            visited: set[str] = set()
+            # Walk backward (find what this belief superseded)
+            current_id: str | None = belief_id
+            backward: list[Belief] = []
+            while current_id and current_id not in visited:
+                visited.add(current_id)
+                row: sqlite3.Row | None = self._conn.execute(
+                    "SELECT * FROM beliefs WHERE id = ?", (current_id,)
+                ).fetchone()
+                if row is None:
+                    break
+                backward.append(_row_to_belief(row))
+                # Find what this belief superseded (old belief with superseded_by = current)
+                prev: sqlite3.Row | None = self._conn.execute(
+                    "SELECT * FROM beliefs WHERE superseded_by = ?", (current_id,)
+                ).fetchone()
+                current_id = prev["id"] if prev is not None else None
+            backward.reverse()
+            chain.extend(backward)
+
+            # Walk forward from original belief_id (find what supersedes it)
+            current_id = belief_id
+            while current_id and current_id not in visited:
+                visited.add(current_id)
+                row = self._conn.execute(
+                    "SELECT * FROM beliefs WHERE id = ?", (current_id,)
+                ).fetchone()
+                if row is None:
+                    break
+                b: Belief = _row_to_belief(row)
+                chain.append(b)
+                current_id = b.superseded_by
+
+            return chain[:limit]
+
+        if topic:
+            rows: list[sqlite3.Row] = self._conn.execute(
+                """SELECT b.* FROM search_index si
+                   JOIN beliefs b ON b.id = si.id
+                   WHERE search_index MATCH ?
+                   ORDER BY b.created_at ASC LIMIT ?""",
+                (topic, limit),
+            ).fetchall()
+            return [_row_to_belief(r) for r in rows]
+
+        return []
+
+    def diff(
+        self,
+        since: str,
+        until: str | None = None,
+    ) -> dict[str, list[Belief]]:
+        """Show what changed in the belief store between two timestamps.
+
+        Returns dict with keys: added, removed, evolved.
+        """
+        end: str = until if until else _now()
+
+        added_rows: list[sqlite3.Row] = self._conn.execute(
+            "SELECT * FROM beliefs WHERE created_at >= ? AND created_at <= ? ORDER BY created_at",
+            (since, end),
+        ).fetchall()
+
+        removed_rows: list[sqlite3.Row] = self._conn.execute(
+            "SELECT * FROM beliefs WHERE valid_to >= ? AND valid_to <= ? ORDER BY valid_to",
+            (since, end),
+        ).fetchall()
+
+        evolved_rows: list[sqlite3.Row] = self._conn.execute(
+            """SELECT new.* FROM beliefs old
+               JOIN beliefs new ON old.superseded_by = new.id
+               WHERE old.valid_to >= ? AND old.valid_to <= ?
+               ORDER BY new.created_at""",
+            (since, end),
+        ).fetchall()
+
+        return {
+            "added": [_row_to_belief(r) for r in added_rows],
+            "removed": [_row_to_belief(r) for r in removed_rows],
+            "evolved": [_row_to_belief(r) for r in evolved_rows],
+        }
+
+    def search_at_time(
+        self,
+        query: str,
+        at_time: str,
+        top_k: int = 10,
+    ) -> list[Belief]:
+        """Search for beliefs that were active at a specific point in time.
+
+        Returns beliefs created before at_time that had not been superseded by then.
+        """
+        rows: list[sqlite3.Row] = self._conn.execute(
+            """SELECT b.* FROM search_index si
+               JOIN beliefs b ON b.id = si.id
+               WHERE search_index MATCH ?
+                 AND b.created_at <= ?
+                 AND (b.valid_to IS NULL OR b.valid_to > ?)
+               ORDER BY rank
+               LIMIT ?""",
+            (query, at_time, at_time, top_k),
+        ).fetchall()
+        return [_row_to_belief(r) for r in rows]
+
     # --- Stats ---
 
     def status(self) -> dict[str, int]:
