@@ -299,11 +299,12 @@ class TestScoreBelief:
         )
         import random
         random.seed(42)
+        # Use a query that matches the locked belief content so lock_boost activates.
         locked_scores: list[float] = [
-            score_belief(locked_b, "query", locked_b.created_at) for _ in range(50)
+            score_belief(locked_b, "locked confidence belief", locked_b.created_at) for _ in range(50)
         ]
         normal_scores: list[float] = [
-            score_belief(normal_b, "query", normal_b.created_at) for _ in range(50)
+            score_belief(normal_b, "locked confidence belief", normal_b.created_at) for _ in range(50)
         ]
         assert sum(locked_scores) / len(locked_scores) > sum(normal_scores) / len(normal_scores)
 
