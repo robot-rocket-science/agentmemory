@@ -152,6 +152,8 @@ CREATE INDEX IF NOT EXISTS idx_beliefs_content_hash ON beliefs(content_hash);
 CREATE INDEX IF NOT EXISTS idx_observations_content_hash ON observations(content_hash);
 CREATE INDEX IF NOT EXISTS idx_beliefs_valid_to ON beliefs(valid_to);
 CREATE INDEX IF NOT EXISTS idx_beliefs_locked ON beliefs(locked);
+CREATE INDEX IF NOT EXISTS idx_beliefs_created_at ON beliefs(created_at);
+CREATE INDEX IF NOT EXISTS idx_beliefs_temporal ON beliefs(created_at, valid_to);
 CREATE INDEX IF NOT EXISTS idx_checkpoints_session ON checkpoints(session_id);
 CREATE INDEX IF NOT EXISTS idx_evidence_belief ON evidence(belief_id);
 CREATE INDEX IF NOT EXISTS idx_edges_from ON edges(from_id);
@@ -190,6 +192,7 @@ def _row_to_observation(row: sqlite3.Row) -> Observation:
 
 
 def _row_to_belief(row: sqlite3.Row) -> Belief:
+    keys: list[str] = list(row.keys())
     return Belief(
         id=row["id"],
         content_hash=row["content_hash"],
@@ -205,6 +208,8 @@ def _row_to_belief(row: sqlite3.Row) -> Belief:
         superseded_by=row["superseded_by"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
+        event_time=row["event_time"] if "event_time" in keys else None,
+        session_id=row["session_id"] if "session_id" in keys else None,
     )
 
 
@@ -262,6 +267,26 @@ class MemoryStore:
         # NOTE: backfill_lock_corrections() was removed. The system must not
         # auto-lock beliefs. Only explicit user confirmation via lock() is
         # allowed to set locked=True.
+        cols: list[sqlite3.Row] = self._conn.execute(
+            "PRAGMA table_info(beliefs)"
+        ).fetchall()
+        col_names: set[str] = {row["name"] for row in cols}
+        # Wave 1B: bitemporal event_time (when fact occurred vs when ingested)
+        if "event_time" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE beliefs ADD COLUMN event_time TEXT"
+            )
+        # Wave 1B: session_id for session replay queries
+        if "session_id" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE beliefs ADD COLUMN session_id TEXT"
+            )
+        self._conn.commit()
+        # Create index on session_id (safe to run even if already exists)
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_beliefs_session_id ON beliefs(session_id)"
+        )
+        self._conn.commit()
         self._migrate_observations()
 
     def _migrate_observations(self) -> None:
@@ -359,6 +384,8 @@ class MemoryStore:
         locked: bool = False,
         observation_id: str | None = None,
         created_at: str | None = None,
+        event_time: str | None = None,
+        session_id: str | None = None,
     ) -> Belief:
         """Insert a belief with optional evidence link. Content-hash dedup.
 
@@ -367,6 +394,10 @@ class MemoryStore:
 
         If created_at is provided, uses that timestamp instead of now().
         This enables source-truth dating (e.g., git commit dates).
+
+        event_time is the bitemporal "when the fact occurred" timestamp,
+        distinct from created_at (when the system ingested it).
+        session_id links the belief to the session that created it.
         """
         ch: str = _content_hash(content)
         existing: sqlite3.Row | None = self._conn.execute(
@@ -383,10 +414,11 @@ class MemoryStore:
         self._conn.execute(
             """INSERT INTO beliefs
                (id, content_hash, content, belief_type, alpha, beta_param,
-                source_type, locked, valid_from, valid_to, superseded_by, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?)""",
+                source_type, locked, valid_from, valid_to, superseded_by,
+                created_at, updated_at, event_time, session_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?)""",
             (belief_id, ch, content, belief_type, alpha, beta_param,
-             source_type, locked_int, ts, ts),
+             source_type, locked_int, ts, ts, event_time, session_id),
         )
         self._conn.execute(
             "INSERT INTO search_index(id, content, type) VALUES (?, ?, ?)",
@@ -420,6 +452,8 @@ class MemoryStore:
             superseded_by=None,
             created_at=ts,
             updated_at=ts,
+            event_time=event_time,
+            session_id=session_id,
         )
 
     def lock_belief(self, belief_id: str) -> None:

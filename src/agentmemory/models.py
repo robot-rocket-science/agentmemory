@@ -100,6 +100,8 @@ class Belief:
     superseded_by: str | None   # Points to replacement belief ID
     created_at: str
     updated_at: str
+    event_time: str | None = None   # Bitemporal: when fact occurred (vs created_at = ingestion time)
+    session_id: str | None = None   # Session that created this belief
 
 
 @dataclass

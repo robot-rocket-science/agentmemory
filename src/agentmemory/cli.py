@@ -447,6 +447,9 @@ def cmd_onboard(args: argparse.Namespace) -> None:
             source=source,
             session_id=None,
             created_at=node.date,
+            source_path=node.file or "",
+            source_id=node.id,
+            event_time=node.date,
         )
         aggregate.merge(turn_result)
 
