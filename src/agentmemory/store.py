@@ -137,6 +137,20 @@ CREATE TABLE IF NOT EXISTS graph_edges (
     created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS confidence_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    belief_id TEXT NOT NULL,
+    alpha REAL NOT NULL,
+    beta_param REAL NOT NULL,
+    event_type TEXT NOT NULL,
+    event_detail TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (belief_id) REFERENCES beliefs(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_confhist_belief ON confidence_history(belief_id);
+CREATE INDEX IF NOT EXISTS idx_confhist_time ON confidence_history(created_at);
+
 CREATE INDEX IF NOT EXISTS idx_graph_edges_from ON graph_edges(from_id);
 CREATE INDEX IF NOT EXISTS idx_graph_edges_to ON graph_edges(to_id);
 CREATE INDEX IF NOT EXISTS idx_graph_edges_type ON graph_edges(edge_type);
@@ -479,6 +493,11 @@ class MemoryStore:
             "UPDATE beliefs SET locked = 1, updated_at = ? WHERE id = ?",
             (ts, belief_id),
         )
+        row: sqlite3.Row | None = self._conn.execute(
+            "SELECT alpha, beta_param FROM beliefs WHERE id = ?", (belief_id,)
+        ).fetchone()
+        if row is not None:
+            self._record_confidence(belief_id, row["alpha"], row["beta_param"], "locked")
         self._conn.commit()
 
     def delete_belief(self, belief_id: str) -> bool:
@@ -522,7 +541,25 @@ class MemoryStore:
                VALUES (?, ?, 'SUPERSEDES', 1.0, ?, ?)""",
             (new_id, old_id, reason, ts),
         )
+        row: sqlite3.Row | None = self._conn.execute(
+            "SELECT alpha, beta_param FROM beliefs WHERE id = ?", (old_id,)
+        ).fetchone()
+        if row is not None:
+            self._record_confidence(old_id, row["alpha"], row["beta_param"], "superseded", new_id)
         self._conn.commit()
+
+    def _record_confidence(
+        self, belief_id: str, alpha: float, beta_param: float,
+        event_type: str, event_detail: str = "",
+    ) -> None:
+        """Append a snapshot to confidence_history for trajectory analysis."""
+        ts: str = _now()
+        self._conn.execute(
+            """INSERT INTO confidence_history
+               (belief_id, alpha, beta_param, event_type, event_detail, created_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (belief_id, alpha, beta_param, event_type, event_detail, ts),
+        )
 
     def update_confidence(self, belief_id: str, outcome: str, weight: float = 1.0) -> None:
         """Bayesian update: 'used' increments alpha, 'harmful' increments beta_param.
@@ -552,6 +589,7 @@ class MemoryStore:
             "UPDATE beliefs SET alpha = ?, beta_param = ?, updated_at = ? WHERE id = ?",
             (alpha, beta, ts, belief_id),
         )
+        self._record_confidence(belief_id, alpha, beta, f"feedback_{outcome}")
         self._conn.commit()
 
     def get_reclassifiable(self, limit: int = 200) -> list[dict[str, str]]:
