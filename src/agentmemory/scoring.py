@@ -31,13 +31,36 @@ def _parse_iso(ts: str) -> datetime:
     return dt
 
 
-def decay_factor(belief: Belief, current_time_iso: str) -> float:
-    """Content-aware exponential decay.
+def velocity_scale(velocity: float) -> float:
+    """Map session velocity (items/hour) to half-life multiplier.
+
+    Sprint sessions (>10 items/hr) get 0.1x half-life (fast decay).
+    Deep sessions (<2 items/hr) get 1.0x (no scaling).
+    From Exp 58c calibration, validated by Exp 75.
+    """
+    if velocity > 10.0:
+        return 0.1
+    if velocity >= 5.0:
+        return 0.5
+    if velocity >= 2.0:
+        return 0.8
+    return 1.0
+
+
+def decay_factor(
+    belief: Belief,
+    current_time_iso: str,
+    session_velocity: float | None = None,
+) -> float:
+    """Content-aware exponential decay with optional velocity scaling.
 
     Locked beliefs return 1.0.
     Superseded beliefs (valid_to is set) return 0.01.
     Beliefs whose type has no half-life (None) return 1.0.
-    All other beliefs decay as: 0.5 ^ (age_hours / half_life_hours).
+    All other beliefs decay as: 0.5 ^ (age_hours / effective_half_life).
+
+    If session_velocity is provided, the half-life is scaled by
+    velocity_scale(session_velocity). Sprint-origin beliefs decay faster.
     """
     if belief.superseded_by is not None or belief.valid_to is not None:
         return 0.01
@@ -56,7 +79,13 @@ def decay_factor(belief: Belief, current_time_iso: str) -> float:
     if age_hours <= 0.0:
         return 1.0
 
-    return math.pow(0.5, age_hours / half_life)
+    effective_hl: float = half_life
+    if session_velocity is not None:
+        effective_hl = half_life * velocity_scale(session_velocity)
+        if effective_hl <= 0.0:
+            return 0.01
+
+    return math.pow(0.5, age_hours / effective_hl)
 
 
 def lock_boost_typed(belief: Belief, query_terms: list[str], boost: float = 2.0) -> float:
