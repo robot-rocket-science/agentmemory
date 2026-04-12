@@ -103,16 +103,19 @@ _COMMAND_DEFS: dict[str, dict[str, str]] = {
             "3. Parse sentences from the JSON between SENTENCES_JSON_START and SENTENCES_JSON_END markers.\n"
             "4. Batch sentences into groups of 20.\n"
             "5. For each batch, spawn a Haiku subagent (model=haiku) with this prompt:\n"
-            '   "Classify each sentence for a memory system.\n'
-            "   For EACH sentence, classify:\n"
-            "   - persist: PERSIST (remember across sessions) or EPHEMERAL (discard)\n"
-            "   - type: REQUIREMENT, CORRECTION, PREFERENCE, FACT, ASSUMPTION, DECISION, ANALYSIS, COORDINATION, QUESTION, or META\n"
+            '   "You are classifying sentences extracted from project files for a memory system.\n'
+            "   For EACH sentence, classify on THREE dimensions:\n"
+            "   1. persist: PERSIST (remember across sessions) or EPHEMERAL (discard)\n"
+            "   2. type: REQUIREMENT, PREFERENCE, FACT, ASSUMPTION, DECISION, ANALYSIS, COORDINATION, QUESTION, or META\n"
+            "      NOTE: Do NOT use CORRECTION. These are document extracts, not live conversation.\n"
+            "      Statements like 'not X, but Y' are FACT or DECISION, not corrections.\n"
+            "   3. author: USER (human-written: direct, terse, imperative), AGENT (AI-written: structured, hedged, analytical), or UNKNOWN\n"
             "   Be conservative: when in doubt, EPHEMERAL.\n"
             "   Sentences:\\n{numbered list}\\n\n"
-            '   Respond as JSON array: [{id, persist, type}]"\n'
+            '   Respond as JSON array: [{id, persist, type, author}]"\n'
             "   Spawn up to 5 batches in parallel.\n"
             "6. Collect classification results from all subagents.\n"
-            "7. Merge classification results back into the sentence objects (add type and persist fields).\n"
+            "7. Merge classification results back into the sentence objects (add type, persist, and author fields).\n"
             "8. Call `mcp__agentmemory__create_beliefs` with the classified JSON.\n"
             "9. Display the belief creation summary.\n"
         ),

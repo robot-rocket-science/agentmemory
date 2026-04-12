@@ -564,6 +564,8 @@ def create_beliefs(classified_json: str) -> str:
     3. create_beliefs() stores the results with correct types and priors
 
     Each item must have at minimum: text, source, observation_id, type, persist.
+    Optional: author (USER/AGENT/UNKNOWN) -- agent-authored content gets lower priors.
+    CORRECTION type is remapped to FACT (corrections are a live-conversation concept).
     """
     import json as _json
 
@@ -589,13 +591,17 @@ def create_beliefs(classified_json: str) -> str:
 
         classified: list[ClassifiedSentence] = []
         source: str = obs_items[0].get("source", "document")
-        full_text_is_correction: bool = obs_items[0].get("is_correction", "False") == "True"
         full_text: str = obs_items[0].get("full_text", "")
         created_at: str | None = obs_items[0].get("created_at") or None
 
         for item in obs_items:
             sentence_type: str = item.get("type", "FACT").upper()
             persist_label: str = item.get("persist", "PERSIST").upper()
+            author: str = item.get("author", "UNKNOWN").upper()
+
+            # Remap CORRECTION to FACT for onboard path
+            if sentence_type == "CORRECTION":
+                sentence_type = "FACT"
 
             prior: tuple[float, float] | None = TYPE_PRIORS.get(sentence_type)
             should_persist: bool = persist_label == "PERSIST" and prior is not None
@@ -605,6 +611,10 @@ def create_beliefs(classified_json: str) -> str:
             if prior is not None:
                 alpha, beta_val = prior
 
+            # Agent-authored content gets lower priors
+            if author == "AGENT" and should_persist:
+                alpha = max(alpha * 0.5, 1.0)
+
             classified.append(ClassifiedSentence(
                 text=item.get("text", ""),
                 source=item.get("source", "document"),
@@ -612,6 +622,7 @@ def create_beliefs(classified_json: str) -> str:
                 sentence_type=sentence_type,
                 alpha=alpha,
                 beta_param=beta_val,
+                author=author,
             ))
 
         result: IngestResult = create_beliefs_from_classified(
@@ -619,7 +630,7 @@ def create_beliefs(classified_json: str) -> str:
             observation=obs,
             classified=classified,
             source=source,
-            full_text_is_correction=full_text_is_correction,
+            full_text_is_correction=False,
             full_text=full_text,
             created_at=created_at,
         )
