@@ -228,6 +228,9 @@ def _row_to_session(row: sqlite3.Row) -> Session:
         corrections_detected=int(row["corrections_detected"]) if "corrections_detected" in keys else 0,
         searches_performed=int(row["searches_performed"]) if "searches_performed" in keys else 0,
         feedback_given=int(row["feedback_given"]) if "feedback_given" in keys else 0,
+        velocity_items_per_hour=float(row["velocity_items_per_hour"]) if "velocity_items_per_hour" in keys and row["velocity_items_per_hour"] is not None else None,
+        velocity_tier=row["velocity_tier"] if "velocity_tier" in keys else None,
+        topics_json=row["topics_json"] if "topics_json" in keys else None,
     )
 
 
@@ -311,7 +314,7 @@ class MemoryStore:
         return cursor.rowcount
 
     def _migrate_sessions(self) -> None:
-        """Add token tracking columns to sessions if missing (existing DBs)."""
+        """Add token tracking and velocity columns to sessions if missing."""
         cols: list[sqlite3.Row] = self._conn.execute(
             "PRAGMA table_info(sessions)"
         ).fetchall()
@@ -326,6 +329,19 @@ class MemoryStore:
                 self._conn.execute(
                     f"ALTER TABLE sessions ADD COLUMN {col} INTEGER NOT NULL DEFAULT 0"
                 )
+        # Velocity tracking columns (Wave 1D)
+        if "velocity_items_per_hour" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE sessions ADD COLUMN velocity_items_per_hour REAL"
+            )
+        if "velocity_tier" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE sessions ADD COLUMN velocity_tier TEXT"
+            )
+        if "topics_json" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE sessions ADD COLUMN topics_json TEXT"
+            )
         self._conn.commit()
 
     # --- Observations (immutable) ---
@@ -924,11 +940,39 @@ class MemoryStore:
         )
 
     def complete_session(self, session_id: str, summary: str = "") -> None:
-        """Mark session as complete with optional summary."""
+        """Mark session as complete with velocity computation."""
         ts: str = _now()
+        # Compute velocity from session metrics
+        row: sqlite3.Row | None = self._conn.execute(
+            "SELECT started_at, beliefs_created, corrections_detected FROM sessions WHERE id = ?",
+            (session_id,),
+        ).fetchone()
+        velocity: float | None = None
+        tier: str | None = None
+        if row is not None:
+            started: str = row["started_at"]
+            items: int = int(row["beliefs_created"]) + int(row["corrections_detected"])
+            try:
+                from datetime import datetime as _dt
+                t0: _dt = _dt.fromisoformat(started)
+                t1: _dt = _dt.fromisoformat(ts)
+                hours: float = max(0.5, (t1 - t0).total_seconds() / 3600.0)
+                velocity = items / hours
+                if velocity > 10.0:
+                    tier = "sprint"
+                elif velocity >= 5.0:
+                    tier = "moderate"
+                elif velocity >= 2.0:
+                    tier = "steady"
+                else:
+                    tier = "deep"
+            except (ValueError, TypeError):
+                pass
         self._conn.execute(
-            "UPDATE sessions SET completed_at = ?, summary = ? WHERE id = ?",
-            (ts, summary if summary else None, session_id),
+            """UPDATE sessions SET completed_at = ?, summary = ?,
+               velocity_items_per_hour = ?, velocity_tier = ?
+               WHERE id = ?""",
+            (ts, summary if summary else None, velocity, tier, session_id),
         )
         self._conn.commit()
 

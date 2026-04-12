@@ -140,6 +140,10 @@ class Session:
     corrections_detected: int = 0   # user corrections detected this session
     searches_performed: int = 0     # search/retrieve calls this session
     feedback_given: int = 0         # feedback events (auto + explicit) this session
+    # Velocity tracking (Wave 1D, Exp 58c)
+    velocity_items_per_hour: float | None = None
+    velocity_tier: str | None = None    # sprint, moderate, steady, deep
+    topics_json: str | None = None      # JSON array of top topic keywords
 
 
 @dataclass
