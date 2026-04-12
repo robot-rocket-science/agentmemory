@@ -34,8 +34,8 @@ Each requirement has:
 
 **Plan trace:** Phase 2 (core memory graph), Phase 3 (feedback loop)
 **Experiment trace:** Experiment 3 (retrieval quality), Phase 0 baseline measurement
-**Status:** Not started
-**Evidence:** --
+**Status:** Implemented (needs formal multi-session verification)
+**Evidence:** SQLite store persists beliefs across sessions. get_locked() injects at session start. Locked beliefs survive all sessions. Formal 5-session replay test not yet run.
 
 ### REQ-002: Belief Consistency
 
@@ -68,8 +68,8 @@ Each requirement has:
 
 **Plan trace:** Phase 2 (progressive context loading, budget packing)
 **Experiment trace:** Experiment 4 (token budget vs quality curve)
-**Status:** Not started
-**Evidence:** --
+**Status:** Implemented
+**Evidence:** pack_beliefs() enforces 2K budget. Exp 42: type-aware compression yields ~675 tokens avg. Exp 60: full pipeline fits under 2K. Formal 20-task verification not yet run.
 
 ### REQ-004: Quality Per Token
 
@@ -117,8 +117,8 @@ Each requirement has:
 
 **Plan trace:** Phase 1 (WAL mode SQLite, synchronous writes)
 **Experiment trace:** Phase 1 exit criteria
-**Status:** Not started
-**Evidence:** --
+**Status:** Implemented (needs formal benchmark)
+**Evidence:** SQLite WAL mode active. Checkpoint writes are synchronous. Acceptance test test_req006_checkpoint_latency.py exists. Formal 1,000-write benchmark not yet run.
 
 ---
 
@@ -136,8 +136,8 @@ Each requirement has:
 
 **Plan trace:** Phase 2 (retrieval pipeline)
 **Experiment trace:** Experiment 3
-**Status:** Not started
-**Evidence:** --
+**Status:** Verified (simulation)
+**Evidence:** Exp 56: FTS5+HRR achieves 100% coverage (13/13 decisions) at K=30. Exp 60: MRR 0.867 with LOCK_BOOST_TYPED. Ground truth is synthetic (13 decisions from alpha-seek). Human-labeled precision@15 on diverse queries not yet run.
 
 ### REQ-008: False Positive Control
 
@@ -204,8 +204,8 @@ Each requirement has:
 
 **Plan trace:** Phase 4 (MCP server)
 **Experiment trace:** Phase 4 exit criteria
-**Status:** Not started
-**Evidence:** --
+**Status:** Partially implemented
+**Evidence:** MCP server built and running with 10 tools via FastMCP. Tested with Claude Code. ChatGPT and local model testing not yet done.
 
 ---
 
@@ -223,8 +223,8 @@ Each requirement has:
 
 **Plan trace:** Phase 1 (WAL mode, synchronous checkpoints)
 **Experiment trace:** Phase 1 exit criteria
-**Status:** Not started
-**Evidence:** --
+**Status:** Implemented (needs crash simulation)
+**Evidence:** SQLite WAL mode ensures acknowledged writes survive crashes. No buffering or async writes in MemoryStore. Acceptance test test_req005_crash_recovery.py exists. Formal SIGKILL simulation not yet run.
 
 ### REQ-013: Observation Immutability
 
@@ -238,8 +238,8 @@ Each requirement has:
 
 **Plan trace:** Phase 2 (schema invariants)
 **Experiment trace:** Unit tests
-**Status:** Not started
-**Evidence:** --
+**Status:** Implemented
+**Evidence:** insert_observation() is insert-only. No UPDATE/DELETE code paths exist for observations table. Verified by code review 2026-04-11.
 
 ---
 
@@ -320,8 +320,8 @@ The correction creates a belief with source_type = user_corrected (highest Bayes
 
 **Plan trace:** Phase 3 (feedback loop, belief promotion)
 **Experiment trace:** Exp 6 Phase D
-**Status:** Not started
-**Evidence:** Exp 6: 30/38 overrides (79%) cluster into 6 topics. Auto-promotion after override #2 would have prevented most of overrides #3-13.
+**Status:** Implemented
+**Evidence:** correct() MCP tool creates locked belief on first correction. Correction detection V2 at 92% accuracy. Locked beliefs injected via get_locked() at session start. Formal alpha-seek replay not yet run, but mechanism is end-to-end. Exp 6: 30/38 overrides (79%) cluster into 6 topics.
 
 ### REQ-020: Locked Beliefs
 
@@ -335,8 +335,8 @@ The correction creates a belief with source_type = user_corrected (highest Bayes
 
 **Plan trace:** Phase 3 (belief management)
 **Experiment trace:** Unit tests
-**Status:** Not started
-**Evidence:** Exp 6: D073/D096/D100 (calls/puts) and D099/D209 (capital) show escalating user frustration when settled decisions are reopened.
+**Status:** Implemented
+**Evidence:** Locked column in beliefs table. update_confidence() skips locked beliefs. get_locked_beliefs() returns all locked. Acceptance test test_cs002_locked_correction.py verifies locked beliefs resist downgrade. Exp 6 context: D073/D096/D100 (calls/puts) and D099/D209 (capital) show escalating user frustration when settled decisions are reopened.
 
 ### REQ-021: Behavioral Beliefs Always-Loaded
 
@@ -350,8 +350,8 @@ The correction creates a belief with source_type = user_corrected (highest Bayes
 
 **Plan trace:** Phase 2 (L0 context loading), Phase 3 (belief classification)
 **Experiment trace:** Unit tests + integration test
-**Status:** Not started
-**Evidence:** Exp 6: D157 was overridden twice within 1 minute (agent used async_bash immediately after being told not to). Behavioral constraints need to be omnipresent.
+**Status:** Implemented
+**Evidence:** get_locked_beliefs() returns all locked beliefs. SessionStart hook injects via get_locked(). Exp 36: 0% violation. Exp 6 context: D157 overridden twice within 1 minute -- behavioral constraints need to be omnipresent.
 
 ---
 
