@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 from agentmemory.compression import compress_belief, estimate_tokens, pack_beliefs
 from agentmemory.hrr import HRRGraph
-from agentmemory.models import Belief
+from agentmemory.models import EDGE_CONTRADICTS, Belief
 from agentmemory.scoring import score_belief
 from agentmemory.store import MemoryStore
 
@@ -28,6 +28,7 @@ class RetrievalResult:
     scores: dict[str, float]   # belief_id -> score
     total_tokens: int
     budget_remaining: int
+    contradiction_warnings: list[str] | None = None
 
 
 # Module-level HRR graph cache (built lazily on first retrieval with HRR)
@@ -187,9 +188,48 @@ def retrieve(
 
     packed_scores: dict[str, float] = {b.id: scores[b.id] for b in packed}
 
+    # Step 9: flag contradictions in result set (REQ-002).
+    contradiction_warnings: list[str] = flag_contradictions(store, packed)
+
     return RetrievalResult(
         beliefs=packed,
         scores=packed_scores,
         total_tokens=total_tokens,
         budget_remaining=budget_remaining,
+        contradiction_warnings=contradiction_warnings,
     )
+
+
+def flag_contradictions(
+    store: MemoryStore,
+    beliefs: list[Belief],
+) -> list[str]:
+    """Check if any beliefs in the result set have CONTRADICTS edges between them.
+
+    Returns a list of warning strings for each contradicting pair found.
+    This addresses REQ-002: never silently present contradictory beliefs.
+    """
+    if len(beliefs) < 2:
+        return []
+
+    result_ids: set[str] = {b.id for b in beliefs}
+    warnings: list[str] = []
+    checked: set[frozenset[str]] = set()
+
+    for belief in beliefs:
+        neighbors = store.get_neighbors(
+            belief.id, edge_types=[EDGE_CONTRADICTS],
+        )
+        for neighbor, _edge in neighbors:
+            if neighbor.id in result_ids:
+                pair: frozenset[str] = frozenset({belief.id, neighbor.id})
+                if pair not in checked:
+                    checked.add(pair)
+                    snippet_a: str = belief.content[:60].replace("\n", " ")
+                    snippet_b: str = neighbor.content[:60].replace("\n", " ")
+                    warnings.append(
+                        f"CONTRADICTS: [{belief.id}] \"{snippet_a}\" "
+                        f"vs [{neighbor.id}] \"{snippet_b}\""
+                    )
+
+    return warnings

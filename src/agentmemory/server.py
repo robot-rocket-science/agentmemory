@@ -263,6 +263,12 @@ def search(query: str, budget: int = 2000) -> str:
         score: float | None = result.scores.get(belief.id)
         lines.append(_format_belief(belief, score))
 
+    # Append contradiction warnings if any (REQ-002)
+    if result.contradiction_warnings:
+        lines.append("")
+        for warning in result.contradiction_warnings:
+            lines.append(f"WARNING: {warning}")
+
     return "\n".join(lines)
 
 
@@ -976,6 +982,76 @@ def bulk_delete(belief_ids: list[str]) -> str:
 
 
 _VALID_OUTCOMES: frozenset[str] = frozenset({OUTCOME_USED, OUTCOME_IGNORED, OUTCOME_HARMFUL})
+
+
+@mcp.tool
+def snapshot(
+    at_time: str | None = None,
+    topic: str | None = None,
+    belief_type: str | None = None,
+    limit: int = 50,
+) -> str:
+    """Return a snapshot of the belief state at a point in time.
+
+    Shows what the agent believed at a given moment, grouped by type.
+    If no at_time is given, returns the current belief state.
+    If topic is given, filters by FTS5 keyword search.
+
+    Args:
+        at_time: ISO timestamp or relative ("-7d", "-24h"). Default: now.
+        topic: Optional keyword filter (FTS5 search).
+        belief_type: Optional type filter (factual, correction, requirement, preference).
+        limit: Maximum beliefs to return (default 50).
+    """
+    store: MemoryStore = _get_store()
+
+    resolved_time: str | None = None
+    if at_time is not None:
+        resolved_time = _resolve_relative_time(at_time)
+
+    beliefs: list[Belief]
+    if topic is not None:
+        effective_time: str = resolved_time if resolved_time is not None else datetime.now(timezone.utc).isoformat()
+        beliefs = store.search_at_time(topic, effective_time, top_k=limit)
+        if belief_type is not None:
+            beliefs = [b for b in beliefs if b.belief_type == belief_type]
+    else:
+        beliefs = store.get_snapshot(
+            at_time=resolved_time,
+            belief_type=belief_type,
+            limit=limit,
+        )
+
+    if not beliefs:
+        return "No beliefs found for the given criteria."
+
+    # Group by type
+    by_type: dict[str, list[Belief]] = {}
+    for b in beliefs:
+        by_type.setdefault(b.belief_type, []).append(b)
+
+    total: int = len(beliefs)
+    locked_count: int = sum(1 for b in beliefs if b.locked)
+    avg_conf: float = sum(b.confidence for b in beliefs) / total
+
+    lines: list[str] = [
+        f"Belief snapshot ({total} beliefs, {locked_count} locked, avg_conf={avg_conf:.3f}):",
+    ]
+    if resolved_time is not None:
+        lines[0] = f"Belief snapshot at {resolved_time} ({total} beliefs, {locked_count} locked, avg_conf={avg_conf:.3f}):"
+
+    for bt, bt_beliefs in sorted(by_type.items(), key=lambda x: -len(x[1])):
+        bt_locked: int = sum(1 for b in bt_beliefs if b.locked)
+        bt_avg: float = sum(b.confidence for b in bt_beliefs) / len(bt_beliefs)
+        lines.append(f"\n  {bt} ({len(bt_beliefs)}, {bt_locked} locked, avg={bt_avg:.3f}):")
+        for b in bt_beliefs[:10]:
+            lock_tag: str = " [LOCKED]" if b.locked else ""
+            snippet: str = b.content[:80].replace("\n", " ")
+            lines.append(f"    [{b.confidence:.0%}{lock_tag}] {snippet}")
+        if len(bt_beliefs) > 10:
+            lines.append(f"    ... and {len(bt_beliefs) - 10} more")
+
+    return "\n".join(lines)
 
 
 @mcp.tool
