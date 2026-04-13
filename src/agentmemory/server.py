@@ -263,6 +263,12 @@ def search(query: str, budget: int = 2000) -> str:
         score: float | None = result.scores.get(belief.id)
         lines.append(_format_belief(belief, score))
 
+    # Append contradiction warnings if any (REQ-002)
+    if result.contradiction_warnings:
+        lines.append("")
+        for warning in result.contradiction_warnings:
+            lines.append(f"WARNING: {warning}")
+
     return "\n".join(lines)
 
 
@@ -415,6 +421,14 @@ def status() -> str:
             lines.append(f"  corrections_detected: {session.corrections_detected}")
             lines.append(f"  searches_performed: {session.searches_performed}")
 
+    # Health metrics
+    health: dict[str, object] = store.get_health_metrics()
+    lines.append("Health:")
+    lines.append(f"  credal_gap: {health['credal_gap_count']} ({health['credal_gap_pct']}%) at type prior")
+    lines.append(f"  orphans: {health['orphan_count']} ({health['orphan_pct']}%) no edges")
+    lines.append(f"  edges: {health['contradicts_edges']} CONTRADICTS, {health['supports_edges']} SUPPORTS, {health['supersedes_edges']} SUPERSEDES")
+    lines.append(f"  feedback_coverage: {health['feedback_coverage_count']} ({health['feedback_coverage_pct']}%)")
+
     return "\n".join(lines)
 
 
@@ -564,6 +578,8 @@ def create_beliefs(classified_json: str) -> str:
     3. create_beliefs() stores the results with correct types and priors
 
     Each item must have at minimum: text, source, observation_id, type, persist.
+    Optional: author (USER/AGENT/UNKNOWN) -- agent-authored content gets lower priors.
+    CORRECTION type is remapped to FACT (corrections are a live-conversation concept).
     """
     import json as _json
 
@@ -589,13 +605,17 @@ def create_beliefs(classified_json: str) -> str:
 
         classified: list[ClassifiedSentence] = []
         source: str = obs_items[0].get("source", "document")
-        full_text_is_correction: bool = obs_items[0].get("is_correction", "False") == "True"
         full_text: str = obs_items[0].get("full_text", "")
         created_at: str | None = obs_items[0].get("created_at") or None
 
         for item in obs_items:
             sentence_type: str = item.get("type", "FACT").upper()
             persist_label: str = item.get("persist", "PERSIST").upper()
+            author: str = item.get("author", "UNKNOWN").upper()
+
+            # Remap CORRECTION to FACT for onboard path
+            if sentence_type == "CORRECTION":
+                sentence_type = "FACT"
 
             prior: tuple[float, float] | None = TYPE_PRIORS.get(sentence_type)
             should_persist: bool = persist_label == "PERSIST" and prior is not None
@@ -605,6 +625,10 @@ def create_beliefs(classified_json: str) -> str:
             if prior is not None:
                 alpha, beta_val = prior
 
+            # Agent-authored content gets lower priors
+            if author == "AGENT" and should_persist:
+                alpha = max(alpha * 0.5, 1.0)
+
             classified.append(ClassifiedSentence(
                 text=item.get("text", ""),
                 source=item.get("source", "document"),
@@ -612,6 +636,7 @@ def create_beliefs(classified_json: str) -> str:
                 sentence_type=sentence_type,
                 alpha=alpha,
                 beta_param=beta_val,
+                author=author,
             ))
 
         result: IngestResult = create_beliefs_from_classified(
@@ -619,7 +644,7 @@ def create_beliefs(classified_json: str) -> str:
             observation=obs,
             classified=classified,
             source=source,
-            full_text_is_correction=full_text_is_correction,
+            full_text_is_correction=False,
             full_text=full_text,
             created_at=created_at,
         )
@@ -774,6 +799,145 @@ def ingest(text: str, source: str = "user") -> str:
 
 
 @mcp.tool
+def timeline(
+    topic: str | None = None,
+    start: str | None = None,
+    end: str | None = None,
+    session_id: str | None = None,
+    limit: int = 50,
+) -> str:
+    """Return beliefs ordered by time, filtered by topic and/or time range.
+
+    Use cases:
+      timeline(topic="deployment") -- all deployment beliefs chronologically
+      timeline(start="-7d") -- everything from the last 7 days
+      timeline(session_id="abc123") -- replay session abc123
+      timeline(topic="capital", start="2026-03-25", end="2026-03-28")
+
+    start/end accept ISO 8601 timestamps or relative offsets: "-7d", "-24h", "-30m".
+    """
+    store: MemoryStore = _get_store()
+    resolved_start: str | None = _resolve_relative_time(start) if start else None
+    resolved_end: str | None = _resolve_relative_time(end) if end else None
+    beliefs: list[Belief] = store.timeline(
+        topic=topic, start=resolved_start, end=resolved_end,
+        session_id=session_id, limit=limit,
+    )
+    if not beliefs:
+        return "No beliefs found for the given time/topic filter."
+    lines: list[str] = [f"Timeline: {len(beliefs)} belief(s)"]
+    for b in beliefs:
+        status: str = " [SUPERSEDED]" if b.valid_to else ""
+        lock: str = " [LOCKED]" if b.locked else ""
+        lines.append(
+            f"  [{b.created_at}] ({b.belief_type}){lock}{status} {b.content[:200]}"
+        )
+    return "\n".join(lines)
+
+
+@mcp.tool
+def evolution(
+    belief_id: str | None = None,
+    topic: str | None = None,
+) -> str:
+    """Trace how a belief or topic evolved over time.
+
+    Two modes:
+    1. belief_id: follow the SUPERSEDES chain in both directions.
+       Shows: original -> correction 1 -> correction 2 -> current.
+    2. topic: FTS5 search + time ordering. Shows all beliefs about
+       the topic chronologically, marking which ones superseded others.
+
+    Use cases:
+      evolution(belief_id="a1b2c3d4e5f6") -- full chain for this belief
+      evolution(topic="dispatch gate") -- how dispatch gate policy evolved
+    """
+    if not belief_id and not topic:
+        return "Error: provide either belief_id or topic."
+    store: MemoryStore = _get_store()
+    beliefs: list[Belief] = store.evolution(belief_id=belief_id, topic=topic)
+    if not beliefs:
+        return "No evolution chain found."
+    lines: list[str] = [f"Evolution: {len(beliefs)} belief(s)"]
+    for i, b in enumerate(beliefs):
+        marker: str = "->" if i > 0 else "  "
+        status: str = " [SUPERSEDED]" if b.valid_to else " [CURRENT]"
+        lock: str = " [LOCKED]" if b.locked else ""
+        lines.append(
+            f"  {marker} [{b.created_at}] (ID: {b.id}){lock}{status} {b.content[:200]}"
+        )
+    return "\n".join(lines)
+
+
+@mcp.tool
+def diff(
+    since: str | None = None,
+    until: str | None = None,
+) -> str:
+    """Show what changed in the belief store over a time period.
+
+    Returns three sections: ADDED, REMOVED, EVOLVED.
+    Accepts ISO 8601 timestamps or relative offsets: "-7d", "-24h", "-1h".
+
+    Use cases:
+      diff(since="-24h") -- what changed in the last 24 hours
+      diff(since="-7d") -- weekly diff
+      diff(since="2026-04-11T00:00:00") -- since a specific time
+    """
+    if not since:
+        return "Error: 'since' is required."
+    store: MemoryStore = _get_store()
+    resolved_since: str = _resolve_relative_time(since)
+    resolved_until: str | None = _resolve_relative_time(until) if until else None
+    changes: dict[str, list[Belief]] = store.diff(
+        since=resolved_since, until=resolved_until,
+    )
+    added: list[Belief] = changes["added"]
+    removed: list[Belief] = changes["removed"]
+    evolved: list[Belief] = changes["evolved"]
+
+    lines: list[str] = [f"Diff since {resolved_since}:"]
+    lines.append(f"\nADDED ({len(added)}):")
+    for b in added[:20]:
+        lines.append(f"  + [{b.belief_type}] {b.content[:150]}")
+    if len(added) > 20:
+        lines.append(f"  ... and {len(added) - 20} more")
+
+    lines.append(f"\nREMOVED ({len(removed)}):")
+    for b in removed[:20]:
+        lines.append(f"  - [{b.belief_type}] {b.content[:150]}")
+    if len(removed) > 20:
+        lines.append(f"  ... and {len(removed) - 20} more")
+
+    lines.append(f"\nEVOLVED ({len(evolved)}):")
+    for b in evolved[:20]:
+        lines.append(f"  ~ [{b.belief_type}] {b.content[:150]}")
+    if len(evolved) > 20:
+        lines.append(f"  ... and {len(evolved) - 20} more")
+
+    return "\n".join(lines)
+
+
+def _resolve_relative_time(time_str: str) -> str:
+    """Resolve relative time strings like '-7d', '-24h', '-30m' to ISO 8601."""
+    import re as _re
+    from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+    match: _re.Match[str] | None = _re.match(r"^-(\d+)([dhm])$", time_str)
+    if match:
+        value: int = int(match.group(1))
+        unit: str = match.group(2)
+        delta: _td
+        if unit == "d":
+            delta = _td(days=value)
+        elif unit == "h":
+            delta = _td(hours=value)
+        else:
+            delta = _td(minutes=value)
+        return (_dt.now(_tz.utc) - delta).isoformat()
+    return time_str
+
+
+@mcp.tool
 def delete(belief_id: str) -> str:
     """Soft-delete a belief by setting valid_to = now.
 
@@ -818,6 +982,76 @@ def bulk_delete(belief_ids: list[str]) -> str:
 
 
 _VALID_OUTCOMES: frozenset[str] = frozenset({OUTCOME_USED, OUTCOME_IGNORED, OUTCOME_HARMFUL})
+
+
+@mcp.tool
+def snapshot(
+    at_time: str | None = None,
+    topic: str | None = None,
+    belief_type: str | None = None,
+    limit: int = 50,
+) -> str:
+    """Return a snapshot of the belief state at a point in time.
+
+    Shows what the agent believed at a given moment, grouped by type.
+    If no at_time is given, returns the current belief state.
+    If topic is given, filters by FTS5 keyword search.
+
+    Args:
+        at_time: ISO timestamp or relative ("-7d", "-24h"). Default: now.
+        topic: Optional keyword filter (FTS5 search).
+        belief_type: Optional type filter (factual, correction, requirement, preference).
+        limit: Maximum beliefs to return (default 50).
+    """
+    store: MemoryStore = _get_store()
+
+    resolved_time: str | None = None
+    if at_time is not None:
+        resolved_time = _resolve_relative_time(at_time)
+
+    beliefs: list[Belief]
+    if topic is not None:
+        effective_time: str = resolved_time if resolved_time is not None else datetime.now(timezone.utc).isoformat()
+        beliefs = store.search_at_time(topic, effective_time, top_k=limit)
+        if belief_type is not None:
+            beliefs = [b for b in beliefs if b.belief_type == belief_type]
+    else:
+        beliefs = store.get_snapshot(
+            at_time=resolved_time,
+            belief_type=belief_type,
+            limit=limit,
+        )
+
+    if not beliefs:
+        return "No beliefs found for the given criteria."
+
+    # Group by type
+    by_type: dict[str, list[Belief]] = {}
+    for b in beliefs:
+        by_type.setdefault(b.belief_type, []).append(b)
+
+    total: int = len(beliefs)
+    locked_count: int = sum(1 for b in beliefs if b.locked)
+    avg_conf: float = sum(b.confidence for b in beliefs) / total
+
+    lines: list[str] = [
+        f"Belief snapshot ({total} beliefs, {locked_count} locked, avg_conf={avg_conf:.3f}):",
+    ]
+    if resolved_time is not None:
+        lines[0] = f"Belief snapshot at {resolved_time} ({total} beliefs, {locked_count} locked, avg_conf={avg_conf:.3f}):"
+
+    for bt, bt_beliefs in sorted(by_type.items(), key=lambda x: -len(x[1])):
+        bt_locked: int = sum(1 for b in bt_beliefs if b.locked)
+        bt_avg: float = sum(b.confidence for b in bt_beliefs) / len(bt_beliefs)
+        lines.append(f"\n  {bt} ({len(bt_beliefs)}, {bt_locked} locked, avg={bt_avg:.3f}):")
+        for b in bt_beliefs[:10]:
+            lock_tag: str = " [LOCKED]" if b.locked else ""
+            snippet: str = b.content[:80].replace("\n", " ")
+            lines.append(f"    [{b.confidence:.0%}{lock_tag}] {snippet}")
+        if len(bt_beliefs) > 10:
+            lines.append(f"    ... and {len(bt_beliefs) - 10} more")
+
+    return "\n".join(lines)
 
 
 @mcp.tool

@@ -137,6 +137,20 @@ CREATE TABLE IF NOT EXISTS graph_edges (
     created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS confidence_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    belief_id TEXT NOT NULL,
+    alpha REAL NOT NULL,
+    beta_param REAL NOT NULL,
+    event_type TEXT NOT NULL,
+    event_detail TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (belief_id) REFERENCES beliefs(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_confhist_belief ON confidence_history(belief_id);
+CREATE INDEX IF NOT EXISTS idx_confhist_time ON confidence_history(created_at);
+
 CREATE INDEX IF NOT EXISTS idx_graph_edges_from ON graph_edges(from_id);
 CREATE INDEX IF NOT EXISTS idx_graph_edges_to ON graph_edges(to_id);
 CREATE INDEX IF NOT EXISTS idx_graph_edges_type ON graph_edges(edge_type);
@@ -152,6 +166,8 @@ CREATE INDEX IF NOT EXISTS idx_beliefs_content_hash ON beliefs(content_hash);
 CREATE INDEX IF NOT EXISTS idx_observations_content_hash ON observations(content_hash);
 CREATE INDEX IF NOT EXISTS idx_beliefs_valid_to ON beliefs(valid_to);
 CREATE INDEX IF NOT EXISTS idx_beliefs_locked ON beliefs(locked);
+CREATE INDEX IF NOT EXISTS idx_beliefs_created_at ON beliefs(created_at);
+CREATE INDEX IF NOT EXISTS idx_beliefs_temporal ON beliefs(created_at, valid_to);
 CREATE INDEX IF NOT EXISTS idx_checkpoints_session ON checkpoints(session_id);
 CREATE INDEX IF NOT EXISTS idx_evidence_belief ON evidence(belief_id);
 CREATE INDEX IF NOT EXISTS idx_edges_from ON edges(from_id);
@@ -190,6 +206,7 @@ def _row_to_observation(row: sqlite3.Row) -> Observation:
 
 
 def _row_to_belief(row: sqlite3.Row) -> Belief:
+    keys: list[str] = list(row.keys())
     return Belief(
         id=row["id"],
         content_hash=row["content_hash"],
@@ -205,6 +222,8 @@ def _row_to_belief(row: sqlite3.Row) -> Belief:
         superseded_by=row["superseded_by"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
+        event_time=row["event_time"] if "event_time" in keys else None,
+        session_id=row["session_id"] if "session_id" in keys else None,
     )
 
 
@@ -223,6 +242,9 @@ def _row_to_session(row: sqlite3.Row) -> Session:
         corrections_detected=int(row["corrections_detected"]) if "corrections_detected" in keys else 0,
         searches_performed=int(row["searches_performed"]) if "searches_performed" in keys else 0,
         feedback_given=int(row["feedback_given"]) if "feedback_given" in keys else 0,
+        velocity_items_per_hour=float(row["velocity_items_per_hour"]) if "velocity_items_per_hour" in keys and row["velocity_items_per_hour"] is not None else None,
+        velocity_tier=row["velocity_tier"] if "velocity_tier" in keys else None,
+        topics_json=row["topics_json"] if "topics_json" in keys else None,
     )
 
 
@@ -262,6 +284,26 @@ class MemoryStore:
         # NOTE: backfill_lock_corrections() was removed. The system must not
         # auto-lock beliefs. Only explicit user confirmation via lock() is
         # allowed to set locked=True.
+        cols: list[sqlite3.Row] = self._conn.execute(
+            "PRAGMA table_info(beliefs)"
+        ).fetchall()
+        col_names: set[str] = {row["name"] for row in cols}
+        # Wave 1B: bitemporal event_time (when fact occurred vs when ingested)
+        if "event_time" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE beliefs ADD COLUMN event_time TEXT"
+            )
+        # Wave 1B: session_id for session replay queries
+        if "session_id" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE beliefs ADD COLUMN session_id TEXT"
+            )
+        self._conn.commit()
+        # Create index on session_id (safe to run even if already exists)
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_beliefs_session_id ON beliefs(session_id)"
+        )
+        self._conn.commit()
         self._migrate_observations()
 
     def _migrate_observations(self) -> None:
@@ -286,7 +328,7 @@ class MemoryStore:
         return cursor.rowcount
 
     def _migrate_sessions(self) -> None:
-        """Add token tracking columns to sessions if missing (existing DBs)."""
+        """Add token tracking and velocity columns to sessions if missing."""
         cols: list[sqlite3.Row] = self._conn.execute(
             "PRAGMA table_info(sessions)"
         ).fetchall()
@@ -301,6 +343,19 @@ class MemoryStore:
                 self._conn.execute(
                     f"ALTER TABLE sessions ADD COLUMN {col} INTEGER NOT NULL DEFAULT 0"
                 )
+        # Velocity tracking columns (Wave 1D)
+        if "velocity_items_per_hour" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE sessions ADD COLUMN velocity_items_per_hour REAL"
+            )
+        if "velocity_tier" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE sessions ADD COLUMN velocity_tier TEXT"
+            )
+        if "topics_json" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE sessions ADD COLUMN topics_json TEXT"
+            )
         self._conn.commit()
 
     # --- Observations (immutable) ---
@@ -359,6 +414,8 @@ class MemoryStore:
         locked: bool = False,
         observation_id: str | None = None,
         created_at: str | None = None,
+        event_time: str | None = None,
+        session_id: str | None = None,
     ) -> Belief:
         """Insert a belief with optional evidence link. Content-hash dedup.
 
@@ -367,6 +424,10 @@ class MemoryStore:
 
         If created_at is provided, uses that timestamp instead of now().
         This enables source-truth dating (e.g., git commit dates).
+
+        event_time is the bitemporal "when the fact occurred" timestamp,
+        distinct from created_at (when the system ingested it).
+        session_id links the belief to the session that created it.
         """
         ch: str = _content_hash(content)
         existing: sqlite3.Row | None = self._conn.execute(
@@ -383,10 +444,11 @@ class MemoryStore:
         self._conn.execute(
             """INSERT INTO beliefs
                (id, content_hash, content, belief_type, alpha, beta_param,
-                source_type, locked, valid_from, valid_to, superseded_by, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?)""",
+                source_type, locked, valid_from, valid_to, superseded_by,
+                created_at, updated_at, event_time, session_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?)""",
             (belief_id, ch, content, belief_type, alpha, beta_param,
-             source_type, locked_int, ts, ts),
+             source_type, locked_int, ts, ts, event_time, session_id),
         )
         self._conn.execute(
             "INSERT INTO search_index(id, content, type) VALUES (?, ?, ?)",
@@ -420,6 +482,8 @@ class MemoryStore:
             superseded_by=None,
             created_at=ts,
             updated_at=ts,
+            event_time=event_time,
+            session_id=session_id,
         )
 
     def lock_belief(self, belief_id: str) -> None:
@@ -429,6 +493,11 @@ class MemoryStore:
             "UPDATE beliefs SET locked = 1, updated_at = ? WHERE id = ?",
             (ts, belief_id),
         )
+        row: sqlite3.Row | None = self._conn.execute(
+            "SELECT alpha, beta_param FROM beliefs WHERE id = ?", (belief_id,)
+        ).fetchone()
+        if row is not None:
+            self._record_confidence(belief_id, row["alpha"], row["beta_param"], "locked")
         self._conn.commit()
 
     def delete_belief(self, belief_id: str) -> bool:
@@ -472,7 +541,25 @@ class MemoryStore:
                VALUES (?, ?, 'SUPERSEDES', 1.0, ?, ?)""",
             (new_id, old_id, reason, ts),
         )
+        row: sqlite3.Row | None = self._conn.execute(
+            "SELECT alpha, beta_param FROM beliefs WHERE id = ?", (old_id,)
+        ).fetchone()
+        if row is not None:
+            self._record_confidence(old_id, row["alpha"], row["beta_param"], "superseded", new_id)
         self._conn.commit()
+
+    def _record_confidence(
+        self, belief_id: str, alpha: float, beta_param: float,
+        event_type: str, event_detail: str = "",
+    ) -> None:
+        """Append a snapshot to confidence_history for trajectory analysis."""
+        ts: str = _now()
+        self._conn.execute(
+            """INSERT INTO confidence_history
+               (belief_id, alpha, beta_param, event_type, event_detail, created_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (belief_id, alpha, beta_param, event_type, event_detail, ts),
+        )
 
     def update_confidence(self, belief_id: str, outcome: str, weight: float = 1.0) -> None:
         """Bayesian update: 'used' increments alpha, 'harmful' increments beta_param.
@@ -502,6 +589,7 @@ class MemoryStore:
             "UPDATE beliefs SET alpha = ?, beta_param = ?, updated_at = ? WHERE id = ?",
             (alpha, beta, ts, belief_id),
         )
+        self._record_confidence(belief_id, alpha, beta, f"feedback_{outcome}")
         self._conn.commit()
 
     def get_reclassifiable(self, limit: int = 200) -> list[dict[str, str]]:
@@ -890,11 +978,39 @@ class MemoryStore:
         )
 
     def complete_session(self, session_id: str, summary: str = "") -> None:
-        """Mark session as complete with optional summary."""
+        """Mark session as complete with velocity computation."""
         ts: str = _now()
+        # Compute velocity from session metrics
+        row: sqlite3.Row | None = self._conn.execute(
+            "SELECT started_at, beliefs_created, corrections_detected FROM sessions WHERE id = ?",
+            (session_id,),
+        ).fetchone()
+        velocity: float | None = None
+        tier: str | None = None
+        if row is not None:
+            started: str = row["started_at"]
+            items: int = int(row["beliefs_created"]) + int(row["corrections_detected"])
+            try:
+                from datetime import datetime as _dt
+                t0: _dt = _dt.fromisoformat(started)
+                t1: _dt = _dt.fromisoformat(ts)
+                hours: float = max(0.5, (t1 - t0).total_seconds() / 3600.0)
+                velocity = items / hours
+                if velocity > 10.0:
+                    tier = "sprint"
+                elif velocity >= 5.0:
+                    tier = "moderate"
+                elif velocity >= 2.0:
+                    tier = "steady"
+                else:
+                    tier = "deep"
+            except (ValueError, TypeError):
+                pass
         self._conn.execute(
-            "UPDATE sessions SET completed_at = ?, summary = ? WHERE id = ?",
-            (ts, summary if summary else None, session_id),
+            """UPDATE sessions SET completed_at = ?, summary = ?,
+               velocity_items_per_hour = ?, velocity_tier = ?
+               WHERE id = ?""",
+            (ts, summary if summary else None, velocity, tier, session_id),
         )
         self._conn.commit()
 
@@ -948,6 +1064,176 @@ class MemoryStore:
         ).fetchall()
         return [_row_to_checkpoint(r) for r in rows]
 
+    # --- Temporal queries (Wave 2) ---
+
+    def timeline(
+        self,
+        topic: str | None = None,
+        start: str | None = None,
+        end: str | None = None,
+        session_id: str | None = None,
+        limit: int = 50,
+    ) -> list[Belief]:
+        """Return beliefs ordered by time, optionally filtered by topic/time/session.
+
+        Uses FTS5 for topic filtering when provided, otherwise pure SQL.
+        """
+        if topic:
+            # FTS5 search with temporal filtering
+            sql: str = """
+                SELECT b.* FROM search_index si
+                JOIN beliefs b ON b.id = si.id
+                WHERE search_index MATCH ?
+                  AND b.valid_to IS NULL
+            """
+            params: list[object] = [topic]
+            if start:
+                sql += " AND b.created_at >= ?"
+                params.append(start)
+            if end:
+                sql += " AND b.created_at <= ?"
+                params.append(end)
+            if session_id:
+                sql += " AND b.session_id = ?"
+                params.append(session_id)
+            sql += " ORDER BY b.created_at ASC LIMIT ?"
+            params.append(limit)
+        else:
+            sql = "SELECT * FROM beliefs WHERE valid_to IS NULL"
+            params = []
+            if start:
+                sql += " AND created_at >= ?"
+                params.append(start)
+            if end:
+                sql += " AND created_at <= ?"
+                params.append(end)
+            if session_id:
+                sql += " AND session_id = ?"
+                params.append(session_id)
+            sql += " ORDER BY created_at ASC LIMIT ?"
+            params.append(limit)
+
+        rows: list[sqlite3.Row] = self._conn.execute(sql, params).fetchall()
+        return [_row_to_belief(r) for r in rows]
+
+    def evolution(
+        self,
+        belief_id: str | None = None,
+        topic: str | None = None,
+        limit: int = 50,
+    ) -> list[Belief]:
+        """Trace belief evolution over time.
+
+        If belief_id: follow SUPERSEDES chain in both directions.
+        If topic: all beliefs about topic chronologically, marking superseded ones.
+        """
+        if belief_id:
+            # Walk backward to find the root
+            chain: list[Belief] = []
+            visited: set[str] = set()
+            # Walk backward (find what this belief superseded)
+            current_id: str | None = belief_id
+            backward: list[Belief] = []
+            while current_id and current_id not in visited:
+                visited.add(current_id)
+                row: sqlite3.Row | None = self._conn.execute(
+                    "SELECT * FROM beliefs WHERE id = ?", (current_id,)
+                ).fetchone()
+                if row is None:
+                    break
+                backward.append(_row_to_belief(row))
+                # Find what this belief superseded (old belief with superseded_by = current)
+                prev: sqlite3.Row | None = self._conn.execute(
+                    "SELECT * FROM beliefs WHERE superseded_by = ?", (current_id,)
+                ).fetchone()
+                current_id = prev["id"] if prev is not None else None
+            backward.reverse()
+            chain.extend(backward)
+
+            # Walk forward from original belief_id (find what supersedes it)
+            current_id = belief_id
+            while current_id and current_id not in visited:
+                visited.add(current_id)
+                row = self._conn.execute(
+                    "SELECT * FROM beliefs WHERE id = ?", (current_id,)
+                ).fetchone()
+                if row is None:
+                    break
+                b: Belief = _row_to_belief(row)
+                chain.append(b)
+                current_id = b.superseded_by
+
+            return chain[:limit]
+
+        if topic:
+            rows: list[sqlite3.Row] = self._conn.execute(
+                """SELECT b.* FROM search_index si
+                   JOIN beliefs b ON b.id = si.id
+                   WHERE search_index MATCH ?
+                   ORDER BY b.created_at ASC LIMIT ?""",
+                (topic, limit),
+            ).fetchall()
+            return [_row_to_belief(r) for r in rows]
+
+        return []
+
+    def diff(
+        self,
+        since: str,
+        until: str | None = None,
+    ) -> dict[str, list[Belief]]:
+        """Show what changed in the belief store between two timestamps.
+
+        Returns dict with keys: added, removed, evolved.
+        """
+        end: str = until if until else _now()
+
+        added_rows: list[sqlite3.Row] = self._conn.execute(
+            "SELECT * FROM beliefs WHERE created_at >= ? AND created_at <= ? ORDER BY created_at",
+            (since, end),
+        ).fetchall()
+
+        removed_rows: list[sqlite3.Row] = self._conn.execute(
+            "SELECT * FROM beliefs WHERE valid_to >= ? AND valid_to <= ? ORDER BY valid_to",
+            (since, end),
+        ).fetchall()
+
+        evolved_rows: list[sqlite3.Row] = self._conn.execute(
+            """SELECT new.* FROM beliefs old
+               JOIN beliefs new ON old.superseded_by = new.id
+               WHERE old.valid_to >= ? AND old.valid_to <= ?
+               ORDER BY new.created_at""",
+            (since, end),
+        ).fetchall()
+
+        return {
+            "added": [_row_to_belief(r) for r in added_rows],
+            "removed": [_row_to_belief(r) for r in removed_rows],
+            "evolved": [_row_to_belief(r) for r in evolved_rows],
+        }
+
+    def search_at_time(
+        self,
+        query: str,
+        at_time: str,
+        top_k: int = 10,
+    ) -> list[Belief]:
+        """Search for beliefs that were active at a specific point in time.
+
+        Returns beliefs created before at_time that had not been superseded by then.
+        """
+        rows: list[sqlite3.Row] = self._conn.execute(
+            """SELECT b.* FROM search_index si
+               JOIN beliefs b ON b.id = si.id
+               WHERE search_index MATCH ?
+                 AND b.created_at <= ?
+                 AND (b.valid_to IS NULL OR b.valid_to > ?)
+               ORDER BY rank
+               LIMIT ?""",
+            (query, at_time, at_time, top_k),
+        ).fetchall()
+        return [_row_to_belief(r) for r in rows]
+
     # --- Stats ---
 
     def status(self) -> dict[str, int]:
@@ -967,6 +1253,148 @@ class MemoryStore:
             "edges": count("SELECT COUNT(*) FROM edges"),
             "sessions": count("SELECT COUNT(*) FROM sessions"),
         }
+
+    def get_health_metrics(self) -> dict[str, object]:
+        """Return diagnostic health metrics for the memory system.
+
+        Includes credal gap (beliefs at type prior), orphan count,
+        edge type breakdown, feedback coverage, and stale sessions.
+        """
+        def count(sql: str) -> int:
+            row: sqlite3.Row = self._conn.execute(sql).fetchone()
+            val: object = row[0]
+            if not isinstance(val, int):
+                return 0
+            return val
+
+        def count_float(sql: str) -> float:
+            row: sqlite3.Row = self._conn.execute(sql).fetchone()
+            val: object = row[0]
+            if val is None:
+                return 0.0
+            return float(str(val))
+
+        active: int = count(
+            "SELECT COUNT(*) FROM beliefs WHERE valid_to IS NULL"
+        )
+
+        # Credal gap: beliefs whose (alpha, beta_param) match the most
+        # common prior for their type (within epsilon). These have never
+        # received feedback.
+        # Detect type priors by most common (alpha, beta_param) per type.
+        type_prior_rows: list[sqlite3.Row] = self._conn.execute(
+            """SELECT belief_type,
+                      ROUND(alpha, 1) AS a, ROUND(beta_param, 1) AS b,
+                      COUNT(*) AS cnt
+               FROM beliefs WHERE valid_to IS NULL
+               GROUP BY belief_type, a, b
+               ORDER BY belief_type, cnt DESC"""
+        ).fetchall()
+
+        # Pick the most common (alpha, beta) per type
+        type_priors: dict[str, tuple[float, float]] = {}
+        for row in type_prior_rows:
+            bt: str = str(row["belief_type"])
+            if bt not in type_priors:
+                type_priors[bt] = (float(str(row["a"])), float(str(row["b"])))
+
+        # Count beliefs at their type prior
+        at_prior: int = 0
+        epsilon: float = 0.15
+        belief_rows: list[sqlite3.Row] = self._conn.execute(
+            "SELECT belief_type, alpha, beta_param FROM beliefs WHERE valid_to IS NULL"
+        ).fetchall()
+        for row in belief_rows:
+            bt = str(row["belief_type"])
+            prior = type_priors.get(bt)
+            if prior is None:
+                continue
+            if (abs(float(str(row["alpha"])) - prior[0]) < epsilon
+                    and abs(float(str(row["beta_param"])) - prior[1]) < epsilon):
+                at_prior += 1
+
+        # Orphans: beliefs with no edges at all
+        orphan: int = count(
+            """SELECT COUNT(*) FROM beliefs b
+               WHERE b.valid_to IS NULL
+                 AND b.id NOT IN (SELECT from_id FROM edges)
+                 AND b.id NOT IN (SELECT to_id FROM edges)"""
+        )
+
+        # Edge type breakdown
+        contradicts: int = count(
+            "SELECT COUNT(*) FROM edges WHERE edge_type = 'CONTRADICTS'"
+        )
+        supports: int = count(
+            "SELECT COUNT(*) FROM edges WHERE edge_type = 'SUPPORTS'"
+        )
+        supersedes: int = count(
+            "SELECT COUNT(*) FROM edges WHERE edge_type = 'SUPERSEDES'"
+        )
+
+        # Feedback coverage: beliefs with at least one test result
+        with_feedback: int = count(
+            """SELECT COUNT(DISTINCT belief_id) FROM tests"""
+        )
+
+        # Average confidence
+        avg_conf: float = count_float(
+            "SELECT AVG(confidence) FROM beliefs WHERE valid_to IS NULL"
+        )
+
+        # Stale sessions
+        stale: int = count(
+            "SELECT COUNT(*) FROM sessions WHERE completed_at IS NULL"
+        )
+
+        credal_gap_pct: float = (at_prior / active * 100) if active > 0 else 0.0
+        orphan_pct: float = (orphan / active * 100) if active > 0 else 0.0
+        feedback_pct: float = (with_feedback / active * 100) if active > 0 else 0.0
+
+        return {
+            "active_beliefs": active,
+            "credal_gap_count": at_prior,
+            "credal_gap_pct": round(credal_gap_pct, 1),
+            "orphan_count": orphan,
+            "orphan_pct": round(orphan_pct, 1),
+            "contradicts_edges": contradicts,
+            "supports_edges": supports,
+            "supersedes_edges": supersedes,
+            "feedback_coverage_count": with_feedback,
+            "feedback_coverage_pct": round(feedback_pct, 1),
+            "avg_confidence": round(avg_conf, 3),
+            "stale_sessions": stale,
+            "type_priors": type_priors,
+        }
+
+    def get_snapshot(
+        self,
+        at_time: str | None = None,
+        belief_type: str | None = None,
+        limit: int = 200,
+    ) -> list[Belief]:
+        """Return beliefs that were active at a specific point in time.
+
+        If at_time is None, returns currently active beliefs.
+        Excludes superseded beliefs (valid_to <= at_time).
+        """
+        if at_time is None:
+            at_time = _now()
+
+        sql: str = """SELECT * FROM beliefs
+                      WHERE created_at <= ?
+                        AND (valid_to IS NULL OR valid_to > ?)"""
+        params: list[object] = [at_time, at_time]
+
+        if belief_type is not None:
+            sql += " AND belief_type = ?"
+            params.append(belief_type)
+
+        sql += " ORDER BY confidence DESC LIMIT ?"
+        params.append(limit)
+
+        rows: list[sqlite3.Row] = self._conn.execute(sql, tuple(params)).fetchall()
+        return [_row_to_belief(r) for r in rows]
 
     def close(self) -> None:
         """Close the database connection."""

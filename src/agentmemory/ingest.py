@@ -27,6 +27,7 @@ from agentmemory.models import (
     OBS_TYPE_CONVERSATION,
     Observation,
 )
+from agentmemory.relationship_detector import detect_relationships
 from agentmemory.store import MemoryStore
 from agentmemory.supersession import check_temporal_supersession
 
@@ -94,6 +95,7 @@ def extract_turn(
     session_id: str | None = None,
     created_at: str | None = None,
     source_path: str = "",
+    source_id: str = "",
 ) -> ExtractedTurn:
     """Extract observations and sentences from a conversation turn.
 
@@ -101,13 +103,15 @@ def extract_turn(
     Does NOT create beliefs -- that happens in create_beliefs_from_classified()
     after LLM classification, or via ingest_turn() for the fast offline path.
 
-    Returns ExtractedTurn with observation, sentences, and correction flags.
+    source_id should be a unique identifier for the source (file path, commit SHA,
+    turn ID), NOT the source type string. Falls back to source_path if empty.
     """
+    resolved_source_id: str = source_id or source_path or ""
     observation: Observation = store.insert_observation(
         content=text,
         observation_type=OBS_TYPE_CONVERSATION,
         source_type=source,
-        source_id=source,
+        source_id=resolved_source_id,
         source_path=source_path,
         session_id=session_id,
     )
@@ -143,6 +147,8 @@ def create_beliefs_from_classified(
     full_text_is_correction: bool = False,
     full_text: str = "",
     created_at: str | None = None,
+    event_time: str | None = None,
+    session_id: str | None = None,
 ) -> IngestResult:
     """Create beliefs from pre-classified sentences.
 
@@ -152,6 +158,9 @@ def create_beliefs_from_classified(
 
     This is the second phase of the two-phase ingest path:
     extract_turn() -> classify (LLM or offline) -> create_beliefs_from_classified()
+
+    event_time: bitemporal timestamp for when the fact occurred.
+    session_id: session that created these beliefs.
     """
     result: IngestResult = IngestResult()
 
@@ -178,11 +187,14 @@ def create_beliefs_from_classified(
             locked=False,
             observation_id=observation.id,
             created_at=created_at,
+            event_time=event_time,
+            session_id=session_id,
         )
         result.beliefs_created += 1
         result.sentences_persisted += 1
 
         check_temporal_supersession(store, belief)
+        detect_relationships(store, belief)
 
         if cs.sentence_type == "CORRECTION":
             raw_words: list[str] = [
@@ -218,6 +230,8 @@ def create_beliefs_from_classified(
             locked=False,
             observation_id=observation.id,
             created_at=created_at,
+            event_time=event_time,
+            session_id=session_id,
         )
         result.beliefs_created += 1
         result.sentences_persisted += 1
@@ -237,6 +251,8 @@ def ingest_turn(
     session_id: str | None = None,
     created_at: str | None = None,
     source_path: str = "",
+    source_id: str = "",
+    event_time: str | None = None,
 ) -> IngestResult:
     """Process a single conversation turn end-to-end (fast path).
 
@@ -246,6 +262,7 @@ def ingest_turn(
     """
     extracted: ExtractedTurn = extract_turn(
         store, text, source, session_id, created_at, source_path,
+        source_id=source_id,
     )
 
     result: IngestResult = IngestResult()
@@ -269,6 +286,8 @@ def ingest_turn(
         full_text_is_correction=extracted.full_text_is_correction,
         full_text=text,
         created_at=created_at,
+        event_time=event_time,
+        session_id=session_id,
     )
     result.merge(belief_result)
 

@@ -67,6 +67,45 @@ Sentences:
 
 Respond as JSON array: [{{"id": 1, "persist": "...", "type": "..."}}]"""
 
+# Onboard-specific prompt: no CORRECTION type, adds author detection.
+# During onboarding we scan documents, git history, and code -- not live
+# conversations. "Corrections" are a live interaction pattern (user corrects
+# agent), not something found in static documents. Agent analysis that says
+# "not X, but Y" is a FACT or DECISION, not a CORRECTION.
+_ONBOARD_CLASSIFICATION_PROMPT: str = """You are classifying sentences extracted from project files for a memory system.
+
+For EACH sentence, classify on THREE dimensions:
+
+1. persist: Should this be remembered across sessions?
+   - PERSIST: Contains a decision, preference, fact, or requirement useful in future sessions
+   - EPHEMERAL: Only useful in the current moment (status updates, meta-commentary, coordination, questions)
+
+2. type: What kind of information?
+   - DECISION: A choice was made
+   - PREFERENCE: A stated like/dislike/style preference
+   - FACT: A stated truth about the project or world
+   - REQUIREMENT: A constraint or rule that must be followed
+   - ASSUMPTION: Something taken as true without firm evidence
+   - ANALYSIS: Reasoning, explanation, or derived conclusion
+   - QUESTION: Asking for information
+   - COORDINATION: Control flow ("ok", "proceed", "next")
+   - META: About the conversation process itself
+
+   NOTE: Do NOT use CORRECTION. These are document extracts, not live conversation.
+   Statements like "not X, but Y" or "actually, X" are FACT or DECISION, not corrections.
+
+3. author: Who likely wrote this?
+   - USER: Written by a human (direct, terse, imperative, first-person preferences/rules)
+   - AGENT: Written by an AI assistant (structured, hedged, analytical, uses markdown/bullets)
+   - UNKNOWN: Cannot determine
+
+Be conservative with PERSIST. When in doubt, mark EPHEMERAL.
+
+Sentences:
+{sentences}
+
+Respond as JSON array: [{{"id": 1, "persist": "...", "type": "...", "author": "..."}}]"""
+
 # Question prefixes for offline classification heuristic.
 _QUESTION_PREFIXES: tuple[str, ...] = (
     "what ",
@@ -93,6 +132,7 @@ class ClassifiedSentence:
     sentence_type: str   # REQUIREMENT, CORRECTION, FACT, etc.
     alpha: float         # Beta prior alpha
     beta_param: float    # Beta prior beta
+    author: str = ""     # USER, AGENT, UNKNOWN (onboard only)
 
 
 # ---------------------------------------------------------------------------
@@ -111,12 +151,15 @@ def _build_sentence_block(batch: list[tuple[str, str]]) -> str:
 def _parse_llm_response(
     raw: str,
     batch: list[tuple[str, str]],
+    remap_correction: bool = False,
 ) -> list[ClassifiedSentence]:
-    """Parse the JSON array from the LLM response into ClassifiedSentence objects."""
-    # Extract JSON array from response (may have surrounding text)
+    """Parse the JSON array from the LLM response into ClassifiedSentence objects.
+
+    If remap_correction is True, any CORRECTION type is remapped to FACT
+    (used for onboard path where corrections are not a valid category).
+    """
     match: re.Match[str] | None = re.search(r"\[[\s\S]*\]", raw)
     if match is None:
-        # Fallback: mark entire batch as EPHEMERAL ANALYSIS
         return _fallback_batch(batch)
 
     items: list[dict[str, str]] = json.loads(match.group())
@@ -129,6 +172,10 @@ def _parse_llm_response(
         text, source = batch[idx]
         persist_label: str = item.get("persist", "EPHEMERAL")
         sentence_type: str = item.get("type", "ANALYSIS").upper()
+        author: str = item.get("author", "UNKNOWN").upper()
+
+        if remap_correction and sentence_type == "CORRECTION":
+            sentence_type = "FACT"
 
         prior: tuple[float, float] | None = TYPE_PRIORS.get(sentence_type)
         should_persist: bool = persist_label == "PERSIST" and prior is not None
@@ -139,6 +186,10 @@ def _parse_llm_response(
         else:
             alpha, beta_val = 2.0, 1.0
 
+        # Agent-authored content gets lower priors (agent-inferred, not user-stated)
+        if author == "AGENT" and should_persist:
+            alpha = max(alpha * 0.5, 1.0)
+
         results.append(
             ClassifiedSentence(
                 text=text,
@@ -147,6 +198,7 @@ def _parse_llm_response(
                 sentence_type=sentence_type,
                 alpha=alpha,
                 beta_param=beta_val,
+                author=author,
             )
         )
 
@@ -201,6 +253,34 @@ def parse_classification_response(
     Returns ClassifiedSentence objects with type-based Bayesian priors.
     """
     return _parse_llm_response(raw, batch)
+
+
+def build_onboard_classification_prompt(sentences: list[tuple[str, str]]) -> str:
+    """Build the onboard-specific classification prompt for a batch of sentences.
+
+    Like build_classification_prompt() but:
+    - No CORRECTION type (corrections are a live-conversation concept)
+    - Adds author detection (USER/AGENT/UNKNOWN)
+    - Agent-authored content gets lower priors
+
+    Use this for the onboard pipeline where text comes from static documents,
+    git history, and code -- not live user/agent conversation.
+    """
+    batch: list[tuple[str, str]] = sentences[:BATCH_SIZE]
+    sentence_block: str = _build_sentence_block(batch)
+    return _ONBOARD_CLASSIFICATION_PROMPT.format(sentences=sentence_block)
+
+
+def parse_onboard_classification_response(
+    raw: str,
+    batch: list[tuple[str, str]],
+) -> list[ClassifiedSentence]:
+    """Parse a Haiku subagent's JSON response for onboard classification.
+
+    Like parse_classification_response() but remaps any CORRECTION to FACT
+    and applies author-based prior adjustments.
+    """
+    return _parse_llm_response(raw, batch, remap_correction=True)
 
 
 def classify_sentences_offline(
