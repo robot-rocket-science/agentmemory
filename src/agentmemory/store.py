@@ -183,6 +183,16 @@ CREATE INDEX IF NOT EXISTS idx_checkpoints_session ON checkpoints(session_id);
 CREATE INDEX IF NOT EXISTS idx_evidence_belief ON evidence(belief_id);
 CREATE INDEX IF NOT EXISTS idx_edges_from ON edges(from_id);
 CREATE INDEX IF NOT EXISTS idx_edges_to ON edges(to_id);
+
+CREATE TABLE IF NOT EXISTS pending_feedback (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    belief_id TEXT NOT NULL,
+    belief_content TEXT NOT NULL,
+    session_id TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_pending_feedback_session ON pending_feedback(session_id);
 """
 
 
@@ -1776,6 +1786,44 @@ class MemoryStore:
             }
         return result
 
+    # --- Stale belief detection ---
+
+    def get_stale_beliefs(self, days_threshold: int = 30, limit: int = 50) -> list[Belief]:
+        """Return beliefs not retrieved in the last N days.
+
+        Excludes locked beliefs (always relevant) and beliefs created
+        within the threshold period (too new to be stale).
+        Returns at most ``limit`` beliefs, ordered by staleness (oldest first).
+        """
+        rows: list[sqlite3.Row] = self._conn.execute(
+            """SELECT * FROM beliefs
+               WHERE valid_to IS NULL
+                 AND locked = 0
+                 AND created_at < datetime('now', ? || ' days')
+                 AND (last_retrieved_at IS NULL
+                      OR last_retrieved_at < datetime('now', ? || ' days'))
+               ORDER BY COALESCE(last_retrieved_at, created_at) ASC
+               LIMIT ?""",
+            (f"-{days_threshold}", f"-{days_threshold}", limit),
+        ).fetchall()
+        return [_row_to_belief(r) for r in rows]
+
+    def count_stale_beliefs(self, days_threshold: int = 30) -> int:
+        """Count beliefs not retrieved in the last N days (excludes locked and new)."""
+        row: sqlite3.Row = self._conn.execute(
+            """SELECT COUNT(*) FROM beliefs
+               WHERE valid_to IS NULL
+                 AND locked = 0
+                 AND created_at < datetime('now', ? || ' days')
+                 AND (last_retrieved_at IS NULL
+                      OR last_retrieved_at < datetime('now', ? || ' days'))""",
+            (f"-{days_threshold}", f"-{days_threshold}"),
+        ).fetchone()
+        val: object = row[0]
+        if not isinstance(val, int):
+            return 0
+        return val
+
     # --- Test results ---
 
     def record_test_result(
@@ -1814,3 +1862,75 @@ class MemoryStore:
             evidence_weight=evidence_weight,
             created_at=ts,
         )
+
+    # --- Pending feedback ---
+
+    def insert_pending_feedback(
+        self,
+        belief_id: str,
+        belief_content: str,
+        session_id: str | None = None,
+    ) -> None:
+        """Store a retrieved belief for later feedback matching."""
+        ts: str = _now()
+        self._conn.execute(
+            """INSERT INTO pending_feedback
+               (belief_id, belief_content, session_id, created_at)
+               VALUES (?, ?, ?, ?)""",
+            (belief_id, belief_content, session_id, ts),
+        )
+        self._conn.commit()
+
+    def get_pending_feedback(
+        self,
+        session_id: str | None = None,
+    ) -> list[dict[str, str]]:
+        """Get pending feedback entries, optionally filtered by session."""
+        if session_id is not None:
+            rows: list[sqlite3.Row] = self._conn.execute(
+                "SELECT belief_id, belief_content, session_id, created_at "
+                "FROM pending_feedback WHERE session_id = ? ORDER BY created_at",
+                (session_id,),
+            ).fetchall()
+        else:
+            rows = self._conn.execute(
+                "SELECT belief_id, belief_content, session_id, created_at "
+                "FROM pending_feedback ORDER BY created_at",
+            ).fetchall()
+        return [
+            {
+                "belief_id": row["belief_id"],
+                "belief_content": row["belief_content"],
+                "session_id": row["session_id"] if row["session_id"] else "",
+                "created_at": row["created_at"],
+            }
+            for row in rows
+        ]
+
+    def clear_pending_feedback(
+        self,
+        session_id: str | None = None,
+    ) -> int:
+        """Remove pending feedback entries after processing. Returns count removed."""
+        if session_id is not None:
+            cursor: sqlite3.Cursor = self._conn.execute(
+                "DELETE FROM pending_feedback WHERE session_id = ?",
+                (session_id,),
+            )
+        else:
+            cursor = self._conn.execute("DELETE FROM pending_feedback")
+        self._conn.commit()
+        return cursor.rowcount
+
+    def get_session_observation_texts(
+        self,
+        session_id: str,
+        limit: int = 200,
+    ) -> list[str]:
+        """Return observation content strings for a given session, most recent first."""
+        rows: list[sqlite3.Row] = self._conn.execute(
+            "SELECT content FROM observations WHERE session_id = ? "
+            "ORDER BY created_at DESC LIMIT ?",
+            (session_id, limit),
+        ).fetchall()
+        return [row["content"] for row in rows]

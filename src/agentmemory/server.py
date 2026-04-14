@@ -276,6 +276,12 @@ def search(query: str, budget: int = 2000) -> str:
         _retrieval_buffer[session_id] = []
     for belief in result.beliefs:
         _retrieval_buffer[session_id].append((belief.id, ts))
+        # Persist to DB so feedback survives session crashes
+        store.insert_pending_feedback(
+            belief_id=belief.id,
+            belief_content=belief.content,
+            session_id=session_id,
+        )
 
     lines: list[str] = [
         f"Found {len(result.beliefs)} belief(s) ({result.total_tokens} tokens, "
@@ -467,6 +473,11 @@ def status() -> str:
         validated: int = rigor.get("validated", 0) + rigor.get("empirically_tested", 0)
         if total_rigor > 0 and validated / total_rigor < 0.3:
             lines.append(f"  CAVEAT: {validated / total_rigor * 100:.0f}% of beliefs are empirically tested or validated. Most findings are hypotheses or simulations.")
+
+    # Stale beliefs
+    stale_count: int = store.count_stale_beliefs(days_threshold=30)
+    if stale_count > 0:
+        lines.append(f"Stale beliefs (>30 days unretrieved): {stale_count}")
 
     # Last completed session velocity
     last_velocity: Session | None = store.get_last_completed_session()

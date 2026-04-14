@@ -703,6 +703,31 @@ def cmd_locked(args: argparse.Namespace) -> None:
 
 
 # ---------------------------------------------------------------------------
+# stale
+# ---------------------------------------------------------------------------
+
+
+def cmd_stale(args: argparse.Namespace) -> None:
+    """Show beliefs not retrieved recently (stale)."""
+    store: MemoryStore = _get_store()
+    beliefs: list[Belief] = store.get_stale_beliefs(
+        days_threshold=args.days, limit=args.limit,
+    )
+    store.close()
+
+    if not beliefs:
+        print(f"No stale beliefs (threshold: {args.days} days).")
+        return
+
+    print(f"Stale beliefs ({len(beliefs)}, threshold: {args.days} days):")
+    for b in beliefs:
+        last: str = b.last_retrieved_at if b.last_retrieved_at else "never"
+        print(f"  [{b.confidence:.0%}] ({b.belief_type}) last retrieved: {last}")
+        print(f"    {b.content}")
+        print(f"    ID: {b.id}")
+
+
+# ---------------------------------------------------------------------------
 # remember (new-belief)
 # ---------------------------------------------------------------------------
 
@@ -1381,6 +1406,96 @@ def _install_commit_hook(agentmemory_bin: str | None) -> None:
 
 
 # ---------------------------------------------------------------------------
+# feedback-flush
+# ---------------------------------------------------------------------------
+
+_FEEDBACK_STOPWORDS: frozenset[str] = frozenset({
+    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
+    "have", "has", "had", "do", "does", "did", "will", "would", "shall",
+    "should", "may", "might", "must", "can", "could", "of", "in", "to",
+    "for", "with", "on", "at", "by", "from", "as", "into", "through",
+    "that", "this", "these", "those", "it", "its", "not", "no", "all",
+    "and", "or", "but", "if", "then", "than", "when", "where", "how",
+    "what", "which", "who", "whom", "use", "using", "used",
+})
+
+_FEEDBACK_MIN_MATCHES: int = 2
+
+
+def _extract_feedback_key_terms(text: str) -> list[str]:
+    """Extract meaningful terms from text, filtering stopwords."""
+    import re as _re
+    words: list[str] = _re.findall(r"[a-zA-Z0-9_]+", text.lower())
+    return [w for w in words if w not in _FEEDBACK_STOPWORDS and len(w) >= 2]
+
+
+def cmd_feedback_flush(args: argparse.Namespace) -> None:
+    """Process pending feedback entries against recently ingested text."""
+    from agentmemory.models import (
+        LAYER_IMPLICIT,
+        OUTCOME_IGNORED,
+        OUTCOME_USED,
+    )
+
+    store: MemoryStore = _get_store()
+    session_filter: str | None = getattr(args, "session", None)
+    entries: list[dict[str, str]] = store.get_pending_feedback(
+        session_id=session_filter if session_filter else None,
+    )
+
+    if not entries:
+        print("No pending feedback entries to process.")
+        return
+
+    # Gather recently ingested text: observations from the same session(s)
+    session_ids: set[str] = {
+        e["session_id"] for e in entries if e["session_id"]
+    }
+    combined_text: str = ""
+    for sid in session_ids:
+        texts: list[str] = store.get_session_observation_texts(sid)
+        combined_text += " ".join(texts) + " "
+    combined_lower: str = combined_text.lower()
+
+    matches: int = 0
+    for entry in entries:
+        belief_id: str = entry["belief_id"]
+        belief_content: str = entry["belief_content"]
+        sid_val: str = entry["session_id"]
+
+        terms: list[str] = _extract_feedback_key_terms(belief_content)
+        if not terms:
+            continue
+
+        unique_terms: set[str] = set(terms)
+        unique_matches: int = sum(1 for t in unique_terms if t in combined_lower)
+
+        outcome: str = (
+            OUTCOME_USED
+            if unique_matches >= _FEEDBACK_MIN_MATCHES
+            else OUTCOME_IGNORED
+        )
+        detail: str = (
+            f"flush: {unique_matches}/{len(unique_terms)} key terms matched"
+        )
+
+        store.record_test_result(
+            belief_id=belief_id,
+            session_id=sid_val if sid_val else "unknown",
+            outcome=outcome,
+            detection_layer=LAYER_IMPLICIT,
+            outcome_detail=detail,
+        )
+        if outcome == OUTCOME_USED:
+            matches += 1
+
+    cleared: int = store.clear_pending_feedback(
+        session_id=session_filter if session_filter else None,
+    )
+    print(f"Processed {cleared} pending feedback entries, {matches} matches found")
+
+
+# ---------------------------------------------------------------------------
 # mcp
 # ---------------------------------------------------------------------------
 
@@ -1478,6 +1593,16 @@ def main() -> None:
         "locked", help="Show locked beliefs"
     )
     p_locked.set_defaults(func=cmd_locked)
+
+    # stale
+    p_stale: argparse.ArgumentParser = subparsers.add_parser(
+        "stale", help="Show stale beliefs (not retrieved recently)"
+    )
+    p_stale.add_argument("--days", type=int, default=30,
+                         help="Days threshold for staleness (default: 30)")
+    p_stale.add_argument("--limit", type=int, default=20,
+                         help="Max beliefs to show (default: 20)")
+    p_stale.set_defaults(func=cmd_stale)
 
     # remember (new-belief)
     p_remember: argparse.ArgumentParser = subparsers.add_parser(
@@ -1603,6 +1728,15 @@ def main() -> None:
         help="Uncommitted changes before nudge (default: 10)",
     )
     p_commit_config.set_defaults(func=cmd_commit_config)
+
+    # feedback-flush
+    p_feedback_flush: argparse.ArgumentParser = subparsers.add_parser(
+        "feedback-flush", help="Process pending feedback entries from DB"
+    )
+    p_feedback_flush.add_argument(
+        "--session", default=None, help="Filter by session ID"
+    )
+    p_feedback_flush.set_defaults(func=cmd_feedback_flush)
 
     # mcp (start MCP server)
     p_mcp: argparse.ArgumentParser = subparsers.add_parser(
