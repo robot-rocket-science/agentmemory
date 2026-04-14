@@ -40,6 +40,7 @@ from agentmemory.models import (
     Session,
     TestResult,
 )
+from agentmemory.relationship_detector import detect_relationships
 from agentmemory.retrieval import RetrievalResult, retrieve
 from agentmemory.store import MemoryStore
 
@@ -290,6 +291,7 @@ def remember(text: str) -> str:
         beta_param=0.5,
         locked=False,
     )
+    detect_relationships(store, belief)
     store.checkpoint(session_id, "remember", belief.content, [belief.id])
     store.increment_session_metrics(session_id, beliefs_created=1)
     return (
@@ -319,6 +321,7 @@ def correct(text: str, replaces: str | None = None) -> str:
         beta_param=0.5,
         locked=False,
     )
+    detect_relationships(store, belief)
 
     superseded_msg: str = ""
     if replaces is not None and replaces.strip():
