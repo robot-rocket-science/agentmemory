@@ -132,10 +132,6 @@ Research phase is complete (83 experiments). Phase 2 MVP is built and self-hosti
 ## Backlog
 
 - Sentence splitting for non-English / mixed-content documents
-- Threshold for full re-onboarding vs incremental after major restructures
-- Cross-project behavioral belief promotion mechanism
-- Onboarding provenance and extractor versioning
-- HRR partition strategy for 10K+ node graphs
 
 ## Pruned (no longer relevant)
 
