@@ -1639,6 +1639,115 @@ def cmd_uninstall(args: argparse.Namespace) -> None:
 
 
 # ---------------------------------------------------------------------------
+# rebuild-edges
+# ---------------------------------------------------------------------------
+
+
+def cmd_rebuild_edges(args: argparse.Namespace) -> None:
+    """Rebuild SUPPORTS/CONTRADICTS edges across all active beliefs."""
+    from agentmemory.relationship_detector import (
+        RelationshipResult,
+        detect_relationships,
+    )
+
+    store: MemoryStore = _get_store()
+    only_orphans: bool = bool(args.only_orphans)
+
+    all_ids: list[str] = store.get_active_belief_ids()
+    total: int = len(all_ids)
+
+    if only_orphans:
+        orphan_ids: list[str] = [
+            bid for bid in all_ids if store.count_edges_for(bid) == 0
+        ]
+        target_ids: list[str] = orphan_ids
+        print(f"Targeting {len(orphan_ids)} orphan beliefs (of {total} active)")
+    else:
+        target_ids = all_ids
+        print(f"Targeting all {total} active beliefs")
+
+    edges_created: int = 0
+    contradictions: int = 0
+    supports: int = 0
+    processed: int = 0
+    skipped: int = 0
+
+    for i, belief_id in enumerate(target_ids):
+        belief: Belief | None = store.get_belief(belief_id)
+        if belief is None or belief.valid_to is not None:
+            skipped += 1
+            continue
+
+        result: RelationshipResult = detect_relationships(store, belief)
+        edges_created += result.edges_created
+        contradictions += result.contradictions
+        supports += result.supports
+        processed += 1
+
+        if (i + 1) % 500 == 0:
+            pct: float = (i + 1) / len(target_ids) * 100
+            print(
+                f"  [{pct:5.1f}%] {i + 1}/{len(target_ids)}"
+                f" -- {edges_created} edges so far"
+                f" ({supports} SUPPORTS, {contradictions} CONTRADICTS)"
+            )
+
+    store.close()
+
+    print(f"\nDone. Processed {processed} beliefs (skipped {skipped}).")
+    print(f"  Edges created: {edges_created}")
+    print(f"    SUPPORTS: {supports}")
+    print(f"    CONTRADICTS: {contradictions}")
+
+
+# ---------------------------------------------------------------------------
+# batch-feedback
+# ---------------------------------------------------------------------------
+
+
+def cmd_batch_feedback(args: argparse.Namespace) -> None:
+    """Apply bulk feedback to beliefs matching criteria."""
+    store: MemoryStore = _get_store()
+    outcome: str = args.outcome
+    weight: float = float(args.weight)
+
+    if args.source_type:
+        rows: list[sqlite3.Row] = store.query(
+            "SELECT id FROM beliefs WHERE valid_to IS NULL AND source_type = ?",
+            (args.source_type,),
+        )
+        target_ids: list[str] = [str(r["id"]) for r in rows]
+        print(f"Targeting {len(target_ids)} beliefs with source_type={args.source_type}")
+    elif args.belief_type:
+        rows = store.query(
+            "SELECT id FROM beliefs WHERE valid_to IS NULL AND belief_type = ?",
+            (args.belief_type,),
+        )
+        target_ids = [str(r["id"]) for r in rows]
+        print(f"Targeting {len(target_ids)} beliefs with belief_type={args.belief_type}")
+    elif args.classified_by:
+        rows = store.query(
+            "SELECT id FROM beliefs WHERE valid_to IS NULL AND classified_by = ?",
+            (args.classified_by,),
+        )
+        target_ids = [str(r["id"]) for r in rows]
+        print(f"Targeting {len(target_ids)} beliefs classified_by={args.classified_by}")
+    else:
+        rows = store.query(
+            "SELECT id FROM beliefs WHERE valid_to IS NULL"
+        )
+        target_ids = [str(r["id"]) for r in rows]
+        print(f"Targeting all {len(target_ids)} active beliefs")
+
+    print(f"Applying outcome={outcome}, weight={weight}")
+
+    updated: int = store.bulk_update_confidence(target_ids, outcome, weight)
+    store.close()
+
+    print(f"Updated {updated} beliefs.")
+
+
+# ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
 
@@ -1855,6 +1964,33 @@ def main() -> None:
         "uninstall", help="Remove agentmemory commands and config"
     )
     p_uninstall.set_defaults(func=cmd_uninstall)
+
+    # rebuild-edges
+    p_rebuild: argparse.ArgumentParser = subparsers.add_parser(
+        "rebuild-edges", help="Rebuild SUPPORTS/CONTRADICTS edges across all beliefs"
+    )
+    p_rebuild.add_argument(
+        "--only-orphans", action="store_true",
+        help="Only process beliefs with no existing SUPPORTS/CONTRADICTS edges",
+    )
+    p_rebuild.set_defaults(func=cmd_rebuild_edges)
+
+    # batch-feedback
+    p_batch: argparse.ArgumentParser = subparsers.add_parser(
+        "batch-feedback", help="Apply bulk feedback to beliefs matching criteria"
+    )
+    p_batch.add_argument(
+        "--outcome", choices=["used", "harmful"], default="used",
+        help="Feedback outcome (default: used)",
+    )
+    p_batch.add_argument(
+        "--weight", type=float, default=0.5,
+        help="Update weight (default: 0.5)",
+    )
+    p_batch.add_argument("--source-type", default=None, help="Filter by source_type")
+    p_batch.add_argument("--belief-type", default=None, help="Filter by belief_type")
+    p_batch.add_argument("--classified-by", default=None, help="Filter by classified_by")
+    p_batch.set_defaults(func=cmd_batch_feedback)
 
     args: argparse.Namespace = parser.parse_args()
 

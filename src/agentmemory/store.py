@@ -1548,6 +1548,67 @@ class MemoryStore:
             "type_priors": type_priors,
         }
 
+    # --- Bulk maintenance ---
+
+    def get_active_belief_ids(self) -> list[str]:
+        """Return all active (non-superseded) belief IDs, ordered by creation."""
+        rows: list[sqlite3.Row] = self._conn.execute(
+            "SELECT id FROM beliefs WHERE valid_to IS NULL ORDER BY created_at"
+        ).fetchall()
+        return [str(r["id"]) for r in rows]
+
+    def count_edges_for(self, belief_id: str) -> int:
+        """Count SUPPORTS + CONTRADICTS edges connected to a belief."""
+        row: sqlite3.Row = self._conn.execute(
+            """SELECT COUNT(*) FROM edges
+               WHERE (from_id = ? OR to_id = ?)
+                 AND edge_type IN ('SUPPORTS', 'CONTRADICTS')""",
+            (belief_id, belief_id),
+        ).fetchone()
+        val: object = row[0]
+        return int(val) if isinstance(val, int) else 0
+
+    def bulk_update_confidence(
+        self,
+        belief_ids: list[str],
+        outcome: str,
+        weight: float = 0.5,
+    ) -> int:
+        """Apply a Bayesian update to multiple beliefs. Returns count updated."""
+        if not belief_ids:
+            return 0
+
+        ts: str = _now()
+        updated: int = 0
+        for belief_id in belief_ids:
+            row: sqlite3.Row | None = self._conn.execute(
+                "SELECT alpha, beta_param, locked FROM beliefs WHERE id = ?",
+                (belief_id,),
+            ).fetchone()
+            if row is None:
+                continue
+
+            alpha: float = float(str(row["alpha"]))
+            beta: float = float(str(row["beta_param"]))
+            is_locked: bool = bool(row["locked"])
+
+            if outcome == "used":
+                alpha += weight
+            elif outcome == "harmful":
+                if not is_locked:
+                    beta += weight
+            else:
+                continue
+
+            self._conn.execute(
+                "UPDATE beliefs SET alpha = ?, beta_param = ?, updated_at = ? WHERE id = ?",
+                (alpha, beta, ts, belief_id),
+            )
+            updated += 1
+
+        self._conn.commit()
+        return updated
+
     # --- Onboarding provenance ---
 
     def record_onboarding_run(
