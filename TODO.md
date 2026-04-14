@@ -70,10 +70,11 @@ Research phase is complete (83 experiments). Phase 2 MVP is built and self-hosti
 - [x] Retrieve performance optimization (10s -> 0.7s)
 - [x] classified_by tracking for reclassification targeting
 - [x] Auto-feedback fires on ingest() + atexit session flush
-- [ ] Full graph edge extraction (CALLS, IMPLEMENTS, TESTS edges)
+- [x] Multi-session validation harness (Exp 84: 10/10 checks pass)
+- [x] CALLS (3,518), CITES (758), CONTAINS (720) edges from scanner (in graph_edges table)
+- [ ] IMPLEMENTS/TESTS edge extraction (requirement-to-code, test-to-code traceability)
 - [ ] Cross-model MCP testing (Claude, ChatGPT, Gemini)
-- [ ] BFS graph traversal with edge weighting
-- [ ] Multi-session validation harness
+- [ ] BFS graph traversal with edge weighting (HRR single-hop exists)
 
 ### Phase 4: Behavioral Enforcement (PLANNED)
 - [ ] Triggered belief automation (15 TB designs ready)
