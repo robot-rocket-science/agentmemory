@@ -151,6 +151,17 @@ CREATE TABLE IF NOT EXISTS confidence_history (
 CREATE INDEX IF NOT EXISTS idx_confhist_belief ON confidence_history(belief_id);
 CREATE INDEX IF NOT EXISTS idx_confhist_time ON confidence_history(created_at);
 
+CREATE TABLE IF NOT EXISTS onboarding_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_path TEXT NOT NULL,
+    commit_hash TEXT,
+    nodes_extracted INTEGER NOT NULL DEFAULT 0,
+    edges_extracted INTEGER NOT NULL DEFAULT 0,
+    beliefs_created INTEGER NOT NULL DEFAULT 0,
+    observations_created INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_graph_edges_from ON graph_edges(from_id);
 CREATE INDEX IF NOT EXISTS idx_graph_edges_to ON graph_edges(to_id);
 CREATE INDEX IF NOT EXISTS idx_graph_edges_type ON graph_edges(edge_type);
@@ -1465,6 +1476,48 @@ class MemoryStore:
             "stale_sessions": stale,
             "type_priors": type_priors,
         }
+
+    # --- Onboarding provenance ---
+
+    def record_onboarding_run(
+        self,
+        project_path: str,
+        commit_hash: str | None,
+        nodes_extracted: int,
+        edges_extracted: int,
+        beliefs_created: int,
+        observations_created: int,
+    ) -> int:
+        """Record an onboarding run for provenance tracking."""
+        ts: str = _now()
+        cursor: sqlite3.Cursor = self._conn.execute(
+            """INSERT INTO onboarding_runs
+               (project_path, commit_hash, nodes_extracted, edges_extracted,
+                beliefs_created, observations_created, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (project_path, commit_hash, nodes_extracted, edges_extracted,
+             beliefs_created, observations_created, ts),
+        )
+        self._conn.commit()
+        row_id: int | None = cursor.lastrowid
+        return row_id if row_id is not None else 0
+
+    def get_last_onboarding(self, project_path: str | None = None) -> dict[str, str] | None:
+        """Return the most recent onboarding run, optionally filtered by project."""
+        if project_path:
+            row: sqlite3.Row | None = self._conn.execute(
+                """SELECT * FROM onboarding_runs
+                   WHERE project_path = ?
+                   ORDER BY created_at DESC LIMIT 1""",
+                (project_path,),
+            ).fetchone()
+        else:
+            row = self._conn.execute(
+                "SELECT * FROM onboarding_runs ORDER BY created_at DESC LIMIT 1"
+            ).fetchone()
+        if row is None:
+            return None
+        return {k: str(row[k]) for k in row.keys()}
 
     def get_rigor_distribution(self) -> dict[str, int]:
         """Return count of active beliefs per rigor_tier."""

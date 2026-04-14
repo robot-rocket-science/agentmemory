@@ -567,6 +567,25 @@ def onboard(project_path: str) -> str:
             reason="scanner",
         )
 
+    # Record onboarding provenance
+    import subprocess
+    commit_hash: str | None = None
+    try:
+        commit_hash = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=str(path),
+            stderr=subprocess.DEVNULL,
+        ).decode().strip()
+    except Exception:
+        pass
+    store.record_onboarding_run(
+        project_path=str(path),
+        commit_hash=commit_hash,
+        nodes_extracted=len(scan.nodes),
+        edges_extracted=len(scan.edges),
+        beliefs_created=0,  # Beliefs created later via create_beliefs()
+        observations_created=observations_created,
+    )
+
     # Build summary
     node_types: dict[str, int] = {}
     for n in scan.nodes:
@@ -595,6 +614,8 @@ def onboard(project_path: str) -> str:
         f"{k}={v:.2f}s" for k, v in scan.timings.items()
     ]
     lines.append(f"  Timing: {', '.join(timing_parts)}")
+    if commit_hash:
+        lines.append(f"  Git HEAD at onboard: {commit_hash[:12]}")
 
     summary: str = "\n".join(lines)
 
