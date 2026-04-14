@@ -76,9 +76,12 @@ Research phase is complete (83 experiments). Phase 2 MVP is built and self-hosti
 - [ ] Cross-model MCP testing (Claude, ChatGPT, Gemini)
 - [ ] BFS graph traversal with edge weighting (HRR single-hop exists)
 
-### Phase 4: Behavioral Enforcement (PLANNED)
-- [ ] Triggered belief automation (15 TB designs ready)
-- [ ] Output gating middleware (pre-execution hooks)
+### Phase 4: Behavioral Enforcement (IN PROGRESS)
+- [x] TB-02: Session start locked belief injection (agentmemory-inject.sh)
+- [x] TB-03: Per-prompt directive injection (agentmemory-search-inject.sh)
+- [x] TB-10: PreToolUse directive violation gate (agentmemory-directive-gate.sh)
+- [x] Session-end hook for session completion (agentmemory-session-end.sh)
+- [ ] Remaining 12 TBs (TB-01,04-09,11-15)
 - [ ] Directed graph traversal for multi-hop queries
 - [ ] L1 behavioral layer in retrieval pipeline
 

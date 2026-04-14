@@ -56,11 +56,13 @@ STAGE                          STATUS          EVIDENCE
                                                atexit flush for final batch.
                                                VALIDATED: Exp 66 +22% MRR over 10 rounds.
 
-12. Triggered beliefs          SIMULATED        5/5 case study failures prevented (Exp 51)
-    (meta-cognitive checks)                    15 TBs designed, not automated
+12. Triggered beliefs          PARTIALLY BUILT  TB-02/03/10 wired as Claude Code hooks
+    (meta-cognitive checks)                    15 TBs designed, 3 automated (Exp 51: 5/5)
+                                               Session-end hook completes sessions
 
-13. Output gating              NOT BUILT        No code path blocks violating agent output
-    (block violating output)                   Locked beliefs inform but don't enforce
+13. Output gating              WORKING (Bash)   PreToolUse directive gate blocks Bash
+    (block violating output)                   commands matching locked prohibitions.
+                                               2-term match threshold, tested live.
 ```
 
 ---
