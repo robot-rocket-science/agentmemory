@@ -15,6 +15,7 @@ from typing import Final
 
 from agentmemory.models import (
     EDGE_CONTRADICTS,
+    EDGE_RELATES_TO,
     EDGE_SUPPORTS,
     Belief,
 )
@@ -28,6 +29,10 @@ _MIN_JACCARD_CONTRADICTS: Final[float] = 0.3
 # Minimum Jaccard similarity for SUPPORTS detection.
 # Higher bar -- we want genuine topical agreement, not just shared vocabulary.
 _MIN_JACCARD_SUPPORTS: Final[float] = 0.5
+
+# Minimum Jaccard for RELATES_TO: lower bar than SUPPORTS, catches
+# beliefs about the same topic with different vocabulary.
+_MIN_JACCARD_RELATES: Final[float] = 0.25
 
 # Maximum candidates to check from FTS5 search.
 _MAX_CANDIDATES: Final[int] = 10
@@ -69,6 +74,7 @@ class RelationshipResult:
     edges_created: int = 0
     contradictions: int = 0
     supports: int = 0
+    relates: int = 0
     details: list[str] = field(default_factory=lambda: list[str]())
 
 
@@ -173,6 +179,23 @@ def detect_relationships(
                 result.details.append(
                     f"SUPPORTS {candidate.id} (jaccard={jaccard:.2f})"
                 )
+                continue
+
+        # Check for RELATES_TO: lower bar, cross-type allowed.
+        # This creates the vocabulary bridges that HRR traverses.
+        if jaccard >= _MIN_JACCARD_RELATES:
+            store.insert_edge(
+                from_id=new_belief.id,
+                to_id=candidate.id,
+                edge_type=EDGE_RELATES_TO,
+                weight=jaccard,
+                reason=f"entity_overlap (jaccard={jaccard:.2f})",
+            )
+            result.edges_created += 1
+            result.relates += 1
+            result.details.append(
+                f"RELATES_TO {candidate.id} (jaccard={jaccard:.2f})"
+            )
 
     if result.edges_created == 0:
         result.details.append("no relationships detected")

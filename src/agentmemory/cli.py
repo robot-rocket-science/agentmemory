@@ -491,6 +491,68 @@ def cmd_onboard(args: argparse.Namespace) -> None:
     if edge_count > 0:
         print(f"  Stored {edge_count} structural edges")
 
+    # --- Semantic linking pass (Haiku LLM) ---
+    # Batch active beliefs and ask Haiku to identify same-concept pairs.
+    # Creates RELATES_TO edges that HRR can traverse without manual citations.
+    # Only runs with --link flag (costs ~$0.01-0.05 per onboard).
+    link_edges: int = 0
+    if getattr(args, "link", False):
+        from agentmemory.semantic_linker import (
+            LINK_BATCH_SIZE,
+            apply_links,
+            build_link_prompt,
+            parse_link_response,
+        )
+        print("\nSemantic linking (Haiku)...")
+        active_rows: list[sqlite3.Row] = store.query(
+            "SELECT id, content FROM beliefs "
+            "WHERE valid_to IS NULL AND superseded_by IS NULL "
+            "ORDER BY created_at DESC LIMIT 500"
+        )
+        belief_pairs: list[tuple[str, str]] = [
+            (r["id"], r["content"]) for r in active_rows
+        ]
+
+        for batch_start in range(0, len(belief_pairs), LINK_BATCH_SIZE):
+            batch: list[tuple[str, str]] = belief_pairs[
+                batch_start : batch_start + LINK_BATCH_SIZE
+            ]
+            prompt: str = build_link_prompt(batch)
+
+            try:
+                import anthropic
+
+                client: anthropic.Anthropic = anthropic.Anthropic()
+                response = client.messages.create(
+                    model="claude-haiku-4-5-20251001",
+                    max_tokens=2048,
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                raw_text: str = str(getattr(response.content[0], "text", response.content[0]))
+                links: list[tuple[str, str, str]] = parse_link_response(raw_text)
+                created: int = apply_links(store, links)
+                link_edges += created
+                batch_num: int = batch_start // LINK_BATCH_SIZE + 1
+                total_batches: int = (
+                    len(belief_pairs) + LINK_BATCH_SIZE - 1
+                ) // LINK_BATCH_SIZE
+                print(
+                    f"  Batch {batch_num}/{total_batches}: "
+                    f"{len(links)} links found, {created} edges created"
+                )
+            except ImportError:
+                print(
+                    "  Warning: anthropic SDK not installed. "
+                    "Install with: uv pip install anthropic"
+                )
+                break
+            except Exception as e:
+                print(f"  Error in batch: {e}")
+                continue
+
+        if link_edges > 0:
+            print(f"  Total semantic edges: {link_edges}")
+
     store.close()
 
     timing_parts: list[str] = [f"{k}={v:.2f}s" for k, v in scan.timings.items()]
@@ -498,7 +560,7 @@ def cmd_onboard(args: argparse.Namespace) -> None:
     print(f"  Observations: {aggregate.observations_created}")
     print(f"  Beliefs: {aggregate.beliefs_created}")
     print(f"  Corrections: {aggregate.corrections_detected}")
-    print(f"  Edges: {edge_count}")
+    print(f"  Edges: {edge_count} structural + {link_edges} semantic")
     print(f"  Timing: {', '.join(timing_parts)}")
 
 
@@ -1774,6 +1836,10 @@ def main() -> None:
         "onboard", help="Scan and ingest a project directory"
     )
     p_onboard.add_argument("path", help="Project directory to onboard")
+    p_onboard.add_argument(
+        "--link", action="store_true", default=False,
+        help="Run Haiku semantic linking after ingestion (~$0.01-0.05)",
+    )
     p_onboard.set_defaults(func=cmd_onboard)
 
     # stats
