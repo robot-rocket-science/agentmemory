@@ -29,9 +29,11 @@ STAGE                          STATUS          EVIDENCE
    (SQLite + FTS5 + edges)                     Content-hash dedup, evidence linking,
                                                SUPERSEDES edges, locked flag. 176+ tests passing.
 
-6. FTS5 + HRR retrieval       WORKING          retrieve() in retrieval.py
-   (query -> candidates)                       FTS5 BM25 + HRR vocabulary bridge
+6. FTS5 + HRR + BFS retrieval WORKING          retrieve() in retrieval.py
+   (query -> candidates)                       L0 (locked) + L1 (behavioral) +
+                                               L2 (FTS5 BM25) + L3 (HRR + BFS depth-2)
                                                Exp 56: 100% coverage (13/13) at K=50
+                                               BFS adds 129ms, 10 L1 beliefs loaded
 
 7. Temporal re-ranking         WORKING          score_belief() in scoring.py
    (decay + lock boost +                       Type/source weights, recency boost,

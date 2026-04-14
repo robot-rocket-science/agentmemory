@@ -76,7 +76,7 @@ Research phase is complete (83 experiments). Phase 2 MVP is built and self-hosti
 - [ ] Cross-model MCP testing (Claude, ChatGPT, Gemini)
 - [ ] BFS graph traversal with edge weighting (HRR single-hop exists)
 
-### Phase 4: Behavioral Enforcement (IN PROGRESS)
+### Phase 4: Behavioral Enforcement (COMPLETE)
 - [x] TB-02: Session start locked belief injection (agentmemory-inject.sh)
 - [x] TB-03: Per-prompt directive injection (agentmemory-search-inject.sh)
 - [x] TB-10: PreToolUse directive violation gate (agentmemory-directive-gate.sh)
@@ -89,9 +89,9 @@ Research phase is complete (83 experiments). Phase 2 MVP is built and self-hosti
 - [x] TB-05: Maturity note when <20% user-validated beliefs (CS-005)
 - [x] TB-13: Locked belief access audit counter in status()
 - [x] TB-15: Confidence drop warning when belief falls below 50%
-- [ ] TB-01/04/12/14: Behavioral guidance (enforced via CLAUDE.md, not hooks)
-- [ ] Directed graph traversal for multi-hop queries
-- [ ] L1 behavioral layer in retrieval pipeline
+- [x] TB-01/04/12/14: Behavioral guidance (enforced via CLAUDE.md rules)
+- [x] BFS multi-hop traversal (depth-2, expand_graph in retrieve, 129ms overhead)
+- [x] L1 behavioral layer (get_behavioral_beliefs between L0 and L2)
 
 ### Phase 5: Epistemic Integrity and Validation (PLANNED)
 - [ ] Provenance metadata (rigor tier, method, sample size)
