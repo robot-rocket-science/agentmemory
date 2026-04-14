@@ -570,6 +570,163 @@ def extract_citations(
     return edges
 
 
+def extract_test_edges(
+    project_root: Path,
+    languages: list[str],
+) -> list[Edge]:
+    """Extract TESTS edges from test files to the source files they test.
+
+    Uses import analysis + naming conventions. Only operates on Python files.
+    Produces edge type: TESTS.
+    """
+    if "python" not in languages:
+        return []
+
+    root: Path = project_root.resolve()
+    all_py: list[Path] = [f for f in _walk_files(root) if f.suffix == ".py"]
+
+    # Build suffix index: map "agentmemory/store.py" -> "src/agentmemory/store.py"
+    # so we can resolve dotted module names by suffix matching.
+    suffix_index: dict[str, str] = {}
+    for f in all_py:
+        parts: tuple[str, ...] = f.parts
+        # Register all possible suffixes: e.g. for src/agentmemory/store.py
+        # register agentmemory/store.py and store.py and src/agentmemory/store.py
+        for start in range(len(parts)):
+            suffix_key: str = str(Path(*parts[start:]))
+            # First match wins (shortest prefix = most specific)
+            if suffix_key not in suffix_index:
+                suffix_index[suffix_key] = str(f)
+
+    def _resolve_module(module_name: str) -> str | None:
+        """Resolve a dotted module name to a relative file path, or None."""
+        # Convert dots to path separator: agentmemory.store -> agentmemory/store.py
+        as_path: str = module_name.replace(".", "/") + ".py"
+        if as_path in suffix_index:
+            return suffix_index[as_path]
+        # Try as package __init__
+        as_pkg: str = module_name.replace(".", "/") + "/__init__.py"
+        if as_pkg in suffix_index:
+            return suffix_index[as_pkg]
+        return None
+
+    def _is_test_file(path: Path) -> bool:
+        """Check if a file matches test naming conventions."""
+        name: str = path.name
+        return name.startswith("test_") or name.endswith("_test.py")
+
+    edges: list[Edge] = []
+    seen: set[tuple[str, str]] = set()
+
+    for rel_path in all_py:
+        if not _is_test_file(rel_path):
+            continue
+
+        test_file_id: str = f"file:{rel_path}"
+        full_path: Path = root / rel_path
+
+        # --- Strategy 1: AST import analysis ---
+        try:
+            source: str = full_path.read_text(encoding="utf-8", errors="replace")
+            tree: python_ast.Module = python_ast.parse(source)
+        except (OSError, SyntaxError):
+            continue
+
+        for node in python_ast.walk(tree):
+            module_name: str | None = None
+            if isinstance(node, python_ast.Import):
+                for alias in node.names:
+                    module_name = alias.name
+                    resolved: str | None = _resolve_module(module_name)
+                    if resolved is not None:
+                        pair: tuple[str, str] = (str(rel_path), resolved)
+                        if pair not in seen:
+                            seen.add(pair)
+                            edges.append(Edge(
+                                src=test_file_id,
+                                tgt=f"file:{resolved}",
+                                edge_type="TESTS",
+                            ))
+            elif isinstance(node, python_ast.ImportFrom):
+                if node.module is not None:
+                    module_name = node.module
+                    resolved = _resolve_module(module_name)
+                    if resolved is not None:
+                        pair = (str(rel_path), resolved)
+                        if pair not in seen:
+                            seen.add(pair)
+                            edges.append(Edge(
+                                src=test_file_id,
+                                tgt=f"file:{resolved}",
+                                edge_type="TESTS",
+                            ))
+
+        # --- Strategy 2: Naming convention ---
+        # test_foo.py -> foo.py, test_foo_bar.py -> foo_bar.py
+        stem: str = rel_path.stem
+        if stem.startswith("test_"):
+            target_stem: str = stem[5:]  # strip "test_"
+        elif stem.endswith("_test"):
+            target_stem = stem[:-5]  # strip "_test"
+        else:
+            continue
+
+        target_filename: str = target_stem + ".py"
+        if target_filename in suffix_index:
+            resolved_name: str = suffix_index[target_filename]
+            pair = (str(rel_path), resolved_name)
+            if pair not in seen:
+                seen.add(pair)
+                edges.append(Edge(
+                    src=test_file_id,
+                    tgt=f"file:{resolved_name}",
+                    edge_type="TESTS",
+                ))
+
+    return edges
+
+
+def extract_implements_edges(
+    project_root: Path,
+    citation_regex: str | None,
+) -> list[Edge]:
+    """Extract IMPLEMENTS edges from source code referencing requirement IDs.
+
+    Scans source files for requirement references (REQ-xxx, CS-xxx, TB-xxx)
+    in comments and docstrings. Produces edge type: IMPLEMENTS.
+    """
+    if citation_regex is None:
+        return []
+
+    root: Path = project_root.resolve()
+    pattern: re.Pattern[str] = re.compile(citation_regex)
+    edges: list[Edge] = []
+
+    for rel_path in _walk_files(root):
+        if rel_path.suffix not in LANGUAGE_EXTENSIONS:
+            continue
+        try:
+            text: str = (root / rel_path).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        matches: list[str] = pattern.findall(text)
+        if not matches:
+            continue
+        seen: set[str] = set()
+        rel_str: str = str(rel_path)
+        for req_id in matches:
+            if req_id in seen:
+                continue
+            seen.add(req_id)
+            edges.append(Edge(
+                src=f"file:{rel_str}",
+                tgt=f"req:{req_id}",
+                edge_type="IMPLEMENTS",
+            ))
+
+    return edges
+
+
 def extract_directives(
     project_root: Path,
     directive_files: list[str],
@@ -671,6 +828,13 @@ def scan_project(
         all_edges.extend(ast_edges)
         timings["ast_calls"] = time.monotonic() - t
 
+    # Test edges
+    if manifest.has_tests and manifest.languages:
+        t = time.monotonic()
+        test_edges: list[Edge] = extract_test_edges(root, manifest.languages)
+        all_edges.extend(test_edges)
+        timings["test_edges"] = time.monotonic() - t
+
     # Citations
     if manifest.citation_regex:
         t = time.monotonic()
@@ -679,6 +843,15 @@ def scan_project(
         )
         all_edges.extend(cite_edges)
         timings["citations"] = time.monotonic() - t
+
+    # Implements edges (requirement traceability)
+    if manifest.citation_regex:
+        t = time.monotonic()
+        impl_edges: list[Edge] = extract_implements_edges(
+            root, manifest.citation_regex
+        )
+        all_edges.extend(impl_edges)
+        timings["implements"] = time.monotonic() - t
 
     # Directives
     if manifest.directives:

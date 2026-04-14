@@ -66,7 +66,7 @@ def _get_hrr_graph(store: MemoryStore) -> HRRGraph | None:
 # bridging; structural edges (COMMIT_TOUCHES, CO_CHANGED, SENTENCE_IN_FILE,
 # WITHIN_SECTION) add noise without improving retrieval quality.
 _HRR_EDGE_TYPES: frozenset[str] = frozenset({
-    "SUPERSEDES", "CONTRADICTS", "SUPPORTS", "CALLS", "CITES",
+    "SUPERSEDES", "CONTRADICTS", "SUPPORTS", "CALLS", "CITES", "TESTS", "IMPLEMENTS",
 })
 
 
