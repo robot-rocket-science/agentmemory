@@ -606,9 +606,9 @@ def cmd_core(args: argparse.Namespace) -> None:
     now_iso: str = dt.now(tz.utc).isoformat()
     store: MemoryStore = _get_store()
 
-    # Fetch all active beliefs and score them
+    # Fetch all active, non-superseded beliefs and score them
     rows: list[sqlite3.Row] = store.query(
-        "SELECT * FROM beliefs WHERE valid_to IS NULL"
+        "SELECT * FROM beliefs WHERE valid_to IS NULL AND superseded_by IS NULL"
     )
     store.close()
 
@@ -643,7 +643,24 @@ def cmd_core(args: argparse.Namespace) -> None:
     print(f"Top {top_n} core beliefs:")
     for i, (b, s) in enumerate(top, 1):
         locked_str: str = " [LOCKED]" if b.locked else ""
-        print(f"  {i}. [score {s:.2f}]{locked_str} {b.content}")
+        # Show belief age
+        age_str: str = ""
+        try:
+            created: dt = dt.fromisoformat(b.created_at)
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=tz.utc)
+            age_days: float = (dt.now(tz.utc) - created).total_seconds() / 86400.0
+            if age_days < 1:
+                age_str = " <1d"
+            elif age_days < 7:
+                age_str = f" {age_days:.0f}d"
+            elif age_days < 30:
+                age_str = f" {age_days/7:.0f}w"
+            else:
+                age_str = f" {age_days/30:.0f}mo"
+        except Exception:
+            pass
+        print(f"  {i}. [score {s:.2f}{age_str}]{locked_str} {b.content}")
         print(f"     type: {b.belief_type}, source: {b.source_type}, id: {b.id}")
 
 
@@ -669,11 +686,30 @@ def cmd_search(args: argparse.Namespace) -> None:
 
     print(f"Found {len(result.beliefs)} belief(s) "
           f"({result.total_tokens} tokens, {result.budget_remaining} remaining):")
+    from datetime import datetime as dt
+    from datetime import timezone as tz
+
     for belief in result.beliefs:
         score: float | None = result.scores.get(belief.id)
         score_str: str = f", score: {score:.3f}" if score is not None else ""
         locked_str: str = " [LOCKED]" if belief.locked else ""
-        print(f"  [{belief.confidence:.0%}]{locked_str} {belief.content} "
+        age_str: str = ""
+        try:
+            created: dt = dt.fromisoformat(belief.created_at)
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=tz.utc)
+            age_days: float = (dt.now(tz.utc) - created).total_seconds() / 86400.0
+            if age_days < 1:
+                age_str = " <1d"
+            elif age_days < 7:
+                age_str = f" {age_days:.0f}d"
+            elif age_days < 30:
+                age_str = f" {age_days/7:.0f}w"
+            else:
+                age_str = f" {age_days/30:.0f}mo"
+        except Exception:
+            pass
+        print(f"  [{belief.confidence:.0%}{age_str}]{locked_str} {belief.content} "
               f"(ID: {belief.id}, type: {belief.belief_type}{score_str})")
 
 

@@ -14,12 +14,12 @@ from agentmemory.models import Belief
 # None means the belief never decays (stays at 1.0 regardless of age).
 DECAY_HALF_LIVES: dict[str, float | None] = {
     "factual": 336.0,        # 14 days
-    "preference": None,       # never decays (usually locked)
-    "correction": None,       # never decays (always locked)
-    "requirement": None,      # never decays
-    "procedural": 504.0,      # 21 days
-    "causal": 720.0,          # 30 days
-    "relational": 336.0,      # 14 days
+    "preference": 2016.0,    # 12 weeks -- slow decay, not immortal
+    "correction": 1344.0,    # 8 weeks -- outlives factual, still decays
+    "requirement": 4032.0,   # 24 weeks -- longest lived, still mortal
+    "procedural": 504.0,     # 21 days
+    "causal": 720.0,         # 30 days
+    "relational": 336.0,     # 14 days
 }
 
 
