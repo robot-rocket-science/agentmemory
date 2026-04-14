@@ -1145,6 +1145,319 @@ A SessionStart hook could detect the permission mode (`--dangerously-skip-permis
 
 ---
 
+## CS-027: Recurring Bug Re-Debugged From Scratch (Paper Trading Agents)
+
+**What happened:** On 2026-04-14, the user reported "the paper trading agents did not fire this morning" (session 6631429e, 34 turns). Root cause: agents were running as launchd jobs on the user's laptop (thelorax), which was closed while traveling. The session spent its full duration migrating 22 agents from thelorax launchd to archon cron -- rsyncing the repo, building the venv, installing cronie, writing crontab entries, fixing Tailscale auth, and removing old launchd jobs. A dry-run test passed in interactive shell.
+
+15 hours later, the same user reported "the paper trading agents are not firing in the morning" (session 4b91a6aa, 45 turns). Same symptom. New root cause: cronie does not expand shell variable references in crontab environment definitions. The crontab set `CRON_SH=${PROJECT}/scripts/paper_trade_cron.sh`, which was stored literally as the string `${PROJECT}/scripts/...` rather than being expanded. Every job silently failed. The session also dealt with cascading damage: `git reset --hard` wiped hold_tracker.json state, requiring position reconstruction and cash back-calculation.
+
+**The memory failure:** Session 1's resolution was never ingested into agentmemory. No belief recorded the migration, the crontab contents, or the dry-run result. When session 2 started, the agent had zero context about what was done 15 hours earlier. The memory system contained 7,990 active beliefs -- almost all about agentmemory's own research. Zero beliefs about infrastructure operations, cron configuration, or the session 1 migration.
+
+**agentmemory search results (counterfactual):** Searching "paper trading agents not firing" returned 71 beliefs, none about paper trading. The results were dominated by locked corrections about agentmemory internals -- "not multi-hop", "not a product" -- because FTS5 matched on the word "not" in negation patterns. Searching "cron job schedule alpha-seek" returned 92 beliefs, also irrelevant. The negation pattern contamination was the dominant noise source.
+
+**What /mem:reason would have needed to prevent session 2:**
+1. A belief from session 1: "Migrated 22 paper trading agents from thelorax launchd to archon cronie. Crontab uses CRON_SH=${PROJECT}/scripts/paper_trade_cron.sh. Dry-run passed in interactive shell."
+2. Temporal context: "14 hours ago, you migrated cron jobs to archon. The dry-run passed in an interactive shell but cron environments don't expand variables the same way."
+3. Consequence path: "If crontab uses ${PROJECT} -&gt; cronie stores literal string -&gt; every job fails silently -&gt; agents don't fire"
+
+**Pattern:** P12 (new: **cross-session operational amnesia**). The agent completes complex infrastructure work but stores nothing about it. The next session re-debugs from zero. This differs from CS-009 (looping on failed approach) because the first session succeeded -- the resolution was correct but incomplete, and neither the success nor the incompleteness was recorded.
+
+**Quantified impact:**
+- Session 2 core debugging: ~8 turns that could have been ~2 turns with context
+- Cascading damage (state reconstruction): ~25 additional turns
+- Estimated token savings: ~30-40K tokens, ~30 minutes wall time
+- Session 2 was entirely preventable if session 1's resolution had been ingested
+
+**What memory should do:**
+1. **Session-end operational summaries.** When a session involves infrastructure changes (migrations, config changes, deployments), automatically extract and store what was done, what was tested, and what assumptions were made. The crontab variable expansion assumption was the latent bug.
+2. **Incomplete-fix detection.** The dry-run passed in interactive shell but not in cron environment. A belief like "tested in interactive shell only, not in cron environment" would have flagged the gap.
+3. **Cross-project ingestion.** The alpha-seek-memtest project was not actively using agentmemory for ops-level events. Infrastructure changes need to be stored regardless of which project they affect.
+
+**REQ mapping:** REQ-001 (cross-session decision retention), REQ-019 (single-correction learning -- the resolution should persist). New requirement candidate:
+- REQ-NEW-L: Operational event ingestion -- infrastructure changes, deployments, and migrations must be automatically captured as beliefs with timestamps and test coverage notes.
+
+**Acceptance tests:**
+
+*Primary (session continuity):* Complete an infrastructure migration in session 1. End session. Start session 2 with the same symptom. Agent must retrieve session 1's resolution within 2 turns and build on it, not start from scratch.
+
+*Secondary (incomplete-fix detection):* Session 1 performs a dry-run test that passes. Session 2 discovers the real environment differs. Agent should surface the gap: "tested in [environment A] but not in [environment B]."
+
+*Tertiary (consequence path):* `/mem:reason "paper trading agents not firing after cron migration"` should produce a consequence path: migration succeeded -&gt; crontab written with variable references -&gt; cronie doesn't expand variables -&gt; jobs fail silently.
+
+---
+
+## CS-028: Locked Correction Retrieved, Injected, and Ignored (API Key vs Subagent)
+
+**What happened:** The correction "LLM classification for onboarding uses Claude Code subagents (Agent tool with model=haiku), not direct Anthropic API calls. No ANTHROPIC_API_KEY needed in the shell" was created, locked at 100% confidence, and injected into context via the SessionStart hook. Despite this, the agent attempted to call `Anthropic()` directly in at least two separate sessions:
+
+- Session bb569101 (2026-04-12, 34 turns): Agent spent turns 0-9 attempting the API path, getting corrected, then working through how subagent spawning works. The user said: "we dont need api key, you can run sub agents and accomplish the same task. we've discussed this 4 times now."
+- Session ff00db1d (2026-04-12, 27 turns): At turn 22, the same correction was needed again. The user said: "we dont need api key... we've discussed this 4 times now."
+
+This was the fifth time the correction was made. The locked belief (ID: 52b815f5d4a2) was present in context both times.
+
+**The memory failure:** This is not a retrieval failure. The belief was retrieved. It was injected. It was in context. The agent ignored it because a flat list of 128 beliefs competes with the LLM's default behavior ("I need to call an API, therefore I need an API key"). The belief was item #47 in a ranked list, not a gate on the action path.
+
+**agentmemory search results (counterfactual):** Searching "API key subagent" returned 75 beliefs. The critical locked belief appeared in the top 5 at 100% confidence. The reason command returned 138 beliefs (130 direct + 8 graph-expanded). The target belief was found, but buried among 130 results, 90%+ of which were generic locked corrections about unrelated topics.
+
+**What /mem:reason would have needed:**
+1. **Action path blocking.** Instead of presenting the belief as one of 128 results, frame it as: "Fork A (use direct Anthropic() API call) is BLOCKED by locked correction 52b815f5d4a2, violated 5 times."
+2. **Consequence path:** "If use Anthropic() -&gt; requires ANTHROPIC_API_KEY -&gt; not available in shell -&gt; classification fails -&gt; user corrects (6th time). If use subagent -&gt; Agent tool available -&gt; Haiku spawnable -&gt; classification succeeds."
+3. **Escalation signal:** "This correction has been violated 5 times. Consider architectural enforcement, not just injection."
+
+**Pattern:** P13 (new: **injection-resistant correction violation**). The memory system correctly stores, locks, retrieves, and injects a correction, but the LLM ignores it because the correction is presented as advisory context rather than as a constraint on the action space. This is distinct from CS-009 (correction lost across sessions) -- here the correction is present and ignored, not absent.
+
+**Why this is structurally important:** This case study proves that retrieval quality is necessary but not sufficient. The entire retrieve-inject-reason pipeline can work perfectly and still fail if the output is framed as a list rather than as a constraint. This is the strongest evidence that /mem:reason needs consequence-path framing, not better retrieval.
+
+**Quantified impact:**
+- 10 turns wasted in session bb569101 (turns 0-9)
+- 7 turns wasted in session ff00db1d (turns 19-25)
+- Estimated: ~15K tokens across both sessions
+- User frustration from repeating the same correction 5 times
+
+**What memory should do:**
+1. **Frame locked corrections as action-path constraints.** When a locked belief constrains an action the agent is about to take, present it as "BLOCKED" rather than as an item in a ranked list.
+2. **Track violation count.** When a correction is violated repeatedly, escalate the severity of the presentation. After 3 violations, the system should output: "WARNING: This correction has been violated N times. The agent repeatedly ignores it."
+3. **Consequence tree output.** For decisions with clear forks (do A vs do B), present the consequences of each path, including which locked beliefs are violated by each.
+
+**REQ mapping:** REQ-019 (single-correction learning -- failed here despite correct storage), REQ-020 (locked beliefs -- present but ignored), REQ-027 (zero-repeat directive -- violated 5 times). New requirement candidate:
+- REQ-NEW-M: Constraint-framed retrieval -- locked corrections relevant to the current action must be presented as constraints on the action space, not as items in a list.
+
+**Acceptance tests:**
+
+*Primary (action blocking):* Store a locked correction "use B not A." Agent attempts to do A. The reason tool should output "Fork A is BLOCKED by locked correction [ID]" before the agent acts.
+
+*Secondary (violation tracking):* A locked correction is violated 3+ times. The system must escalate: "This correction has been violated N times. Consider architectural enforcement."
+
+*Tertiary (consequence path):* `/mem:reason "should I use direct API call or subagent spawning for classification"` should produce two forked paths with clear BLOCKED/VALID verdicts.
+
+---
+
+## CS-029: Partial Fix Undone by Background Process (Auto-Lock Regression)
+
+**What happened:** In session 504ccc1b (2026-04-12, 20 turns), the user discovered 2,914 locked beliefs they never created. Investigation revealed three auto-locking paths: `remember()`, `correct()`, and the `ingest()` correction fallback, all setting `locked=True` without user confirmation. The session spent 20 turns diagnosing, auditing, bulk-unlocking, and re-locking only 4 chosen beliefs.
+
+20 minutes later, in session 0b2de19a (2026-04-12, 8 turns), the user asked for status. The system reported 17,103 beliefs with 3,176 locked. The user said: "oof we just pared this down to 4." Investigation found that `backfill_lock_corrections()` in `store.py:262` was running on every DB open, re-locking everything that had just been unlocked.
+
+The fix from session 504ccc1b was correct but incomplete. The agent fixed `remember()`/`correct()` auto-locking but missed `backfill_lock_corrections()` in the migration path. The next session's agent had no knowledge of the partial fix.
+
+**The memory failure:** Two compounding failures:
+1. **Incomplete-fix blindness.** Session 504ccc1b's agent didn't flag what was NOT changed. No belief recorded "WARNING: backfill_lock_corrections() was NOT removed -- it re-locks on every DB open."
+2. **Cross-session state loss.** Session 0b2de19a's agent had no knowledge of the work done 20 minutes earlier. It re-diagnosed from scratch, spending all 8 turns on a problem that could have been a 1-turn fix.
+
+**agentmemory search results (counterfactual):** Searching "locked beliefs count increase" returned 63 beliefs. The belief "2,592 correction-type beliefs are NOT locked" (created during session 504ccc1b) exists but was now factually wrong because `backfill_lock_corrections()` re-locked them. The reason command found 18 contradictions, but they were generic design disagreements, not the operational contradiction between "we unlocked everything" and "everything is re-locked."
+
+**What /mem:reason would have needed:**
+1. **Temporal contradiction detection.** Cross-reference: "Belief from 20 min ago says 4 locked. Current DB says 3,176. CONTRADICTION -- something re-locked between sessions."
+2. **Incomplete-fix tracking.** A belief: "Fixed auto-locking in remember()/correct(). NOT fixed: backfill_lock_corrections() in store.py:262 still runs on every DB open."
+3. **Recent-change context.** "20 minutes ago, session 504ccc1b unlocked 2,914 beliefs and re-locked 4."
+
+**Pattern:** P14 (new: **partial fix regression**). A bug is partially fixed in session N. The unfixed component silently undoes the fix. Session N+1 discovers the regression but has no context about what was or wasn't fixed. This is a special case of CS-027 (cross-session operational amnesia) where the original fix was incomplete rather than missing.
+
+**Quantified impact:**
+- 8 turns (entire session 0b2de19a), ~5K tokens
+- User frustration at regression: "oof we just pared this down to 4"
+- The fix would have been 1 turn with context: "remove backfill_lock_corrections() call from store.py:262"
+
+**What memory should do:**
+1. **Diff-complete check at session end.** When a bug fix is committed, analyze: does the fix cover all code paths? Flag paths that were NOT changed.
+2. **Store incomplete-fix warnings.** When a fix is partial, create a high-confidence belief: "Fixed X but NOT Y. Y still exhibits the original bug."
+3. **Temporal contradiction detection.** When queried about state that was recently changed, cross-reference the current DB state against recent beliefs about that state.
+
+**REQ mapping:** REQ-001 (cross-session retention -- the partial fix was lost). New requirement candidate:
+- REQ-NEW-N: Incomplete-fix detection -- when a fix is applied to some but not all code paths exhibiting a bug, flag the unfixed paths as beliefs.
+
+**Acceptance tests:**
+
+*Primary (regression detection):* Fix a bug in 2 of 3 code paths. End session. Start new session. Query the same bug. Agent must identify the unfixed 3rd path within 2 turns.
+
+*Secondary (temporal contradiction):* Unlock 100 locked beliefs. Background process re-locks them. `/mem:reason "why are there still locked beliefs"` should detect: "beliefs were unlocked recently but current state shows them locked -- something re-locked them."
+
+---
+
+## CS-030: Cross-Project Knowledge Isolation (Stash Debugging)
+
+**What happened:** In session 14995e1c (2026-04-14, 57 turns), the user reported "stash is having major performance/streaming issues." The agent immediately misdiagnosed: "Willow is completely unreachable -- 100% packet loss." The user corrected: "willow is not down entirely, you are on tailscale trying to access it from another LAN." The session spent 57 turns debugging network topology (DERP relay, symmetric NAT, subnet routing, SSH tunnels), proposing dead-end solutions (phone hotspot, Jellyfin migration), and eventually discovering that 39 of 42 Stash plugins were causing slow page loads.
+
+**The memory failure:** The belief store contained 7,990 active beliefs, almost all about agentmemory's own research. Zero beliefs about: the user's network topology (Tailscale, DERP, gl-mt2500, symmetric NAT), Stash's configuration, prior debugging of willow/stash, or the relationship between the user's travel setup and LAN access.
+
+**agentmemory search results (counterfactual):** Searching "stash streaming performance" returned 82 beliefs, all about agentmemory internals. The word "stash" does not appear in any belief. Searching "willow server media" found 2 tangential beliefs -- one acknowledging willow exists, one recording prior confusion about data location. Neither would have prevented any wrong turns.
+
+**Wrong turns identified:**
+1. Turn 1: "Willow completely unreachable" -- didn't consider Tailscale context (2 turns)
+2. Turns 8-14, 20-22: Subnet routing through gl-mt2500 extensively configured, yielded 0.08 Mbps (8 turns)
+3. Turns 23-27: SSH tunnel approach, marginal improvement (5 turns)
+4. Turns 28-31: Proposing Jellyfin (content isolation violation) and phone hotspot (4 turns)
+5. Turns 32-35: User had to challenge agent's assumptions about Brume 2 capability (3 turns)
+
+**Total: ~22 wrong-turn turns out of 57 (39%)**
+
+**What /mem:reason would have needed (but couldn't have):**
+1. "You are on Tailscale, not the same LAN as willow" -- would have prevented the 'server down' misdiagnosis
+2. "gl-mt2500 is a low-power travel router with limited throughput" -- would have avoided the subnet routing dead end
+3. "Stash has 42 plugins that cause slow page loads" -- would have jumped to plugin optimization
+
+None of this is in agentmemory because: (a) it's a different project entirely, (b) infrastructure context was never ingested, (c) there is no cross-project "tribal knowledge" namespace.
+
+**Pattern:** P15 (new: **cross-project knowledge isolation**). The user's knowledge spans multiple projects and domains. Each project's belief graph is siloed. When debugging project B, nothing from project A's belief store helps, and project B may never have been onboarded. The agent has no concept of the user's infrastructure, habits, or environmental context that spans projects.
+
+**Quantified impact:**
+- 22 wrong-turn turns, ~40K tokens wasted
+- /mem:reason would have had near-zero impact even with improved retrieval -- the beliefs simply don't exist
+- The information needed was environmental (network topology, hardware specs) not project-specific
+
+**What memory should do:**
+1. **Cross-project tribal knowledge namespace.** Infrastructure facts (machine inventory, network topology, server roles), user habits (travel setup, permission preferences), and environmental context should live in a global namespace accessible from any project.
+2. **Onboard operational context.** When a user first mentions a project/server/service, create beliefs about its basic configuration. "Willow runs Stash, Jellyfin, and Sonarr behind Tailscale" should be a persistent belief.
+3. **"No relevant results" threshold.** When the belief store has nothing about the queried topic, say so explicitly rather than returning 82 irrelevant results about a different project.
+
+**REQ mapping:** New requirement candidates:
+- REQ-NEW-O: Cross-project knowledge namespace -- environmental facts, infrastructure inventory, and user behavioral patterns that span projects must be accessible from any project context.
+- REQ-NEW-P: Relevance floor -- when no belief scores above a relevance threshold for a query, the system must indicate "no relevant beliefs" rather than returning noise.
+
+**Acceptance tests:**
+
+*Primary (cross-project retrieval):* Store an infrastructure belief in project A context. Query the same topic from project B context. The belief should be retrievable.
+
+*Secondary (relevance floor):* Query a topic with zero relevant beliefs in the store. System must return "no relevant beliefs found" rather than a ranked list of irrelevant results.
+
+*Tertiary (operational context):* User mentions a new server name. System should prompt for or infer basic configuration (role, access method, key services) and store as beliefs.
+
+---
+
+## CS-031: Decision Never Stored as Belief (MemPalace Uninstall)
+
+**What happened:** In session 314f06e1 (2026-04-14, 27 turns), the user asked for project status on alpha-seek-memtest. The agent used MemPalace tools instead of agentmemory tools. The user corrected: "i thought we turned off and uninstalled mempalace." The agent couldn't confirm whether this decision had been executed because the decision was never stored as a belief.
+
+**The memory failure:** At some point in a prior session, the user decided to uninstall MemPalace and use only agentmemory. This decision was either never stored or stored without enough specificity to be retrieved. The closest beliefs in the store: "The correction 'mempalace is already an MCP tool, don't pip install it' was lost across sessions" (meta-ironic -- records that a MemPalace correction was itself lost) and "lhl verdict on MemPalace: NOT promoted to main comparison table due to claims-vs-code gap" (evaluation, not decision).
+
+**agentmemory search results (counterfactual):** Searching "mempalace uninstall disable remove" returned 94 beliefs. None captured the decision "uninstall MemPalace." The search found evaluation beliefs about MemPalace but not the operational decision to remove it.
+
+**Pattern:** P16 (new: **decision without execution tracking**). A decision is made verbally in a conversation but never stored as a belief with execution state. The decision has at least three states: decided / in-progress / done / abandoned. The current belief taxonomy (factual/correction/preference/requirement) doesn't capture decisions with state.
+
+**Quantified impact:**
+- 4-5 turns wasted on confusion and redirection
+- ~3K tokens
+- Trust erosion -- this session triggered the user's comment: "I could replace agentmemory entirely with a git history parser and it would do a better job"
+
+**What memory should do:**
+1. **Store decisions as first-class entities.** "We decided to uninstall MemPalace" is not a factual belief or a correction. It's a decision with an execution state. The system needs a `decision` belief type or a state field on existing types.
+2. **Track decision execution.** When a decision is made, create a belief with state "decided." When acted on, update to "in-progress" or "done." If never acted on, the belief persists as "decided but not executed" -- a warning for future sessions.
+3. **Surface unexecuted decisions.** When the agent encounters a topic related to an unexecuted decision, flag it: "You decided to [X] but it was never confirmed as complete."
+
+**REQ mapping:** REQ-001 (cross-session retention -- the decision was lost). New requirement candidate:
+- REQ-NEW-Q: Decision tracking with execution state -- decisions must be stored with status (decided/in-progress/done/abandoned) and surfaced when the topic is queried.
+
+**Acceptance tests:**
+
+*Primary (decision persistence):* Make a decision "uninstall tool X" in session 1. Start session 2. Agent should know the decision was made and check whether it was executed.
+
+*Secondary (unexecuted decision warning):* Make a decision but don't execute it. Query the topic in a later session. Agent must flag: "Decision was made but not confirmed as executed."
+
+---
+
+## CS-032: Negation Pattern Noise in Retrieval
+
+**What happened:** Across all 6 counterfactual tests run against the belief graph, the dominant noise source was negation pattern contamination. When searching for "paper trading agents not firing," FTS5 matched "not" against hundreds of locked corrections that contain "not" as part of their correction structure ("HRR is not enough alone", "the offline classifier has no way to distinguish", "no end-to-end test was ever run"). Similarly, "MCP commands not showing" matched correction beliefs about things that are "not" something.
+
+In every scenario tested:
+- "not firing" returned 71 beliefs, none about paper trading
+- "not showing" returned 68 beliefs, none about MCP visibility
+- "not implemented" returned beliefs about every unimplemented feature rather than the specific one queried
+
+**The failure:** FTS5 treats "not" as a content word. In a belief store where 1,489 beliefs are corrections (which structurally contain negation), any query with a negation word gets flooded with correction beliefs that share the negation word but not the topic.
+
+**Pattern:** P17 (new: **negation keyword flooding**). The correction-heavy structure of the belief store creates a systematic retrieval noise problem. Correction beliefs are overrepresented in results for any query containing negation words, because corrections inherently contain negation ("not X", "don't Y", "never Z").
+
+**Quantified impact:**
+- In 4 of 6 counterfactual scenarios, negation noise was the primary reason the search failed
+- Top-10 results were dominated by irrelevant corrections in every negation-containing query
+- The relevant beliefs (when they existed) were buried at ranks 30-50
+
+**What memory should do:**
+1. **Negation-aware FTS5 filtering.** When the query contains negation words, deprioritize beliefs that match only on the negation word. "Not firing" should match beliefs about "firing" that happen to contain "not," not beliefs about "not" that have nothing to do with firing.
+2. **Stop-word treatment for structural negation.** In correction-type beliefs, "not", "don't", "never", "no" are structural (they define the correction), not topical. These should be downweighted or excluded from FTS5 indexing for correction beliefs.
+3. **Relevance floor.** When the top-ranked result has low topical overlap with the query (beyond shared stop/negation words), flag the results as low-confidence rather than presenting them as relevant.
+
+**REQ mapping:** REQ-007 (retrieval precision). New requirement candidate:
+- REQ-NEW-R: Negation-aware retrieval -- queries containing negation words must not be flooded with correction beliefs that share only the negation word.
+
+**Acceptance tests:**
+
+*Primary (negation filtering):* Store 100 correction beliefs containing "not." Query "service not starting." Correction beliefs about unrelated topics must not dominate the top-10 results.
+
+*Secondary (relevance floor):* Query a topic where the only FTS5 matches are on negation/stop words. System must indicate low relevance rather than presenting results as confident matches.
+
+---
+
+## CS-033: Cold Start -- First Session Has No Memory to Reason Over
+
+**What happened:** Session d7d828a3 (2026-04-11, 105 turns) was the first session using the agentmemory system. The user expected `/agentmemory` commands. The agent didn't know Claude Code's command architecture. 53 of 105 turns (50%) were wrong turns:
+- 3 turns: created skill wrappers without understanding slash command architecture
+- 5 turns: didn't know a project scanner was expected, didn't know Exp 48/49 code existed
+- 22 turns: tried 4 different approaches to exposing commands before `.claude/commands/` worked
+- 14 turns: confused GSD vs GSD-2, proposed mempalace pattern (user had trouble with it)
+- 7 turns: auto-lock bug diagnosis
+
+**The memory failure:** The belief store was empty at session start. There was literally nothing to reason over. No prior beliefs existed about Claude Code's command architecture, skill authoring, or the GSD install pattern. All the knowledge that would have prevented the wrong turns was learned during this session.
+
+**agentmemory search results (counterfactual, post-session):** After the session, the store contains useful beliefs: "The slash command system is always LLM-mediated", "The correction 'mempalace is already an MCP tool' was lost across sessions." But searching for "MCP commands not showing up" still returns 70 irrelevant beliefs because the stored beliefs use different vocabulary ("slash command system", "LLM-mediated") than the problem description ("not showing up").
+
+**Pattern:** P18 (new: **cold start knowledge vacuum**). The first session on any new topic has no beliefs to reason over. /mem:reason is useless until the belief store has been populated. The session that most needs help is the one that produces all the helpful beliefs. This is an inherent bootstrapping problem.
+
+**Quantified impact:**
+- 53 wrong-turn turns, estimated ~60K tokens wasted
+- /mem:reason would have had zero impact at the time (empty store)
+- If the same problem recurred, /mem:reason could help partially -- but vocabulary mismatch would still limit retrieval quality
+
+**What memory should do:**
+1. **Accept the cold start limitation.** /mem:reason cannot help on the first encounter with a new topic. Document this clearly so expectations are calibrated.
+2. **Maximize ingestion from the first session.** Since the first session produces the beliefs that will help future sessions, ensure that session-end summaries, corrections, and operational decisions are captured with high fidelity.
+3. **Bridge vocabulary gaps for future retrieval.** When beliefs are created, also index them under likely query formulations, not just the terms used in the belief text.
+
+**REQ mapping:** New requirement candidate:
+- REQ-NEW-S: Cold start acknowledgment -- the system must indicate when a topic has no prior beliefs rather than returning irrelevant results from other topics.
+
+**Acceptance tests:**
+
+*Primary (cold start signal):* Query a topic with zero beliefs in the store. System must indicate "no prior knowledge on this topic" rather than returning beliefs about unrelated topics.
+
+*Secondary (first-session capture):* Complete a 50+ turn session on a new topic. End session. Start a new session on the same topic. At least 5 actionable beliefs from the first session should be retrievable.
+
+---
+
+## CS-034: Design-Reality Gap Not Surfaced Until Explicitly Asked
+
+**What happened:** In session ff00db1d (2026-04-12, 27 turns), the user asked "what is the full design and pipeline vision vs what currently exists as prototype?" The agent produced a thorough audit finding multiple gaps: `feedback_given` column missing from migration, hook patterns described in design docs are proposals only, the feedback loop is not implemented. The agent found beliefs like "Gap: The critical enforcement tiers are not implemented" and "The hook patterns are proposed designs only."
+
+The gap analysis was productive -- but only because the user explicitly asked for it. No prior session had proactively surfaced these gaps. The agent had been reporting project status in prior sessions without noting the design-reality divergence.
+
+**The memory failure:** The beliefs about gaps existed in the store. They were retrievable. But they were never proactively surfaced during status reports because: (a) status reports use search, which returns a flat list ranked by confidence, and (b) gap beliefs compete with high-confidence locked corrections for top-K slots. The gaps were true and important but lower-ranked than the corrections.
+
+**What /mem:reason would have needed:**
+1. **Proactive contradiction detection.** When reporting status, cross-reference "design says X exists" against "implementation shows X is missing." This is a temporal contradiction (design created at time T1, gap discovered at T2).
+2. **Faceted grouping.** Instead of ranking all beliefs by score, group by facet: "what works", "what's designed but not built", "what's broken." The gaps would appear in their own section rather than being buried.
+
+**Pattern:** This is a variant of CS-005 (maturity inflation) and CS-008 (result inflation). The agent has the information to give an honest status report but defaults to presenting the high-confidence positive beliefs rather than the contradicting gap beliefs.
+
+**Quantified impact:**
+- Difficult to quantify because the gap analysis was productive when triggered
+- The cost is in prior sessions where status was reported without gaps -- leading to overconfidence about project state
+- The design-vs-reality divergence could have been surfaced at session start rather than requiring an explicit user question
+
+**What memory should do:**
+1. **Include gap/contradiction section in status reports.** When `status` or `search` is called for project state, automatically surface beliefs that contradict the positive findings.
+2. **Faceted output for status queries.** Group beliefs by: confirmed working, designed but unbuilt, known broken, uncertain.
+
+**REQ mapping:** REQ-025 (rigor tiers), REQ-026 (calibrated status reporting), CS-005 (maturity inflation).
+
+**Acceptance tests:**
+
+*Primary (gap surfacing):* Store beliefs "feature X is designed" and "feature X is not implemented." Query project status. Both beliefs must appear, with the gap explicitly noted.
+
+*Secondary (faceted status):* `/mem:reason "what is the project status"` should group findings into working/designed/broken/uncertain facets, not a flat ranked list.
+
+---
+
 ## How to Use These Case Studies
 
 Each case study is a concrete acceptance test for the memory system:
@@ -1175,6 +1488,15 @@ Each case study is a concrete acceptance test for the memory system:
 20. **CS-023 test:** Launch two concurrent agent sessions on the same project. Both assign sequential IDs to new artifacts. System must prevent or detect collisions before the user discovers them manually.
 21. **CS-024 test:** Agent makes an evidence-backed claim. User pushes back without counter-evidence. Agent must hold the evidence-backed portions, identify speculative portions, and ask what the user finds unconvincing -- not capitulate.
 22. **CS-025 test:** Agent is asked to recommend candidates for testing. It must cross-reference all candidates against the experiment log before presenting any. Presenting an already-tested approach is a primary failure. If the primary test fails and the user corrects one item, the agent must generalize and verify all remaining candidates without a second prompt.
+
+23. **CS-027 test:** Complete an infrastructure migration in session 1. End session. Start session 2 with the same symptom. Agent must retrieve session 1's resolution within 2 turns and build on it, not re-debug from scratch.
+24. **CS-028 test:** Store a locked correction "use B not A." Agent attempts A. `/mem:reason` must output "Fork A is BLOCKED by locked correction [ID]" before the agent acts. A flat-list presentation is a test failure.
+25. **CS-029 test:** Fix a bug in 2 of 3 code paths. End session. Start new session. Query the same bug. Agent must identify the unfixed 3rd path within 2 turns.
+26. **CS-030 test:** Store an infrastructure belief in project A context. Query the same topic from project B. The belief must be retrievable. If no relevant beliefs exist, system must say "no relevant beliefs" not return noise.
+27. **CS-031 test:** Make a decision "uninstall tool X" in session 1. Start session 2. Agent must know the decision was made and check whether it was executed.
+28. **CS-032 test:** Store 100 correction beliefs containing "not." Query "service not starting." Correction beliefs matching only on "not" must not dominate the top-10 results.
+29. **CS-033 test:** Query a topic with zero beliefs in the store. System must return "no prior knowledge on this topic" rather than beliefs about unrelated topics.
+30. **CS-034 test:** Store "feature X is designed" and "feature X is not implemented." Query project status. Both beliefs must appear with the gap explicitly noted.
 
 These are more valuable than synthetic benchmarks because they test the exact failure modes we're building the system to prevent.
 
