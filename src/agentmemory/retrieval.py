@@ -111,13 +111,16 @@ def retrieve(
     include_locked: bool = True,
     max_locked: int = 100,
     use_hrr: bool = True,
+    use_bfs: bool = True,
 ) -> RetrievalResult:
-    """Full retrieval pipeline: FTS5 + HRR + scoring + compression.
+    """Full retrieval pipeline: L0 + L1 + FTS5 + HRR + BFS + scoring + compression.
 
     Steps:
     1. Collect locked beliefs (L0).
+    1.5. Collect behavioral beliefs (L1).
     2. FTS5 full-text search (L2).
-    3. HRR vocabulary-bridge expansion from FTS5 hits (L3).
+    3. HRR vocabulary-bridge expansion (L3).
+    3.5. BFS multi-hop from FTS5+HRR hits (L3).
     4. Merge all candidate sets, deduplicate.
     5. Score, sort, compress, pack into budget.
     """
@@ -125,8 +128,6 @@ def retrieve(
     query_stripped: str = query.strip()
 
     # Step 1: locked beliefs (L0), relevance-filtered.
-    # Split into relevant (query term overlap) and irrelevant.
-    # Include all relevant locked beliefs, cap irrelevant ones to avoid noise.
     locked_beliefs: list[Belief] = []
     if include_locked:
         all_locked: list[Belief] = store.get_locked_beliefs()
@@ -139,11 +140,11 @@ def retrieve(
                 relevant_locked.append(belief)
             else:
                 irrelevant_locked.append(belief)
-        # All relevant locked beliefs are included.
-        # Cap irrelevant ones to avoid budget waste (keep a small sample
-        # so truly universal constraints still surface).
         max_irrelevant: int = min(10, max_locked - len(relevant_locked))
         locked_beliefs = relevant_locked + irrelevant_locked[:max(0, max_irrelevant)]
+
+    # Step 1.5: behavioral beliefs (L1) -- unlocked directives always included.
+    behavioral_beliefs: list[Belief] = store.get_behavioral_beliefs(limit=10)
 
     # Step 2: FTS5 search (L2).
     fts_beliefs: list[Belief] = []
@@ -158,11 +159,28 @@ def retrieve(
             seed_ids: list[str] = [b.id for b in fts_beliefs[:5]]
             hrr_beliefs = _hrr_expand(store, hrr, seed_ids, top_k=5)
 
+    # Step 3.5: BFS multi-hop from FTS5+HRR hits (L3).
+    bfs_beliefs: list[Belief] = []
+    if use_bfs and (fts_beliefs or hrr_beliefs):
+        bfs_seed_ids: list[str] = [b.id for b in fts_beliefs[:5] + hrr_beliefs[:3]]
+        if bfs_seed_ids:
+            expanded: dict[str, list[tuple[Belief, str, int]]] = store.expand_graph(
+                seed_ids=bfs_seed_ids, depth=2, max_nodes=20,
+            )
+            for entries in expanded.values():
+                for belief, _edge_type, _hop in entries:
+                    bfs_beliefs.append(belief)
+
     # Step 4: merge and deduplicate.
     seen_ids: set[str] = set()
     candidates: list[Belief] = []
 
     for belief in locked_beliefs:
+        if belief.id not in seen_ids:
+            seen_ids.add(belief.id)
+            candidates.append(belief)
+
+    for belief in behavioral_beliefs:
         if belief.id not in seen_ids:
             seen_ids.add(belief.id)
             candidates.append(belief)
@@ -175,6 +193,11 @@ def retrieve(
             candidates.append(belief)
 
     for belief in hrr_beliefs:
+        if belief.id not in seen_ids:
+            seen_ids.add(belief.id)
+            candidates.append(belief)
+
+    for belief in bfs_beliefs:
         if belief.id not in seen_ids:
             seen_ids.add(belief.id)
             candidates.append(belief)

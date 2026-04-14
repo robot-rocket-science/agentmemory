@@ -938,6 +938,39 @@ class MemoryStore:
         ).fetchall()
         return [_row_to_belief(r) for r in rows]
 
+    def get_behavioral_beliefs(self, limit: int = 10) -> list[Belief]:
+        """Return high-confidence unlocked behavioral beliefs (L1 layer).
+
+        Behavioral beliefs are procedural constraints that should be in context
+        regardless of query. Identified by: source_type='directive', OR
+        high-confidence requirement/procedural beliefs with behavioral keywords.
+        Locked beliefs are already in L0; this returns unlocked ones.
+        """
+        rows: list[sqlite3.Row] = self._conn.execute(
+            """SELECT * FROM beliefs
+               WHERE locked = 0
+                 AND valid_to IS NULL
+                 AND superseded_by IS NULL
+                 AND (
+                   source_type = 'directive'
+                   OR (
+                     belief_type IN ('requirement', 'procedural')
+                     AND confidence >= 0.8
+                     AND (
+                       content LIKE '%never %'
+                       OR content LIKE '%always %'
+                       OR content LIKE '%must not%'
+                       OR content LIKE '%do not%'
+                       OR content LIKE '%must %'
+                     )
+                   )
+                 )
+               ORDER BY confidence DESC
+               LIMIT ?""",
+            (limit,),
+        ).fetchall()
+        return [_row_to_belief(r) for r in rows]
+
     def get_belief(self, belief_id: str) -> Belief | None:
         """Get a single belief by ID."""
         row: sqlite3.Row | None = self._conn.execute(
