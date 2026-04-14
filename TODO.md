@@ -93,11 +93,11 @@ Research phase is complete (83 experiments). Phase 2 MVP is built and self-hosti
 - [x] BFS multi-hop traversal (depth-2, expand_graph in retrieve, 129ms overhead)
 - [x] L1 behavioral layer (get_behavioral_beliefs between L0 and L2)
 
-### Phase 5: Epistemic Integrity and Validation (PLANNED)
-- [ ] Provenance metadata (rigor tier, method, sample size)
-- [ ] Session velocity tracking
-- [ ] Calibrated status reporting
-- [ ] Cross-model benchmarking
+### Phase 5: Epistemic Integrity and Validation (IN PROGRESS)
+- [x] Provenance metadata (rigor_tier, method, sample_size columns in beliefs)
+- [x] Session velocity tracking (velocity_items_per_hour + velocity_tier in sessions)
+- [x] Calibrated status reporting (rigor distribution + velocity + caveat in status())
+- [ ] Cross-model benchmarking (needs ChatGPT/Gemini access)
 - [ ] Comprehensive acceptance testing (22 case study replays)
 
 ---
