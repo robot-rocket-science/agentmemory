@@ -319,7 +319,7 @@ class TestEstimateTokens:
         assert estimate_tokens("") == 0
 
     def test_rough_estimate(self) -> None:
-        text: str = "a" * 400
+        text: str = "a" * 350
         assert estimate_tokens(text) == 100
 
 

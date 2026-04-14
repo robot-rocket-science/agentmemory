@@ -134,6 +134,27 @@ def uncertainty_score(alpha: float, beta_param: float) -> float:
     return min(1.0, variance / 0.125)
 
 
+# Thompson sampling instrumentation counters.
+_exploration_count: int = 0
+_exploitation_count: int = 0
+
+
+def get_exploration_stats() -> dict[str, int]:
+    """Return Thompson sampling exploration vs exploitation counts."""
+    return {
+        "exploration": _exploration_count,
+        "exploitation": _exploitation_count,
+        "total": _exploration_count + _exploitation_count,
+    }
+
+
+def reset_exploration_stats() -> None:
+    """Reset Thompson sampling instrumentation counters."""
+    global _exploration_count, _exploitation_count
+    _exploration_count = 0
+    _exploitation_count = 0
+
+
 # Core ranking weights (from CORE_RANKING.md, validated by Exp 38/61 research).
 _TYPE_WEIGHTS: dict[str, float] = {
     "requirement": 2.5,
@@ -232,12 +253,18 @@ def recency_boost(belief: Belief, current_time_iso: str | datetime, half_life_ho
     return 1.0 + math.pow(0.5, age_hours / half_life_hours)
 
 
-def score_belief(belief: Belief, query: str, current_time_iso: str | datetime) -> float:
-    """Combined scoring using decay, lock boost, Thompson sampling, type/source weights, and recency.
+def score_belief(
+    belief: Belief,
+    query: str,
+    current_time_iso: str | datetime,
+    retrieval_count: int = 0,
+    used_count: int = 0,
+) -> float:
+    """Combined scoring using decay, lock boost, Thompson sampling, type/source weights, recency, and frequency.
 
     Superseded beliefs always score 0.01.
-    Locked beliefs: score = lock_boost_typed * thompson_sample (always elevated).
-    Normal beliefs: score = type_weight * source_weight * thompson_sample * decay_factor * recency_boost.
+    Locked beliefs: score = lock_boost_typed * thompson_sample (always elevated, no frequency boost).
+    Normal beliefs: score = type_weight * source_weight * thompson_sample * decay_factor * recency_boost * freq_boost.
 
     current_time_iso accepts a pre-parsed datetime to avoid redundant parsing.
     """
@@ -252,7 +279,17 @@ def score_belief(belief: Belief, query: str, current_time_iso: str | datetime) -
     source_w: float = _SOURCE_WEIGHTS.get(belief.source_type, 1.0)
     recency: float = recency_boost(belief, current_time_iso)
 
+    # Track exploration vs exploitation for instrumentation.
+    unc: float = uncertainty_score(belief.alpha, belief.beta_param)
+    if unc > 0.5:
+        global _exploration_count
+        _exploration_count += 1
+    else:
+        global _exploitation_count
+        _exploitation_count += 1
+
     if belief.locked:
         return boost * sample
 
-    return type_w * source_w * sample * decay * recency
+    freq_boost: float = retrieval_frequency_boost(retrieval_count, used_count)
+    return type_w * source_w * sample * decay * recency * freq_boost

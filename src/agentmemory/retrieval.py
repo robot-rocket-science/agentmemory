@@ -212,10 +212,21 @@ def retrieve(
             seen_ids.add(belief.id)
             candidates.append(belief)
 
+    # Step 4.5: batch-query retrieval stats for frequency boost.
+    candidate_ids: list[str] = [b.id for b in candidates]
+    stats_batch: dict[str, dict[str, int]] = store.get_retrieval_stats_batch(candidate_ids)
+
     # Step 5: score every candidate.
     scores: dict[str, float] = {}
     for belief in candidates:
-        scores[belief.id] = score_belief(belief, query_stripped, current_time)
+        stats: dict[str, int] = stats_batch.get(belief.id, {})
+        scores[belief.id] = score_belief(
+            belief,
+            query_stripped,
+            current_time,
+            retrieval_count=stats.get("retrieval_count", 0),
+            used_count=stats.get("used", 0),
+        )
 
     # Step 6: sort by score descending.
     candidates.sort(key=lambda b: scores[b.id], reverse=True)

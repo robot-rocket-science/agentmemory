@@ -240,6 +240,7 @@ def _row_to_belief(row: sqlite3.Row) -> Belief:
         method=row["method"] if "method" in keys else None,
         sample_size=row["sample_size"] if "sample_size" in keys else None,
         scope=row["scope"] if "scope" in keys else "project",
+        last_retrieved_at=row["last_retrieved_at"] if "last_retrieved_at" in keys else None,
     )
 
 
@@ -337,6 +338,11 @@ class MemoryStore:
         if "scope" not in col_names:
             self._conn.execute(
                 "ALTER TABLE beliefs ADD COLUMN scope TEXT NOT NULL DEFAULT 'project'"
+            )
+        # Track when a belief was last retrieved
+        if "last_retrieved_at" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE beliefs ADD COLUMN last_retrieved_at TEXT"
             )
         self._conn.commit()
         # Create index on session_id (safe to run even if already exists)
@@ -986,6 +992,18 @@ class MemoryStore:
             row: sqlite3.Row | None = by_id.get(r["id"])
             if row is not None:
                 beliefs.append(_row_to_belief(row))
+
+        # Update last_retrieved_at for all returned beliefs.
+        if beliefs:
+            now: str = _now()
+            returned_ids: list[str] = [b.id for b in beliefs]
+            ph: str = ",".join("?" for _ in returned_ids)
+            self._conn.execute(
+                f"UPDATE beliefs SET last_retrieved_at = ? WHERE id IN ({ph})",
+                [now, *returned_ids],
+            )
+            self._conn.commit()
+
         return beliefs
 
     def search_observations(self, query: str, top_k: int = 15) -> list[Observation]:
@@ -1726,6 +1744,37 @@ class MemoryStore:
             "ignored": int(str(row["ignored"])),
             "harmful": int(str(row["harmful"])),
         }
+
+    def get_retrieval_stats_batch(self, belief_ids: list[str]) -> dict[str, dict[str, int]]:
+        """Batch retrieval stats for multiple beliefs.
+
+        Returns {belief_id: {retrieval_count, used, ignored, harmful}}.
+        Beliefs with no test data are omitted from the result.
+        """
+        if not belief_ids:
+            return {}
+        placeholders: str = ",".join("?" for _ in belief_ids)
+        rows: list[sqlite3.Row] = self._conn.execute(
+            f"""SELECT
+                belief_id,
+                COUNT(*) as total,
+                SUM(CASE WHEN outcome = 'used' THEN 1 ELSE 0 END) as used,
+                SUM(CASE WHEN outcome = 'ignored' THEN 1 ELSE 0 END) as ignored,
+                SUM(CASE WHEN outcome = 'harmful' THEN 1 ELSE 0 END) as harmful
+            FROM tests
+            WHERE belief_id IN ({placeholders})
+            GROUP BY belief_id""",
+            belief_ids,
+        ).fetchall()
+        result: dict[str, dict[str, int]] = {}
+        for row in rows:
+            result[row["belief_id"]] = {
+                "retrieval_count": int(str(row["total"])),
+                "used": int(str(row["used"])),
+                "ignored": int(str(row["ignored"])),
+                "harmful": int(str(row["harmful"])),
+            }
+        return result
 
     # --- Test results ---
 

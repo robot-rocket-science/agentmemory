@@ -109,6 +109,7 @@ class Belief:
     method: str | None = None       # How this belief was produced (REQ-023)
     sample_size: int | None = None  # Number of samples in evidence (REQ-023)
     scope: str = "project"          # "project" or "global" -- cross-project promotion
+    last_retrieved_at: str | None = None  # ISO 8601 timestamp of last retrieval
 
 
 @dataclass
