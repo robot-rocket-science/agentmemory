@@ -9,6 +9,7 @@ import hashlib
 import json
 import sqlite3
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Final
@@ -987,6 +988,259 @@ class MemoryStore:
         self._last_traversed_edges = traversal_log
 
         return result
+
+    # --- Consequence path extraction (for /mem:reason) ---
+
+    # Edge types that represent consequence/support relationships.
+    # CONTRADICTS creates forks (branching paths).
+    _CONSEQUENCE_EDGE_TYPES: frozenset[str] = frozenset({
+        "SUPPORTS", "IMPLEMENTS", "TESTS", "CITES",
+        "CONTRADICTS", "RELATES_TO", "CALLS",
+    })
+
+    def find_consequence_paths(
+        self,
+        root_ids: list[str],
+        max_depth: int = 3,
+        confidence_floor: float = 0.3,
+        max_branches: int = 20,
+    ) -> list[list[tuple[Belief, str, float]]]:
+        """Walk typed edges as consequence paths with compound confidence decay.
+
+        Each returned path is a list of (belief, edge_type, compound_confidence)
+        tuples. The first entry in each path is the root belief with compound
+        confidence equal to its own confidence.
+
+        Stops expanding when compound confidence drops below confidence_floor.
+        Forks into separate paths at CONTRADICTS edges.
+
+        Args:
+            root_ids: Starting belief IDs (the "what if" anchors).
+            max_depth: Maximum hops per path.
+            confidence_floor: Prune branches below this compound confidence.
+            max_branches: Cap on total paths to bound output size.
+
+        Returns list of paths. Each path is ordered root-to-leaf.
+        """
+        paths: list[list[tuple[Belief, str, float]]] = []
+
+        # Load root beliefs
+        root_beliefs: dict[str, Belief] = {}
+        for rid in root_ids:
+            rows: list[sqlite3.Row] = self._conn.execute(
+                "SELECT * FROM beliefs WHERE id = ? AND valid_to IS NULL",
+                (rid,),
+            ).fetchall()
+            if rows:
+                root_beliefs[rid] = _row_to_belief(rows[0])
+
+        if not root_beliefs:
+            return paths
+
+        # DFS with path tracking
+        # Stack entries: (current_belief, edge_type_to_here, compound_conf, path_so_far, visited)
+        stack: list[tuple[Belief, str, float, list[tuple[Belief, str, float]], set[str]]] = []
+
+        for rid, rb in root_beliefs.items():
+            root_conf: float = rb.confidence
+            initial_path: list[tuple[Belief, str, float]] = [(rb, "ROOT", root_conf)]
+            stack.append((rb, "ROOT", root_conf, initial_path, {rid}))
+
+        while stack and len(paths) < max_branches:
+            current, _etype, compound_conf, path_so_far, visited = stack.pop()
+
+            if len(path_so_far) > max_depth:
+                # Reached depth limit -- emit path as-is
+                if len(path_so_far) > 1:
+                    paths.append(list(path_so_far))
+                continue
+
+            neighbors: list[tuple[Belief, Edge]] = self.get_neighbors(
+                current.id,
+                edge_types=list(self._CONSEQUENCE_EDGE_TYPES),
+                direction="both",
+            )
+
+            # Filter to unvisited, non-superseded neighbors
+            valid_neighbors: list[tuple[Belief, Edge]] = [
+                (nb, e) for nb, e in neighbors
+                if nb.id not in visited and nb.valid_to is None
+            ]
+
+            if not valid_neighbors:
+                # Leaf node -- emit path
+                if len(path_so_far) > 1:
+                    paths.append(list(path_so_far))
+                continue
+
+            # Sort: CONTRADICTS first (create forks), then by edge confidence
+            def _sort_key(pair: tuple[Belief, Edge]) -> tuple[int, float]:
+                _, e = pair
+                is_contradict: int = 0 if e.edge_type == "CONTRADICTS" else 1
+                type_w: float = self._EDGE_TYPE_WEIGHTS.get(e.edge_type, 0.5)
+                e_conf: float = e.alpha / (e.alpha + e.beta_param)
+                return (is_contradict, -(e_conf * type_w))
+
+            valid_neighbors.sort(key=_sort_key)
+
+            expanded_any: bool = False
+            for nb, edge in valid_neighbors:
+                if len(paths) >= max_branches:
+                    break
+
+                # Compound confidence = parent * child belief confidence * edge confidence
+                edge_conf: float = edge.alpha / (edge.alpha + edge.beta_param)
+                child_conf: float = compound_conf * nb.confidence * edge_conf
+                child_conf = min(child_conf, 1.0)
+
+                if child_conf < confidence_floor:
+                    continue  # Pruned -- speculation becomes noise
+
+                new_visited: set[str] = visited | {nb.id}
+                new_step: tuple[Belief, str, float] = (nb, edge.edge_type, child_conf)
+
+                if edge.edge_type == "CONTRADICTS":
+                    # Fork: start a new branch from the root up to current,
+                    # then diverge to the contradicting belief
+                    fork_path: list[tuple[Belief, str, float]] = list(path_so_far) + [new_step]
+                    stack.append((nb, edge.edge_type, child_conf, fork_path, new_visited))
+                else:
+                    # Continue the current path
+                    continued_path: list[tuple[Belief, str, float]] = list(path_so_far) + [new_step]
+                    stack.append((nb, edge.edge_type, child_conf, continued_path, new_visited))
+
+                expanded_any = True
+
+            if not expanded_any and len(path_so_far) > 1:
+                # All children pruned -- emit current path
+                paths.append(list(path_so_far))
+
+        # Sort paths: longest first, then by leaf compound confidence desc
+        paths.sort(key=lambda p: (-len(p), -p[-1][2] if p else 0.0))
+
+        return paths
+
+    @dataclass
+    class Impasse:
+        """A reasoning impasse detected in the belief graph."""
+        impasse_type: str   # "tie", "gap", "constraint_failure", "no_change"
+        description: str
+        beliefs: list[str]  # Belief IDs involved
+        severity: float     # 0.0 to 1.0
+
+    def detect_impasses(
+        self,
+        beliefs: dict[str, Belief],
+        paths: list[list[tuple[Belief, str, float]]],
+        locked_beliefs: list[Belief] | None = None,
+    ) -> list[Impasse]:
+        """Detect reasoning impasses in retrieved evidence.
+
+        Identifies four impasse types:
+        - tie: Two contradicting beliefs with similar confidence (no clear winner)
+        - gap: Path ends at a dead-end where connections would be expected
+        - constraint_failure: Retrieved evidence conflicts with a locked belief
+        - no_change: All retrieved beliefs have low confidence (no actionable evidence)
+
+        Args:
+            beliefs: All retrieved beliefs keyed by ID.
+            paths: Consequence paths from find_consequence_paths().
+            locked_beliefs: Locked beliefs to check for constraint failures.
+
+        Returns list of Impasse objects sorted by severity desc.
+        """
+        from agentmemory.scoring import uncertainty_score
+
+        impasses: list[MemoryStore.Impasse] = []
+
+        # 1. Tie impasses: contradicting beliefs with similar confidence
+        checked_pairs: set[tuple[str, str]] = set()
+        for bid in beliefs:
+            neighbors: list[tuple[Belief, Edge]] = self.get_neighbors(
+                bid, edge_types=["CONTRADICTS"], direction="both",
+            )
+            for nb, _edge in neighbors:
+                if nb.id not in beliefs:
+                    continue
+                pair_key: tuple[str, str] = (min(bid, nb.id), max(bid, nb.id))
+                if pair_key in checked_pairs:
+                    continue
+                checked_pairs.add(pair_key)
+
+                b1: Belief = beliefs[bid]
+                b2: Belief = nb
+                conf_diff: float = abs(b1.confidence - b2.confidence)
+                if conf_diff < 0.2:
+                    # Similar confidence -- genuine tie
+                    severity: float = 1.0 - conf_diff  # closer = more severe
+                    impasses.append(MemoryStore.Impasse(
+                        impasse_type="tie",
+                        description=(
+                            f"Contradicting beliefs with similar confidence "
+                            f"({b1.confidence:.0%} vs {b2.confidence:.0%}): "
+                            f'"{b1.content[:60]}..." vs "{b2.content[:60]}..."'
+                        ),
+                        beliefs=[bid, nb.id],
+                        severity=severity,
+                    ))
+
+        # 2. Gap impasses: paths that terminate with high uncertainty at the leaf
+        for path in paths:
+            if not path:
+                continue
+            leaf_belief, _etype, compound_conf = path[-1]
+            leaf_unc: float = uncertainty_score(leaf_belief.alpha, leaf_belief.beta_param)
+            if leaf_unc > 0.7 and len(path) >= 2:
+                impasses.append(MemoryStore.Impasse(
+                    impasse_type="gap",
+                    description=(
+                        f"Path ends at high-uncertainty belief "
+                        f"(uncertainty={leaf_unc:.2f}, compound_conf={compound_conf:.2f}): "
+                        f'"{leaf_belief.content[:80]}..."'
+                    ),
+                    beliefs=[leaf_belief.id],
+                    severity=leaf_unc,
+                ))
+
+        # 3. Constraint failures: evidence contradicts a locked belief
+        if locked_beliefs:
+            locked_ids: set[str] = {lb.id for lb in locked_beliefs}
+            for bid in beliefs:
+                neighbors = self.get_neighbors(
+                    bid, edge_types=["CONTRADICTS"], direction="both",
+                )
+                for nb, _edge in neighbors:
+                    if nb.id in locked_ids:
+                        impasses.append(MemoryStore.Impasse(
+                            impasse_type="constraint_failure",
+                            description=(
+                                f"Evidence contradicts LOCKED belief: "
+                                f'"{beliefs[bid].content[:60]}..." '
+                                f'CONTRADICTS locked "{nb.content[:60]}..."'
+                            ),
+                            beliefs=[bid, nb.id],
+                            severity=1.0,  # Always high -- locked beliefs are constraints
+                        ))
+
+        # 4. No-change impasses: all beliefs have low confidence
+        if beliefs:
+            avg_conf: float = sum(b.confidence for b in beliefs.values()) / len(beliefs)
+            high_conf_count: int = sum(1 for b in beliefs.values() if b.confidence > 0.7)
+            if avg_conf < 0.5 and high_conf_count == 0:
+                impasses.append(MemoryStore.Impasse(
+                    impasse_type="no_change",
+                    description=(
+                        f"No high-confidence evidence found. "
+                        f"Average confidence: {avg_conf:.0%}, "
+                        f"beliefs with >70% confidence: 0/{len(beliefs)}"
+                    ),
+                    beliefs=list(beliefs.keys())[:5],
+                    severity=0.8,
+                ))
+
+        # Sort by severity descending
+        impasses.sort(key=lambda imp: -imp.severity)
+        return impasses
 
     # --- HRR graph ---
 
