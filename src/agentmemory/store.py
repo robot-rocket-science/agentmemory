@@ -790,6 +790,27 @@ class MemoryStore:
 
         return results
 
+    # Edge-type traversal weights for BFS expansion. Semantic edges are
+    # preferred over structural edges during graph traversal. The stored
+    # edge.weight is multiplied by this type weight to produce the
+    # effective priority. Default for unlisted types is 0.5.
+    _EDGE_TYPE_WEIGHTS: dict[str, float] = {
+        # Semantic edges (high priority)
+        "CONTRADICTS": 2.0,
+        "SUPPORTS": 1.8,
+        "IMPLEMENTS": 1.5,
+        "TESTS": 1.5,
+        "CALLS": 1.3,
+        "CITES": 1.3,
+        # Structural edges (lower priority)
+        "CO_CHANGED": 0.8,
+        "TEMPORAL_NEXT": 0.6,
+        "COMMIT_TOUCHES": 0.4,
+        "CONTAINS": 0.3,
+        "SENTENCE_IN_FILE": 0.2,
+        "WITHIN_SECTION": 0.2,
+    }
+
     def expand_graph(
         self,
         seed_ids: list[str],
@@ -808,7 +829,8 @@ class MemoryStore:
 
         Returns dict mapping belief_id to list of
         (neighbor_belief, edge_type, hop_distance) tuples.
-        Deterministic: neighbors processed by weight DESC, created_at ASC.
+        Deterministic: neighbors sorted by effective weight (edge weight *
+        type weight) DESC, then created_at ASC.
         """
         from collections import deque
 
@@ -838,6 +860,15 @@ class MemoryStore:
                 edge_types=effective_types,
                 direction="both",
             )
+
+            # Re-sort by effective weight: edge.weight * type_weight
+            def _effective_weight(pair: tuple[Belief, Edge]) -> tuple[float, str]:
+                _, e = pair
+                type_w: float = self._EDGE_TYPE_WEIGHTS.get(e.edge_type, 0.5)
+                # Negate for descending sort; created_at for deterministic tiebreak
+                return (-e.weight * type_w, e.created_at)
+
+            neighbors.sort(key=_effective_weight)
 
             for neighbor_belief, edge in neighbors:
                 # Skip SUPERSEDES when no explicit type filter
