@@ -49,7 +49,7 @@ def velocity_scale(velocity: float) -> float:
 
 def decay_factor(
     belief: Belief,
-    current_time_iso: str,
+    current_time_iso: str | datetime,
     session_velocity: float | None = None,
 ) -> float:
     """Content-aware exponential decay with optional velocity scaling.
@@ -61,6 +61,8 @@ def decay_factor(
 
     If session_velocity is provided, the half-life is scaled by
     velocity_scale(session_velocity). Sprint-origin beliefs decay faster.
+
+    current_time_iso accepts a pre-parsed datetime to avoid redundant parsing.
     """
     if belief.superseded_by is not None or belief.valid_to is not None:
         return 0.01
@@ -72,7 +74,7 @@ def decay_factor(
     if half_life is None:
         return 1.0
 
-    current: datetime = _parse_iso(current_time_iso)
+    current: datetime = current_time_iso if isinstance(current_time_iso, datetime) else _parse_iso(current_time_iso)
     created: datetime = _parse_iso(belief.created_at)
     age_hours: float = (current - created).total_seconds() / 3600.0
 
@@ -213,7 +215,7 @@ def retrieval_frequency_boost(retrieval_count: int, used_count: int) -> float:
     return 1.0
 
 
-def recency_boost(belief: Belief, current_time_iso: str, half_life_hours: float = 24.0) -> float:
+def recency_boost(belief: Belief, current_time_iso: str | datetime, half_life_hours: float = 24.0) -> float:
     """Boost recently created beliefs so new information can surface.
 
     Exp 63 showed new beliefs cannot penetrate existing top-k at uniform
@@ -221,19 +223,23 @@ def recency_boost(belief: Belief, current_time_iso: str, half_life_hours: float 
     the last half_life_hours, tapering to 1.0 for older beliefs.
 
     Returns a value in [1.0, 2.0]: 2.0 for brand-new, 1.0 at +inf age.
+
+    current_time_iso accepts a pre-parsed datetime to avoid redundant parsing.
     """
-    current: datetime = _parse_iso(current_time_iso)
+    current: datetime = current_time_iso if isinstance(current_time_iso, datetime) else _parse_iso(current_time_iso)
     created: datetime = _parse_iso(belief.created_at)
     age_hours: float = max(0.0, (current - created).total_seconds() / 3600.0)
     return 1.0 + math.pow(0.5, age_hours / half_life_hours)
 
 
-def score_belief(belief: Belief, query: str, current_time_iso: str) -> float:
+def score_belief(belief: Belief, query: str, current_time_iso: str | datetime) -> float:
     """Combined scoring using decay, lock boost, Thompson sampling, type/source weights, and recency.
 
     Superseded beliefs always score 0.01.
     Locked beliefs: score = lock_boost_typed * thompson_sample (always elevated).
     Normal beliefs: score = type_weight * source_weight * thompson_sample * decay_factor * recency_boost.
+
+    current_time_iso accepts a pre-parsed datetime to avoid redundant parsing.
     """
     if belief.superseded_by is not None or belief.valid_to is not None:
         return 0.01

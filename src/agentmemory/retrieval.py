@@ -8,16 +8,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from agentmemory.compression import compress_belief, estimate_tokens, pack_beliefs
+from agentmemory.compression import pack_beliefs
 from agentmemory.hrr import HRRGraph
 from agentmemory.models import EDGE_CONTRADICTS, Belief
 from agentmemory.scoring import score_belief
 from agentmemory.store import MemoryStore
 
-
-def _now_iso() -> str:
-    """Current UTC timestamp in ISO 8601 format."""
-    return datetime.now(timezone.utc).isoformat()
 
 
 @dataclass
@@ -56,6 +52,14 @@ def _get_hrr_graph(store: MemoryStore) -> HRRGraph | None:
     return graph
 
 
+# Edge types worth querying via HRR. Semantic edges provide vocabulary
+# bridging; structural edges (COMMIT_TOUCHES, CO_CHANGED, SENTENCE_IN_FILE,
+# WITHIN_SECTION) add noise without improving retrieval quality.
+_HRR_EDGE_TYPES: frozenset[str] = frozenset({
+    "SUPERSEDES", "CONTRADICTS", "SUPPORTS", "CALLS", "CITES",
+})
+
+
 def _hrr_expand(
     store: MemoryStore,
     hrr: HRRGraph,
@@ -65,23 +69,29 @@ def _hrr_expand(
     """Use HRR single-hop to find structurally connected beliefs from seeds.
 
     This is the vocabulary-bridge step: finds beliefs connected via typed edges
-    that FTS5 keyword matching would miss.
+    that FTS5 keyword matching would miss. Only queries semantic edge types
+    to avoid O(seeds * edge_types * cleanup_size) blowup.
     """
+    # Only query edge types that exist in the graph AND are semantic.
+    active_types: list[str] = [
+        et for et in hrr.edge_types() if et in _HRR_EDGE_TYPES
+    ]
+
     found_ids: set[str] = set()
-    for seed_id in seed_ids:
-        # Try each edge type the seed participates in
-        for edge_type in hrr.edge_types():
+    for seed_id in seed_ids[:3]:  # Cap seeds to limit query count.
+        for edge_type in active_types:
             results: list[tuple[str, float]] = hrr.query_forward(
                 seed_id, edge_type, top_k=3,
             )
             for label, _sim in results:
                 found_ids.add(label)
-            # Also reverse
             results = hrr.query_reverse(seed_id, edge_type, top_k=3)
             for label, _sim in results:
                 found_ids.add(label)
 
-    # Look up actual beliefs for found IDs
+    # Batch lookup instead of N+1 get_belief calls.
+    if not found_ids:
+        return []
     beliefs: list[Belief] = []
     for belief_id in found_ids:
         belief: Belief | None = store.get_belief(belief_id)
@@ -111,7 +121,7 @@ def retrieve(
     4. Merge all candidate sets, deduplicate.
     5. Score, sort, compress, pack into budget.
     """
-    current_time: str = _now_iso()
+    current_time: datetime = datetime.now(timezone.utc)
     query_stripped: str = query.strip()
 
     # Step 1: locked beliefs (L0), relevance-filtered.
@@ -178,12 +188,9 @@ def retrieve(
     candidates.sort(key=lambda b: scores[b.id], reverse=True)
 
     # Step 7: compress and pack into budget.
-    packed: list[Belief] = pack_beliefs(candidates, budget_tokens=budget)
-
-    # Step 8: compute token accounting.
-    total_tokens: int = sum(
-        estimate_tokens(compress_belief(b)) for b in packed
-    )
+    packed: list[Belief]
+    total_tokens: int
+    packed, total_tokens = pack_beliefs(candidates, budget_tokens=budget)
     budget_remaining: int = budget - total_tokens
 
     packed_scores: dict[str, float] = {b.id: scores[b.id] for b in packed}

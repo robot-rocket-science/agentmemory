@@ -858,14 +858,24 @@ class MemoryStore:
             (safe_query, top_k),
         ).fetchall()
 
+        if not rows:
+            return []
+
+        # Batch lookup: single query instead of N+1 individual fetches.
+        ids: list[str] = [r["id"] for r in rows]
+        placeholders: str = ",".join("?" for _ in ids)
+        belief_rows: list[sqlite3.Row] = self._conn.execute(
+            f"SELECT * FROM beliefs WHERE id IN ({placeholders}) AND valid_to IS NULL",
+            ids,
+        ).fetchall()
+
+        # Preserve FTS5 BM25 rank order.
+        by_id: dict[str, sqlite3.Row] = {r["id"]: r for r in belief_rows}
         beliefs: list[Belief] = []
         for r in rows:
-            belief: sqlite3.Row | None = self._conn.execute(
-                "SELECT * FROM beliefs WHERE id = ? AND valid_to IS NULL",
-                (r["id"],),
-            ).fetchone()
-            if belief is not None:
-                beliefs.append(_row_to_belief(belief))
+            row: sqlite3.Row | None = by_id.get(r["id"])
+            if row is not None:
+                beliefs.append(_row_to_belief(row))
         return beliefs
 
     def search_observations(self, query: str, top_k: int = 15) -> list[Observation]:

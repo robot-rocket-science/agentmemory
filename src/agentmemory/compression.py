@@ -77,14 +77,17 @@ def compress_belief(belief: Belief) -> str:
     return content
 
 
-def pack_beliefs(beliefs: list[Belief], budget_tokens: int = 2000) -> list[Belief]:
+def pack_beliefs(
+    beliefs: list[Belief], budget_tokens: int = 2000,
+) -> tuple[list[Belief], int]:
     """Pack beliefs into a token budget.
 
     Takes a pre-scored, pre-sorted list of beliefs. Adds beliefs in order until
-    the budget is exhausted. Returns the subset that fits within budget_tokens.
+    the budget is exhausted. Returns (packed beliefs, total tokens used).
     """
     packed: list[Belief] = []
     remaining: int = budget_tokens
+    used: int = 0
 
     for belief in beliefs:
         compressed: str = compress_belief(belief)
@@ -93,5 +96,6 @@ def pack_beliefs(beliefs: list[Belief], budget_tokens: int = 2000) -> list[Belie
             break
         packed.append(belief)
         remaining -= cost
+        used += cost
 
-    return packed
+    return packed, used

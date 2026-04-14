@@ -391,8 +391,7 @@ class TestPackBeliefs:
             )
             beliefs.append(b)
 
-        packed: list[Belief] = pack_beliefs(beliefs, budget_tokens=50)
-        total: int = sum(estimate_tokens(compress_belief(b)) for b in packed)
+        _packed, total = pack_beliefs(beliefs, budget_tokens=50)
         assert total <= 50
 
     def test_returns_in_order(self, store: MemoryStore) -> None:
@@ -404,11 +403,11 @@ class TestPackBeliefs:
             )
             for i in range(5)
         ]
-        packed: list[Belief] = pack_beliefs(beliefs, budget_tokens=2000)
+        packed, _tokens = pack_beliefs(beliefs, budget_tokens=2000)
         assert [b.id for b in packed] == [b.id for b in beliefs[: len(packed)]]
 
     def test_empty_input(self) -> None:
-        assert pack_beliefs([], budget_tokens=1000) == []
+        assert pack_beliefs([], budget_tokens=1000) == ([], 0)
 
     def test_zero_budget_returns_empty(self, store: MemoryStore) -> None:
         b: Belief = store.insert_belief(
@@ -416,7 +415,7 @@ class TestPackBeliefs:
             belief_type=BELIEF_FACTUAL,
             source_type=BSRC_AGENT_INFERRED,
         )
-        packed: list[Belief] = pack_beliefs([b], budget_tokens=0)
+        packed, _tokens = pack_beliefs([b], budget_tokens=0)
         assert packed == []
 
 
