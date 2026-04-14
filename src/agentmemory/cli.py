@@ -217,37 +217,48 @@ _COMMAND_DEFS: dict[str, dict[str, str]] = {
         ),
     },
     "reason": {
-        "description": "Focused reasoning about a problem using graph-aware retrieval and uncertainty analysis.",
-        "argument_hint": "A statement or topic to reason about",
+        "description": "Consequence-path reasoning about a decision, problem, or hypothesis using branching evidence trees.",
+        "argument_hint": "A decision point, problem to debug, or hypothesis to test",
         "tools": "Bash, Read, WebSearch, Agent",
-        "objective": "Use multi-hop graph retrieval and uncertainty signals to reason deeply about the given topic.",
+        "objective": "Simulate branching consequence paths from memory to support decision-making, debugging, or planning.",
         "process": (
-            "1. Run: `uv run agentmemory reason \"$ARGUMENTS\"` to get structured evidence context.\n"
+            "1. Run: `uv run agentmemory reason \"$ARGUMENTS\"` to get structured consequence-path output.\n"
             "2. Run: `uv run agentmemory settings` to read reason.max_agents and reason.depth.\n"
             "3. Analyze the structured output. It contains:\n"
-            "   - DIRECT EVIDENCE: FTS5 matches with confidence scores\n"
-            "   - CONNECTED EVIDENCE: Graph-expanded beliefs with edge types and hop distance\n"
-            "   - HIGH-UNCERTAINTY BELIEFS: Beliefs where the system has insufficient evidence\n"
-            "   - CONTRADICTIONS: Pairs of beliefs that contradict each other\n"
-            "4. Build a reasoning chain:\n"
-            "   - Start from the highest-confidence direct evidence\n"
-            "   - Follow graph connections to build supporting arguments\n"
-            "   - Note where the chain relies on high-uncertainty beliefs\n"
-            "   - Note where contradictions block a clear conclusion\n"
-            "5. If the reasoning chain has gaps or relies on uncertain beliefs, spawn up to "
+            "   - VERDICT: SUFFICIENT / INSUFFICIENT / CONTRADICTORY / UNCERTAIN / PARTIAL\n"
+            "   - SEED EVIDENCE: FTS5 matches with confidence and uncertainty scores\n"
+            "   - CONSEQUENCE PATHS: Branching belief chains with compound confidence decay.\n"
+            "     Each path shows: root belief -> edge_type -> next belief -> ...\n"
+            "     Compound confidence decays multiplicatively at each hop.\n"
+            "     WEAKEST LINK is marked in each path.\n"
+            "     CONTRADICTS edges create forks (alternative consequence branches).\n"
+            "   - IMPASSES: Reasoning blockers detected in the evidence:\n"
+            "     * TIE: Contradicting beliefs with similar confidence (fork needs resolution)\n"
+            "     * GAP: Path ends at high-uncertainty belief (evidence insufficient)\n"
+            "     * CONSTRAINT_FAILURE: Evidence conflicts with a LOCKED belief (path BLOCKED)\n"
+            "     * NO_CHANGE: All evidence is low-confidence (nothing actionable)\n"
+            "4. Use the VERDICT to decide next steps:\n"
+            "   - SUFFICIENT: Present the answer based on the strongest consequence path.\n"
+            "   - INSUFFICIENT: Spawn subagents to fill gaps (see step 5).\n"
+            "   - CONTRADICTORY: A LOCKED constraint blocks a path. DO NOT take the blocked path.\n"
+            "     Present the unblocked path(s) instead. If ALL paths are blocked, escalate to user.\n"
+            "   - UNCERTAIN: Present the fork to the user for resolution.\n"
+            "   - PARTIAL: Present what is known, flag gaps explicitly.\n"
+            "5. If the VERDICT is INSUFFICIENT or UNCERTAIN, spawn up to "
             "max_agents subagents using the Agent tool. Each subagent gets:\n"
             "   - The original reason query\n"
-            "   - ONE specific investigation task (not the full evidence dump)\n"
-            "   - Assign roles based on need: Verifier (check uncertain belief), "
-            "Gap-filler (research missing info), Contradiction-resolver (which is correct?)\n"
-            "   If the evidence is sufficient, skip subagent dispatch entirely.\n"
+            "   - ONE specific impasse to resolve (from the IMPASSES section)\n"
+            "   - Assign roles: Verifier (check uncertain leaf), "
+            "Gap-filler (research missing evidence), Fork-resolver (which branch is correct?)\n"
+            "   If VERDICT is SUFFICIENT, skip subagent dispatch entirely.\n"
             "6. Collect subagent results (if any).\n"
             "7. Present the reasoned analysis:\n"
-            "   - ANSWER: Direct response based on evidence\n"
-            "   - EVIDENCE CHAIN: Beliefs and connections supporting the answer\n"
-            "   - CONFIDENCE: How confident the reasoning is, citing uncertain links\n"
-            "   - OPEN QUESTIONS: Anything that could not be resolved\n"
+            "   - ANSWER: Direct response with consequence path supporting it\n"
+            "   - BLOCKED PATHS: Any paths forbidden by locked constraints\n"
+            "   - WEAKEST LINKS: Beliefs where confidence is lowest in the chain\n"
+            "   - OPEN QUESTIONS: Impasses that could not be resolved\n"
             "   - SUGGESTED UPDATES: Beliefs whose confidence should change based on findings\n"
+            "     (call mcp__agentmemory__feedback for beliefs that were used/rejected)\n"
         ),
     },
     "disable": {
