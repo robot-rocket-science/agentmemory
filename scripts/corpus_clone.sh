@@ -18,6 +18,7 @@ set -euo pipefail
 
 ARCHON="archon"
 BASE="~/agentmemory-corpus"
+PROJECTS_DIR="${PROJECTS_DIR:-$HOME/projects}"
 TIER="${1:---tier}"
 TIER_VAL="small"
 DO_PERSONAL=false
@@ -142,7 +143,7 @@ REMOTE_EOF
 # Mirror personal project
 mirror_personal() {
     local name="$1"
-    local src="/Users/thelorax/projects/${name}"
+    local src="${PROJECTS_DIR}/${name}"
     local dest="${BASE}/personal/${name}"
 
     echo "==> personal/${name}"
@@ -196,7 +197,7 @@ if $DO_PERSONAL; then
     echo ""
     echo "--- Personal projects ---"
     for name in "${PERSONAL_REPOS[@]}"; do
-        if [ -d "/Users/thelorax/projects/${name}" ]; then
+        if [ -d "${PROJECTS_DIR}/${name}" ]; then
             mirror_personal "$name"
         else
             echo "==> personal/${name} [SKIP: not found locally]"
