@@ -297,6 +297,7 @@ class MemoryStore:
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA synchronous=NORMAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
+        self._last_traversed_edges: dict[str, list[tuple[int, int]]] = {}
         self._init_schema()
 
     def _init_schema(self) -> None:
@@ -305,6 +306,7 @@ class MemoryStore:
         self._conn.commit()
         self._migrate_sessions()
         self._migrate_beliefs()
+        self._migrate_edges()
 
     def _migrate_beliefs(self) -> None:
         """Run belief-table migrations."""
@@ -411,6 +413,34 @@ class MemoryStore:
         if "topics_json" not in col_names:
             self._conn.execute(
                 "ALTER TABLE sessions ADD COLUMN topics_json TEXT"
+            )
+        self._conn.commit()
+
+    def _migrate_edges(self) -> None:
+        """Add Bayesian scoring and traversal tracking columns to edges."""
+        cols: list[sqlite3.Row] = self._conn.execute(
+            "PRAGMA table_info(edges)"
+        ).fetchall()
+        col_names: set[str] = {row["name"] for row in cols}
+        if "alpha" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE edges ADD COLUMN alpha REAL NOT NULL DEFAULT 1.0"
+            )
+        if "beta_param" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE edges ADD COLUMN beta_param REAL NOT NULL DEFAULT 1.0"
+            )
+        if "traversal_count" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE edges ADD COLUMN traversal_count INTEGER NOT NULL DEFAULT 0"
+            )
+        if "last_traversed_at" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE edges ADD COLUMN last_traversed_at TEXT"
+            )
+        if "pruned_at" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE edges ADD COLUMN pruned_at TEXT"
             )
         self._conn.commit()
 
@@ -678,6 +708,11 @@ class MemoryStore:
         self._record_confidence(belief_id, alpha, beta, f"feedback_{outcome}")
         self._conn.commit()
 
+        # Propagate feedback to edges that led to this belief
+        traversed: list[tuple[int, int]] | None = self._last_traversed_edges.get(belief_id)
+        if traversed:
+            self.propagate_feedback_to_edges(belief_id, outcome, traversed)
+
         # TB-15: detect significant confidence drop
         old_conf: float = old_alpha / (old_alpha + old_beta) if (old_alpha + old_beta) > 0 else 0.5
         new_conf: float = alpha / (alpha + beta) if (alpha + beta) > 0 else 0.5
@@ -743,19 +778,31 @@ class MemoryStore:
         edge_type: str,
         weight: float = 1.0,
         reason: str = "",
+        alpha: float = 1.0,
+        beta_param: float = 1.0,
     ) -> int:
         """Insert a directed edge between two beliefs. Returns the new edge row ID."""
         ts: str = _now()
         cursor: sqlite3.Cursor = self._conn.execute(
-            """INSERT INTO edges (from_id, to_id, edge_type, weight, reason, created_at)
-               VALUES (?, ?, ?, ?, ?, ?)""",
-            (from_id, to_id, edge_type, weight, reason, ts),
+            """INSERT INTO edges (from_id, to_id, edge_type, weight, reason,
+               created_at, alpha, beta_param)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (from_id, to_id, edge_type, weight, reason, ts, alpha, beta_param),
         )
         self._conn.commit()
         row_id: int | None = cursor.lastrowid
         if row_id is None:
             raise RuntimeError("Edge insert did not return a rowid")
         return row_id
+
+    def edge_exists(self, id_a: str, id_b: str) -> bool:
+        """Check if any edge exists between two beliefs (either direction)."""
+        row: sqlite3.Row | None = self._conn.execute(
+            "SELECT 1 FROM edges WHERE "
+            "(from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?)",
+            (id_a, id_b, id_b, id_a),
+        ).fetchone()
+        return row is not None
 
     def get_neighbors(
         self,
@@ -785,9 +832,13 @@ class MemoryStore:
             sql: str = (
                 f"SELECT e.id AS eid, e.from_id, e.to_id, e.edge_type, "
                 f"e.weight, e.reason, e.created_at AS ecreated, "
+                f"e.alpha AS ealpha, e.beta_param AS ebeta, "
+                f"e.traversal_count AS etrav, e.last_traversed_at AS elast, "
+                f"e.pruned_at AS epruned, "
                 f"b.* FROM edges e "
                 f"JOIN beliefs b ON b.id = e.{neighbor_col} "
-                f"WHERE e.{match_col} = ? AND b.valid_to IS NULL"
+                f"WHERE e.{match_col} = ? AND b.valid_to IS NULL "
+                f"AND e.pruned_at IS NULL"
             )
             params: list[object] = [belief_id]
             if edge_types:
@@ -807,6 +858,11 @@ class MemoryStore:
                     weight=row["weight"],
                     reason=row["reason"],
                     created_at=row["ecreated"],
+                    alpha=float(str(row["ealpha"])) if row["ealpha"] is not None else 1.0,
+                    beta_param=float(str(row["ebeta"])) if row["ebeta"] is not None else 1.0,
+                    traversal_count=int(str(row["etrav"])) if row["etrav"] is not None else 0,
+                    last_traversed_at=str(row["elast"]) if row["elast"] else None,
+                    pruned_at=str(row["epruned"]) if row["epruned"] else None,
                 )
                 results.append((belief, edge))
 
@@ -851,8 +907,9 @@ class MemoryStore:
 
         Returns dict mapping belief_id to list of
         (neighbor_belief, edge_type, hop_distance) tuples.
-        Deterministic: neighbors sorted by effective weight (edge weight *
-        type weight) DESC, then created_at ASC.
+
+        Side effects: records edge traversals (traversal_count, last_traversed_at)
+        and stores traversal log in _last_traversed_edges for feedback propagation.
         """
         from collections import deque
 
@@ -861,11 +918,12 @@ class MemoryStore:
         effective_types: list[str] | None = None
         if edge_types is not None:
             effective_types = [t for t in edge_types if t not in excluded]
-        # When no explicit types, we filter SUPERSEDES in post-processing
 
         visited: set[str] = set(seed_ids)
         result: dict[str, list[tuple[Belief, str, int]]] = {}
         queue: deque[tuple[str, int]] = deque()
+        # Track which edges led to which beliefs for feedback propagation
+        traversal_log: dict[str, list[tuple[int, int]]] = {}
 
         for sid in seed_ids:
             queue.append((sid, 0))
@@ -883,17 +941,16 @@ class MemoryStore:
                 direction="both",
             )
 
-            # Re-sort by effective weight: edge.weight * type_weight
-            def _effective_weight(pair: tuple[Belief, Edge]) -> tuple[float, str]:
+            # Sort by Bayesian edge score: confidence * type_weight
+            def _edge_priority(pair: tuple[Belief, Edge]) -> tuple[float, str]:
                 _, e = pair
                 type_w: float = self._EDGE_TYPE_WEIGHTS.get(e.edge_type, 0.5)
-                # Negate for descending sort; created_at for deterministic tiebreak
-                return (-e.weight * type_w, e.created_at)
+                confidence: float = e.alpha / (e.alpha + e.beta_param)
+                return (-confidence * type_w, e.created_at)
 
-            neighbors.sort(key=_effective_weight)
+            neighbors.sort(key=_edge_priority)
 
             for neighbor_belief, edge in neighbors:
-                # Skip SUPERSEDES when no explicit type filter
                 if edge_types is None and edge.edge_type in excluded:
                     continue
 
@@ -905,6 +962,14 @@ class MemoryStore:
                 visited.add(neighbor_belief.id)
                 hop: int = current_depth + 1
 
+                # Record traversal
+                self.record_edge_traversal(edge.id)
+
+                # Log edge for feedback propagation
+                if neighbor_belief.id not in traversal_log:
+                    traversal_log[neighbor_belief.id] = []
+                traversal_log[neighbor_belief.id].append((edge.id, hop))
+
                 if neighbor_belief.id not in result:
                     result[neighbor_belief.id] = []
                 result[neighbor_belief.id].append(
@@ -913,6 +978,13 @@ class MemoryStore:
 
                 queue.append((neighbor_belief.id, hop))
                 total_expanded += 1
+
+        # Commit traversal updates
+        if total_expanded > 0:
+            self._conn.commit()
+
+        # Store traversal log for feedback propagation
+        self._last_traversed_edges = traversal_log
 
         return result
 
@@ -1608,6 +1680,131 @@ class MemoryStore:
 
         self._conn.commit()
         return updated
+
+    # --- Edge dynamics ---
+
+    def record_edge_traversal(self, edge_id: int) -> None:
+        """Record that an edge was traversed during retrieval."""
+        ts: str = _now()
+        self._conn.execute(
+            """UPDATE edges SET traversal_count = traversal_count + 1,
+               last_traversed_at = ? WHERE id = ?""",
+            (ts, edge_id),
+        )
+        # No commit here -- caller batches multiple traversals.
+
+    def update_edge_confidence(
+        self, edge_id: int, outcome: str, weight: float = 1.0,
+    ) -> None:
+        """Bayesian update on an edge after traversal feedback.
+
+        'used': alpha += weight (edge led to useful belief).
+        'ignored': beta += weight * 0.5 (mild penalty).
+        'harmful': beta += weight * 2.0 (strong penalty).
+        """
+        row: sqlite3.Row | None = self._conn.execute(
+            "SELECT alpha, beta_param FROM edges WHERE id = ?", (edge_id,),
+        ).fetchone()
+        if row is None:
+            return
+
+        alpha: float = float(str(row["alpha"]))
+        beta: float = float(str(row["beta_param"]))
+
+        if outcome == "used":
+            alpha += weight
+        elif outcome == "ignored":
+            beta += weight * 0.5
+        elif outcome == "harmful":
+            beta += weight * 2.0
+
+        self._conn.execute(
+            "UPDATE edges SET alpha = ?, beta_param = ? WHERE id = ?",
+            (alpha, beta, edge_id),
+        )
+        # No commit -- caller batches.
+
+    def propagate_feedback_to_edges(
+        self,
+        belief_id: str,
+        outcome: str,
+        traversed_edges: list[tuple[int, int]] | None = None,
+    ) -> int:
+        """Propagate belief feedback to edges that led to this belief.
+
+        Args:
+            belief_id: The belief that received feedback.
+            outcome: 'used', 'ignored', or 'harmful'.
+            traversed_edges: List of (edge_id, hop_distance) pairs recorded
+                during the retrieval that surfaced this belief.
+                If None, updates all edges connected to the belief (weaker signal).
+
+        Returns count of edges updated.
+        """
+        updated: int = 0
+        if traversed_edges:
+            for edge_id, hop in traversed_edges:
+                # Discount by hop distance: hop 1 = 1.0, hop 2 = 0.5, hop 3 = 0.25
+                discount: float = 0.5 ** (hop - 1)
+                self.update_edge_confidence(edge_id, outcome, weight=discount)
+                updated += 1
+        else:
+            # Fallback: update all connected edges with mild weight
+            rows: list[sqlite3.Row] = self._conn.execute(
+                "SELECT id FROM edges WHERE (from_id = ? OR to_id = ?) "
+                "AND pruned_at IS NULL",
+                (belief_id, belief_id),
+            ).fetchall()
+            for row in rows:
+                self.update_edge_confidence(int(str(row["id"])), outcome, weight=0.3)
+                updated += 1
+
+        if updated > 0:
+            self._conn.commit()
+        return updated
+
+    def get_edge_health(self) -> dict[str, object]:
+        """Edge-specific health metrics."""
+        def count(sql: str) -> int:
+            row: sqlite3.Row = self._conn.execute(sql).fetchone()
+            val: object = row[0]
+            return int(val) if isinstance(val, int) else 0
+
+        def avg(sql: str) -> float:
+            row: sqlite3.Row = self._conn.execute(sql).fetchone()
+            val: object = row[0]
+            return float(str(val)) if val is not None else 0.0
+
+        active: int = count("SELECT COUNT(*) FROM edges WHERE pruned_at IS NULL")
+        pruned: int = count("SELECT COUNT(*) FROM edges WHERE pruned_at IS NOT NULL")
+        traversed: int = count(
+            "SELECT COUNT(*) FROM edges WHERE traversal_count > 0 AND pruned_at IS NULL"
+        )
+        never_traversed: int = active - traversed
+
+        avg_conf: float = avg(
+            "SELECT AVG(alpha / (alpha + beta_param)) FROM edges WHERE pruned_at IS NULL"
+        )
+        avg_traversals: float = avg(
+            "SELECT AVG(traversal_count) FROM edges WHERE pruned_at IS NULL"
+        )
+
+        # Edge credal gap: edges still at default prior (1.0, 1.0)
+        at_prior: int = count(
+            "SELECT COUNT(*) FROM edges WHERE pruned_at IS NULL "
+            "AND ABS(alpha - 1.0) < 0.01 AND ABS(beta_param - 1.0) < 0.01"
+        )
+
+        return {
+            "active_edges": active,
+            "pruned_edges": pruned,
+            "traversed_edges": traversed,
+            "never_traversed_edges": never_traversed,
+            "avg_edge_confidence": round(avg_conf, 3),
+            "avg_traversal_count": round(avg_traversals, 1),
+            "edge_credal_gap": at_prior,
+            "edge_credal_gap_pct": round(at_prior / active * 100, 1) if active > 0 else 0.0,
+        }
 
     # --- Onboarding provenance ---
 

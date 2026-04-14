@@ -634,11 +634,12 @@ def cmd_health(args: argparse.Namespace) -> None:
 
     store = _get_store()
     metrics: dict[str, object] = store.get_health_metrics()
+    edge_health: dict[str, object] = store.get_edge_health()
     store.close()
 
     active: int = int(str(metrics["active_beliefs"]))
 
-    print("\n  Diagnostics:")
+    print("\n  Belief diagnostics:")
     print(f"    Credal gap: {metrics['credal_gap_count']} / {active}"
           f" ({metrics['credal_gap_pct']}%) beliefs at type prior (untested)")
     print(f"    Orphans: {metrics['orphan_count']}"
@@ -650,6 +651,16 @@ def cmd_health(args: argparse.Namespace) -> None:
           f" ({metrics['feedback_coverage_pct']}%) beliefs with test results")
     print(f"    Avg confidence: {metrics['avg_confidence']}")
     print(f"    Stale sessions: {metrics['stale_sessions']} incomplete")
+
+    print("\n  Edge diagnostics:")
+    print(f"    Active: {edge_health['active_edges']}"
+          f" (pruned: {edge_health['pruned_edges']})")
+    print(f"    Traversed: {edge_health['traversed_edges']}"
+          f" (never: {edge_health['never_traversed_edges']})")
+    print(f"    Avg edge confidence: {edge_health['avg_edge_confidence']}")
+    print(f"    Avg traversal count: {edge_health['avg_traversal_count']}")
+    print(f"    Edge credal gap: {edge_health['edge_credal_gap']}"
+          f" ({edge_health['edge_credal_gap_pct']}%) at default prior")
 
 
 # ---------------------------------------------------------------------------

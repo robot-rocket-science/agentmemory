@@ -131,6 +131,11 @@ class Edge:
     weight: float
     reason: str
     created_at: str
+    alpha: float = 1.0
+    beta_param: float = 1.0
+    traversal_count: int = 0
+    last_traversed_at: str | None = None
+    pruned_at: str | None = None
 
 
 @dataclass
