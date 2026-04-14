@@ -50,11 +50,11 @@ STAGE                          STATUS          EVIDENCE
     (detect user corrections)                  V2: 92% accuracy, 7 signal types
                                                Auto-locked on detection (2026-04-11 fix)
 
-11. Feedback loop              PARTIALLY BUILT  Auto-feedback in server.py
-    (test outcomes -> conf)                    record_test_result() exists and is called
-                                               by _process_auto_feedback() after each search.
-                                               NOT YET VALIDATED: Exp 66 will test whether
-                                               feedback improves retrieval quality over time.
+11. Feedback loop              WORKING          Auto-feedback in server.py
+    (test outcomes -> conf)                    record_test_result() called by
+                                               _process_auto_feedback() after search and ingest.
+                                               atexit flush for final batch.
+                                               VALIDATED: Exp 66 +22% MRR over 10 rounds.
 
 12. Triggered beliefs          SIMULATED        5/5 case study failures prevented (Exp 51)
     (meta-cognitive checks)                    15 TBs designed, not automated
@@ -65,7 +65,7 @@ STAGE                          STATUS          EVIDENCE
 
 ---
 
-## MCP Server Tools (10 registered)
+## MCP Server Tools (19 registered)
 
 | Tool | Status | Notes |
 |------|--------|-------|
@@ -79,10 +79,19 @@ STAGE                          STATUS          EVIDENCE
 | get_locked | WORKING | Returns all locked beliefs for context injection |
 | feedback | WORKING | Records test result, updates Bayesian confidence |
 | settings | WORKING | View/update agentmemory config |
+| lock | WORKING | Lock belief as permanent constraint |
+| get_unclassified | WORKING | Return offline-classified beliefs for LLM reclassification |
+| reclassify | WORKING | Apply LLM classification results to existing beliefs |
+| create_beliefs | WORKING | Store LLM-classified sentences as beliefs |
+| timeline | WORKING | Temporal query: beliefs by time range/topic |
+| evolution | WORKING | Track belief content changes over time |
+| diff | WORKING | Compare belief state between sessions or time points |
+| snapshot | WORKING | Capture current belief graph state |
+| delete / bulk_delete | WORKING | Soft-delete beliefs |
 
 ---
 
-## Production Modules (16 in src/agentmemory/)
+## Production Modules (18 in src/agentmemory/)
 
 | Module | LOC | Purpose |
 |--------|-----|---------|
@@ -100,6 +109,8 @@ STAGE                          STATUS          EVIDENCE
 | cli.py | ~800 | CLI: setup, onboard, stats, health, search, etc. |
 | config.py | ~100 | JSON configuration management |
 | commit_tracker.py | ~150 | Deterministic commit status checker |
+| relationship_detector.py | ~180 | CONTRADICTS/SUPPORTS edge detection on ingest |
+| supersession.py | ~100 | Temporal supersession detection (Jaccard overlap) |
 | models.py | ~150 | Dataclass domain models |
 | __init__.py | ~20 | Public API exports |
 
@@ -115,11 +126,17 @@ STAGE                          STATUS          EVIDENCE
 - **Unused scoring components** -- _TYPE_WEIGHTS, _SOURCE_WEIGHTS, and recency_boost() wired into score_belief().
 
 ### Open Issues
-- **Feedback loop unvalidated** -- Auto-feedback fires but we don't know if it improves retrieval. Exp 66 will test.
 - **Output gating not built** -- Locked beliefs inform but don't block violating output.
 - **Triggered beliefs not automated** -- 15 designs simulated, not wired to events.
-- **Contradiction detection absent** -- No semantic conflict alerting on insertion.
 - **L1 behavioral layer missing** -- Design has L0/L1/L2/L3; implementation skips L1.
+- **Retrieval cold start** -- First retrieve() takes ~10s (HRR graph build over 21K labels). Warm queries ~0.7s.
+- **No multi-session validation** -- Self-hosting only; no controlled cross-session test harness.
+
+### Resolved (2026-04-12/13)
+- **Feedback loop validated** -- Exp 66: +22% MRR over 10 rounds. Auto-feedback now fires on ingest() and atexit.
+- **Contradiction detection built** -- CONTRADICTS/SUPPORTS edge detection in relationship_detector.py, wired into remember(), correct(), and ingest().
+- **Retrieve performance** -- 10s -> 0.7s avg (batch FTS5, pre-parsed datetime, HRR edge filtering).
+- **Classified_by tracking** -- Beliefs now track which classifier produced them (offline/llm/user).
 
 ### Research Findings That Challenge the Design (Exp 62-65)
 1. Global scoring without query produces Thompson sampling noise. FTS5 is the real signal.
