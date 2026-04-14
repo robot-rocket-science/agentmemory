@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sqlite3
 import uuid
 from datetime import datetime, timezone
@@ -466,6 +467,64 @@ class MemoryStore:
 
     # --- Beliefs ---
 
+    @staticmethod
+    def _tokenize(text: str) -> set[str]:
+        """Extract lowercase word tokens (3+ chars) for similarity comparison."""
+        return {w.lower() for w in re.findall(r"[a-zA-Z0-9]+", text) if len(w) >= 3}
+
+    def _find_near_duplicate(
+        self,
+        content: str,
+        belief_type: str,
+        threshold: float = 0.70,
+    ) -> str | None:
+        """Find an active belief with high Jaccard similarity to content.
+
+        Returns the ID of the most similar existing belief if Jaccard >= threshold,
+        or None if no near-duplicate exists. Only compares within the same
+        belief_type to avoid cross-type false matches.
+        """
+        tokens: set[str] = self._tokenize(content)
+        if len(tokens) < 3:
+            return None  # Too short to meaningfully compare
+
+        # Use FTS5 to find candidates (fast narrow-down)
+        sample_terms: list[str] = sorted(tokens)[:6]
+        safe_query: str = " OR ".join(f'"{t}"' for t in sample_terms)
+        try:
+            rows: list[sqlite3.Row] = self._conn.execute(
+                """SELECT b.id, b.content
+                   FROM search_index si
+                   JOIN beliefs b ON b.id = si.id
+                   WHERE search_index MATCH ?
+                     AND si.type = 'belief'
+                     AND b.valid_to IS NULL
+                     AND b.superseded_by IS NULL
+                     AND b.belief_type = ?
+                   ORDER BY bm25(search_index)
+                   LIMIT 10""",
+                (safe_query, belief_type),
+            ).fetchall()
+        except Exception:
+            return None
+
+        best_id: str | None = None
+        best_sim: float = 0.0
+        for row in rows:
+            other_tokens: set[str] = self._tokenize(row["content"])
+            if not other_tokens:
+                continue
+            intersection: int = len(tokens & other_tokens)
+            union: int = len(tokens | other_tokens)
+            jaccard: float = intersection / union if union > 0 else 0.0
+            if jaccard > best_sim:
+                best_sim = jaccard
+                best_id = row["id"]
+
+        if best_sim >= threshold:
+            return best_id
+        return None
+
     def insert_belief(
         self,
         content: str,
@@ -502,6 +561,10 @@ class MemoryStore:
         if existing is not None:
             return _row_to_belief(existing)
 
+        # Near-duplicate detection: if a similar belief already exists,
+        # supersede the old one (new belief is more recent/relevant).
+        near_dup_id: str | None = self._find_near_duplicate(content, belief_type)
+
         belief_id: str = _new_id()
         ts: str = created_at if created_at is not None else _now()
         confidence: float = alpha / (alpha + beta_param)
@@ -535,6 +598,11 @@ class MemoryStore:
             )
 
         self._conn.commit()
+
+        # Supersede the near-duplicate after the new belief is committed
+        if near_dup_id is not None:
+            self.supersede_belief(near_dup_id, belief_id, "near_duplicate")
+
         return Belief(
             id=belief_id,
             content_hash=ch,
@@ -1547,6 +1615,70 @@ class MemoryStore:
             "stale_sessions": stale,
             "type_priors": type_priors,
         }
+
+    # --- Bulk maintenance ---
+
+    def get_active_belief_ids(self) -> list[str]:
+        """Return all active (non-superseded) belief IDs, ordered by creation."""
+        rows: list[sqlite3.Row] = self._conn.execute(
+            "SELECT id FROM beliefs WHERE valid_to IS NULL ORDER BY created_at"
+        ).fetchall()
+        return [str(r["id"]) for r in rows]
+
+    def count_edges_for(self, belief_id: str) -> int:
+        """Count edges (SUPPORTS + CONTRADICTS) connected to a belief."""
+        row: sqlite3.Row = self._conn.execute(
+            """SELECT COUNT(*) FROM edges
+               WHERE (from_id = ? OR to_id = ?)
+                 AND edge_type IN ('SUPPORTS', 'CONTRADICTS')""",
+            (belief_id, belief_id),
+        ).fetchone()
+        val: object = row[0]
+        return int(val) if isinstance(val, int) else 0
+
+    def bulk_update_confidence(
+        self,
+        belief_ids: list[str],
+        outcome: str,
+        weight: float = 0.5,
+    ) -> int:
+        """Apply a Bayesian update to multiple beliefs in a single transaction.
+
+        Returns the number of beliefs updated.
+        """
+        if not belief_ids:
+            return 0
+
+        ts: str = _now()
+        updated: int = 0
+        for belief_id in belief_ids:
+            row: sqlite3.Row | None = self._conn.execute(
+                "SELECT alpha, beta_param, locked FROM beliefs WHERE id = ?",
+                (belief_id,),
+            ).fetchone()
+            if row is None:
+                continue
+
+            alpha: float = float(str(row["alpha"]))
+            beta: float = float(str(row["beta_param"]))
+            is_locked: bool = bool(row["locked"])
+
+            if outcome == "used":
+                alpha += weight
+            elif outcome == "harmful":
+                if not is_locked:
+                    beta += weight
+            else:
+                continue
+
+            self._conn.execute(
+                "UPDATE beliefs SET alpha = ?, beta_param = ?, updated_at = ? WHERE id = ?",
+                (alpha, beta, ts, belief_id),
+            )
+            updated += 1
+
+        self._conn.commit()
+        return updated
 
     # --- Onboarding provenance ---
 
