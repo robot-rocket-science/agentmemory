@@ -374,6 +374,9 @@ def cmd_setup(args: argparse.Namespace) -> None:
     # Step 5: Install commit tracker hook
     _install_commit_hook(agentmemory_bin)
 
+    # Step 5b: Install directive gate hook
+    _install_directive_gate()
+
     # Step 6: Smoke test
     print("\n  Smoke test...")
     import subprocess
@@ -1339,6 +1342,7 @@ def cmd_commit_config(args: argparse.Namespace) -> None:
 # ---------------------------------------------------------------------------
 
 _HOOK_MATCHER: str = "agentmemory commit-check"
+_DIRECTIVE_GATE_MATCHER: str = "agentmemory-directive-gate"
 
 _SETTINGS_PATH: Path = Path.home() / ".claude" / "settings.json"
 
@@ -1403,6 +1407,72 @@ def _install_commit_hook(agentmemory_bin: str | None) -> None:
     settings["hooks"] = hooks
     _SETTINGS_PATH.write_text(json.dumps(settings, indent=2) + "\n")
     print(f"  Installed commit tracker hook in {_SETTINGS_PATH}")
+
+
+def _install_directive_gate() -> None:
+    """Add the directive-gate PreToolUse hook to Claude Code settings.json.
+
+    The hook runs ``scripts/agentmemory-directive-gate.sh`` before write-like
+    tools, surfacing locked behavioral directives as context reminders.
+    Idempotent -- skips if already present.
+    """
+    gate_script: Path = Path(__file__).resolve().parents[2] / "scripts" / "agentmemory-directive-gate.sh"
+    gate_command: str = f"bash {gate_script}"
+
+    hook_entry: dict[str, object] = {
+        "hooks": {
+            "PreToolUse": [
+                {
+                    "type": "command",
+                    "matcher": "Edit|Write|Bash|NotebookEdit",
+                    "command": gate_command,
+                }
+            ]
+        }
+    }
+
+    if not _SETTINGS_PATH.exists():
+        _SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
+        _SETTINGS_PATH.write_text(json.dumps(hook_entry, indent=2) + "\n")
+        print(f"  Installed directive gate hook in {_SETTINGS_PATH}")
+        return
+
+    try:
+        settings: dict[str, Any] = json.loads(_SETTINGS_PATH.read_text())
+    except (json.JSONDecodeError, ValueError):
+        print(
+            f"  Warning: could not parse {_SETTINGS_PATH}, skipping directive gate install",
+            file=sys.stderr,
+        )
+        return
+
+    hooks: dict[str, Any] = cast(
+        dict[str, Any],
+        settings.get("hooks") if isinstance(settings.get("hooks"), dict) else {},
+    )
+
+    pre_tool: list[Any] = cast(
+        list[Any],
+        hooks.get("PreToolUse") if isinstance(hooks.get("PreToolUse"), list) else [],
+    )
+
+    # Check if already installed
+    for entry in pre_tool:
+        if isinstance(entry, dict):
+            cmd_val: str = str(cast(dict[str, Any], entry).get("command", ""))
+            if _DIRECTIVE_GATE_MATCHER in cmd_val:
+                print("  Directive gate hook already installed")
+                return
+
+    pre_tool.append({
+        "type": "command",
+        "matcher": "Edit|Write|Bash|NotebookEdit",
+        "command": gate_command,
+    })
+    hooks["PreToolUse"] = pre_tool
+    settings["hooks"] = hooks
+    _SETTINGS_PATH.write_text(json.dumps(settings, indent=2) + "\n")
+    print(f"  Installed directive gate hook in {_SETTINGS_PATH}")
 
 
 # ---------------------------------------------------------------------------
