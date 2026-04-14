@@ -196,14 +196,15 @@ class TestDecayFactor:
         assert superseded is not None
         assert decay_factor(superseded, superseded.created_at) == 0.01
 
-    def test_no_half_life_type_returns_one(self, store: MemoryStore) -> None:
+    def test_preference_slow_decay(self, store: MemoryStore) -> None:
         b: Belief = store.insert_belief(
-            content="A preference belief stays fresh forever",
+            content="A preference belief decays slowly over weeks",
             belief_type=BELIEF_PREFERENCE,
             source_type=BSRC_USER_STATED,
         )
-        # DECAY_HALF_LIVES["preference"] is None -- should always be 1.0
-        assert DECAY_HALF_LIVES["preference"] is None
+        # preference half-life is 2016 hours (12 weeks)
+        assert DECAY_HALF_LIVES["preference"] == 2016.0
+        # At creation time, factor is 1.0
         assert decay_factor(b, b.created_at) == 1.0
 
     def test_factual_decays_over_time(self, store: MemoryStore) -> None:
