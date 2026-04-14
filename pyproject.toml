@@ -1,9 +1,20 @@
 [project]
 name = "agentmemory"
 version = "0.1.0"
-description = "Add your description here"
+description = "Persistent, graph-backed memory for AI coding agents. Bayesian confidence, FTS5 search, HRR vocabulary bridge, MCP server."
 readme = "README.md"
 requires-python = ">=3.12"
+license = {text = "MIT"}
+authors = [{name = "yoshi280"}]
+keywords = ["ai", "memory", "llm", "mcp", "agent", "retrieval", "sqlite"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
+]
 dependencies = [
     "anthropic>=0.93.0",
     "datasketch>=1.9.0",
@@ -11,6 +22,11 @@ dependencies = [
     "numpy>=2.4.4",
     "scipy>=1.17.1",
 ]
+
+[project.urls]
+Homepage = "https://github.com/yoshi280/agentmemory"
+Repository = "https://github.com/yoshi280/agentmemory"
+Changelog = "https://github.com/yoshi280/agentmemory/blob/master/CHANGELOG.md"
 
 [project.scripts]
 agentmemory = "agentmemory.cli:main"
