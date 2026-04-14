@@ -304,6 +304,7 @@ def remember(text: str) -> str:
         alpha=9.0,
         beta_param=0.5,
         locked=False,
+        classified_by="user",
     )
     detect_relationships(store, belief)
     store.checkpoint(session_id, "remember", belief.content, [belief.id])
@@ -334,6 +335,7 @@ def correct(text: str, replaces: str | None = None) -> str:
         alpha=9.0,
         beta_param=0.5,
         locked=False,
+        classified_by="user",
     )
     detect_relationships(store, belief)
 
@@ -664,6 +666,7 @@ def create_beliefs(classified_json: str) -> str:
             full_text_is_correction=False,
             full_text=full_text,
             created_at=created_at,
+            classified_by="llm",
         )
         total_created += result.beliefs_created
 
@@ -809,13 +812,19 @@ def ingest(text: str, source: str = "user") -> str:
     )
 
     fb_msg: str = f"\n  Auto-feedback: {auto_fb} belief(s) scored" if auto_fb > 0 else ""
+    reclass_msg: str = ""
+    if result.beliefs_created > 0:
+        reclass_msg = (
+            f"\n  NOTE: {result.beliefs_created} belief(s) classified offline (36% accuracy). "
+            f"Call get_unclassified() + reclassify() for LLM accuracy."
+        )
     return (
         f"Ingested {source} turn (offline classifier):\n"
         f"  Observations: {result.observations_created}\n"
         f"  Beliefs: {result.beliefs_created}\n"
         f"  Corrections: {result.corrections_detected}\n"
         f"  Sentences: {result.sentences_extracted} extracted, "
-        f"{result.sentences_persisted} persisted{fb_msg}"
+        f"{result.sentences_persisted} persisted{fb_msg}{reclass_msg}"
     )
 
 

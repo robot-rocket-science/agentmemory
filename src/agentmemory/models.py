@@ -102,6 +102,7 @@ class Belief:
     updated_at: str
     event_time: str | None = None   # Bitemporal: when fact occurred (vs created_at = ingestion time)
     session_id: str | None = None   # Session that created this belief
+    classified_by: str = "offline"  # "offline" or "llm" -- which classifier produced this belief
 
 
 @dataclass

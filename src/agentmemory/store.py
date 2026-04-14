@@ -224,6 +224,7 @@ def _row_to_belief(row: sqlite3.Row) -> Belief:
         updated_at=row["updated_at"],
         event_time=row["event_time"] if "event_time" in keys else None,
         session_id=row["session_id"] if "session_id" in keys else None,
+        classified_by=row["classified_by"] if "classified_by" in keys else "offline",
     )
 
 
@@ -297,6 +298,11 @@ class MemoryStore:
         if "session_id" not in col_names:
             self._conn.execute(
                 "ALTER TABLE beliefs ADD COLUMN session_id TEXT"
+            )
+        # Track which classifier produced this belief ("offline" or "llm").
+        if "classified_by" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE beliefs ADD COLUMN classified_by TEXT NOT NULL DEFAULT 'offline'"
             )
         self._conn.commit()
         # Create index on session_id (safe to run even if already exists)
@@ -416,6 +422,7 @@ class MemoryStore:
         created_at: str | None = None,
         event_time: str | None = None,
         session_id: str | None = None,
+        classified_by: str = "offline",
     ) -> Belief:
         """Insert a belief with optional evidence link. Content-hash dedup.
 
@@ -445,10 +452,10 @@ class MemoryStore:
             """INSERT INTO beliefs
                (id, content_hash, content, belief_type, alpha, beta_param,
                 source_type, locked, valid_from, valid_to, superseded_by,
-                created_at, updated_at, event_time, session_id)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?)""",
+                created_at, updated_at, event_time, session_id, classified_by)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?)""",
             (belief_id, ch, content, belief_type, alpha, beta_param,
-             source_type, locked_int, ts, ts, event_time, session_id),
+             source_type, locked_int, ts, ts, event_time, session_id, classified_by),
         )
         self._conn.execute(
             "INSERT INTO search_index(id, content, type) VALUES (?, ?, ?)",
@@ -484,6 +491,7 @@ class MemoryStore:
             updated_at=ts,
             event_time=event_time,
             session_id=session_id,
+            classified_by=classified_by,
         )
 
     def lock_belief(self, belief_id: str) -> None:
@@ -593,7 +601,7 @@ class MemoryStore:
         self._conn.commit()
 
     def get_reclassifiable(self, limit: int = 200) -> list[dict[str, str]]:
-        """Return unlocked, active beliefs eligible for LLM reclassification."""
+        """Return unlocked, offline-classified beliefs eligible for LLM reclassification."""
         rows: list[dict[str, str]] = []
         cursor = self._conn.execute(
             """SELECT id, content, belief_type, source_type
@@ -601,6 +609,7 @@ class MemoryStore:
                WHERE locked = 0
                  AND superseded_by IS NULL
                  AND valid_to IS NULL
+                 AND classified_by = 'offline'
                ORDER BY created_at DESC
                LIMIT ?""",
             (limit,),
@@ -621,11 +630,14 @@ class MemoryStore:
         alpha: float,
         beta_param: float,
     ) -> None:
-        """Update a belief's type and priors (for reclassification)."""
+        """Update a belief's type and priors (for reclassification).
+
+        Also sets classified_by='llm' to mark the belief as LLM-classified.
+        """
         ts: str = _now()
         self._conn.execute(
             """UPDATE beliefs SET belief_type = ?, alpha = ?, beta_param = ?,
-               updated_at = ? WHERE id = ?""",
+               classified_by = 'llm', updated_at = ? WHERE id = ?""",
             (belief_type, alpha, beta_param, ts, belief_id),
         )
         self._conn.commit()
