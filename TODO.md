@@ -1,7 +1,7 @@
 # TODO: Agentic Memory Project
 
-**Last updated:** 2026-04-13
-**Status:** Phase 3 in progress. 18 production modules, 260 tests passing, 19 MCP tools, MCP server active.
+**Last updated:** 2026-04-14
+**Status:** Phase 3 nearing completion. 18 production modules, 285 tests passing, 19 MCP tools, MCP server active.
 
 ---
 
@@ -72,9 +72,9 @@ Research phase is complete (83 experiments). Phase 2 MVP is built and self-hosti
 - [x] Auto-feedback fires on ingest() + atexit session flush
 - [x] Multi-session validation harness (Exp 84: 10/10 checks pass)
 - [x] CALLS (3,518), CITES (758), CONTAINS (720) edges from scanner (in graph_edges table)
-- [ ] IMPLEMENTS/TESTS edge extraction (requirement-to-code, test-to-code traceability)
+- [x] IMPLEMENTS/TESTS edge extraction (requirement-to-code, test-to-code traceability)
 - [ ] Cross-model MCP testing (Claude, ChatGPT, Gemini)
-- [ ] BFS graph traversal with edge weighting (HRR single-hop exists)
+- [x] BFS graph traversal with edge weighting (HRR single-hop exists)
 
 ### Phase 4: Behavioral Enforcement (COMPLETE)
 - [x] TB-02: Session start locked belief injection (agentmemory-inject.sh)
@@ -98,7 +98,7 @@ Research phase is complete (83 experiments). Phase 2 MVP is built and self-hosti
 - [x] Session velocity tracking (velocity_items_per_hour + velocity_tier in sessions)
 - [x] Calibrated status reporting (rigor distribution + velocity + caveat in status())
 - [ ] Cross-model benchmarking (needs ChatGPT/Gemini access)
-- [ ] Comprehensive acceptance testing (22 case study replays)
+- [x] Comprehensive acceptance testing (18 case studies covered, 45 tests total)
 
 ---
 
