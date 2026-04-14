@@ -5,6 +5,7 @@ Uses a single lazily-initialized MemoryStore backed by ~/.agentmemory/memory.db.
 """
 from __future__ import annotations
 
+import atexit
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -157,6 +158,19 @@ def _process_auto_feedback(session_id: str) -> int:
     if count > 0:
         store.increment_session_metrics(session_id, feedback_given=count)
     return count
+
+
+def _flush_feedback_on_exit() -> None:
+    """Flush the last retrieval batch's auto-feedback when the server exits.
+
+    Without this, the final search()'s retrieved beliefs never get feedback
+    because no subsequent search() or ingest() triggers processing.
+    """
+    if _session_id is not None:
+        _process_auto_feedback(_session_id)
+
+
+atexit.register(_flush_feedback_on_exit)
 
 
 def _resolve_server_db() -> Path:
@@ -781,8 +795,11 @@ def ingest(text: str, source: str = "user") -> str:
     session_id: str = _ensure_session()
     result: IngestResult = ingest_turn(store, text, source, session_id=session_id)
 
-    # Feed ingested text into the auto-feedback buffer
+    # Feed ingested text into the auto-feedback buffer, then process.
+    # Processing after append ensures the ingested text (agent's response to
+    # previous search results) is included in the key-term matching.
     _ingest_buffer.append(text)
+    auto_fb: int = _process_auto_feedback(session_id)
 
     store.increment_session_metrics(
         session_id,
@@ -791,13 +808,14 @@ def ingest(text: str, source: str = "user") -> str:
         corrections_detected=result.corrections_detected,
     )
 
+    fb_msg: str = f"\n  Auto-feedback: {auto_fb} belief(s) scored" if auto_fb > 0 else ""
     return (
         f"Ingested {source} turn (offline classifier):\n"
         f"  Observations: {result.observations_created}\n"
         f"  Beliefs: {result.beliefs_created}\n"
         f"  Corrections: {result.corrections_detected}\n"
         f"  Sentences: {result.sentences_extracted} extracted, "
-        f"{result.sentences_persisted} persisted"
+        f"{result.sentences_persisted} persisted{fb_msg}"
     )
 
 
