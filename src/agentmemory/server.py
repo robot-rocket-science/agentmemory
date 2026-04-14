@@ -64,6 +64,9 @@ _ingest_buffer: list[str] = []
 # Auto-feedback skips these (explicit always wins).
 _explicit_feedback_ids: set[str] = set()
 
+# TB-13: Count locked belief accesses for audit trail.
+_locked_access_count: int = 0
+
 # ---------------------------------------------------------------------------
 # Auto-feedback: key-term extraction and matching
 # ---------------------------------------------------------------------------
@@ -261,7 +264,11 @@ def search(query: str, budget: int = 2000) -> str:
     )
 
     if not result.beliefs:
-        return "No beliefs found matching your query."
+        return (
+            "No beliefs found matching your query. "
+            "This may be a knowledge gap. Consider asking the user for context, "
+            "or use observe() to record new information."
+        )
 
     # Track which beliefs were retrieved for feedback loop
     ts: str = datetime.now(timezone.utc).isoformat()
@@ -439,6 +446,7 @@ def status() -> str:
             lines.append(f"  beliefs_created: {session.beliefs_created}")
             lines.append(f"  corrections_detected: {session.corrections_detected}")
             lines.append(f"  searches_performed: {session.searches_performed}")
+            lines.append(f"  locked_accesses: {_locked_access_count}")
 
     # Health metrics
     health: dict[str, object] = store.get_health_metrics()
@@ -458,6 +466,9 @@ def get_locked() -> str:
     This is what the SessionStart hook calls to load persistent beliefs
     into the agent's active context.
     """
+    global _locked_access_count
+    _locked_access_count += 1
+
     store: MemoryStore = _get_store()
     beliefs: list[Belief] = store.get_locked_beliefs()
 
@@ -1125,11 +1136,18 @@ def feedback(belief_id: str, outcome: str, detail: str = "") -> str:
         return f"Feedback recorded (test #{test.id}) but belief disappeared."
 
     lock_note: str = " (locked, beta unchanged)" if updated.locked and outcome == OUTCOME_HARMFUL else ""
+    drop_warn: str = ""
+    if belief.confidence >= 0.5 and updated.confidence < 0.5:
+        snippet: str = updated.content[:80].replace("\n", " ")
+        drop_warn = (
+            f"\n  WARNING: Belief dropped below 50% confidence. "
+            f'Review: "{snippet}"'
+        )
     return (
         f"Feedback recorded for {belief_id}: {outcome}{lock_note}\n"
         f"  confidence: {belief.confidence:.3f} -> {updated.confidence:.3f}\n"
         f"  alpha: {belief.alpha} -> {updated.alpha}, "
-        f"beta: {belief.beta_param} -> {updated.beta_param}"
+        f"beta: {belief.beta_param} -> {updated.beta_param}{drop_warn}"
     )
 
 

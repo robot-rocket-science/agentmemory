@@ -569,20 +569,25 @@ class MemoryStore:
             (belief_id, alpha, beta_param, event_type, event_detail, ts),
         )
 
-    def update_confidence(self, belief_id: str, outcome: str, weight: float = 1.0) -> None:
+    def update_confidence(
+        self, belief_id: str, outcome: str, weight: float = 1.0,
+    ) -> bool:
         """Bayesian update: 'used' increments alpha, 'harmful' increments beta_param.
 
         Locked beliefs cannot have beta_param increased (confidence floor preserved).
+        Returns True if the belief dropped below 0.5 confidence (TB-15 warning).
         """
         row: sqlite3.Row | None = self._conn.execute(
             "SELECT alpha, beta_param, locked FROM beliefs WHERE id = ?",
             (belief_id,),
         ).fetchone()
         if row is None:
-            return
+            return False
 
-        alpha: float = row["alpha"]
-        beta: float = row["beta_param"]
+        old_alpha: float = row["alpha"]
+        old_beta: float = row["beta_param"]
+        alpha: float = old_alpha
+        beta: float = old_beta
         is_locked: bool = bool(row["locked"])
         ts: str = _now()
 
@@ -599,6 +604,11 @@ class MemoryStore:
         )
         self._record_confidence(belief_id, alpha, beta, f"feedback_{outcome}")
         self._conn.commit()
+
+        # TB-15: detect significant confidence drop
+        old_conf: float = old_alpha / (old_alpha + old_beta) if (old_alpha + old_beta) > 0 else 0.5
+        new_conf: float = alpha / (alpha + beta) if (alpha + beta) > 0 else 0.5
+        return old_conf >= 0.5 and new_conf < 0.5
 
     def get_reclassifiable(self, limit: int = 200) -> list[dict[str, str]]:
         """Return unlocked, offline-classified beliefs eligible for LLM reclassification."""
