@@ -563,7 +563,16 @@ class MemoryStore:
         return deleted
 
     def supersede_belief(self, old_id: str, new_id: str, reason: str) -> None:
-        """Mark old belief as superseded. Sets valid_to, creates a SUPERSEDES edge."""
+        """Mark old belief as superseded. Sets valid_to, creates a SUPERSEDES edge.
+
+        Locked beliefs cannot be superseded -- they are authoritative (REQ-020).
+        """
+        old_row: sqlite3.Row | None = self._conn.execute(
+            "SELECT locked FROM beliefs WHERE id = ?", (old_id,)
+        ).fetchone()
+        if old_row is not None and bool(old_row["locked"]):
+            return  # Locked beliefs are immune to supersession.
+
         ts: str = _now()
         self._conn.execute(
             "UPDATE beliefs SET valid_to = ?, superseded_by = ?, updated_at = ? WHERE id = ?",
