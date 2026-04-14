@@ -517,8 +517,15 @@ def onboard(project_path: str) -> str:
     if not path.is_dir():
         return f"Not a directory: {path}"
 
-    # Scan the project
-    scan: ScanResult = scan_project(path)
+    # Check for incremental onboarding: use last onboard commit if available
+    store_pre: MemoryStore = _get_store()
+    last_run: dict[str, str] | None = store_pre.get_last_onboarding(str(path))
+    since_commit: str | None = None
+    if last_run is not None and last_run.get("commit_hash"):
+        since_commit = last_run["commit_hash"]
+
+    # Scan the project (incremental if since_commit is set)
+    scan: ScanResult = scan_project(path, since_commit=since_commit)
 
     # Extract observations and sentences (no beliefs)
     store: MemoryStore = _get_store()
@@ -595,8 +602,9 @@ def onboard(project_path: str) -> str:
     for e in scan.edges:
         edge_types[e.edge_type] = edge_types.get(e.edge_type, 0) + 1
 
+    mode: str = f"incremental (since {since_commit[:12]})" if since_commit else "full"
     lines: list[str] = [
-        f"Onboarded project: {scan.manifest.name}",
+        f"Onboarded project: {scan.manifest.name} [{mode}]",
         f"  Signals: git={scan.manifest.has_git}, "
         f"docs={scan.manifest.doc_count}, "
         f"languages={scan.manifest.languages}",

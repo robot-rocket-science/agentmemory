@@ -260,20 +260,27 @@ def extract_file_tree(project_root: Path) -> tuple[list[Node], list[Edge]]:
     return nodes, edges
 
 
-def extract_git_history(project_root: Path) -> tuple[list[Node], list[Edge]]:
+def extract_git_history(
+    project_root: Path,
+    since_commit: str | None = None,
+) -> tuple[list[Node], list[Edge]]:
     """Extract commit nodes and file-change edges from git log.
 
     Produces edge types: COMMIT_TOUCHES, CO_CHANGED, TEMPORAL_NEXT.
     Filters: merge commits, WIP commits, bulk commits (>50 files).
+
+    If since_commit is provided, only extracts commits after that hash
+    (for incremental onboarding).
     """
     root: Path = project_root.resolve()
     nodes: list[Node] = []
     edges: list[Edge] = []
 
     # Parse git log
-    raw: str = _run_git(root, [
-        "log", "--format=COMMIT:%H|%s|%aI", "--name-only",
-    ])
+    git_args: list[str] = ["log", "--format=COMMIT:%H|%s|%aI", "--name-only"]
+    if since_commit:
+        git_args.append(f"{since_commit}..HEAD")
+    raw: str = _run_git(root, git_args)
     if not raw.strip():
         return nodes, edges
 
@@ -604,11 +611,17 @@ def extract_directives(
 # ---------------------------------------------------------------------------
 
 
-def scan_project(project_root: str | Path) -> ScanResult:
+def scan_project(
+    project_root: str | Path,
+    since_commit: str | None = None,
+) -> ScanResult:
     """Scan a project directory and extract all available signals.
 
     This is the main entry point. It runs discover() to detect signals,
     then conditionally runs each extractor based on what's available.
+
+    If since_commit is provided, git history extraction is limited to
+    commits after that hash (incremental onboarding).
 
     Returns a ScanResult with manifest, nodes, and edges.
     """
@@ -637,7 +650,7 @@ def scan_project(project_root: str | Path) -> ScanResult:
     # Git history
     if manifest.has_git and manifest.commit_count > 0:
         t = time.monotonic()
-        git_nodes, git_edges = extract_git_history(root)
+        git_nodes, git_edges = extract_git_history(root, since_commit=since_commit)
         all_nodes.extend(git_nodes)
         all_edges.extend(git_edges)
         timings["git_history"] = time.monotonic() - t
