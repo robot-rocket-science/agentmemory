@@ -225,6 +225,9 @@ def _row_to_belief(row: sqlite3.Row) -> Belief:
         event_time=row["event_time"] if "event_time" in keys else None,
         session_id=row["session_id"] if "session_id" in keys else None,
         classified_by=row["classified_by"] if "classified_by" in keys else "offline",
+        rigor_tier=row["rigor_tier"] if "rigor_tier" in keys else "hypothesis",
+        method=row["method"] if "method" in keys else None,
+        sample_size=row["sample_size"] if "sample_size" in keys else None,
     )
 
 
@@ -303,6 +306,20 @@ class MemoryStore:
         if "classified_by" not in col_names:
             self._conn.execute(
                 "ALTER TABLE beliefs ADD COLUMN classified_by TEXT NOT NULL DEFAULT 'offline'"
+            )
+        # REQ-025: rigor tier (hypothesis/simulated/empirically_tested/validated)
+        if "rigor_tier" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE beliefs ADD COLUMN rigor_tier TEXT NOT NULL DEFAULT 'hypothesis'"
+            )
+        # REQ-023: provenance metadata
+        if "method" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE beliefs ADD COLUMN method TEXT"
+            )
+        if "sample_size" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE beliefs ADD COLUMN sample_size INTEGER"
             )
         self._conn.commit()
         # Create index on session_id (safe to run even if already exists)
@@ -423,6 +440,9 @@ class MemoryStore:
         event_time: str | None = None,
         session_id: str | None = None,
         classified_by: str = "offline",
+        rigor_tier: str = "hypothesis",
+        method: str | None = None,
+        sample_size: int | None = None,
     ) -> Belief:
         """Insert a belief with optional evidence link. Content-hash dedup.
 
@@ -452,10 +472,12 @@ class MemoryStore:
             """INSERT INTO beliefs
                (id, content_hash, content, belief_type, alpha, beta_param,
                 source_type, locked, valid_from, valid_to, superseded_by,
-                created_at, updated_at, event_time, session_id, classified_by)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?)""",
+                created_at, updated_at, event_time, session_id, classified_by,
+                rigor_tier, method, sample_size)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (belief_id, ch, content, belief_type, alpha, beta_param,
-             source_type, locked_int, ts, ts, event_time, session_id, classified_by),
+             source_type, locked_int, ts, ts, event_time, session_id, classified_by,
+             rigor_tier, method, sample_size),
         )
         self._conn.execute(
             "INSERT INTO search_index(id, content, type) VALUES (?, ?, ?)",
@@ -492,6 +514,9 @@ class MemoryStore:
             event_time=event_time,
             session_id=session_id,
             classified_by=classified_by,
+            rigor_tier=rigor_tier,
+            method=method,
+            sample_size=sample_size,
         )
 
     def lock_belief(self, belief_id: str) -> None:
@@ -1431,6 +1456,26 @@ class MemoryStore:
             "stale_sessions": stale,
             "type_priors": type_priors,
         }
+
+    def get_rigor_distribution(self) -> dict[str, int]:
+        """Return count of active beliefs per rigor_tier."""
+        rows: list[sqlite3.Row] = self._conn.execute(
+            """SELECT rigor_tier, COUNT(*) as cnt FROM beliefs
+               WHERE valid_to IS NULL
+               GROUP BY rigor_tier ORDER BY cnt DESC"""
+        ).fetchall()
+        return {str(r["rigor_tier"]): int(r["cnt"]) for r in rows}
+
+    def get_last_completed_session(self) -> Session | None:
+        """Return the most recently completed session (for velocity reporting)."""
+        row: sqlite3.Row | None = self._conn.execute(
+            """SELECT * FROM sessions
+               WHERE completed_at IS NOT NULL
+               ORDER BY completed_at DESC LIMIT 1"""
+        ).fetchone()
+        if row is None:
+            return None
+        return _row_to_session(row)
 
     def get_snapshot(
         self,

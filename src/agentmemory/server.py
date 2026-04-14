@@ -456,6 +456,23 @@ def status() -> str:
     lines.append(f"  edges: {health['contradicts_edges']} CONTRADICTS, {health['supports_edges']} SUPPORTS, {health['supersedes_edges']} SUPERSEDES")
     lines.append(f"  feedback_coverage: {health['feedback_coverage_count']} ({health['feedback_coverage_pct']}%)")
 
+    # REQ-025/026: Rigor tier distribution + calibrated framing
+    rigor: dict[str, int] = store.get_rigor_distribution()
+    if rigor:
+        total_rigor: int = sum(rigor.values())
+        lines.append("Rigor tiers:")
+        for tier, cnt in sorted(rigor.items(), key=lambda x: x[1], reverse=True):
+            pct: float = cnt / total_rigor * 100 if total_rigor > 0 else 0.0
+            lines.append(f"  {tier}: {cnt} ({pct:.0f}%)")
+        validated: int = rigor.get("validated", 0) + rigor.get("empirically_tested", 0)
+        if total_rigor > 0 and validated / total_rigor < 0.3:
+            lines.append(f"  CAVEAT: {validated / total_rigor * 100:.0f}% of beliefs are empirically tested or validated. Most findings are hypotheses or simulations.")
+
+    # Last completed session velocity
+    last_velocity: Session | None = store.get_last_completed_session()
+    if last_velocity is not None and last_velocity.velocity_tier is not None:
+        lines.append(f"Last session: {last_velocity.velocity_tier} ({last_velocity.velocity_items_per_hour:.1f} items/hr)")
+
     return "\n".join(lines)
 
 

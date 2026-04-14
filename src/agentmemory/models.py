@@ -103,6 +103,9 @@ class Belief:
     event_time: str | None = None   # Bitemporal: when fact occurred (vs created_at = ingestion time)
     session_id: str | None = None   # Session that created this belief
     classified_by: str = "offline"  # "offline" or "llm" -- which classifier produced this belief
+    rigor_tier: str = "hypothesis"  # hypothesis / simulated / empirically_tested / validated (REQ-025)
+    method: str | None = None       # How this belief was produced (REQ-023)
+    sample_size: int | None = None  # Number of samples in evidence (REQ-023)
 
 
 @dataclass
