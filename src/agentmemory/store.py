@@ -239,6 +239,7 @@ def _row_to_belief(row: sqlite3.Row) -> Belief:
         rigor_tier=row["rigor_tier"] if "rigor_tier" in keys else "hypothesis",
         method=row["method"] if "method" in keys else None,
         sample_size=row["sample_size"] if "sample_size" in keys else None,
+        scope=row["scope"] if "scope" in keys else "project",
     )
 
 
@@ -331,6 +332,11 @@ class MemoryStore:
         if "sample_size" not in col_names:
             self._conn.execute(
                 "ALTER TABLE beliefs ADD COLUMN sample_size INTEGER"
+            )
+        # Cross-project scope: "project" (default) or "global"
+        if "scope" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE beliefs ADD COLUMN scope TEXT NOT NULL DEFAULT 'project'"
             )
         self._conn.commit()
         # Create index on session_id (safe to run even if already exists)
@@ -1518,6 +1524,36 @@ class MemoryStore:
         if row is None:
             return None
         return {k: str(row[k]) for k in row.keys()}
+
+    def promote_to_global(self, belief_id: str) -> bool:
+        """Mark a belief as global scope (cross-project).
+
+        Global beliefs are visible across all projects via the global DB.
+        Returns True if the belief was promoted, False if not found.
+        Requires user confirmation before calling (enforced by MCP tool).
+        """
+        row: sqlite3.Row | None = self._conn.execute(
+            "SELECT id FROM beliefs WHERE id = ? AND valid_to IS NULL",
+            (belief_id,),
+        ).fetchone()
+        if row is None:
+            return False
+        self._conn.execute(
+            "UPDATE beliefs SET scope = 'global', updated_at = ? WHERE id = ?",
+            (_now(), belief_id),
+        )
+        self._conn.commit()
+        return True
+
+    def get_global_beliefs(self, limit: int = 20) -> list[Belief]:
+        """Return beliefs marked as global scope (cross-project)."""
+        rows: list[sqlite3.Row] = self._conn.execute(
+            """SELECT * FROM beliefs
+               WHERE scope = 'global' AND valid_to IS NULL
+               ORDER BY confidence DESC LIMIT ?""",
+            (limit,),
+        ).fetchall()
+        return [_row_to_belief(r) for r in rows]
 
     def get_rigor_distribution(self) -> dict[str, int]:
         """Return count of active beliefs per rigor_tier."""

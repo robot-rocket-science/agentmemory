@@ -1197,5 +1197,33 @@ def feedback(belief_id: str, outcome: str, detail: str = "") -> str:
     )
 
 
+@mcp.tool
+def promote(belief_id: str) -> str:
+    """Promote a belief to global scope (visible across all projects).
+
+    Only call this AFTER the user has explicitly confirmed they want the
+    belief promoted. Global beliefs are loaded in every project's context.
+    Useful for behavioral rules like "always use pyright strict mode"
+    that apply regardless of which project is active.
+
+    Returns confirmation or error if belief not found.
+    """
+    store: MemoryStore = _get_store()
+    belief: Belief | None = store.get_belief(belief_id)
+    if belief is None:
+        return f"Error: no belief found with ID {belief_id}"
+    if belief.scope == "global":
+        return f"Already global (ID: {belief.id}): {belief.content[:80]}"
+
+    ok: bool = store.promote_to_global(belief_id)
+    if not ok:
+        return f"Error: could not promote belief {belief_id}"
+
+    return (
+        f"Promoted to global scope (ID: {belief.id}): {belief.content[:80]}\n"
+        f"This belief will now be visible in all projects."
+    )
+
+
 if __name__ == "__main__":
     mcp.run()
