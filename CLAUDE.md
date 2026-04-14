@@ -56,6 +56,18 @@ If the memory system causes a context loop, hallucination spiral, or other probl
 
 To re-enable after disabling: the user says "enable agentmemory" and you resume calling tools.
 
+## Behavioral Enforcement (TB-01/04/12/14)
+
+These rules are not enforceable via hooks. You must self-enforce them.
+
+1. **Before asking the user what to do next:** Check TODO.md first. If it has pending items, present them instead of asking. Do not say "What would you like to work on?" when the answer is in the task list. (TB-01, CS-003)
+
+2. **Verify entity IDs from instructions:** When the user references a specific experiment number, belief ID, requirement ID, or file name, verify it exists before acting on it. Do not substitute a different ID. If you generate output referencing an ID, confirm it matches the user's instruction. (TB-04, CS-020)
+
+3. **Load task context on task switch:** When the user shifts to a different topic or task, search agentmemory for relevant beliefs about that topic before responding. Do not carry assumptions from the previous task. (TB-12)
+
+4. **Do not overclaim rigor:** When describing project findings or status, do not use "extensive", "thoroughly validated", "comprehensive", or equivalent without qualifying the rigor tier. Most findings are from simulation or single-project testing. Say "simulated" or "tested on N samples" instead of implying broad validation. Check the source_type distribution before summarizing maturity. (TB-14, CS-005)
+
 ## Coding Guidelines
 
 - All code must use strict static typing (pyright strict mode)
@@ -69,4 +81,4 @@ To re-enable after disabling: the user says "enable agentmemory" and you resume 
 
 This IS the agentmemory project -- a persistent memory system for AI coding agents. The system you are using (the MCP server) is the artifact this project builds. Testing the system on itself is intentional.
 
-Research phase: 60 experiments completed. Phase 2 MVP built and tested (115 tests, all passing). The memory system is now in live testing mode.
+Phase 3 complete, Phase 4 in progress. 84 experiments, 260 tests passing, 19 MCP tools, 18 production modules. 11/15 triggered beliefs implemented. The memory system is in live testing mode with active feedback loop.
