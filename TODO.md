@@ -81,7 +81,10 @@ Research phase is complete (83 experiments). Phase 2 MVP is built and self-hosti
 - [x] TB-03: Per-prompt directive injection (agentmemory-search-inject.sh)
 - [x] TB-10: PreToolUse directive violation gate (agentmemory-directive-gate.sh)
 - [x] Session-end hook: complete session + auto-ingest turns from conversation log
-- [ ] Remaining 12 TBs (TB-01,04-09,11-15)
+- [x] TB-06: PreCompact guard warns about locked beliefs before compression
+- [x] TB-08: Corrections auto-promoted (correct() creates high-conf belief)
+- [x] TB-09: Contradictions surfaced (flag_contradictions() in retrieve)
+- [ ] Remaining 9 TBs (TB-01,04,05,07,11-15)
 - [ ] Directed graph traversal for multi-hop queries
 - [ ] L1 behavioral layer in retrieval pipeline
 
