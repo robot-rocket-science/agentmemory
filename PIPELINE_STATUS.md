@@ -56,9 +56,10 @@ STAGE                          STATUS          EVIDENCE
                                                atexit flush for final batch.
                                                VALIDATED: Exp 66 +22% MRR over 10 rounds.
 
-12. Triggered beliefs          PARTIALLY BUILT  TB-02/03/10 wired as Claude Code hooks
-    (meta-cognitive checks)                    15 TBs designed, 3 automated (Exp 51: 5/5)
-                                               Session-end hook completes sessions
+12. Triggered beliefs          MOSTLY BUILT     11/15 TBs implemented via hooks + server code
+    (meta-cognitive checks)                    TB-02/03/05/06/07/08/09/10/11/13/15 done
+                                               4 remaining (TB-01/04/12/14) are behavioral
+                                               guidance enforced via CLAUDE.md instructions
 
 13. Output gating              WORKING (Bash)   PreToolUse directive gate blocks Bash
     (block violating output)                   commands matching locked prohibitions.

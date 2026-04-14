@@ -82,9 +82,14 @@ Research phase is complete (83 experiments). Phase 2 MVP is built and self-hosti
 - [x] TB-10: PreToolUse directive violation gate (agentmemory-directive-gate.sh)
 - [x] Session-end hook: complete session + auto-ingest turns from conversation log
 - [x] TB-06: PreCompact guard warns about locked beliefs before compression
+- [x] TB-07: Empty retrieval escalation (suggests asking user or observe())
 - [x] TB-08: Corrections auto-promoted (correct() creates high-conf belief)
 - [x] TB-09: Contradictions surfaced (flag_contradictions() in retrieve)
-- [ ] Remaining 9 TBs (TB-01,04,05,07,11-15)
+- [x] TB-11: Stale context detection (>24h gap warning at session start)
+- [x] TB-05: Maturity note when <20% user-validated beliefs (CS-005)
+- [x] TB-13: Locked belief access audit counter in status()
+- [x] TB-15: Confidence drop warning when belief falls below 50%
+- [ ] TB-01/04/12/14: Behavioral guidance (enforced via CLAUDE.md, not hooks)
 - [ ] Directed graph traversal for multi-hop queries
 - [ ] L1 behavioral layer in retrieval pipeline
 
