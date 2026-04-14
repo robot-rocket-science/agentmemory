@@ -34,8 +34,8 @@ Each requirement has:
 
 **Plan trace:** Phase 2 (core memory graph), Phase 3 (feedback loop)
 **Experiment trace:** Experiment 3 (retrieval quality), Phase 0 baseline measurement
-**Status:** Implemented (needs formal multi-session verification)
-**Evidence:** SQLite store persists beliefs across sessions. get_locked() injects at session start. Locked beliefs survive all sessions. Formal 5-session replay test not yet run.
+**Status:** Verified (simulation)
+**Evidence:** Exp 84: 10/10 multi-session checks pass (5 sessions, fresh MemoryStore per session). Beliefs persist, feedback accumulates, supersession works, locked beliefs survive, retrieval quality stable (MRR=1.0). SQLite store + get_locked() injection confirmed end-to-end. Full 5-session replay with 10 real decisions not yet run.
 
 ### REQ-002: Belief Consistency
 
@@ -49,8 +49,8 @@ Each requirement has:
 
 **Plan trace:** Phase 2 (conflict detection), Phase 3 (revision pipeline)
 **Experiment trace:** Experiment 2 (Bayesian calibration, non-stationarity test)
-**Status:** Not started
-**Evidence:** --
+**Status:** Implemented
+**Evidence:** CONTRADICTS/SUPPORTS edge detection in relationship_detector.py (wired into remember, correct, ingest). flag_contradictions() in retrieval.py:199 checks result set for contradicting pairs and appends warnings. Contradiction warnings included in RetrievalResult. Formal 10-contradiction injection test not yet run, but the detection and flagging pipeline is end-to-end.
 
 ---
 
@@ -205,7 +205,7 @@ Each requirement has:
 **Plan trace:** Phase 4 (MCP server)
 **Experiment trace:** Phase 4 exit criteria
 **Status:** Partially implemented
-**Evidence:** MCP server built and running with 10 tools via FastMCP. Tested with Claude Code. ChatGPT and local model testing not yet done.
+**Evidence:** MCP server built and running with 19 tools via FastMCP. Tested with Claude Code. ChatGPT and local model testing not yet done.
 
 ---
 
@@ -279,8 +279,8 @@ Each requirement has:
 
 **Plan trace:** All phases (architectural constraint)
 **Experiment trace:** Dedicated audit in Phase 5
-**Status:** Not started
-**Evidence:** --
+**Status:** Verified
+**Evidence:** Code audit 2026-04-13: zero network imports (requests, urllib, httpx, socket, aiohttp) in all 18 src/agentmemory/*.py modules. All memory operations use local SQLite. Only external call is optional LLM classification (Haiku, user-consented). Offline test not yet run but code paths are verified local-only.
 
 ### REQ-018: No Telemetry or Data Collection
 
@@ -294,8 +294,8 @@ Each requirement has:
 
 **Plan trace:** All phases (architectural constraint)
 **Experiment trace:** Phase 5 audit
-**Status:** Not started
-**Evidence:** --
+**Status:** Verified
+**Evidence:** Code audit 2026-04-13: grep for telemetry, analytics, sentry, datadog, mixpanel, segment, amplitude returned zero code paths. "analytics" in cli.py refers to local statistics display only. No outbound data collection.
 
 ---
 
@@ -420,8 +420,8 @@ Derived from CS-005. The system must not only store what was learned, but how co
 
 **Plan trace:** Phase 1 (session tracking), Phase 2 (status reporting)
 **Experiment trace:** CS-005 acceptance test
-**Status:** Not started
-**Evidence:** --
+**Status:** Implemented
+**Evidence:** velocity_items_per_hour and velocity_tier columns in sessions table (store.py:353-360). complete_session() computes velocity = items/hours and assigns tier (sprint/moderate/steady/deep) at store.py:1000-1037. Exp 75 validated velocity measurement. Velocity-scaled decay wired into scoring.py. Status reporting does not yet surface velocity in natural language summaries (CS-005 acceptance test not yet run).
 
 ### REQ-025: Methodological Confidence Layer
 
@@ -499,8 +499,8 @@ The memory system CANNOT guarantee (not under our control):
 
 **Plan trace:** Phase 1 (storage, persistence), Phase 3 (detection), Phase 4 (MCP enforcement, hooks)
 **Experiment trace:** CS-002, CS-004 acceptance tests, alpha-seek override replay
-**Status:** Not started
-**Evidence:** Exp 6: 30/38 overrides (66%) are repeated directives. This is the #1 problem.
+**Status:** Partially implemented (Tiers 1-3)
+**Evidence:** Tier 1 (storage): SQLite WAL + locked beliefs (store.py:64, 498-508). Tier 2 (injection): get_locked() MCP tool + L0 injection in retrieve() (server.py:454-470, retrieval.py:131-146). Tier 3 (compression survival): locked beliefs prioritized first in candidate list, correction/preference types kept as full text in compression (compression.py:52-77). Tiers 4-5 (violation detection/blocking): not implemented. Exp 6: 30/38 overrides (66%) are repeated directives.
 
 ---
 
