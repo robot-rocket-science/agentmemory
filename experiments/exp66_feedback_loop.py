@@ -24,8 +24,8 @@ CWD: Final[str] = "/Users/thelorax/projects/agentmemory"
 DB_HASH: Final[str] = hashlib.sha256(CWD.encode()).hexdigest()[:12]
 LIVE_DB: Final[Path] = Path.home() / ".agentmemory" / "projects" / DB_HASH / "memory.db"
 
-NUM_ROUNDS: Final[int] = 50
-TOP_K: Final[int] = 30
+NUM_ROUNDS: Final[int] = 10
+TOP_K: Final[int] = 10
 MRR_K: Final[int] = 10
 SESSION_ID: Final[str] = "exp66_sim"
 
@@ -108,6 +108,8 @@ def main() -> None:
     print(f"Working on temp DB: {tmp_db}")
 
     store: MemoryStore = MemoryStore(tmp_db)
+    session = store.create_session(model="exp66_sim")
+    session_id: str = session.id
 
     # Bootstrap ground truth: first retrieval pass, top-3 per query are "relevant"
     initial_results: dict[str, list[str]] = run_retrieval_round(store, QUERIES)
@@ -129,7 +131,7 @@ def main() -> None:
                 outcome: str = "used" if bid in gt else "ignored"
                 store.record_test_result(
                     belief_id=bid,
-                    session_id=SESSION_ID,
+                    session_id=session_id,
                     outcome=outcome,
                     detection_layer="checkpoint",
                 )
@@ -157,7 +159,7 @@ def main() -> None:
         "delta": delta,
         "pct_change": pct_change,
         "success": pct_change >= 10.0,
-        "success_criterion": "MRR improves by >= 10% over 50 rounds",
+        "success_criterion": f"MRR improves by >= 10% over {NUM_ROUNDS} rounds",
     }
 
     out_path: Path = Path(__file__).parent / "exp66_results.json"
