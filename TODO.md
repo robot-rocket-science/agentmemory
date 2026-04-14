@@ -80,7 +80,7 @@ Research phase is complete (83 experiments). Phase 2 MVP is built and self-hosti
 - [x] TB-02: Session start locked belief injection (agentmemory-inject.sh)
 - [x] TB-03: Per-prompt directive injection (agentmemory-search-inject.sh)
 - [x] TB-10: PreToolUse directive violation gate (agentmemory-directive-gate.sh)
-- [x] Session-end hook for session completion (agentmemory-session-end.sh)
+- [x] Session-end hook: complete session + auto-ingest turns from conversation log
 - [ ] Remaining 12 TBs (TB-01,04-09,11-15)
 - [ ] Directed graph traversal for multi-hop queries
 - [ ] L1 behavioral layer in retrieval pipeline
