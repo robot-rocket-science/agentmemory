@@ -757,32 +757,132 @@ def cmd_lock(args: argparse.Namespace) -> None:
 
 
 # ---------------------------------------------------------------------------
-# wonder (stub)
+# wonder
 # ---------------------------------------------------------------------------
 
 
 def cmd_wonder(args: argparse.Namespace) -> None:
-    """Gather graph context for deep research. Stub -- full implementation TODO."""
+    """Deep research context gathering with graph expansion.
+
+    Retrieves beliefs via FTS5, expands along graph edges (BFS),
+    computes uncertainty scores, detects contradictions, and outputs
+    structured context formatted for LLM consumption.
+    """
     query: str = " ".join(args.query)
     if not query.strip():
         print("Error: empty query", file=sys.stderr)
         sys.exit(1)
 
+    depth: int = args.depth if args.depth is not None else int(
+        get_setting("wonder", "depth") or 2
+    )
+    budget: int = args.budget
+
     store: MemoryStore = _get_store()
-    result: RetrievalResult = retrieve(store, query, budget=4000)
-    store.close()
+
+    # Step 1: FTS5 retrieval
+    result: RetrievalResult = retrieve(store, query, budget=budget)
 
     if not result.beliefs:
         print(f"No beliefs found for: {query}")
         print("The memory system has no context on this topic yet.")
+        store.close()
         return
 
-    print(f"Wonder: {query}")
-    print(f"Found {len(result.beliefs)} related belief(s):\n")
-    for belief in result.beliefs:
-        locked_str: str = " [LOCKED]" if belief.locked else ""
-        print(f"  [{belief.confidence:.0%}]{locked_str} {belief.content}")
-    print("\n--- Graph context above. Deep research prompt template: TODO ---")
+    # Step 2: Graph expansion from top 10 seeds
+    seed_ids: list[str] = [b.id for b in result.beliefs[:10]]
+    expanded: dict[str, list[tuple[Belief, str, int]]] = store.expand_graph(
+        seed_ids, depth=depth,
+    )
+
+    # Step 3: Merge and deduplicate
+    all_beliefs: dict[str, Belief] = {}
+    belief_hops: dict[str, int] = {}
+    belief_edges: dict[str, str] = {}
+
+    for b in result.beliefs:
+        all_beliefs[b.id] = b
+        belief_hops[b.id] = 0
+
+    for _bid, exp_neighbors in expanded.items():
+        for neighbor_belief, edge_type, hop in exp_neighbors:
+            if neighbor_belief.id not in all_beliefs:
+                all_beliefs[neighbor_belief.id] = neighbor_belief
+            if neighbor_belief.id not in belief_hops or hop < belief_hops[neighbor_belief.id]:
+                belief_hops[neighbor_belief.id] = hop
+                belief_edges[neighbor_belief.id] = edge_type
+
+    # Step 4: Compute uncertainty for each belief
+    belief_uncertainty: dict[str, float] = {}
+    for bid, b in all_beliefs.items():
+        belief_uncertainty[bid] = uncertainty_score(b.alpha, b.beta_param)
+
+    # Step 5: Detect contradictions
+    contradictions: list[tuple[Belief, Belief]] = []
+    result_ids: set[str] = set(all_beliefs.keys())
+    for bid in result_ids:
+        neighbors: list[tuple[Belief, Edge]] = store.get_neighbors(
+            bid, edge_types=["CONTRADICTS"], direction="both",
+        )
+        for neighbor_belief, _edge in neighbors:
+            if neighbor_belief.id in result_ids and neighbor_belief.id > bid:
+                contradictions.append(
+                    (all_beliefs[bid], neighbor_belief)
+                )
+
+    store.close()
+
+    # Step 6: Categorize
+    direct: list[Belief] = [
+        b for b in result.beliefs if belief_hops.get(b.id, 0) == 0
+    ]
+    connected: list[tuple[Belief, str, int]] = []
+    for bid, b in all_beliefs.items():
+        hop: int = belief_hops.get(bid, 0)
+        if hop > 0:
+            etype: str = belief_edges.get(bid, "RELATES_TO")
+            connected.append((b, etype, hop))
+    connected.sort(key=lambda x: (x[2], -x[0].confidence))
+
+    high_uncertainty: list[tuple[Belief, float]] = [
+        (b, belief_uncertainty[bid])
+        for bid, b in all_beliefs.items()
+        if belief_uncertainty[bid] > 0.7
+    ]
+    high_uncertainty.sort(key=lambda x: x[1], reverse=True)
+
+    # Step 7: Output as structured context block (for LLM consumption)
+    print(f"WONDER: {query}")
+    print(f"depth={depth}, direct={len(direct)}, "
+          f"graph={len(connected)}, uncertain={len(high_uncertainty)}, "
+          f"contradictions={len(contradictions)}")
+
+    print("\n## Known Facts")
+    for b in direct:
+        locked_tag: str = " [LOCKED]" if b.locked else ""
+        unc: float = belief_uncertainty.get(b.id, 0.0)
+        unc_tag: str = f" [uncertain:{unc:.2f}]" if unc > 0.5 else ""
+        print(f"- [{b.confidence:.0%}]{locked_tag}{unc_tag} {b.content}")
+
+    if connected:
+        print("\n## Connected Evidence")
+        for b, etype, hop in connected:
+            locked_tag = " [LOCKED]" if b.locked else ""
+            print(f"- [hop {hop}, via {etype}]{locked_tag} {b.content}")
+
+    if high_uncertainty:
+        print("\n## Open Questions (high-uncertainty beliefs)")
+        for b, unc in high_uncertainty:
+            print(f"- [uncertainty:{unc:.2f}, conf:{b.confidence:.0%}] {b.content}")
+
+    if contradictions:
+        print("\n## Contradictions")
+        for a, b in contradictions:
+            print(f"- \"{a.content[:100]}\"")
+            print(f"  CONTRADICTS \"{b.content[:100]}\"")
+
+    if not connected and not high_uncertainty and not contradictions:
+        print("\n(No graph connections, uncertainty flags, or contradictions found.)")
 
 
 # ---------------------------------------------------------------------------
@@ -1398,6 +1498,10 @@ def main() -> None:
         "wonder", help="Deep research from graph context"
     )
     p_wonder.add_argument("query", nargs="+", help="Research topic or question")
+    p_wonder.add_argument("--depth", type=int, default=None,
+                          help="Graph expansion depth 1-3 (default: from config, usually 2)")
+    p_wonder.add_argument("--budget", type=int, default=4000,
+                          help="Token budget for retrieval (default: 4000)")
     p_wonder.set_defaults(func=cmd_wonder)
 
     # reason

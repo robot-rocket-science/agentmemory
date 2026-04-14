@@ -80,7 +80,7 @@ class Observation:
     content: str
     observation_type: str       # conversation, file_change, error, decision, user_statement, document
     source_type: str            # user, agent, system, document
-    source_id: str
+    source_id: str              # unique identifier for source (file path, commit SHA, turn ID -- NOT the type string)
     source_path: str = ""       # file path the content was extracted from (for doc tracing)
     session_id: str | None = None
     created_at: str = ""        # ISO 8601

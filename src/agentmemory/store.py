@@ -409,7 +409,13 @@ class MemoryStore:
         source_path: str = "",
         session_id: str | None = None,
     ) -> Observation:
-        """Insert an observation. Content-hash dedup: if same hash exists, return existing."""
+        """Insert an observation. Content-hash dedup: if same hash exists, return existing.
+
+        Args:
+            source_id: Unique identifier for the source -- a file path, commit SHA,
+                turn ID, or document hash. Must NOT be the source type string
+                (use source_type for that). Empty string means unknown provenance.
+        """
         ch: str = _content_hash(content)
         existing: sqlite3.Row | None = self._conn.execute(
             "SELECT * FROM observations WHERE content_hash = ?", (ch,)
