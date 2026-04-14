@@ -224,23 +224,26 @@ class TestOfflineClassifier:
         )
 
     def test_offline_false_correction_rate(self) -> None:
-        """Offline correction detector fires on non-corrections."""
+        """Offline correction detector only fires on user-sourced text.
+
+        After the source-gating fix, non-user sources (document, git, code)
+        should never be classified as CORRECTION regardless of keyword content.
+        """
         sentences: list[tuple[str, str]] = [
             (gt["text"], gt["source"]) for gt in GROUND_TRUTH
         ]
         results: list[ClassifiedSentence] = classify_sentences_offline(sentences)
 
-        # Count sentences offline labels CORRECTION that are not corrections
-        false_corrections: list[str] = []
-        for gt, result in zip(GROUND_TRUTH, results):
-            if result.sentence_type == "CORRECTION" and gt["type"] != "CORRECTION":
-                false_corrections.append(gt["text"][:80])
-
-        # Expect at least 3 false corrections from this set (commit messages,
-        # coordination text with imperative verbs, etc.)
-        assert len(false_corrections) >= 3, (
-            f"Expected >= 3 false corrections, got {len(false_corrections)}. "
-            f"False corrections found: {false_corrections}"
+        # With source-gating, non-user sources should never be CORRECTION
+        non_user_false: list[str] = [
+            gt["text"][:80]
+            for gt, result in zip(GROUND_TRUTH, results)
+            if result.sentence_type == "CORRECTION"
+            and gt["type"] != "CORRECTION"
+            and gt["source"] != "user"
+        ]
+        assert len(non_user_false) == 0, (
+            f"Non-user sources should never be CORRECTION, got: {non_user_false}"
         )
 
     def test_offline_never_catches_what_llm_misses(self) -> None:

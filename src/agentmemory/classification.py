@@ -319,7 +319,9 @@ def classify_sentences_offline(
         alpha: float
         beta_val: float
 
-        if any(
+        # Requirement keywords -- only trust for user/directive sources.
+        # Document text uses "must", "require", "constraint" descriptively.
+        if source in ("user", "directive") and any(
             kw in text_lower
             for kw in [
                 "must",
@@ -347,8 +349,12 @@ def classify_sentences_offline(
             continue
 
         # Correction detector (runs after requirement check to avoid false positives
-        # from directive keywords like "must" that also appear in requirements)
-        is_correction, _signals, _conf = detect_correction(text)
+        # from directive keywords like "must" that also appear in requirements).
+        # Only apply to user conversation turns -- document text contains negation
+        # and directive language ("not X", "never Y") that triggers false positives.
+        is_correction: bool = False
+        if source == "user":
+            is_correction, _signals, _conf = detect_correction(text)
         if is_correction:
             _cor_prior = TYPE_PRIORS["CORRECTION"]
             assert _cor_prior is not None
