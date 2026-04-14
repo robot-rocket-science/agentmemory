@@ -1028,11 +1028,11 @@ def cmd_wonder(args: argparse.Namespace) -> None:
 
 
 def cmd_reason(args: argparse.Namespace) -> None:
-    """Graph-aware reasoning with uncertainty analysis.
+    """Consequence-path reasoning with impasse detection.
 
-    Retrieves beliefs via FTS5, expands along graph edges (BFS),
-    computes uncertainty scores, detects contradictions, and outputs
-    structured evidence for LLM reasoning.
+    Retrieves beliefs via FTS5, builds branching consequence paths with
+    compound confidence decay, detects reasoning impasses (ties, gaps,
+    constraint failures), and outputs a structured decision-support tree.
     """
     query: str = " ".join(args.query)
     if not query.strip():
@@ -1046,115 +1046,125 @@ def cmd_reason(args: argparse.Namespace) -> None:
 
     store: MemoryStore = _get_store()
 
-    # Step 1: FTS5 retrieval
+    # Step 1: FTS5 retrieval for seed beliefs
     result: RetrievalResult = retrieve(store, query, budget=budget)
 
     if not result.beliefs:
-        print("No beliefs found matching your query.")
+        print("REASON: No relevant beliefs found for this query.")
+        print("VERDICT: INSUFFICIENT -- no evidence in memory.")
         store.close()
         return
 
-    # Step 2: Graph expansion from top 10 seeds
+    # Step 2: Build consequence paths from top 10 seeds
     seed_ids: list[str] = [b.id for b in result.beliefs[:10]]
-    expanded: dict[str, list[tuple[Belief, str, int]]] = store.expand_graph(
-        seed_ids, depth=depth,
+    paths: list[list[tuple[Belief, str, float]]] = store.find_consequence_paths(
+        root_ids=seed_ids,
+        max_depth=depth,
+        confidence_floor=0.3,
+        max_branches=20,
     )
 
-    # Step 3: Merge and deduplicate
+    # Step 3: Collect all beliefs involved (seeds + path members)
     all_beliefs: dict[str, Belief] = {}
-    belief_hops: dict[str, int] = {}  # belief_id -> min hop distance
-    belief_edges: dict[str, str] = {}  # belief_id -> edge type that found it
-
     for b in result.beliefs:
         all_beliefs[b.id] = b
-        belief_hops[b.id] = 0
+    for path in paths:
+        for b, _etype, _conf in path:
+            all_beliefs[b.id] = b
 
-    for _bid, exp_neighbors in expanded.items():
-        for neighbor_belief, edge_type, hop in exp_neighbors:
-            if neighbor_belief.id not in all_beliefs:
-                all_beliefs[neighbor_belief.id] = neighbor_belief
-            if neighbor_belief.id not in belief_hops or hop < belief_hops[neighbor_belief.id]:
-                belief_hops[neighbor_belief.id] = hop
-                belief_edges[neighbor_belief.id] = edge_type
+    # Step 4: Load locked beliefs for constraint checking
+    locked_rows: list[Belief] = store.get_locked_beliefs()
+    # Filter to topically relevant locked beliefs (in all_beliefs or connected)
+    relevant_locked: list[Belief] = [
+        lb for lb in locked_rows if lb.id in all_beliefs
+    ]
 
-    # Step 4: Compute uncertainty for each belief
-    belief_uncertainty: dict[str, float] = {}
-    for bid, b in all_beliefs.items():
-        belief_uncertainty[bid] = uncertainty_score(b.alpha, b.beta_param)
-
-    # Step 5: Detect contradictions
-    contradictions: list[tuple[Belief, Belief]] = []
-    result_ids: set[str] = set(all_beliefs.keys())
-    for bid in result_ids:
-        neighbors: list[tuple[Belief, Edge]] = store.get_neighbors(
-            bid, edge_types=["CONTRADICTS"], direction="both",
-        )
-        for neighbor_belief, _edge in neighbors:
-            if neighbor_belief.id in result_ids and neighbor_belief.id > bid:
-                contradictions.append(
-                    (all_beliefs[bid], neighbor_belief)
-                )
+    # Step 5: Detect impasses
+    impasses: list[MemoryStore.Impasse] = store.detect_impasses(
+        beliefs=all_beliefs,
+        paths=paths,
+        locked_beliefs=relevant_locked,
+    )
 
     store.close()
 
-    # Step 6: Format structured output
-    direct: list[Belief] = [
-        b for b in result.beliefs if belief_hops.get(b.id, 0) == 0
-    ]
-    connected: list[tuple[Belief, str, int]] = []
-    for bid, b in all_beliefs.items():
-        hop: int = belief_hops.get(bid, 0)
-        if hop > 0:
-            etype: str = belief_edges.get(bid, "RELATES_TO")
-            connected.append((b, etype, hop))
-    connected.sort(key=lambda x: (x[2], -x[0].confidence))
+    # Step 6: Compute sufficiency verdict
+    has_high_conf: bool = any(b.confidence > 0.7 for b in result.beliefs[:5])
+    has_paths: bool = len(paths) > 0
+    has_constraint_failure: bool = any(
+        imp.impasse_type == "constraint_failure" for imp in impasses
+    )
+    has_ties: bool = any(imp.impasse_type == "tie" for imp in impasses)
 
-    high_uncertainty: list[tuple[Belief, float]] = [
-        (b, belief_uncertainty[bid])
-        for bid, b in all_beliefs.items()
-        if belief_uncertainty[bid] > 0.7
-    ]
-    high_uncertainty.sort(key=lambda x: x[1], reverse=True)
+    if has_constraint_failure:
+        verdict: str = "CONTRADICTORY -- evidence conflicts with locked constraints"
+    elif not has_high_conf and not has_paths:
+        verdict = "INSUFFICIENT -- no high-confidence evidence or consequence paths"
+    elif has_ties:
+        verdict = "UNCERTAIN -- contradicting beliefs with similar confidence"
+    elif has_paths and has_high_conf:
+        verdict = "SUFFICIENT -- evidence supports reasoning"
+    else:
+        verdict = "PARTIAL -- some evidence found, gaps remain"
 
-    # Print
-    print(f"QUERY: {query}")
-    print(f"  Depth: {depth}, Direct hits: {len(direct)}, "
-          f"Graph-expanded: {len(connected)}, "
-          f"High-uncertainty: {len(high_uncertainty)}, "
-          f"Contradictions: {len(contradictions)}")
+    # Step 7: Format output
+    print(f"REASON: {query}")
+    print(f"  depth={depth}, seeds={len(seed_ids)}, "
+          f"paths={len(paths)}, impasses={len(impasses)}")
+    print(f"VERDICT: {verdict}")
 
-    print(f"\nDIRECT EVIDENCE (Level 1 -- {len(direct)} beliefs):")
-    for b in direct:
-        locked_str: str = " [LOCKED]" if b.locked else ""
-        unc: float = belief_uncertainty.get(b.id, 0.0)
-        print(f"  [{b.confidence:.0%}]{locked_str} {b.content}")
-        print(f"    type: {b.belief_type}, uncertainty: {unc:.2f}, id: {b.id}")
+    # Direct evidence (top 10 seed beliefs)
+    if result.beliefs:
+        print(f"\nSEED EVIDENCE ({min(len(result.beliefs), 10)} beliefs):")
+        for b in result.beliefs[:10]:
+            locked_str: str = " [LOCKED]" if b.locked else ""
+            unc: float = uncertainty_score(b.alpha, b.beta_param)
+            print(f"  [{b.confidence:.0%}]{locked_str} {b.content}")
+            print(f"    type={b.belief_type}, uncertainty={unc:.2f}, id={b.id}")
 
-    if connected:
-        print(f"\nCONNECTED EVIDENCE (Level 2-3 -- {len(connected)} beliefs):")
-        for b, etype, hop in connected:
-            locked_str = " [LOCKED]" if b.locked else ""
-            print(f"  [hop {hop}] [{b.confidence:.0%}]{locked_str} {b.content}")
-            print(f"    via {etype}, type: {b.belief_type}, id: {b.id}")
+    # Consequence paths
+    if paths:
+        print(f"\nCONSEQUENCE PATHS ({len(paths)} paths):")
+        for i, path in enumerate(paths):
+            if not path:
+                continue
+            leaf_conf: float = path[-1][2]
+            # Find weakest link
+            weakest_idx: int = 0
+            weakest_conf: float = path[0][2]
+            for j, (_, _, cc) in enumerate(path):
+                if cc < weakest_conf:
+                    weakest_conf = cc
+                    weakest_idx = j
 
-    if high_uncertainty:
-        print(f"\nHIGH-UNCERTAINTY BELIEFS ({len(high_uncertainty)} beliefs):")
-        for b, unc in high_uncertainty:
-            hop = belief_hops.get(b.id, 0)
-            print(f"  [{b.confidence:.0%}, uncertainty: {unc:.2f}] {b.content}")
-            print(f"    alpha: {b.alpha}, beta: {b.beta_param}, hop: {hop}, id: {b.id}")
+            print(f"\n  PATH {i + 1} (length={len(path)}, "
+                  f"leaf_confidence={leaf_conf:.0%}):")
+            for j, (b, etype, cc) in enumerate(path):
+                indent: str = "    " + "  " * j
+                locked_str = " [LOCKED]" if b.locked else ""
+                arrow: str = f"--{etype}-->" if etype != "ROOT" else "[root]"
+                weak_marker: str = " *** WEAKEST LINK ***" if j == weakest_idx and len(path) > 1 else ""
+                print(f"{indent}{arrow} [{cc:.0%}]{locked_str} {b.content[:100]}{weak_marker}")
 
-    if contradictions:
-        print(f"\nCONTRADICTIONS ({len(contradictions)} pairs):")
-        for a, b in contradictions:
-            print(f"  \"{a.content[:80]}\"")
-            print(f"    CONTRADICTS")
-            print(f"  \"{b.content[:80]}\"")
-            print()
+    # Impasses
+    if impasses:
+        print(f"\nIMPASSES ({len(impasses)} detected):")
+        for imp in impasses:
+            severity_bar: str = "#" * int(imp.severity * 10)
+            print(f"  [{imp.impasse_type.upper()}] (severity={imp.severity:.1f}) "
+                  f"[{severity_bar}]")
+            print(f"    {imp.description}")
+            if imp.impasse_type == "constraint_failure":
+                print(f"    ACTION: This path is BLOCKED by a locked constraint.")
+            elif imp.impasse_type == "tie":
+                print(f"    ACTION: Fork -- resolve which belief is correct.")
+            elif imp.impasse_type == "gap":
+                print(f"    ACTION: Evidence insufficient at this point in the chain.")
 
-    if not connected and not high_uncertainty and not contradictions:
-        print("\n  (No graph edges, uncertainty flags, or contradictions found.)")
-        print("  Reason output is equivalent to a standard search at this graph density.")
+    if not paths and not impasses:
+        print("\n(No consequence paths or impasses found -- "
+              "graph may be too sparse for path-based reasoning.)")
+        print("Reason output is equivalent to a standard search at this graph density.")
 
 
 # ---------------------------------------------------------------------------
