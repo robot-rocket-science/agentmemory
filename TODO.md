@@ -1,7 +1,7 @@
 # TODO: Agentic Memory Project
 
 **Last updated:** 2026-04-14
-**Status:** Phases 1-4 complete. Phase 5 in progress. 18 production modules, 348 tests passing, 19 MCP tools, MCP server active. 10/27 requirements GREEN, 13 YELLOW, 2 RED, 2 DEFERRED.
+**Status:** Phases 1-4 complete. Phase 5 in progress. 18 production modules, 356 tests passing, 19 MCP tools, MCP server active. 16/27 requirements GREEN, 7 YELLOW, 2 RED, 2 DEFERRED.
 
 ---
 
@@ -94,18 +94,17 @@ Research phase is complete (83 experiments). Phase 2 MVP is built and self-hosti
 - [x] L1 behavioral layer (get_behavioral_beliefs between L0 and L2)
 
 ### Phase 5: Epistemic Integrity, Validation, and Gap Closure (IN PROGRESS)
-- [x] Provenance metadata: rigor_tier, method, sample_size columns in beliefs (3/5 fields)
-- [ ] Provenance metadata: add data_source + independently_validated columns (REQ-023)
+- [x] Provenance metadata: all 5 fields (rigor_tier, method, sample_size, data_source, independently_validated) (REQ-023)
 - [x] Session velocity tracking (velocity_items_per_hour + velocity_tier in sessions) (REQ-024)
 - [x] Rigor tier field with 4-tier classification (REQ-025)
-- [ ] Wire rigor distribution into status() output with confidence caveats (REQ-026)
-- [ ] REQ-027 Tier 5: convert soft directive gate to hard block for Bash commands
+- [x] Wire rigor distribution into status() output with confidence caveats (REQ-026)
+- [x] REQ-027 Tier 5: hard-blocking directive gate for Bash commands
+- [x] REQ-002: formal 10-contradiction injection test (5 tests, all passing)
+- [x] REQ-012: SIGKILL crash simulation test (3 tests, 10 crash cycles, zero data loss)
+- [x] Acceptance tests Phase 2: integration tests (20 tests, all passing)
 - [ ] REQ-004: quality-per-token evaluation (2K vs 10K comparison)
 - [ ] REQ-008: longitudinal FP rate tracking across sessions
-- [ ] REQ-002: formal 10-contradiction injection test
-- [ ] REQ-012: crash simulation test (SIGKILL + recovery verification)
-- [ ] Acceptance tests Phase 2: integration tests (SQLite + MCP)
-- [ ] Acceptance tests Phase 3: full-system tests (22 case studies)
+- [ ] Acceptance tests Phase 3: full-system tests (remaining case studies)
 - [ ] Cross-model benchmarking (needs ChatGPT/Gemini access) (REQ-011)
 - [ ] REQ-015/016: claims audit + limitations documentation (ship-time)
 
