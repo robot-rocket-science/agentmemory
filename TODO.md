@@ -1,7 +1,7 @@
 # TODO: Agentic Memory Project
 
 **Last updated:** 2026-04-14
-**Status:** Phases 1-4 complete. Phase 5 in progress. 18 production modules, 356 tests passing, 19 MCP tools, MCP server active. 16/27 requirements GREEN, 7 YELLOW, 2 RED, 2 DEFERRED.
+**Status:** Phases 1-4 complete. Phase 5 in progress. 18 production modules, 361 tests passing, 19 MCP tools, MCP server active. 18/27 requirements GREEN, 5 YELLOW, 0 RED, 2 DEFERRED.
 
 ---
 
@@ -102,8 +102,8 @@ Research phase is complete (83 experiments). Phase 2 MVP is built and self-hosti
 - [x] REQ-002: formal 10-contradiction injection test (5 tests, all passing)
 - [x] REQ-012: SIGKILL crash simulation test (3 tests, 10 crash cycles, zero data loss)
 - [x] Acceptance tests Phase 2: integration tests (20 tests, all passing)
-- [ ] REQ-004: quality-per-token evaluation (2K vs 10K comparison)
-- [ ] REQ-008: longitudinal FP rate tracking across sessions
+- [x] REQ-004: quality-per-token evaluation (3 tests: precision, recall, budget enforcement)
+- [x] REQ-008: longitudinal FP rate tracking (2 tests: 20-session feedback loop validates FP decrease)
 - [ ] Acceptance tests Phase 3: full-system tests (remaining case studies)
 - [ ] Cross-model benchmarking (needs ChatGPT/Gemini access) (REQ-011)
 - [ ] REQ-015/016: claims audit + limitations documentation (ship-time)
