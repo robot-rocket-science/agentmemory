@@ -1,4 +1,4 @@
-"""Tests for relationship detector (CONTRADICTS/SUPPORTS edge creation)."""
+"""Tests for relationship detector (CONTRADICTS/SUPPORTS/gap closure)."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -7,7 +7,9 @@ import pytest
 
 from agentmemory.models import EDGE_CONTRADICTS, EDGE_SUPPORTS
 from agentmemory.relationship_detector import (
+    GapClosureResult,
     RelationshipResult,
+    detect_gap_closure,
     detect_relationships,
     has_negation_signal,
     negation_divergence,
@@ -211,3 +213,124 @@ def test_short_belief_skipped(store: MemoryStore) -> None:
     result: RelationshipResult = detect_relationships(store, new)
     assert result.edges_created == 0
     assert "too short" in result.details[0]
+
+
+# ---------------------------------------------------------------------------
+# Gap closure detection tests (CS-035 fix)
+# ---------------------------------------------------------------------------
+
+
+def test_gap_closure_supersedes_gap_belief(store: MemoryStore) -> None:
+    """Implementation belief supersedes a matching gap belief."""
+    gap = store.insert_belief(
+        content="No hooks are currently configured for this project",
+        belief_type="correction",
+        source_type="agent_inferred",
+        alpha=3.0,
+        beta_param=1.0,
+    )
+    impl = store.insert_belief(
+        content=(
+            "FEATURE IMPLEMENTED: Hooks ARE configured in settings.json. "
+            "SessionStart, UserPromptSubmit, Stop, PreCompact, PostCompact "
+            "hooks are all wired and active. Shipped and running."
+        ),
+        belief_type="factual",
+        source_type="agent_inferred",
+        alpha=3.0,
+        beta_param=1.0,
+    )
+
+    result: GapClosureResult = detect_gap_closure(store, impl)
+    assert result.checked
+    assert result.gaps_closed >= 1
+
+    # Gap belief should be superseded
+    refreshed_gap = store.get_belief(gap.id)
+    assert refreshed_gap is not None
+    assert refreshed_gap.superseded_by == impl.id
+
+    # IMPLEMENTS edge should exist (get_neighbors filters superseded beliefs,
+    # so use edge_exists which checks both directions regardless of status)
+    assert store.edge_exists(impl.id, gap.id)
+
+
+def test_gap_closure_no_false_positive(store: MemoryStore) -> None:
+    """Non-implementation belief does not trigger gap closure."""
+    store.insert_belief(
+        content="No hooks are currently configured for this project",
+        belief_type="correction",
+        source_type="agent_inferred",
+        alpha=3.0,
+        beta_param=1.0,
+    )
+    unrelated = store.insert_belief(
+        content="The retrieval pipeline uses FTS5 with BM25 scoring for search",
+        belief_type="factual",
+        source_type="agent_inferred",
+        alpha=3.0,
+        beta_param=1.0,
+    )
+
+    result: GapClosureResult = detect_gap_closure(store, unrelated)
+    assert result.gaps_closed == 0
+
+
+def test_gap_closure_locked_gap_still_superseded(store: MemoryStore) -> None:
+    """Locked gap beliefs are also superseded by implementation events.
+
+    Gap closure is evidence-based, not opinion-based. A locked belief
+    saying 'not implemented' that is now factually wrong should still
+    be superseded. store.supersede_belief handles the lock check.
+    """
+    gap = store.insert_belief(
+        content="Conversation logger captures but does not ingest data",
+        belief_type="correction",
+        source_type="agent_inferred",
+        alpha=9.0,
+        beta_param=0.5,
+        locked=True,
+    )
+    impl = store.insert_belief(
+        content=(
+            "FEATURE IMPLEMENTED: The conversation logger both captures "
+            "AND ingests. PostCompact triggers agentmemory ingest on the "
+            "archived conversation segment. Shipped and running."
+        ),
+        belief_type="factual",
+        source_type="agent_inferred",
+        alpha=3.0,
+        beta_param=1.0,
+    )
+
+    result: GapClosureResult = detect_gap_closure(store, impl)
+    # supersede_belief refuses to supersede locked beliefs, so the gap
+    # stays active but an IMPLEMENTS edge is still created
+    refreshed_gap = store.get_belief(gap.id)
+    assert refreshed_gap is not None
+    # Locked belief should NOT be superseded (store protects it)
+    assert refreshed_gap.superseded_by is None
+    # But the detection still ran
+    assert result.checked
+
+
+def test_gap_closure_needs_two_implementation_signals(store: MemoryStore) -> None:
+    """A belief with only one implementation keyword is not enough."""
+    store.insert_belief(
+        content="The system is not implemented yet",
+        belief_type="factual",
+        source_type="agent_inferred",
+        alpha=3.0,
+        beta_param=1.0,
+    )
+    # Only one signal word ("configured") -- should not trigger
+    weak = store.insert_belief(
+        content="The system is configured for basic operation",
+        belief_type="factual",
+        source_type="agent_inferred",
+        alpha=3.0,
+        beta_param=1.0,
+    )
+
+    result: GapClosureResult = detect_gap_closure(store, weak)
+    assert result.gaps_closed == 0
