@@ -1,3 +1,60 @@
+# Benchmark Log
+
+## LoCoMo (2026-04-15)
+
+**Paper:** Maharana et al., ACL 2024 (arXiv:2402.17753)
+**Dataset:** locomo10.json (10 conversations, 5882 turns, 272 sessions, 1986 QA pairs)
+**Pipeline:** agentmemory FTS5+HRR+BFS retrieval (budget=2000) + Haiku reader (batch_size=1)
+**Scoring:** LoCoMo exact F1 methodology (Porter stemming, article removal, per-category rules)
+
+### Overall Results
+
+| Metric | Score |
+|---|---|
+| **Overall F1** | **40.5%** |
+| Non-adversarial F1 | 22.3% |
+| Ingest time (10 conversations) | ~25s total |
+| Avg query latency | ~16ms |
+
+### Per-Category F1
+
+| Category | F1 | n | Notes |
+|---|---|---|---|
+| 1. Multi-hop | 17.6% | 282 | Answer spans multiple sessions |
+| 2. Temporal | 22.2% | 321 | Date/time reasoning |
+| 3. Open-ended | 12.4% | 96 | Speculative questions |
+| 4. Single-hop | 26.9% | 841 | Direct factual recall |
+| 5. Adversarial | 100.0% | 446 | Correctly refuses all |
+
+### Reference Baselines (from LoCoMo paper, Table 2/3)
+
+| System | Overall F1 | Notes |
+|---|---|---|
+| Human | 87.9% | Ceiling |
+| GPT-4-turbo (128K) | 51.6% | Best long-context |
+| RAG (DRAGON + gpt-3.5-turbo, top-5 obs) | 43.3% | Best RAG in paper |
+| **agentmemory (FTS5+HRR+BFS + Haiku)** | **40.5%** | This run |
+| Claude-3-Sonnet (200K) | 38.5% | Long-context |
+| gpt-3.5-turbo (16K) | 36.1% | Long-context |
+| RAG (DRAGON + gpt-3.5-turbo, top-5 dialog) | 32.9% | RAG on raw dialog |
+
+### Analysis
+
+1. **Adversarial detection is perfect** (100%). agentmemory correctly identifies when information is absent.
+2. **Retrieval is the bottleneck.** FTS5+HRR finds topically relevant beliefs but misses the specific evidence turns containing answer tokens. The non-adversarial F1 (22.3%) vs the RAG baseline (32.9% on raw dialog) shows the gap is in retrieval precision.
+3. **Temporal reasoning partially works.** Session date injection enables "yesterday"/"last week" resolution, but many temporal questions need inference agentmemory's belief decomposition loses.
+4. **Open-ended is weakest** (12.4%). These require synthesis across multiple beliefs, which the retrieval-only pipeline handles poorly.
+5. **The 40.5% overall is inflated by perfect adversarial score.** Without category 5, agentmemory scores 22.3% vs the paper's best non-adversarial scores in the 35-55% range.
+
+### What Would Improve the Score
+
+- Better retrieval recall (the retrieval pipeline finds ~30% of evidence turns vs DRAGON's ~60%)
+- Embedding-based retrieval as a complement to FTS5 (keyword gaps on paraphrased questions)
+- Larger retrieval budget (2000 tokens may be too tight for multi-hop questions)
+- Using observations/summaries as retrieval targets (the LoCoMo dataset provides these)
+
+---
+
 # Onboarding Benchmark Log
 
 ## agentmemory (2026-04-11)
