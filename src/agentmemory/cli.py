@@ -1067,28 +1067,41 @@ def cmd_reason(args: argparse.Namespace) -> None:
         return
 
     # Step 1.5: Relevance floor check (CS-033)
-    # If top-5 results share no topical terms with the query, signal low relevance
+    # Use content-word overlap between query and top-5 beliefs.
+    # Require min 3-char words and exclude common stopwords.
     import re as _re
-    _negation_words: frozenset[str] = frozenset({
-        "not", "no", "dont", "don't", "never", "cannot", "can't",
-        "isn't", "doesn't", "didn't", "without", "none",
+    _stop_words: frozenset[str] = frozenset({
+        "not", "don", "dont", "never", "cannot", "can",
+        "isn", "doesn", "didn", "without", "none", "nor",
+        "the", "and", "for", "are", "but", "with", "this", "that",
+        "from", "have", "has", "was", "were", "been", "being",
+        "will", "would", "could", "should", "about", "into",
+        "what", "when", "where", "which", "while", "how", "who",
+        "does", "did", "our", "your", "their", "its", "than",
+        "then", "also", "just", "only", "very", "some", "any",
+        "each", "every", "all", "both", "such", "more", "most",
+        "other", "using", "used", "use", "may", "need", "way",
     })
-    query_topical: set[str] = {
-        t.lower() for t in _re.split(r'\W+', query) if len(t) >= 2
-    } - _negation_words
-    if query_topical:
+    query_content: set[str] = {
+        t.lower() for t in _re.split(r'\W+', query)
+        if len(t) >= 3
+    } - _stop_words
+    if query_content:
         topical_hits: int = 0
         for b in result.beliefs[:5]:
             b_terms: set[str] = {
-                t.lower() for t in _re.split(r'\W+', b.content) if len(t) >= 2
-            }
-            if query_topical & b_terms:
+                t.lower() for t in _re.split(r'\W+', b.content)
+                if len(t) >= 3
+            } - _stop_words
+            overlap: int = len(query_content & b_terms)
+            # Require at least 1 shared content word
+            if overlap >= 1:
                 topical_hits += 1
         if topical_hits == 0:
             print(f"REASON: {query}")
             print("VERDICT: INSUFFICIENT -- no topically relevant beliefs found.")
             print(f"  (Returned {len(result.beliefs)} beliefs but none share "
-                  f"topical terms with the query.)")
+                  f"content words with the query.)")
             print("  This topic may not be in memory. Consider using /mem:search "
                   "with different keywords.")
             store.close()
