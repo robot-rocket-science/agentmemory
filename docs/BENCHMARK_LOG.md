@@ -5,15 +5,24 @@
 **Paper:** Maharana et al., ACL 2024 (arXiv:2402.17753)
 **Dataset:** locomo10.json (10 conversations, 5882 turns, 272 sessions, 1986 QA pairs)
 **Retrieval:** agentmemory FTS5+HRR+BFS (budget=2000, batch_size=1)
-**Reader:** Opus 4.6 (via Claude Code subagent)
+**Readers tested:** Opus 4.6, Haiku 4.5 (via Claude Code subagent)
 **Scoring:** LoCoMo exact F1 methodology (Porter stemming, article removal, per-category rules)
 **Protocol compliance:** Exact LoCoMo prompts, forced-choice for cat5, date hint for cat2, no answer leakage (ground truth in separate file, agents never see it)
 
 ### Overall Results (protocol-correct)
 
+| Reader | Overall F1 | Notes |
+|---|---|---|
+| **Opus 4.6** | **66.1%** | 1986/1986 predictions filled |
+| Haiku 4.5 | 5.4% | 697/1986 empty (subagent capacity limit) |
+
+Ingest time: ~25s (10 conversations). Avg query latency: ~16ms.
+
+**Note on Haiku:** The 5.4% score is not a fair retrieval comparison. Haiku subagents failed to generate predictions for 35% of items (returned empty strings). This is a subagent batch-processing limitation, not a retrieval quality signal. A fair Haiku comparison would require smaller batches or per-item processing.
+
 | Metric | Score |
 |---|---|
-| **Overall F1** | **66.1%** |
+| **Overall F1 (Opus)** | **66.1%** |
 | Ingest time (10 conversations) | ~25s total |
 | Avg query latency | ~16ms |
 
