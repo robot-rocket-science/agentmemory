@@ -14,11 +14,11 @@
 | Reader | Overall F1 | Notes |
 |---|---|---|
 | **Opus 4.6** | **66.1%** | 1986/1986 predictions filled |
-| Haiku 4.5 | 5.4% | 697/1986 empty (subagent capacity limit) |
+| Haiku 4.5 | 6.1% | 571/1986 empty (subagent capacity limit) |
 
 Ingest time: ~25s (10 conversations). Avg query latency: ~16ms.
 
-**Note on Haiku:** The 5.4% score is not a fair retrieval comparison. Haiku subagents failed to generate predictions for 35% of items (returned empty strings). This is a subagent batch-processing limitation, not a retrieval quality signal. A fair Haiku comparison would require smaller batches or per-item processing.
+**Note on Haiku:** The 6.1% score is not a fair retrieval comparison. Haiku subagents failed to generate predictions for 29% of items (returned empty strings). This is a subagent batch-processing limitation, not a retrieval quality signal. A fair Haiku comparison would require smaller batches or per-item processing.
 
 | Metric | Score |
 |---|---|
