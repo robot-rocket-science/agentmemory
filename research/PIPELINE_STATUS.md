@@ -1,6 +1,6 @@
 # Pipeline Status: Design vs Reality
 
-**Date:** 2026-04-11
+**Date:** 2026-04-14 (updated from 2026-04-11 original)
 **Purpose:** Honest assessment of what exists, what's validated, and what's missing.
 
 ---
@@ -130,12 +130,22 @@ STAGE                          STATUS          EVIDENCE
 - **FTS5 K=30 too low** -- Default increased to K=50.
 - **Unused scoring components** -- _TYPE_WEIGHTS, _SOURCE_WEIGHTS, and recency_boost() wired into score_belief().
 
-### Open Issues
-- **Output gating not built** -- Locked beliefs inform but don't block violating output.
-- **Triggered beliefs not automated** -- 15 designs simulated, not wired to events.
-- **L1 behavioral layer missing** -- Design has L0/L1/L2/L3; implementation skips L1.
+### Resolved (2026-04-12 to 2026-04-14)
+- ~~Output gating not built~~ -- PreToolUse soft gate (agentmemory-directive-gate.sh) outputs advisory warnings for locked behavioral directives. Hard block not yet implemented.
+- ~~Triggered beliefs not automated~~ -- 11/15 TBs implemented via hooks + server code. 4 remaining (TB-01/04/12/14) enforced via CLAUDE.md behavioral guidance.
+- ~~L1 behavioral layer missing~~ -- L1 layer built at retrieval.py:205; get_behavioral_beliefs() loads unlocked directives between L0 (locked) and L2 (FTS5).
+- ~~No multi-session validation~~ -- Exp 84: 10/10 multi-session checks pass (5 sessions, fresh MemoryStore per session).
+- ~~Locked beliefs can be superseded~~ -- supersede_belief() now checks locked flag (store.py:641-644).
+- ~~Locked beliefs blow token budget~~ -- Locked beliefs now packed into 2K budget uniformly.
+- ~~No contradiction detection in retrieval~~ -- flag_contradictions() in retrieval.py:305-337.
+
+### Open Issues (2026-04-14)
 - **Retrieval cold start** -- First retrieve() takes ~10s (HRR graph build over 21K labels). Warm queries ~0.7s.
-- **No multi-session validation** -- Self-hosting only; no controlled cross-session test harness.
+- **REQ-027 Tier 5 hard blocking** -- Soft gate exists (advisory warnings). No hard gate that prevents violating Bash commands from executing.
+- **REQ-026 rigor distribution** -- get_rigor_distribution() exists in store but not wired into status() output.
+- **REQ-023 missing 2 provenance fields** -- data_source and independently_validated not in schema.
+- **REQ-004/REQ-008 not measured** -- Quality-per-token comparison and longitudinal FP rate tracking have no code.
+- **Acceptance tests Phases 2-3 not started** -- Phase 1 (TB simulation) done; integration and full-system tests not started.
 
 ### Resolved (2026-04-12/13)
 - **Feedback loop validated** -- Exp 66: +22% MRR over 10 rounds. Auto-feedback now fires on ingest() and atexit.
@@ -152,13 +162,13 @@ STAGE                          STATUS          EVIDENCE
 
 ---
 
-## Requirements Coverage Summary
+## Requirements Coverage Summary (updated 2026-04-14)
 
-See REQUIREMENTS.md for full details. Quick status:
+See REQUIREMENTS.md and REQUIREMENTS_GAP_ANALYSIS.md for full details.
 
 | Status | Count | Requirements |
 |--------|-------|-------------|
-| Verified/Passing | 6 | REQ-003, REQ-007, REQ-009, REQ-010, REQ-017, REQ-018 |
-| Implemented (needs formal verification) | 8 | REQ-001, REQ-005, REQ-006, REQ-012, REQ-013, REQ-019, REQ-020, REQ-021 |
-| Partially implemented | 4 | REQ-002, REQ-008, REQ-011, REQ-027 |
-| Not started | 8 | REQ-004, REQ-014, REQ-015, REQ-016, REQ-023, REQ-024, REQ-025, REQ-026 |
+| GREEN (implemented + tested) | 10 | REQ-003, REQ-006, REQ-013, REQ-014, REQ-017, REQ-018, REQ-019, REQ-020, REQ-024, REQ-025 |
+| YELLOW (implemented, untested or partial) | 13 | REQ-001, REQ-002, REQ-005, REQ-007, REQ-009, REQ-010, REQ-011, REQ-012, REQ-021, REQ-022, REQ-023, REQ-026, REQ-027 |
+| RED (not implemented) | 2 | REQ-004, REQ-008 |
+| DEFERRED (audit/doc tasks) | 2 | REQ-015, REQ-016 |

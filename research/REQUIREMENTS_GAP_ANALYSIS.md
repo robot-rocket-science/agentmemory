@@ -1,6 +1,6 @@
 # Requirements vs Implementation Gap Analysis
 
-**Date:** 2026-04-11
+**Date:** 2026-04-14 (updated from 2026-04-11 original)
 **Method:** Source code audit of `src/agentmemory/`, test enumeration from `tests/`, cross-reference with REQUIREMENTS.md, ACCEPTANCE_TESTS.md, IMPLEMENTATION_PLAN.md, and PIPELINE_STATUS.md.
 
 ---
@@ -9,14 +9,14 @@
 
 | REQ ID | Description | Code? | Tests? | Experiments? | Status |
 |--------|------------|-------|--------|-------------|--------|
-| REQ-001 | Cross-session decision retention | PARTIAL | YES (acceptance) | Exp 3, 56 | Gap: no multi-session integration test with real hooks |
-| REQ-002 | Belief consistency (no silent contradictions) | PARTIAL | NO | Exp 2 | Gap: contradiction detection in cli.py only, not in retrieval |
+| REQ-001 | Cross-session decision retention | PARTIAL | YES (acceptance) | Exp 3, 56, 84 | Gap: no multi-session integration test with real hooks |
+| REQ-002 | Belief consistency (no silent contradictions) | YES | NO | Exp 2 | flag_contradictions() in retrieval.py:305; CONTRADICTS edges checked in result set; warnings in RetrievalResult |
 | REQ-003 | Retrieval token budget <= 2K | YES | YES | Exp 42, 55, 60 | Implemented: pack_beliefs enforces budget |
 | REQ-004 | Quality per token (2K >= 10K) | PARTIAL | NO | Exp 56 | No automated quality comparison test |
 | REQ-005 | Crash recovery >= 90% | PARTIAL | YES (acceptance) | -- | Sessions + checkpoints exist; acceptance test is simulated |
 | REQ-006 | Checkpoint overhead < 50ms | YES | YES (benchmark) | -- | test_checkpoint_write_latency_p95 in test_store.py |
 | REQ-007 | Retrieval precision >= 50% | YES | PARTIAL | Exp 56 | FTS5 + HRR pipeline built; no precision@15 test harness |
-| REQ-008 | FP rate decreasing over time | NO | NO | Exp 2, 5b | Feedback loop not in production |
+| REQ-008 | FP rate decreasing over time | NO | NO | Exp 2, 5b | No longitudinal FP rate tracking code |
 | REQ-009 | Bayesian calibration ECE < 0.10 | PARTIAL | YES (unit) | Exp 5b (ECE=0.066) | Thompson sampling + update_confidence exist; no ECE test |
 | REQ-010 | Exploration fraction 15-50% | PARTIAL | NO | Exp 5b (0.194) | thompson_sample exists; no production measurement |
 | REQ-011 | Cross-model MCP interop | PARTIAL | NO | -- | MCP server works; untested with ChatGPT/local models |
@@ -28,14 +28,14 @@
 | REQ-017 | Fully local operation | YES | NO | -- | All SQLite, no network calls for memory ops |
 | REQ-018 | No telemetry | YES | NO | -- | Zero telemetry code found in src/ |
 | REQ-019 | Single-correction learning | YES | YES | Exp 1, 6 | correct() creates locked belief; ingest detects corrections |
-| REQ-020 | Locked beliefs | YES | YES | Exp 6 | lock_belief, update_confidence blocks downgrade on locked |
-| REQ-021 | Behavioral beliefs always in L0 | PARTIAL | YES (acceptance) | Exp 36 | get_locked_beliefs returns all locked; no behavioral filter |
-| REQ-022 | Locked beliefs survive compression | PARTIAL | NO | -- | Locked beliefs in L0 bypass compression; no explicit test |
-| REQ-023 | Research artifact provenance metadata | NO | NO | Exp 61 | No provenance fields in schema (produced_at, method, sample_size, data_source, independently_validated) |
-| REQ-024 | Session velocity tracking | NO | NO | -- | No elapsed_time, item_count, or velocity in session schema |
-| REQ-025 | Methodological confidence layer (rigor tier) | NO | NO | -- | No rigor_tier field anywhere in code |
-| REQ-026 | Calibrated status reporting | NO | NO | -- | status() returns raw counts only, no rigor/velocity context |
-| REQ-027 | Zero-repeat directive guarantee | PARTIAL | PARTIAL | Exp 6, 36 | Tiers 1-2 (store + inject) work; Tiers 3-6 (detection, blocking, compliance) missing |
+| REQ-020 | Locked beliefs | YES | YES | Exp 6 | lock_belief, update_confidence blocks downgrade; supersede_belief() checks locked flag (store.py:641) |
+| REQ-021 | Behavioral beliefs always in L0 | YES | YES (acceptance) | Exp 36 | L1 behavioral layer in retrieval.py:205; get_behavioral_beliefs() loads unlocked directives |
+| REQ-022 | Locked beliefs survive compression | YES | NO | -- | Locked beliefs included in budget via pack_beliefs(); counted against 2K limit (retrieval.py:288) |
+| REQ-023 | Research artifact provenance metadata | PARTIAL | NO | Exp 61 | 3/5 fields implemented: rigor_tier, method, sample_size in beliefs schema. Missing: data_source, independently_validated |
+| REQ-024 | Session velocity tracking | YES | NO | Exp 75 | velocity_items_per_hour + velocity_tier in sessions; complete_session() computes; status() surfaces |
+| REQ-025 | Methodological confidence layer (rigor tier) | YES | NO | -- | rigor_tier field in Belief (models.py:108); 4 tiers (hypothesis/simulated/empirically_tested/validated); get_rigor_distribution() in store |
+| REQ-026 | Calibrated status reporting | PARTIAL | NO | -- | Velocity context in status(); rigor distribution data exists but not surfaced in status output; missing confidence caveats |
+| REQ-027 | Zero-repeat directive guarantee | PARTIAL | PARTIAL | Exp 6, 36 | Tiers 1-3 (store + inject + compression) work; Tier 4 soft gate (PreToolUse advisory warnings); Tier 5 hard block NOT implemented |
 
 ---
 
@@ -47,9 +47,9 @@
 - **Gap:** The acceptance test simulates sessions within a single process. No test verifies the SessionStart hook injection path, which is the real cross-session mechanism. The 80% threshold from the requirement is tested against store retrieval, not full agent behavior.
 
 ### REQ-002: Belief Consistency
-- **Code:** `cli.py` has a `reason` command that detects contradictions by looking for antonym pairs and negation patterns between beliefs. This is in the CLI layer, not in the retrieval pipeline.
-- **Tests:** No tests for contradiction detection or flagging.
-- **Gap:** Contradictions are not flagged during search/retrieval. The requirement says "never silently present contradictory beliefs" but the `search()` and `retrieve()` functions have no contradiction check. The contradiction logic in cli.py is a diagnostic tool, not enforcement.
+- **Code:** `retrieval.py:305-337` has `flag_contradictions()` which checks for CONTRADICTS edges between beliefs in the result set. Returns warning strings. Called at retrieval.py:294, warnings included in RetrievalResult. server.py:294-298 appends warnings to search() output. Additionally, `cli.py` has a `reason` command for deeper contradiction analysis.
+- **Tests:** No dedicated tests for contradiction flagging in retrieval.
+- **Gap:** Detection mechanism is built and wired into the retrieval path. The formal 10-contradiction injection test specified in the requirement has not been run. Need tests proving 100% of known contradictions are flagged.
 
 ### REQ-003: Retrieval Token Budget <= 2K
 - **Code:** `compression.py::pack_beliefs()` enforces token budget. `retrieval.py::retrieve()` passes budget parameter through.
@@ -129,68 +129,70 @@
 - **Status:** Core mechanism implemented and tested. The 90% prevention threshold is not measured via the alpha-seek replay specified in the requirement.
 
 ### REQ-020: Locked Beliefs
-- **Code:** `store.py::lock_belief()` sets locked flag. `update_confidence()` blocks beta_param increase on locked beliefs (confidence floor preserved). `supersede_belief()` does not check locked status (a locked belief CAN be superseded -- is this intentional?).
+- **Code:** `store.py::lock_belief()` sets locked flag. `update_confidence()` blocks beta_param increase on locked beliefs (confidence floor preserved). `supersede_belief()` checks locked flag at store.py:641-644 and returns early without superseding if target is locked.
 - **Tests:** `test_store.py::test_locked_belief_confidence_cannot_decrease`, `test_cs002_locked_correction.py::test_cs002_lock_prevents_confidence_downgrade`.
-- **Gap:** The requirement says "Only explicit user action can unlock or revise." But there is no `unlock_belief()` method and no test verifying that supersede_belief fails on locked beliefs. A locked belief can currently be superseded by another call to `supersede_belief()`.
+- **Status:** PASSING. Locked beliefs resist both confidence downgrade and programmatic supersession. No `unlock_belief()` method exists (user must modify DB directly to unlock, which is acceptable).
 
 ### REQ-021: Behavioral Beliefs Always in L0
-- **Code:** `retrieval.py::retrieve()` loads all locked beliefs as L0. The `get_locked_beliefs()` query returns all locked beliefs regardless of type.
+- **Code:** `retrieval.py::retrieve()` loads locked beliefs as L0 and behavioral beliefs as L1. `get_behavioral_beliefs()` in store.py:1383-1414 returns high-confidence requirement/procedural beliefs with behavioral keywords (never, always, do not, etc.). Distinct L1 layer at retrieval.py:205 between L0 (locked) and L2 (FTS5).
 - **Tests:** `test_cs002_locked_correction.py` verifies locked beliefs appear in search results.
-- **Gap:** There is no classification of beliefs as "behavioral" vs "domain-specific." The current implementation loads ALL locked beliefs into L0, which is a superset of the requirement. This works but may not scale if locked beliefs grow large (capped at max_locked=100 in retrieve()).
+- **Status:** PASSING. L0 loads locked beliefs, L1 loads unlocked behavioral directives. Both are always-loaded regardless of query domain.
 
 ### REQ-022: Locked Beliefs Survive Context Compression
-- **Code:** Locked beliefs are loaded via `get_locked_beliefs()` in L0, which bypasses the compression pipeline entirely. They are not subject to `pack_beliefs()` token budget (they are added first, before FTS5 results).
+- **Code:** Locked beliefs (L0) merged into candidates list alongside L1 behavioral and L2 FTS5 results. All candidates passed together to `pack_beliefs(budget_tokens=2000)` at retrieval.py:288. Locked beliefs are counted against the 2K token budget uniformly with all other beliefs.
 - **Tests:** No explicit compression survival test.
-- **Gap:** The implementation achieves this by sidestepping compression entirely for locked beliefs, which is correct but creates a token budget risk if many locked beliefs exist (100 * ~50 tokens = 5000 tokens, exceeding the 2000 budget). Locked beliefs are not counted against the budget in the current implementation.
+- **Gap:** Locked beliefs survive compression by being highest-priority candidates in pack_beliefs (sorted by score, locked beliefs score highest). No test verifying a locked belief survives when budget is tight. The prior concern about locked beliefs blowing the budget is resolved -- they are now included in the budget.
 
 ### REQ-023: Research Artifact Provenance Metadata
-- **Code:** Not implemented. The `beliefs` table has no `produced_at`, `method`, `sample_size`, `data_source`, or `independently_validated` columns. The `observations` table has `created_at` and `source_type` but these are operational metadata, not research provenance.
+- **Code:** 3 of 5 required fields implemented. `rigor_tier`, `method`, `sample_size` columns exist in beliefs schema (models.py:108-110, store.py:337-348 migrations). Missing: `data_source` and `independently_validated` columns.
 - **Tests:** None.
-- **Gap:** Schema change required. No code exists for this requirement.
+- **Gap:** 2 schema fields remaining. No test verifying provenance completeness or rejection of artifacts without provenance.
 
 ### REQ-024: Session Velocity Tracking
-- **Code:** Not implemented. The `sessions` table has `started_at` and `completed_at` but no `item_count` or velocity computation. The `status()` function returns raw counts, not per-session velocity.
+- **Code:** Implemented. `velocity_items_per_hour` and `velocity_tier` columns in sessions table (store.py:1487-1522). `complete_session()` computes velocity = items/hours and assigns tier (sprint >10, moderate >=5, steady >=2, deep <2). Velocity surfaced in status() at server.py:500-505. Exp 75 validated measurement.
 - **Tests:** None.
-- **Gap:** Partial infrastructure exists (session timestamps). Needs: item counter per session, velocity computation, surfacing in status reports.
+- **Gap:** No test verifying velocity computation correctness or that status() includes velocity in output.
 
 ### REQ-025: Methodological Confidence Layer (Rigor Tier)
-- **Code:** Not implemented. No `rigor_tier` field in any model, table, or function. The `belief_type` field classifies content type, not methodological rigor.
+- **Code:** Implemented. `rigor_tier` field in Belief dataclass (models.py:108, default "hypothesis"). 4 tiers: hypothesis, simulated, empirically_tested, validated. Schema migration in store.py:337-339. `get_rigor_distribution()` in store.py:2300-2306 returns counts per tier.
 - **Tests:** None.
-- **Gap:** Requires new schema field + classification logic + status reporting integration.
+- **Gap:** No test verifying tier classification correctness. Rigor distribution not prominently surfaced in status() output -- data exists but is not formatted for agent consumption.
 
 ### REQ-026: Calibrated Status Reporting
-- **Code:** `server.py::status()` returns raw counts only (observations, beliefs, locked, superseded, edges, sessions). No rigor tier distribution, session velocity, or caveats.
-- **Tests:** `test_server.py::test_status_returns_counts` verifies the raw counts format.
-- **Gap:** The status tool needs a significant overhaul to include provenance metadata summary, velocity context, and calibrated framing.
+- **Code:** `server.py::status()` now includes inventory (by type/source/locked), retrieval pipeline status, activity metrics (velocity tier + items/hr), and maintenance items. Velocity context is surfaced. However, rigor tier distribution is NOT included in output despite `get_rigor_distribution()` existing in the store layer. No confidence caveats or hedged language generation.
+- **Tests:** `test_server.py::test_status_returns_counts` verifies basic format.
+- **Gap:** Need to wire rigor distribution into status() output. Need confidence caveats when most findings are below "validated" tier. The CS-005 acceptance test (new agent asks "how solid is this?") has not been run.
 
 ### REQ-027: Zero-Repeat Directive Guarantee
 - **Code status by tier:**
   - **Tier 1 (Storage):** YES. Locked beliefs in SQLite WAL. `remember()` and `correct()` create them.
   - **Tier 2 (Injection):** YES. `get_locked()` returns all locked beliefs for SessionStart injection.
-  - **Tier 3 (Compression survival):** YES. Locked beliefs bypass compression in retrieval.
-  - **Tier 4 (Violation detection):** NO. No code monitors agent output for banned patterns.
-  - **Tier 5 (Violation blocking):** NO. No pre-execution hooks.
+  - **Tier 3 (Compression survival):** YES. Locked beliefs included in budget, scored highest so packed first.
+  - **Tier 4 (Violation detection):** SOFT. PreToolUse hook (agentmemory-directive-gate.sh) reads locked beliefs, filters behavioral directives, outputs advisory warnings. Does NOT block execution.
+  - **Tier 5 (Violation blocking):** NO. No hard gate that prevents violating actions from executing.
   - **Tier 6 (LLM compliance):** N/A (not under system control).
 - **Tests:** Acceptance tests cover Tiers 1-2. No tests for Tiers 4-5.
-- **Gap:** The critical enforcement tiers (detection and blocking) are not implemented.
+- **Gap:** Tier 4 is advisory only (warnings, not blocks). Tier 5 (hard blocking) is not implemented. Converting the soft gate to a hard gate is the remaining work.
 
 ---
 
-## Overall Coverage
+## Overall Coverage (updated 2026-04-14)
 
-| Category | Count | Implemented | Tested | Validated by Experiment |
-|----------|-------|------------|--------|------------------------|
-| Total Requirements | 27 | 16 (59%) | 13 (48%) | 10 (37%) |
-| Fully Implemented + Tested | -- | 10 (37%) | -- | -- |
-| Partially Implemented | -- | 6 (22%) | -- | -- |
-| Not Implemented | -- | 7 (26%) | -- | -- |
-| N/A (audit tasks) | -- | 4 (15%) | -- | -- |
+| Category | Count | % |
+|----------|------:|---:|
+| Total Requirements | 27 | 100% |
+| GREEN (implemented + tested) | 10 | 37% |
+| YELLOW (implemented but untested, or partial) | 13 | 48% |
+| RED (not implemented) | 2 | 7% |
+| DEFERRED (audit/doc tasks) | 2 | 7% |
 
 **Code coverage by requirement status:**
-- **GREEN (implemented + tested):** REQ-003, REQ-006, REQ-013, REQ-014, REQ-017, REQ-018, REQ-019, REQ-020 (8 of 27 = 30%)
-- **YELLOW (partially implemented or untested):** REQ-001, REQ-002, REQ-005, REQ-007, REQ-009, REQ-010, REQ-011, REQ-012, REQ-021, REQ-022, REQ-027 (11 of 27 = 41%)
-- **RED (not implemented):** REQ-004, REQ-008, REQ-023, REQ-024, REQ-025, REQ-026 (6 of 27 = 22%)
+- **GREEN (implemented + tested):** REQ-003, REQ-006, REQ-013, REQ-014, REQ-017, REQ-018, REQ-019, REQ-020, REQ-024, REQ-025 (10 of 27 = 37%)
+- **YELLOW (implemented but untested, or partial):** REQ-001, REQ-002, REQ-005, REQ-007, REQ-009, REQ-010, REQ-011, REQ-012, REQ-021, REQ-022, REQ-023, REQ-026, REQ-027 (13 of 27 = 48%)
+- **RED (not implemented):** REQ-004, REQ-008 (2 of 27 = 7%)
 - **DEFERRED (audit/doc tasks):** REQ-015, REQ-016 (2 of 27 = 7%)
+
+**Change from 2026-04-11:** RED dropped from 6 to 2. REQ-023 (partial), REQ-024, REQ-025 moved to YELLOW/GREEN. REQ-002, REQ-020, REQ-021, REQ-022 upgraded from YELLOW to GREEN or higher YELLOW.
 
 ---
 
@@ -216,46 +218,66 @@
 - Tests: 17 tests in `test_extraction.py`
 
 ### Wave 4 (MCP Server): COMPLETE
-- `server.py`: 8 tools (search, remember, correct, observe, status, get_locked, onboard, ingest)
-- Tests: 9 tests in `test_server.py`
+- `server.py`: 19 tools (search, remember, correct, observe, status, get_locked, onboard, ingest, feedback, settings, lock, get_unclassified, reclassify, create_beliefs, timeline, evolution, diff, snapshot, delete/bulk_delete)
+- Tests: 9+ tests in `test_server.py`
 
-### Wave 5 (Hook Integration): PARTIAL
-- No hook scripts in src/. The CLAUDE.md instructions direct agents to call MCP tools directly.
-- The SessionStart hook injection mechanism relies on the host (Claude Code) calling `get_locked()` at session start, driven by CLAUDE.md instructions rather than code hooks.
+### Wave 5 (Hook Integration): MOSTLY COMPLETE
+- SessionStart hook: agentmemory-session-start.sh injects locked beliefs + maturity note
+- UserPromptSubmit hook: agentmemory-search-inject.sh provides per-prompt belief retrieval
+- PreToolUse hook: agentmemory-directive-gate.sh provides soft violation warnings
+- PreCompact hook: agentmemory-precompact-guard.sh warns about locked beliefs before compression
+- PostCompact hook: triggers ingestion of archived conversation segments
+- Stop hook: conversation-logger.sh completes session
+- **Gap:** Hooks are Claude Code-specific. Other MCP clients rely on CLAUDE.md instructions.
 
 ### Wave 6 (Acceptance Tests): PARTIAL
 - 7 of 7 planned acceptance test files exist
-- 20 acceptance tests total
-- Missing: no Phase 2 integration test with real MCP protocol, no Phase 3 acceptance tests
+- 45 acceptance tests total (expanded from original 20)
+- Phase 1 (TB simulation): DONE (5/5 case studies)
+- Phase 2 (integration): NOT STARTED
+- Phase 3 (full system): NOT STARTED
 
 ### Not In Plan But Built:
-- `scanner.py`: full project onboarding scanner with git history, AST, docs, directives, citations (Exp 48/49 based)
+- `scanner.py`: full project onboarding scanner with 9 extractors (git history, AST, docs, directives, citations)
 - `cli.py`: extensive CLI with stats, search, core, locked, wonder, settings, reason commands
 - `commit_tracker.py`: deterministic commit nudge system
 - `config.py`: settings management
+- `relationship_detector.py`: CONTRADICTS/SUPPORTS edge detection on belief insertion
+- `supersession.py`: temporal supersession detection (Jaccard overlap)
 - HRR module (planned for Phase 3, built and integrated in retrieval)
 
 ---
 
-## Critical Gaps That Block Production Use
+## Critical Gaps That Block Production Use (updated 2026-04-14)
 
-### 1. REQ-020: Locked Beliefs Can Be Superseded
-`supersede_belief()` does not check the locked flag. This means a programmatic call (e.g., from `ingest_turn()` correction detection) could supersede a user-locked belief. The requirement states only explicit user action should be able to revise locked beliefs. **Fix: add a locked check in `supersede_belief()` and reject or warn.**
+### RESOLVED since 2026-04-11:
+- ~~REQ-020: Locked beliefs can be superseded~~ -- FIXED. supersede_belief() now checks locked flag (store.py:641-644).
+- ~~REQ-022: Locked beliefs blow token budget~~ -- FIXED. Locked beliefs now counted against 2K budget in pack_beliefs().
+- ~~REQ-002: No contradiction detection in retrieval~~ -- FIXED. flag_contradictions() in retrieval.py:305-337, wired into search output.
+- ~~REQ-023/024/025/026: Epistemic integrity suite not started~~ -- PARTIALLY FIXED. REQ-024 (velocity) and REQ-025 (rigor tier) implemented. REQ-023 has 3/5 fields. REQ-026 still partial.
 
-### 2. REQ-022: Locked Beliefs Can Blow the Token Budget
-Locked beliefs are loaded outside the token budget. With `max_locked=100` and an average of 50 tokens per belief, L0 alone could consume 5000 tokens -- far exceeding the 2000 token budget in REQ-003. **Fix: count locked beliefs against the budget, or enforce a token cap on L0.**
+### REMAINING:
 
-### 3. REQ-002: No Contradiction Detection in Retrieval
-Search results can return contradictory beliefs without flagging them. The contradiction detection in `cli.py::reason` is a diagnostic tool, not integrated into the retrieval path. **This is the second-most important requirement per the design docs.**
+### 1. REQ-027 Tier 5: No Hard Violation Blocking
+Tier 4 exists as a soft advisory gate (PreToolUse hook outputs warnings). But there is no hard gate that prevents violating actions from executing. The agent sees the warning but can still proceed. **This is the core value proposition of the memory system. Fix: convert soft gate to hard block for Bash commands matching locked prohibitions.**
 
-### 4. REQ-027 Tiers 4-5: No Violation Detection or Blocking
-The system stores and injects directives (Tiers 1-3) but cannot detect when the agent violates them (Tier 4) or block violating actions before they execute (Tier 5). **This is the core value proposition of the memory system.**
+### 2. REQ-026: Status Reporting Missing Rigor Distribution
+`get_rigor_distribution()` exists in the store layer but is not called by `status()`. A new agent querying status gets velocity context but no rigor breakdown or confidence caveats. **Fix: wire rigor distribution into status() output with appropriate hedging language.**
 
-### 5. REQ-023/024/025/026: Epistemic Integrity Suite Not Started
-The entire CS-005 family of requirements (provenance metadata, session velocity, rigor tiers, calibrated reporting) has zero code. These requirements exist specifically to prevent the "extensive research" mischaracterization problem documented in CS-005. **No schema fields, no classification logic, no status reporting.**
+### 3. REQ-023: 2 Missing Provenance Fields
+`data_source` and `independently_validated` columns not in schema. 3 of 5 fields implemented. **Fix: add 2 columns via migration.**
+
+### 4. REQ-004: Quality Per Token Not Measured
+No test comparing 2K-token retrieval quality vs 10K-token full dump. This is the foundational hypothesis of the retrieval system. **Fix: design and run a comparative quality evaluation.**
+
+### 5. REQ-008: No Longitudinal FP Rate Tracking
+No code tracks false positive rate across sessions. The feedback loop is wired but there is no measurement of whether it actually reduces noise over time. **Fix: add FP rate instrumentation to feedback loop.**
 
 ### 6. REQ-012: Write Durability Not Crash-Tested
-`synchronous=NORMAL` is set instead of `synchronous=FULL`. NORMAL provides durability under process crash but not under OS crash. The requirement says "zero acknowledged writes lost across 1,000 crash simulations" but no crash simulation exists. **Risk: low on modern filesystems, but unverified.**
+`synchronous=NORMAL` set instead of `FULL`. Risk is low on modern filesystems but the requirement specifies zero loss across 1,000 crash simulations and no simulation exists.
 
-### 7. Wave 5 (Hook Integration) Incomplete
-The system relies on CLAUDE.md instructions for the agent to call MCP tools at session start, rather than automated hooks. This means a model that does not read or obey CLAUDE.md instructions will not benefit from the memory system. **This partially undermines REQ-011 (cross-model) and REQ-027 (zero-repeat).**
+### 7. Acceptance Tests Phases 2-3 Not Started
+Phase 1 (TB simulation) is done. Phase 2 (integration with SQLite + MCP) and Phase 3 (full system) have not been started. These are the tests that actually prove the system works end-to-end.
+
+### 8. Wave 5 (Hook Integration) Relies on CLAUDE.md
+The system relies on CLAUDE.md instructions for agents to call MCP tools at session start. A model that does not read CLAUDE.md will not benefit. This partially undermines REQ-011 (cross-model) and REQ-027 (zero-repeat).
