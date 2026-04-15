@@ -110,6 +110,8 @@ class Belief:
     sample_size: int | None = None  # Number of samples in evidence (REQ-023)
     scope: str = "project"          # "project" or "global" -- cross-project promotion
     last_retrieved_at: str | None = None  # ISO 8601 timestamp of last retrieval
+    data_source: str = ""               # Where belief came from (REQ-023: e.g. "documentation", "git_log")
+    independently_validated: bool = False  # Has external verification (REQ-023)
 
 
 @dataclass

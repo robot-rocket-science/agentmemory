@@ -252,6 +252,8 @@ def _row_to_belief(row: sqlite3.Row) -> Belief:
         sample_size=row["sample_size"] if "sample_size" in keys else None,
         scope=row["scope"] if "scope" in keys else "project",
         last_retrieved_at=row["last_retrieved_at"] if "last_retrieved_at" in keys else None,
+        data_source=row["data_source"] if "data_source" in keys else "",
+        independently_validated=bool(row["independently_validated"]) if "independently_validated" in keys else False,
     )
 
 
@@ -356,6 +358,15 @@ class MemoryStore:
         if "last_retrieved_at" not in col_names:
             self._conn.execute(
                 "ALTER TABLE beliefs ADD COLUMN last_retrieved_at TEXT"
+            )
+        # REQ-023: remaining provenance fields
+        if "data_source" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE beliefs ADD COLUMN data_source TEXT NOT NULL DEFAULT ''"
+            )
+        if "independently_validated" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE beliefs ADD COLUMN independently_validated INTEGER NOT NULL DEFAULT 0"
             )
         self._conn.commit()
         # Create index on session_id (safe to run even if already exists)
@@ -513,6 +524,8 @@ class MemoryStore:
         rigor_tier: str = "hypothesis",
         method: str | None = None,
         sample_size: int | None = None,
+        data_source: str = "",
+        independently_validated: bool = False,
     ) -> Belief:
         """Insert a belief with optional evidence link. Content-hash dedup.
 
@@ -543,11 +556,13 @@ class MemoryStore:
                (id, content_hash, content, belief_type, alpha, beta_param,
                 source_type, locked, valid_from, valid_to, superseded_by,
                 created_at, updated_at, event_time, session_id, classified_by,
-                rigor_tier, method, sample_size)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                rigor_tier, method, sample_size, data_source,
+                independently_validated)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (belief_id, ch, content, belief_type, alpha, beta_param,
              source_type, locked_int, ts, ts, event_time, session_id, classified_by,
-             rigor_tier, method, sample_size),
+             rigor_tier, method, sample_size, data_source,
+             1 if independently_validated else 0),
         )
         self._conn.execute(
             "INSERT INTO search_index(id, content, type) VALUES (?, ?, ?)",
@@ -587,6 +602,8 @@ class MemoryStore:
             rigor_tier=rigor_tier,
             method=method,
             sample_size=sample_size,
+            data_source=data_source,
+            independently_validated=independently_validated,
         )
 
     def lock_belief(self, belief_id: str) -> None:
