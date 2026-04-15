@@ -8,11 +8,60 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+import re
+
 from agentmemory.compression import pack_beliefs
 from agentmemory.hrr import HRRGraph
 from agentmemory.models import EDGE_CONTRADICTS, Belief
 from agentmemory.scoring import score_belief
 from agentmemory.store import MemoryStore
+
+# Words that appear structurally in correction beliefs but carry no topical
+# signal. When the query contains these, deprioritize beliefs that match ONLY
+# on these words (CS-032: negation pattern noise).
+_NEGATION_STOP_WORDS: frozenset[str] = frozenset({
+    "not", "no", "dont", "don't", "never", "cannot", "can't",
+    "isn't", "aren't", "wasn't", "weren't", "doesn't", "didn't",
+    "without", "none", "nor",
+})
+
+
+def _filter_negation_noise(
+    query: str,
+    beliefs: list[Belief],
+    keep_top: int = 50,
+) -> list[Belief]:
+    """Deprioritize beliefs that match a query only on negation/stop words.
+
+    When a query like "service not starting" is run through FTS5, beliefs
+    containing "not" in their correction text flood the results even though
+    they share no topical terms with the query.
+
+    This filter splits query terms into topical vs negation, then pushes
+    beliefs with zero topical overlap to the end of the list.
+    """
+    query_terms: set[str] = {
+        t.lower() for t in re.split(r'\W+', query) if len(t) >= 2
+    }
+    topical_terms: set[str] = query_terms - _NEGATION_STOP_WORDS
+    if not topical_terms:
+        return beliefs  # Query is all negation words -- can't filter
+
+    signal: list[Belief] = []
+    noise: list[Belief] = []
+    for b in beliefs:
+        belief_terms: set[str] = {
+            t.lower() for t in re.split(r'\W+', b.content) if len(t) >= 2
+        }
+        # Check if belief shares any topical term with the query
+        if topical_terms & belief_terms:
+            signal.append(b)
+        else:
+            noise.append(b)
+
+    # Return signal first, then noise (preserving original order within each)
+    result: list[Belief] = signal + noise
+    return result[:keep_top]
 
 
 
@@ -160,6 +209,8 @@ def retrieve(
     fts_beliefs: list[Belief] = []
     if query_stripped:
         fts_beliefs = store.search(query_stripped, top_k=top_k)
+        # CS-032: deprioritize beliefs matching only on negation words
+        fts_beliefs = _filter_negation_noise(query_stripped, fts_beliefs, keep_top=top_k)
 
     # Step 3: HRR vocabulary-bridge expansion (L3).
     hrr_beliefs: list[Belief] = []

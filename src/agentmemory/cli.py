@@ -1066,6 +1066,34 @@ def cmd_reason(args: argparse.Namespace) -> None:
         store.close()
         return
 
+    # Step 1.5: Relevance floor check (CS-033)
+    # If top-5 results share no topical terms with the query, signal low relevance
+    import re as _re
+    _negation_words: frozenset[str] = frozenset({
+        "not", "no", "dont", "don't", "never", "cannot", "can't",
+        "isn't", "doesn't", "didn't", "without", "none",
+    })
+    query_topical: set[str] = {
+        t.lower() for t in _re.split(r'\W+', query) if len(t) >= 2
+    } - _negation_words
+    if query_topical:
+        topical_hits: int = 0
+        for b in result.beliefs[:5]:
+            b_terms: set[str] = {
+                t.lower() for t in _re.split(r'\W+', b.content) if len(t) >= 2
+            }
+            if query_topical & b_terms:
+                topical_hits += 1
+        if topical_hits == 0:
+            print(f"REASON: {query}")
+            print("VERDICT: INSUFFICIENT -- no topically relevant beliefs found.")
+            print(f"  (Returned {len(result.beliefs)} beliefs but none share "
+                  f"topical terms with the query.)")
+            print("  This topic may not be in memory. Consider using /mem:search "
+                  "with different keywords.")
+            store.close()
+            return
+
     # Step 2: Build consequence paths from top 10 seeds
     seed_ids: list[str] = [b.id for b in result.beliefs[:10]]
     paths: list[list[tuple[Belief, str, float]]] = store.find_consequence_paths(
