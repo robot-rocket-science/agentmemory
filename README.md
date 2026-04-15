@@ -202,6 +202,31 @@ Key settings:
 | `reason.depth` | `2` | BFS graph traversal depth |
 | `fts5.top_k` | `50` | Max FTS5 results per query |
 
+## Benchmarks
+
+Evaluated on [LoCoMo](https://snap-research.github.io/locomo/) (Maharana et al., ACL 2024), the standard benchmark for long-conversation memory. 10 conversations, 5882 turns, 1986 QA pairs across 5 categories.
+
+| System | Overall F1 |
+|---|---|
+| Human ceiling | 87.9% |
+| **agentmemory + Opus 4.6** | **61.6%** |
+| GPT-4-turbo (128K full context) | 51.6% |
+| RAG (DRAGON + gpt-3.5-turbo) | 43.3% |
+| agentmemory + Haiku 4.5 | 40.5% |
+| Claude-3-Sonnet (200K full context) | 38.5% |
+
+Per-category breakdown (agentmemory + Opus):
+
+| Category | F1 | n |
+|---|---|---|
+| Adversarial (refusal) | 100.0% | 446 |
+| Temporal reasoning | 54.8% | 321 |
+| Single-hop factual | 54.4% | 841 |
+| Multi-hop reasoning | 38.4% | 282 |
+| Open-ended | 38.0% | 96 |
+
+agentmemory uses FTS5 + HRR + BFS retrieval (no embeddings, no vector DB) with a 2000-token budget per query. The retrieval pipeline runs in ~16ms per query. Full methodology and results in [docs/BENCHMARK_LOG.md](docs/BENCHMARK_LOG.md).
+
 ## Development
 
 ```bash
