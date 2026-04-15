@@ -1458,6 +1458,72 @@ The gap analysis was productive -- but only because the user explicitly asked fo
 
 ---
 
+## CS-035: Triple Self-Contradiction on Implemented Features
+
+**What happened:** The user asked whether agentmemory resets or compacts context periodically. The agent checked `mcp__agentmemory__status`, saw raw numbers (19K beliefs, 76% at type prior, 37% orphans), and confidently declared: "No, it's not. There's no compaction, pruning, or periodic reset built into agentmemory." It listed four missing capabilities (compact, prune, decay, archive) and presented the system as grow-only.
+
+The user said: "wait we just did a big sprint to fix all that stuff."
+
+The agent searched agentmemory and git log, found recent commits implementing temporal decay, stale detection, dedup, and maintenance CLI. It retracted the first answer: "I was wrong... the system does have decay, stale detection, and dedup." But it still claimed compaction was missing: "What it still doesn't have is automatic compaction."
+
+The user said: "ok i thought we implemented a compaction system."
+
+The agent searched the codebase, found COMPACTION_LOGGING_PLAN.md, and declared: "It's a plan, not an implementation." It explicitly stated no Python code references compaction, no hooks exist, and the conversation logger doesn't handle compaction events.
+
+The user said: "yes" (to implementing it).
+
+The agent then read the actual conversation logger code and discovered the compaction system was fully implemented and live: PreCompact/PostCompact hooks wired in settings.json, log rotation, archived segments, auto-ingestion. It had to retract a third time: "It IS implemented. I was wrong twice."
+
+Total: three successive confident declarations about the system's capabilities, all wrong, each corrected by the user, in a single conversation about the system the agent is embedded in.
+
+**The memory failure:** This is a compound failure across multiple retrieval and reasoning layers:
+
+1. **Status numbers without implementation knowledge.** The agent interpreted `mcp__agentmemory__status` output (raw counts, health percentages) as definitive evidence of system capability. The status tool reports database statistics, not feature inventory. The agent treated "76% at type prior" as proof that no decay exists, when it actually means 76% of beliefs haven't had their prior updated -- which is expected even with decay active.
+
+2. **Grep-as-proof-of-absence.** When searching for compaction, the agent found 3 casual uses of the word "compact" and concluded no implementation existed. It didn't search for the actual implementation artifacts (hook scripts, conversation logger compaction handlers, settings.json hook entries). The search terms were too narrow.
+
+3. **Plan-doc as ceiling.** Finding COMPACTION_LOGGING_PLAN.md, the agent assumed the plan was the most advanced state of the feature. It didn't check whether the plan had been executed. This is exactly CS-034 (design-reality gap) but in reverse: instead of reporting design as done, it reported done as design-only.
+
+4. **No self-knowledge of own infrastructure.** The agent is running inside the system it was asked about. The compaction hooks fire when Claude Code compresses context. The agent could have checked settings.json or the conversation logger source directly. It didn't think to look at the infrastructure it is actively using.
+
+**Pattern:** P1 (repeated decisions -- the agent "decided" the feature was missing three times), P5 (confident wrong answer), P18 (new: **self-system blindness** -- the agent cannot accurately describe the system it is embedded in despite having access to all source code, configuration, and runtime artifacts).
+
+**Connection to prior case studies:**
+- **CS-005 (maturity inflation):** CS-005 was over-claiming maturity. CS-035 is the inverse: under-claiming maturity. Both are calibration failures where the agent's report diverges from reality, just in opposite directions.
+- **CS-034 (design-reality gap):** CS-034 documented the agent failing to surface gaps proactively. CS-035 is the agent actively creating a false gap by reporting implemented features as unimplemented.
+- **CS-003 (overwriting state instead of consulting it):** The agent had access to the codebase, git history, settings.json, and the running system. It consulted none of them before making claims. It relied on a status tool output and a quick grep instead of reading the actual code.
+
+**Why this is particularly egregious:**
+
+1. The features being denied were implemented in a recent sprint the user explicitly referenced.
+2. The agent is embedded in the system it was denying. The compaction hooks fire on its own context window.
+3. Each retraction was followed by a new confident wrong claim, not by humility or broader investigation.
+4. The user had to correct the agent three times in a row on the same topic, escalating specificity each time.
+
+**Quantified impact:**
+- ~15 turns wasted across the correction cycle
+- ~6K tokens of wrong answers that had to be retracted
+- Significant trust erosion -- "I was completely wrong in my initial answer. My apologies for the runaround."
+- Potential for the user to doubt the agent's understanding of the entire system
+
+**What memory should do:**
+1. **Feature inventory belief type.** When features are implemented, store a belief: "Feature X is implemented (commit abc123, date)." When asked "does X exist?", retrieve the feature belief before checking code. This prevents grep-as-proof-of-absence.
+2. **Self-system awareness.** The agent should have a loaded set of beliefs about the system it is running inside: what hooks are active, what tools are available, what infrastructure is configured. These are not optional context -- they're the agent's own operating environment.
+3. **Escalating uncertainty on successive corrections.** After the first correction ("we just did a big sprint"), the agent should have broadened its investigation rather than making another narrow claim. Each correction on the same topic should increase the search radius, not just fix the specific item called out.
+
+**REQ mapping:** REQ-001 (cross-session retention -- recent work not surfaced), REQ-025 (rigor tiers -- status report without verification), CS-034 (design-reality gap, inverted). New requirement candidate:
+- REQ-NEW-S: Self-system knowledge -- the agent must maintain accurate beliefs about its own infrastructure (hooks, tools, configuration) and verify them before making claims about system capabilities.
+
+**Acceptance tests:**
+
+*Primary (feature inventory):* Implement a feature, commit it, store a belief. In a new session, ask "does feature X exist?" Agent must retrieve the feature belief and confirm, not grep for it and conclude it's missing.
+
+*Secondary (self-correction escalation):* Agent makes a wrong claim about system capability. User corrects. Agent's next investigation must be broader than the previous one (more files checked, more search terms, read actual code). A second wrong claim on the same topic in the same conversation is a test failure.
+
+*Tertiary (self-system queries):* Ask "what hooks are active in this system?" Agent must answer from settings.json and hook scripts, not from memory or inference. The answer must match the actual configuration.
+
+---
+
 ## How to Use These Case Studies
 
 Each case study is a concrete acceptance test for the memory system:
@@ -1497,6 +1563,7 @@ Each case study is a concrete acceptance test for the memory system:
 28. **CS-032 test:** Store 100 correction beliefs containing "not." Query "service not starting." Correction beliefs matching only on "not" must not dominate the top-10 results.
 29. **CS-033 test:** Query a topic with zero beliefs in the store. System must return "no prior knowledge on this topic" rather than beliefs about unrelated topics.
 30. **CS-034 test:** Store "feature X is designed" and "feature X is not implemented." Query project status. Both beliefs must appear with the gap explicitly noted.
+31. **CS-035 test:** Implement a feature and commit it. Start a new session. Ask "does feature X exist?" Agent must confirm from code/git, not deny based on a shallow grep. If the agent makes a wrong claim and the user corrects, the agent's next investigation must be strictly broader. A second wrong claim on the same topic is a test failure.
 
 These are more valuable than synthetic benchmarks because they test the exact failure modes we're building the system to prevent.
 
