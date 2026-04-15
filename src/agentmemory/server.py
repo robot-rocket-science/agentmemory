@@ -504,6 +504,31 @@ def status() -> str:
             f"({last_velocity.velocity_items_per_hour:.1f} items/hr)"
         )
 
+    # --- Rigor (REQ-026: calibrated status reporting) ---
+    rigor_dist: dict[str, int] = store.get_rigor_distribution()
+    if rigor_dist:
+        active_total_r: int = sum(rigor_dist.values())
+        lines.append("Rigor:")
+        rigor_parts: list[str] = [
+            f"{cnt} {tier} ({cnt / active_total_r * 100:.0f}%)"
+            for tier, cnt in rigor_dist.items()
+        ]
+        lines.append(f"  {', '.join(rigor_parts)}")
+        # Confidence caveat when most findings are below "validated" tier
+        validated_count: int = rigor_dist.get("validated", 0)
+        empirical_count: int = rigor_dist.get("empirically_tested", 0)
+        strong_count: int = validated_count + empirical_count
+        strong_pct: float = strong_count / active_total_r * 100 if active_total_r > 0 else 0.0
+        if strong_pct < 20.0:
+            lines.append(
+                f"  Caveat: {strong_pct:.0f}% of beliefs are empirically tested or validated. "
+                "Most findings are hypothesis-tier; treat with appropriate skepticism."
+            )
+        elif strong_pct < 50.0:
+            lines.append(
+                f"  Note: {strong_pct:.0f}% of beliefs are empirically tested or validated."
+            )
+
     # --- Maintenance (actionable) ---
     stale: int = int(maint["stale_count"])  # type: ignore[arg-type]
     orphan: int = int(maint["orphan_count"])  # type: ignore[arg-type]
