@@ -5,48 +5,58 @@
 **Paper:** Maharana et al., ACL 2024 (arXiv:2402.17753)
 **Dataset:** locomo10.json (10 conversations, 5882 turns, 272 sessions, 1986 QA pairs)
 **Retrieval:** agentmemory FTS5+HRR+BFS (budget=2000, batch_size=1)
+**Reader:** Opus 4.6 (via Claude Code subagent)
 **Scoring:** LoCoMo exact F1 methodology (Porter stemming, article removal, per-category rules)
-**Readers tested:** Haiku 4.5, Opus 4.6
+**Protocol compliance:** Exact LoCoMo prompts, forced-choice for cat5, date hint for cat2, no answer leakage (ground truth in separate file, agents never see it)
 
-### Overall Results
+### Overall Results (protocol-correct)
 
-| Reader | Overall F1 | Non-adversarial F1 |
-|---|---|---|
-| **Opus 4.6** | **61.6%** | **47.0%** |
-| Haiku 4.5 | 40.5% | 22.3% |
-
-Ingest time: ~25s (10 conversations). Avg query latency: ~16ms.
+| Metric | Score |
+|---|---|
+| **Overall F1** | **66.1%** |
+| Ingest time (10 conversations) | ~25s total |
+| Avg query latency | ~16ms |
 
 ### Per-Category F1
 
-| Category | Haiku | Opus | Delta | n |
-|---|---|---|---|---|
-| 1. Multi-hop | 17.6% | 38.4% | +20.8pp | 282 |
-| 2. Temporal | 22.2% | 54.8% | +32.6pp | 321 |
-| 3. Open-ended | 12.4% | 38.0% | +25.6pp | 96 |
-| 4. Single-hop | 26.9% | 54.4% | +27.5pp | 841 |
-| 5. Adversarial | 100.0% | 100.0% | 0 | 446 |
+| Category | F1 | n |
+|---|---|---|
+| 1. Multi-hop | 42.2% | 282 |
+| 2. Temporal | 45.4% | 321 |
+| 3. Open-ended | 30.5% | 96 |
+| 4. Single-hop | 69.4% | 841 |
+| 5. Adversarial | 97.5% | 446 |
 
 ### Reference Baselines (from LoCoMo paper, Table 2/3)
 
 | System | Overall F1 | Notes |
 |---|---|---|
 | Human | 87.9% | Ceiling |
-| **agentmemory (FTS5+HRR+BFS + Opus)** | **61.6%** | This run |
+| **agentmemory (FTS5+HRR+BFS + Opus)** | **66.1%** | Protocol-correct run |
 | GPT-4-turbo (128K) | 51.6% | Best long-context in paper |
 | RAG (DRAGON + gpt-3.5-turbo, top-5 obs) | 43.3% | Best RAG in paper |
-| agentmemory (FTS5+HRR+BFS + Haiku) | 40.5% | This run |
 | Claude-3-Sonnet (200K) | 38.5% | Long-context |
 | gpt-3.5-turbo (16K) | 36.1% | Long-context |
 | RAG (DRAGON + gpt-3.5-turbo, top-5 dialog) | 32.9% | RAG on raw dialog |
 
+### Methodology
+
+1. **Retrieval:** agentmemory ingests all LoCoMo sessions, one per agentmemory session. Each dialog turn is ingested with session date prefix for temporal grounding. Per-question retrieval via `retrieve()` with 2000-token budget, FTS5+HRR+BFS enabled, no locked beliefs.
+2. **Answer generation:** 10 parallel Opus subagents (one per 200-item batch). Each agent receives only `id`, `prompt`, `context`. No answer field, no category label, no metadata. Ground truth stored in a separate file agents never access.
+3. **Prompts:** Exact LoCoMo protocol. Cat 1/3/4: "Based on the above context, write an answer in the form of a short phrase..." Cat 2: appends "Use DATE of CONVERSATION to answer with an approximate date." Cat 5: forced-choice "(a) Not mentioned (b) [adversarial_answer]" with randomized order (seed=42).
+4. **Scoring:** LoCoMo F1 (Porter stemming, article removal). Cat 1 uses multi-hop partial F1. Cat 3 uses first semicolon segment. Cat 5 uses forced-choice letter matching per `get_cat_5_answer()`.
+
+### Earlier runs (methodology issues, superseded)
+
+Two earlier runs had answer leakage (the `answer` field was present in the agent input JSON). The Haiku run (40.5%) and first Opus run (61.6%) are not valid. The protocol-correct run (66.1%) is the only reportable result.
+
 ### Analysis
 
-1. **agentmemory + Opus beats the paper's best result by 10pp** (61.6% vs 51.6% GPT-4-turbo). This is with FTS5+HRR keyword retrieval, not embedding-based.
-2. **Reader model matters enormously.** Opus vs Haiku on identical retrieved context: +21pp overall, +32.6pp on temporal. Opus is far better at extracting answers from noisy context and resolving temporal references.
-3. **Adversarial detection is perfect** (100%) regardless of reader. agentmemory correctly identifies absent information.
-4. **Retrieval is still the bottleneck.** Even with Opus, non-adversarial F1 is 47%. The retrieval pipeline finds topically relevant beliefs but misses specific evidence turns. Embedding-based retrieval would likely push this higher.
-5. **Temporal is the biggest reader-dependent category** (+32.6pp). Opus handles "yesterday" and "last week" date arithmetic much better than Haiku.
+1. **agentmemory + Opus beats the paper's best by 14.5pp** (66.1% vs 51.6% GPT-4-turbo). This uses keyword-only retrieval (FTS5+HRR), no embeddings.
+2. **Single-hop is strongest** (69.4%). Direct factual recall from individual turns is well-served by keyword retrieval.
+3. **Adversarial is near-perfect** (97.5%). Forced-choice format slightly harder than simple refusal, but the model correctly identifies absent information.
+4. **Multi-hop and temporal are weaker** (42-45%). These require cross-session reasoning and date arithmetic from noisy context.
+5. **Open-ended is weakest** (30.5%). Speculative questions require synthesis the retrieval pipeline doesn't directly support.
 
 ### What Would Improve the Score
 

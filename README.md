@@ -209,23 +209,22 @@ Evaluated on [LoCoMo](https://snap-research.github.io/locomo/) (Maharana et al.,
 | System | Overall F1 |
 |---|---|
 | Human ceiling | 87.9% |
-| **agentmemory + Opus 4.6** | **61.6%** |
+| **agentmemory + Opus 4.6** | **66.1%** |
 | GPT-4-turbo (128K full context) | 51.6% |
 | RAG (DRAGON + gpt-3.5-turbo) | 43.3% |
-| agentmemory + Haiku 4.5 | 40.5% |
 | Claude-3-Sonnet (200K full context) | 38.5% |
 
-Per-category breakdown (agentmemory + Opus):
+Per-category breakdown (agentmemory + Opus, protocol-correct):
 
 | Category | F1 | n |
 |---|---|---|
-| Adversarial (refusal) | 100.0% | 446 |
-| Temporal reasoning | 54.8% | 321 |
-| Single-hop factual | 54.4% | 841 |
-| Multi-hop reasoning | 38.4% | 282 |
-| Open-ended | 38.0% | 96 |
+| Single-hop factual | 69.4% | 841 |
+| Adversarial (forced-choice) | 97.5% | 446 |
+| Temporal reasoning | 45.4% | 321 |
+| Multi-hop reasoning | 42.2% | 282 |
+| Open-ended | 30.5% | 96 |
 
-agentmemory uses FTS5 + HRR + BFS retrieval (no embeddings, no vector DB) with a 2000-token budget per query. The retrieval pipeline runs in ~16ms per query. Full methodology and results in [docs/BENCHMARK_LOG.md](docs/BENCHMARK_LOG.md).
+agentmemory uses FTS5 + HRR + BFS retrieval (no embeddings, no vector DB) with a 2000-token budget per query. The retrieval pipeline runs in ~16ms per query. Protocol-correct evaluation: exact LoCoMo prompts, forced-choice for adversarial, answer field isolated from reader. Full methodology in [docs/BENCHMARK_LOG.md](docs/BENCHMARK_LOG.md).
 
 ## Development
 
