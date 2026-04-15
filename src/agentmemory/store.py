@@ -1761,6 +1761,170 @@ class MemoryStore:
             "sessions": count("SELECT COUNT(*) FROM sessions"),
         }
 
+    def get_status_report(self) -> dict[str, object]:
+        """Return a structured status report with four sections.
+
+        Sections:
+          inventory -- counts by type, source, locked status
+          retrieval -- coverage, scoring features, pending feedback
+          activity  -- sessions, observations, age distribution
+          maintenance -- stale, orphans, credal gap (actionable items)
+        """
+        def count(sql: str, params: tuple[object, ...] = ()) -> int:
+            row: sqlite3.Row = self._conn.execute(sql, params).fetchone()
+            val: object = row[0]
+            return val if isinstance(val, int) else 0
+
+        active: int = count(
+            "SELECT COUNT(*) FROM beliefs WHERE valid_to IS NULL"
+        )
+        superseded: int = count(
+            "SELECT COUNT(*) FROM beliefs WHERE valid_to IS NOT NULL"
+        )
+        locked: int = count(
+            "SELECT COUNT(*) FROM beliefs WHERE locked = 1 AND valid_to IS NULL"
+        )
+
+        # Type distribution
+        by_type: dict[str, int] = {}
+        for row in self._conn.execute(
+            "SELECT belief_type, COUNT(*) FROM beliefs "
+            "WHERE valid_to IS NULL GROUP BY belief_type ORDER BY COUNT(*) DESC"
+        ).fetchall():
+            by_type[str(row[0])] = int(row[1])
+
+        # Source distribution
+        by_source: dict[str, int] = {}
+        for row in self._conn.execute(
+            "SELECT source_type, COUNT(*) FROM beliefs "
+            "WHERE valid_to IS NULL GROUP BY source_type ORDER BY COUNT(*) DESC"
+        ).fetchall():
+            by_source[str(row[0])] = int(row[1])
+
+        # Locked breakdown by type
+        locked_by_type: dict[str, int] = {}
+        for row in self._conn.execute(
+            "SELECT belief_type, COUNT(*) FROM beliefs "
+            "WHERE locked = 1 AND valid_to IS NULL "
+            "GROUP BY belief_type ORDER BY COUNT(*) DESC"
+        ).fetchall():
+            locked_by_type[str(row[0])] = int(row[1])
+
+        inventory: dict[str, object] = {
+            "active": active,
+            "superseded": superseded,
+            "locked": locked,
+            "by_type": by_type,
+            "by_source": by_source,
+            "locked_by_type": locked_by_type,
+        }
+
+        # --- Retrieval ---
+        retrieved_once: int = count(
+            "SELECT COUNT(*) FROM beliefs "
+            "WHERE valid_to IS NULL AND last_retrieved_at IS NOT NULL"
+        )
+        pending_fb: int = count("SELECT COUNT(*) FROM pending_feedback")
+
+        scoring_features: list[str] = [
+            "temporal_decay",
+            "recency_boost",
+            "velocity_scaling",
+            "thompson_sampling",
+            "type_weights",
+            "source_weights",
+        ]
+
+        retrieval: dict[str, object] = {
+            "retrieved_once": retrieved_once,
+            "total_active": active,
+            "pending_feedback": pending_fb,
+            "scoring_features": scoring_features,
+        }
+
+        # --- Activity ---
+        sessions: int = count("SELECT COUNT(*) FROM sessions")
+        observations: int = count("SELECT COUNT(*) FROM observations")
+
+        age_buckets: dict[str, int] = {}
+        for row in self._conn.execute(
+            """SELECT
+                 CASE
+                   WHEN julianday('now') - julianday(created_at) < 1 THEN '<1d'
+                   WHEN julianday('now') - julianday(created_at) < 3 THEN '1-3d'
+                   WHEN julianday('now') - julianday(created_at) < 7 THEN '3-7d'
+                   WHEN julianday('now') - julianday(created_at) < 30 THEN '7-30d'
+                   ELSE '>30d'
+                 END AS age_bucket,
+                 COUNT(*)
+               FROM beliefs WHERE valid_to IS NULL
+               GROUP BY age_bucket"""
+        ).fetchall():
+            age_buckets[str(row[0])] = int(row[1])
+
+        activity: dict[str, object] = {
+            "sessions": sessions,
+            "observations": observations,
+            "age_distribution": age_buckets,
+        }
+
+        # --- Maintenance (actionable items) ---
+        stale: int = self.count_stale_beliefs(days_threshold=30)
+
+        orphan: int = count(
+            """SELECT COUNT(*) FROM beliefs b
+               WHERE b.valid_to IS NULL
+                 AND b.id NOT IN (SELECT from_id FROM edges)
+                 AND b.id NOT IN (SELECT to_id FROM edges)"""
+        )
+        orphan_pct: float = round(orphan / active * 100, 1) if active > 0 else 0.0
+
+        # Credal gap: beliefs at type prior (never received feedback)
+        type_prior_rows: list[sqlite3.Row] = self._conn.execute(
+            """SELECT belief_type,
+                      ROUND(alpha, 1) AS a, ROUND(beta_param, 1) AS b,
+                      COUNT(*) AS cnt
+               FROM beliefs WHERE valid_to IS NULL
+               GROUP BY belief_type, a, b
+               ORDER BY belief_type, cnt DESC"""
+        ).fetchall()
+        type_priors: dict[str, tuple[float, float]] = {}
+        for row in type_prior_rows:
+            bt: str = str(row["belief_type"])
+            if bt not in type_priors:
+                type_priors[bt] = (float(str(row["a"])), float(str(row["b"])))
+
+        at_prior: int = 0
+        epsilon: float = 0.15
+        belief_rows: list[sqlite3.Row] = self._conn.execute(
+            "SELECT belief_type, alpha, beta_param FROM beliefs WHERE valid_to IS NULL"
+        ).fetchall()
+        for row in belief_rows:
+            bt = str(row["belief_type"])
+            prior = type_priors.get(bt)
+            if prior is None:
+                continue
+            if (abs(float(str(row["alpha"])) - prior[0]) < epsilon
+                    and abs(float(str(row["beta_param"])) - prior[1]) < epsilon):
+                at_prior += 1
+
+        credal_pct: float = round(at_prior / active * 100, 1) if active > 0 else 0.0
+
+        maintenance: dict[str, object] = {
+            "stale_count": stale,
+            "orphan_count": orphan,
+            "orphan_pct": orphan_pct,
+            "credal_gap_count": at_prior,
+            "credal_gap_pct": credal_pct,
+        }
+
+        return {
+            "inventory": inventory,
+            "retrieval": retrieval,
+            "activity": activity,
+            "maintenance": maintenance,
+        }
+
     def get_health_metrics(self) -> dict[str, object]:
         """Return diagnostic health metrics for the memory system.
 

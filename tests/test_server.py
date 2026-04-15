@@ -144,20 +144,15 @@ def test_status_returns_counts() -> None:
 
     result: str = status()
 
-    assert "Memory system status:" in result
-    assert "observations:" in result
-    assert "beliefs:" in result
-    assert "locked:" in result
-    assert "superseded:" in result
-    assert "edges:" in result
-    assert "sessions:" in result
+    # New format: Inventory / Retrieval / Activity sections
+    assert "Inventory:" in result
+    assert "Retrieval:" in result
+    assert "Activity:" in result
 
-    # There should be 2 beliefs (remember + correct) and 1 observation
-    # Neither remember() nor correct() auto-lock; locking requires user confirmation
-    assert "observations: 1" in result
-    assert "beliefs: 2" in result
-    assert "locked: 0" in result
-    assert "sessions: 1" in result
+    # 2 active beliefs (remember + correct), 0 superseded
+    assert "2 active beliefs (0 superseded)" in result
+    # 1 observation, 1 session
+    assert "1 sessions, 1 observations" in result
 
 
 def test_get_locked_returns_only_locked() -> None:

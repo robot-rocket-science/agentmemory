@@ -433,56 +433,89 @@ def observe(text: str, source: str = "user") -> str:
 def status() -> str:
     """Return memory system status.
 
-    Reports counts of observations, beliefs, locked beliefs, superseded
-    beliefs, edges, and sessions. Includes current session token metrics.
+    Reports inventory (counts by type/source/locked), retrieval pipeline
+    status, activity metrics, and actionable maintenance items.
     """
     store: MemoryStore = _get_store()
-    counts: dict[str, int] = store.status()
-    lines: list[str] = ["Memory system status:"]
-    for key, value in counts.items():
-        lines.append(f"  {key}: {value}")
+    report: dict[str, object] = store.get_status_report()
+    inv: dict[str, object] = report["inventory"]  # type: ignore[assignment]
+    ret: dict[str, object] = report["retrieval"]  # type: ignore[assignment]
+    act: dict[str, object] = report["activity"]  # type: ignore[assignment]
+    maint: dict[str, object] = report["maintenance"]  # type: ignore[assignment]
 
-    # Current session metrics
+    lines: list[str] = []
+
+    # --- Inventory ---
+    lines.append("Inventory:")
+    lines.append(f"  {inv['active']} active beliefs ({inv['superseded']} superseded)")
+    by_type: dict[str, int] = inv["by_type"]  # type: ignore[assignment]
+    if by_type:
+        type_parts: list[str] = [f"{c} {t}" for t, c in by_type.items()]
+        lines.append(f"  By type: {', '.join(type_parts)}")
+    by_source: dict[str, int] = inv["by_source"]  # type: ignore[assignment]
+    if by_source:
+        active_total: int = int(inv["active"])  # type: ignore[arg-type]
+        src_parts: list[str] = []
+        for src, cnt in by_source.items():
+            pct: float = cnt / active_total * 100 if active_total > 0 else 0.0
+            src_parts.append(f"{cnt} {src} ({pct:.0f}%)")
+        lines.append(f"  By source: {', '.join(src_parts)}")
+    locked_by_type: dict[str, int] = inv["locked_by_type"]  # type: ignore[assignment]
+    if locked_by_type:
+        lock_parts: list[str] = [f"{c} {t}" for t, c in locked_by_type.items()]
+        lines.append(f"  Locked: {inv['locked']} ({', '.join(lock_parts)})")
+    elif int(inv["locked"]) > 0:  # type: ignore[arg-type]
+        lines.append(f"  Locked: {inv['locked']}")
+
+    # --- Retrieval ---
+    lines.append("Retrieval:")
+    total_active: int = int(ret["total_active"])  # type: ignore[arg-type]
+    retrieved: int = int(ret["retrieved_once"])  # type: ignore[arg-type]
+    ret_pct: float = retrieved / total_active * 100 if total_active > 0 else 0.0
+    lines.append(f"  {ret_pct:.0f}% retrieved at least once ({retrieved}/{total_active})")
+    features: list[str] = ret["scoring_features"]  # type: ignore[assignment]
+    lines.append(f"  Scoring: {' + '.join(features)}")
+    pending: int = int(ret["pending_feedback"])  # type: ignore[arg-type]
+    if pending > 0:
+        lines.append(f"  Pending feedback: {pending}")
+
+    # --- Current session ---
     if _session_id is not None:
         session: Session | None = store.get_session(_session_id)
         if session is not None:
-            lines.append("Current session:")
-            lines.append(f"  retrieval_tokens: {session.retrieval_tokens}")
-            lines.append(f"  classification_tokens: {session.classification_tokens}")
-            lines.append(f"  beliefs_created: {session.beliefs_created}")
-            lines.append(f"  corrections_detected: {session.corrections_detected}")
-            lines.append(f"  searches_performed: {session.searches_performed}")
-            lines.append(f"  locked_accesses: {_locked_access_count}")
+            lines.append("Session:")
+            lines.append(
+                f"  beliefs: {session.beliefs_created}, "
+                f"corrections: {session.corrections_detected}, "
+                f"searches: {session.searches_performed}"
+            )
 
-    # Health metrics
-    health: dict[str, object] = store.get_health_metrics()
-    lines.append("Health:")
-    lines.append(f"  credal_gap: {health['credal_gap_count']} ({health['credal_gap_pct']}%) at type prior")
-    lines.append(f"  orphans: {health['orphan_count']} ({health['orphan_pct']}%) no edges")
-    lines.append(f"  edges: {health['contradicts_edges']} CONTRADICTS, {health['supports_edges']} SUPPORTS, {health['supersedes_edges']} SUPERSEDES")
-    lines.append(f"  feedback_coverage: {health['feedback_coverage_count']} ({health['feedback_coverage_pct']}%)")
-
-    # REQ-025/026: Rigor tier distribution + calibrated framing
-    rigor: dict[str, int] = store.get_rigor_distribution()
-    if rigor:
-        total_rigor: int = sum(rigor.values())
-        lines.append("Rigor tiers:")
-        for tier, cnt in sorted(rigor.items(), key=lambda x: x[1], reverse=True):
-            pct: float = cnt / total_rigor * 100 if total_rigor > 0 else 0.0
-            lines.append(f"  {tier}: {cnt} ({pct:.0f}%)")
-        validated: int = rigor.get("validated", 0) + rigor.get("empirically_tested", 0)
-        if total_rigor > 0 and validated / total_rigor < 0.3:
-            lines.append(f"  CAVEAT: {validated / total_rigor * 100:.0f}% of beliefs are empirically tested or validated. Most findings are hypotheses or simulations.")
-
-    # Stale beliefs
-    stale_count: int = store.count_stale_beliefs(days_threshold=30)
-    if stale_count > 0:
-        lines.append(f"Stale beliefs (>30 days unretrieved): {stale_count}")
-
-    # Last completed session velocity
+    # --- Activity ---
+    lines.append("Activity:")
+    lines.append(f"  {act['sessions']} sessions, {act['observations']} observations")
+    age_dist: dict[str, int] = act["age_distribution"]  # type: ignore[assignment]
+    if age_dist:
+        age_parts: list[str] = [f"{c} {bucket}" for bucket, c in age_dist.items()]
+        lines.append(f"  Age: {', '.join(age_parts)}")
     last_velocity: Session | None = store.get_last_completed_session()
     if last_velocity is not None and last_velocity.velocity_tier is not None:
-        lines.append(f"Last session: {last_velocity.velocity_tier} ({last_velocity.velocity_items_per_hour:.1f} items/hr)")
+        lines.append(
+            f"  Last session: {last_velocity.velocity_tier} "
+            f"({last_velocity.velocity_items_per_hour:.1f} items/hr)"
+        )
+
+    # --- Maintenance (actionable) ---
+    stale: int = int(maint["stale_count"])  # type: ignore[arg-type]
+    orphan: int = int(maint["orphan_count"])  # type: ignore[arg-type]
+    credal: int = int(maint["credal_gap_count"])  # type: ignore[arg-type]
+    if stale > 0 or orphan > 0 or credal > 0:
+        lines.append("Maintenance:")
+        if stale > 0:
+            lines.append(f"  Stale (>30d unretrieved): {stale}")
+        if orphan > 0:
+            lines.append(f"  Orphans (no edges): {orphan} ({maint['orphan_pct']}%)")
+        if credal > 0:
+            lines.append(f"  Never updated (at type prior): {credal} ({maint['credal_gap_pct']}%)")
 
     return "\n".join(lines)
 
