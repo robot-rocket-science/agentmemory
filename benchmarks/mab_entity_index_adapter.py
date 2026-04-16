@@ -147,28 +147,73 @@ class EntityIndex:
 def extract_entity_from_question(question: str) -> str | None:
     """Extract the primary named entity from a multi-hop question.
 
-    Looks for quoted entities first, then proper noun phrases at the
-    end of the question.
+    Looks for quoted entities first, then entity-bearing phrases,
+    then proper nouns including single-word and mixed-case names.
     """
     # Quoted entities: "American Pastoral", "Your Hit Parade"
     quoted: list[str] = re.findall(r'"([^"]+)"', question)
     if quoted:
         return quoted[-1]
 
-    # Entity after "by", "of", "with" at end of question
-    m: re.Match[str] | None = re.search(
-        r'(?:by|of|with|for)\s+([A-Z][a-zA-Z\s\.\-\']+?)(?:\?|$)',
+    # Entity after "created/developed/founded/produced/broadcasted" + name
+    # Allows lowercase for things like "centrifugal governor"
+    m_created: re.Match[str] | None = re.search(
+        r'(?:created|developed|founded|produced|broadcasted|established)\s+'
+        r'(?:the\s+)?([A-Za-z][a-zA-Z\s\.\-\'\,]+?)(?:\s+(?:is|was|born|located)\b|\?|$)',
         question,
     )
-    if m:
-        entity: str = m.group(1).strip().rstrip("?. ")
+    if m_created:
+        entity: str = m_created.group(1).strip().rstrip("?., ")
         if len(entity) > 2:
             return entity
 
-    # Last capitalized phrase
+    # Entity after "that/which/whom" + name + "is/was"
+    m_that: re.Match[str] | None = re.search(
+        r'(?:that|which|whom)\s+([A-Z][a-zA-Z\s\.\-\'\,]+?)\s+(?:is|was|professes)',
+        question,
+    )
+    if m_that:
+        entity = m_that.group(1).strip().rstrip("?., ")
+        if len(entity) > 2:
+            return entity
+
+    # Entity after "by", "of", "with", "for" at end of question
+    # Stop at common verbs (was, is, has, born, located, etc.)
+    m: re.Match[str] | None = re.search(
+        r'(?:by|of|with|for)\s+([A-Z][a-zA-Z\s\.\-\']+?)'
+        r'(?:\s+(?:was|is|has|born|located|played|wrote|created)\b|\?|$)',
+        question,
+    )
+    if m:
+        entity = m.group(1).strip().rstrip("?. ")
+        if len(entity) > 2:
+            return entity
+
+    # "affiliated with <entity>" pattern
+    m_affil: re.Match[str] | None = re.search(
+        r'affiliated with\s+([A-Z][a-zA-Z\s\.\-\']+?)(?:\s+was\b|\?|$)',
+        question,
+    )
+    if m_affil:
+        entity = m_affil.group(1).strip().rstrip("?. ")
+        if len(entity) > 2:
+            return entity
+
+    # Multi-word capitalized phrase (2+ words)
     caps: list[str] = re.findall(r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)', question)
     if caps:
         return caps[-1]
+
+    # Single capitalized word that looks like a proper noun (not a common word)
+    # Must be at least 4 chars and not a common English word
+    common: frozenset[str] = frozenset({
+        "What", "Which", "Where", "When", "How", "Who", "That", "This",
+        "The", "Does", "Have", "City", "Name", "Country", "Language",
+    })
+    single_caps: list[str] = re.findall(r'\b([A-Z][a-z]{3,})\b', question)
+    for sc in reversed(single_caps):
+        if sc not in common:
+            return sc
 
     return None
 
