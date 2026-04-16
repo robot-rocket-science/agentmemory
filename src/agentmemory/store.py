@@ -2517,6 +2517,24 @@ class MemoryStore:
             return 0
         return val
 
+    def count_active_beliefs(self) -> int:
+        """Count non-superseded beliefs."""
+        row: sqlite3.Row = self._conn.execute(
+            "SELECT COUNT(*) FROM beliefs WHERE valid_to IS NULL",
+        ).fetchone()
+        val: object = row[0]
+        if not isinstance(val, int):
+            return 0
+        return val
+
+    def get_all_active_beliefs(self, limit: int = 50000) -> list[Belief]:
+        """Get all non-superseded beliefs (for entity index building)."""
+        rows: list[sqlite3.Row] = self._conn.execute(
+            "SELECT * FROM beliefs WHERE valid_to IS NULL LIMIT ?",
+            (limit,),
+        ).fetchall()
+        return [_row_to_belief(r) for r in rows]
+
     # --- Test results ---
 
     def record_test_result(
