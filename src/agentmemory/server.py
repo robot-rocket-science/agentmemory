@@ -243,11 +243,15 @@ def _format_belief(belief: Belief, score: float | None = None) -> str:
 
 
 @mcp.tool
-def search(query: str, budget: int = 2000) -> str:
+def search(query: str, budget: int = 2000, temporal_sort: bool = False) -> str:
     """Search for beliefs relevant to the query.
 
     Returns formatted text of matching beliefs with confidence scores.
     Uses the retrieval pipeline (FTS5 + scoring + packing).
+
+    If temporal_sort is True, results are re-sorted newest-first after
+    relevance-based selection. Useful for state-tracking queries where
+    the most recent information should appear first.
     """
     store: MemoryStore = _get_store()
     session_id: str = _ensure_session()
@@ -255,7 +259,9 @@ def search(query: str, budget: int = 2000) -> str:
     # Process auto-feedback for the previous retrieval batch before this search
     _process_auto_feedback(session_id)
 
-    result: RetrievalResult = retrieve(store, query, budget=budget)
+    result: RetrievalResult = retrieve(
+        store, query, budget=budget, temporal_sort=temporal_sort,
+    )
 
     store.increment_session_metrics(
         session_id,
