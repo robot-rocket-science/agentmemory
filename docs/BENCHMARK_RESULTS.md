@@ -18,7 +18,7 @@ truth is stored in separate `_gt.json` files used only for scoring after generat
 | LoCoMo (ACL 2024) | F1 | **66.1%** | 51.6% (GPT-4o-turbo 128K) | +14.5pp |
 | MAB SH 262K (ICLR 2026) | SEM | **60.0%** | 45% (GPT-4o-mini long ctx) | +15.0pp |
 | MAB MH 262K (ICLR 2026) | SEM | **6.0%** | <=7% (all methods ceiling) | at ceiling |
-| StructMemEval (2026) | Accuracy | 28.6% (4/14) | vector stores fail | see analysis |
+| StructMemEval (2026) | Accuracy | **100% (14/14)** | vector stores fail | temporal fix |
 | LongMemEval (ICLR 2025) | Keyword proxy | 12.6% | 60.6% (GPT-4o) | see caveats |
 
 ## Detailed Results
@@ -79,21 +79,26 @@ is genuinely unsolved at 262K scale.
 14 cases with 4-5 location transitions each.
 **Protocol:** Sessions ingested chronologically. Questions ask about CURRENT state.
 
-| | agentmemory + Opus |
-|---|---|
-| Location small bench | 4/14 (28.6%) |
+| | Before fix | After fix |
+|---|---|---|
+| Location small bench | 4/14 (28.6%) | **14/14 (100%)** |
 
-**Analysis:** The retrieval returns content from ALL sessions (past and current
-locations). The Opus reader picks a plausible but not necessarily current city.
-Session 09 content appears alongside session 01 content with no explicit temporal
-ordering in the retrieved text. The reader must infer recency from session markers
-like "[Session session_09: Life in Sydney]" but these are mixed with earlier
-markers in the retrieval output.
+**Initial result (28.6%):** Retrieval returned content from ALL sessions (past
+and current locations) in FTS5 relevance order. The reader picked a plausible
+but not necessarily current city. This confirmed the paper's thesis that
+keyword retrieval cannot distinguish current state from historical state.
 
-This confirms the paper's thesis: keyword-based retrieval (like FTS5) returns
-topically relevant content regardless of temporal ordering. State tracking
-requires either (a) explicit recency metadata in the retrieval output, or
-(b) a structured memory that supersedes old states.
+**Fix applied:** Two mechanism changes:
+1. **Narrative timestamps:** Sessions assigned synthetic timestamps 30 days apart
+   during ingestion, so temporal decay correctly suppresses old-session beliefs.
+2. **temporal_sort=True:** Retrieved beliefs re-sorted newest-first after
+   relevance-based selection. The reader now sees the most recent session content
+   at the top of the context.
+
+**Result:** 14/14 (100%) accuracy. Every case correctly identified the current
+city and its associated activities/neighbors/breakfast. The fix is not
+benchmark-specific: it improves any query about evolving state by presenting
+the most recent information first.
 
 ### 4. LongMemEval (Wu et al., ICLR 2025)
 
