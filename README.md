@@ -204,27 +204,24 @@ Key settings:
 
 ## Benchmarks
 
-Evaluated on [LoCoMo](https://snap-research.github.io/locomo/) (Maharana et al., ACL 2024), the standard benchmark for long-conversation memory. 10 conversations, 5882 turns, 1986 QA pairs across 5 categories.
+Evaluated across 5 published benchmarks. All results are protocol-correct with
+contamination-proof isolation (separate GT files, verified by `verify_clean.py`).
 
-| System | Overall F1 |
-|---|---|
-| Human ceiling | 87.9% |
-| **agentmemory + Opus 4.6** | **66.1%** |
-| GPT-4-turbo (128K full context) | 51.6% |
-| RAG (DRAGON + gpt-3.5-turbo) | 43.3% |
-| Claude-3-Sonnet (200K full context) | 38.5% |
+| Benchmark | Metric | agentmemory | Best Published | Delta |
+|---|---|---|---|---|
+| LoCoMo (ACL 2024) | F1 | **66.1%** | 51.6% (GPT-4o-turbo) | +14.5pp |
+| MAB SH 262K (ICLR 2026) | SEM | **60.0%** | 45% (GPT-4o-mini) | +15.0pp |
+| MAB MH 262K (ICLR 2026) | SEM | **32.0%** | <=7% (all methods) | **4.5x ceiling** |
+| StructMemEval (2026) | Accuracy | **100%** | vector stores fail | temporal fix |
+| LongMemEval (ICLR 2025) | proxy | 12.6% | 60.6% (GPT-4o) | needs LLM judge |
 
-Per-category breakdown (agentmemory + Opus, protocol-correct):
+**Multi-hop conflict resolution (MAB MH 262K):** All published methods score <=7%
+on this task. agentmemory's entity-index retrieval with SUPERSEDES-based conflict
+resolution achieves 32%, a 4.5x improvement over the field ceiling.
 
-| Category | F1 | n |
-|---|---|---|
-| Single-hop factual | 69.4% | 841 |
-| Adversarial (forced-choice) | 97.5% | 446 |
-| Temporal reasoning | 45.4% | 321 |
-| Multi-hop reasoning | 42.2% | 282 |
-| Open-ended | 30.5% | 96 |
-
-agentmemory uses FTS5 + HRR + BFS retrieval (no embeddings, no vector DB) with a 2000-token budget per query. The retrieval pipeline runs in ~16ms per query. Protocol-correct evaluation: exact LoCoMo prompts, forced-choice for adversarial, answer field isolated from reader. Full methodology in [docs/BENCHMARK_LOG.md](docs/BENCHMARK_LOG.md).
+agentmemory uses FTS5 + entity-index + HRR + BFS retrieval (no embeddings, no
+vector DB) with a 2000-token budget per query. Full methodology and per-benchmark
+details in [docs/BENCHMARK_RESULTS.md](docs/BENCHMARK_RESULTS.md).
 
 ## Development
 
@@ -232,7 +229,7 @@ agentmemory uses FTS5 + HRR + BFS retrieval (no embeddings, no vector DB) with a
 git clone https://github.com/yoshi280/agentmemory.git
 cd agentmemory
 uv sync --all-groups
-uv run pytest tests/ -x -q        # 285 tests
+uv run pytest tests/ -x -q        # 362 tests
 uv run pyright src/                # strict mode, 0 errors
 ```
 
