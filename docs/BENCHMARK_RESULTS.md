@@ -35,14 +35,21 @@ is incidental matches where deeper traversal happened to include the answer
 string in unrelated facts. The conservative 35% chain-valid number counts
 only answers where the question entity was found and the chain is traceable.
 
-### Version progression (v1.0 -> v1.1)
+### Version progression (v1.0 -> v1.1 -> Exp 5)
 
-| Benchmark | v1.0 | v1.1 | Change |
-|-----------|------|------|--------|
-| MAB SH 262K | 60% | 90% (Opus) / 62% (Haiku) | +30pp / +2pp |
-| MAB MH 262K | 6% | 35% (both readers) | +29pp, 5x ceiling |
-| StructMemEval | 29% | 100% | +71pp |
-| LoCoMo | 66.1% | 66.1% | unchanged |
+| Benchmark | v1.0 | v1.1 | Exp 5 (extended regex) | Change |
+|-----------|------|------|----------------------|--------|
+| MAB SH 262K | 60% | 90% (Opus) / 62% (Haiku) | not re-tested | +30pp / +2pp |
+| MAB MH 262K | 6% | 35% chain-valid | 55% (Opus) / 54% (Haiku) raw SEM | +8pp raw |
+| StructMemEval | 29% | 100% | not re-tested | +71pp |
+| LoCoMo | 66.1% | 66.1% | not re-tested | unchanged |
+
+### Exp 5: Extended regex vs LLM entity extraction
+
+Closing the 4.9% regex extraction gap (adding 7 patterns to cover all
+18,332 facts) improved MH raw SEM by +8pp. LLM extraction performed
+worse than baseline due to property fragmentation and structural errors.
+See [EXP5_RESULTS.md](EXP5_RESULTS.md) for full analysis.
 
 ## Detailed Results
 
