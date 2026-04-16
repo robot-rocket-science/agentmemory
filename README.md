@@ -202,31 +202,88 @@ Key settings:
 | `reason.depth` | `2` | BFS graph traversal depth |
 | `fts5.top_k` | `50` | Max FTS5 results per query |
 
-## Benchmarks
+## Benchmarks (v1.2.1)
 
 Evaluated across 5 published benchmarks. All results are protocol-correct with
 contamination-proof isolation (separate GT files, verified by `verify_clean.py`).
+No embeddings, no vector DB.
 
 | Benchmark | Metric | agentmemory | Best Published | Delta |
 |---|---|---|---|---|
 | LoCoMo (ACL 2024) | F1 | **66.1%** | 51.6% (GPT-4o-turbo) | +14.5pp |
-| MAB SH 262K (ICLR 2026) | SEM | **60.0%** | 45% (GPT-4o-mini) | +15.0pp |
-| MAB MH 262K (ICLR 2026) | SEM | **32.0%** | <=7% (all methods) | **4.5x ceiling** |
-| StructMemEval (2026) | Accuracy | **100%** | vector stores fail | temporal fix |
-| LongMemEval (ICLR 2025) | proxy | 12.6% | 60.6% (GPT-4o) | needs LLM judge |
+| MAB SH 262K (ICLR 2026) | SEM | **90%** Opus / **62%** Haiku | 45% (GPT-4o-mini) | +45pp / +17pp |
+| MAB MH 262K (ICLR 2026) | SEM | **60%** Opus | <=7% (all methods) | **8.6x ceiling** |
+| StructMemEval (2026) | Accuracy | **100%** (14/14) | vector stores fail | temporal_sort fix |
+| LongMemEval (ICLR 2025) | Opus judge | **59.0%** | 60.6% (GPT-4o) | -1.6pp |
 
 **Multi-hop conflict resolution (MAB MH 262K):** All published methods score <=7%
-on this task. agentmemory's entity-index retrieval with SUPERSEDES-based conflict
-resolution achieves 32%, a 4.5x improvement over the field ceiling.
+on this task. agentmemory's entity-index retrieval achieves 60% (Opus) with 96%
+of ground truth answers reachable in retrieved context (Exp 6). The conservative
+chain-valid score is 35%, identical for both Opus and Haiku, confirming the
+improvement comes from retrieval, not the reader model.
 
-agentmemory uses FTS5 + entity-index + HRR + BFS retrieval (no embeddings, no
-vector DB) with a 2000-token budget per query. Full methodology and per-benchmark
-details in [docs/BENCHMARK_RESULTS.md](docs/BENCHMARK_RESULTS.md).
+**LongMemEval:** 59.0% overall (295/500), within noise of the published GPT-4o
+pipeline at 60.6%. Uses Opus as judge (paper specifies GPT-4o); comparison
+carries an asterisk. Strongest categories: single-session-user (91.4%),
+single-session-preference (80.0%), knowledge-update (70.5%).
+
+agentmemory uses FTS5 + entity-index (L2.5) + HRR + BFS retrieval with a
+2000-token budget per query. Full methodology, contamination protocol, and
+per-benchmark details in [docs/BENCHMARK_RESULTS.md](docs/BENCHMARK_RESULTS.md).
+Research article at [robotrocketscience.com/projects/agentmemory](https://robotrocketscience.com/projects/agentmemory).
+
+## Acceptance Tests
+
+35 documented LLM behavioral failures (across Claude and Codex) were cataloged
+into case studies with root cause analysis. Each maps to a concrete acceptance
+test with pass/fail criteria.
+
+| Metric | Value |
+|---|---|
+| Total tests | 65 |
+| Passed | 62 |
+| Failed | 0 |
+| Skipped | 3 (require behavioral hooks not yet built) |
+| Duration | 1.65s |
+| Test files | 29 |
+| Case studies covered | 23 of 25 |
+
+The 3 skipped tests require capabilities outside the memory system itself:
+CS-012 (PostEdit hook for syntax validation), CS-024 (sycophantic collapse
+detection), CS-026 (permission-gated behavioral beliefs).
+
+Run acceptance tests:
+
+```bash
+uv run pytest tests/acceptance/ -x -q
+```
+
+## Research
+
+This project is documented in a research article: [Persistent Memory for LLM Agents](https://robotrocketscience.com/projects/agentmemory).
+
+85+ experiments during core development, plus 6 benchmark-phase experiments.
+Each experiment had a pre-registered hypothesis, measurement protocol,
+documented results, and an explicit proceed/revise/abandon decision. Negative
+findings are documented with the same rigor as positive findings.
+
+Key research documents in `docs/`:
+
+| Document | Contents |
+|---|---|
+| [BENCHMARK_RESULTS.md](docs/BENCHMARK_RESULTS.md) | All benchmark scores, methodology, version progression |
+| [BENCHMARK_PROTOCOL.md](docs/BENCHMARK_PROTOCOL.md) | Contamination-proof evaluation protocol |
+| [RESEARCH_FREEZE_20260416.md](docs/RESEARCH_FREEZE_20260416.md) | Final findings, ceilings, future levers |
+| [EXP1_PERHOP_FAILURE_ANALYSIS.md](docs/EXP1_PERHOP_FAILURE_ANALYSIS.md) | Multi-hop root cause analysis |
+| [EXP5_RESULTS.md](docs/EXP5_RESULTS.md) | Regex vs LLM entity extraction |
+| [EXP6_TEMPORAL_COHERENCE.md](docs/EXP6_TEMPORAL_COHERENCE.md) | Temporal branching results |
+
+Experiment logs in `research/EXPERIMENTS.md`. Case studies in `research/CASE_STUDIES.md`.
 
 ## Development
 
 ```bash
-git clone https://github.com/yoshi280/agentmemory.git
+git clone https://github.com/robotrocketscience/agentmemory.git
 cd agentmemory
 uv sync --all-groups
 uv run pytest tests/ -x -q        # 362 tests
