@@ -100,6 +100,38 @@ class EntityIndex:
 
         return results
 
+    def resolve_all(self, entity: str, prop: str | None = None) -> list[EntityFact]:
+        """Get ALL historical facts for an entity (all serials, not just latest).
+
+        If prop is specified, returns all facts for that property.
+        If prop is None, returns all facts for every property.
+        Sorted by serial descending within each property.
+        """
+        entity_lower: str = entity.lower()
+        results: list[EntityFact] = []
+
+        if prop is not None:
+            key: tuple[str, str] = (entity_lower, prop)
+            facts: list[tuple[int, str, str]] = self._facts.get(key, [])
+            for serial, value_str, _raw in facts:
+                results.append(EntityFact(
+                    entity=entity, property_name=prop,
+                    value=value_str, serial=serial,
+                ))
+        else:
+            props: set[str] = self._entity_props.get(entity_lower, set())
+            for p in props:
+                key = (entity_lower, p)
+                facts = self._facts.get(key, [])
+                for serial, value_str, _raw in facts:
+                    results.append(EntityFact(
+                        entity=entity, property_name=p,
+                        value=value_str, serial=serial,
+                    ))
+
+        results.sort(key=lambda f: f.serial, reverse=True)
+        return results
+
     def lookup_value(self, value: str) -> list[EntityFact]:
         """Find all entities where this value appears as a fact value.
 
@@ -125,6 +157,10 @@ class EntityIndex:
             if entity_lower in ent_key or ent_key in entity_lower:
                 return ent_key
         return None
+
+    def property_count(self, entity: str) -> int:
+        """Return number of properties for an entity."""
+        return len(self._entity_props.get(entity.lower(), set()))
 
     @property
     def entity_count(self) -> int:
@@ -337,6 +373,82 @@ def multi_hop_retrieve(
     return "\n".join(lines)
 
 
+def multi_hop_retrieve_temporal(
+    index: EntityIndex,
+    question: str,
+    max_hops: int = 4,
+    breadth_cap: int = 30,
+) -> str:
+    """Multi-hop retrieval exploring ALL historical values at each hop.
+
+    Unlike multi_hop_retrieve (which resolves to latest serial only),
+    this explores every historical value at each hop, branching through
+    all possible chains. This discovers chains that follow non-latest
+    values at intermediate hops (the temporal coherence problem).
+
+    The breadth cap limits explosion: at each hop, entities are sorted
+    by the number of properties they have (richer entities first), and
+    only the top breadth_cap are explored.
+
+    Returns concatenated fact texts, newest first.
+    """
+    entity: str | None = extract_entity_from_question(question)
+    if entity is None:
+        return ""
+
+    all_facts: list[EntityFact] = []
+    visited_entities: set[str] = set()
+    current_entities: list[str] = [entity]
+
+    for _hop in range(max_hops):
+        next_entities_set: set[str] = set()
+        for ent in current_entities:
+            ent_lower: str = ent.lower()
+            if ent_lower in visited_entities:
+                continue
+            visited_entities.add(ent_lower)
+
+            # Resolve ALL historical values, not just latest
+            facts: list[EntityFact] = index.resolve_all(ent)
+            if not facts:
+                partial: str | None = index.find_partial_entity(ent)
+                if partial is not None:
+                    facts = index.resolve_all(partial)
+                    visited_entities.add(partial)
+
+            all_facts.extend(facts)
+            for fact in facts:
+                val_lower: str = fact.value.lower()
+                if val_lower not in visited_entities:
+                    next_entities_set.add(fact.value)
+
+        if not next_entities_set:
+            break
+
+        # Sort candidates: entities that exist in the index first,
+        # then by property count (richer entities more likely useful)
+        next_list: list[str] = sorted(
+            next_entities_set,
+            key=lambda e: index.property_count(e),
+            reverse=True,
+        )
+        current_entities = next_list[:breadth_cap]
+
+    # Sort by serial descending (newest first)
+    all_facts.sort(key=lambda f: f.serial, reverse=True)
+
+    # Deduplicate (include serial so reader can resolve conflicts)
+    seen: set[str] = set()
+    lines: list[str] = []
+    for fact in all_facts:
+        line: str = f"{fact.serial}. {fact.entity} {fact.property_name}: {fact.value}"
+        if line not in seen:
+            seen.add(line)
+            lines.append(line)
+
+    return "\n".join(lines)
+
+
 # ---------------------------------------------------------------------------
 # Ingestion
 # ---------------------------------------------------------------------------
@@ -386,9 +498,18 @@ def main() -> None:
         "--retrieve-only", default=None, metavar="PATH",
         help="Write retrieval results (NO answers) to PATH",
     )
+    parser.add_argument(
+        "--temporal", action="store_true",
+        help="Use temporal retrieval (explore all historical values at each hop)",
+    )
+    parser.add_argument(
+        "--breadth-cap", type=int, default=30,
+        help="Breadth cap for temporal retrieval (default: 30)",
+    )
     args: argparse.Namespace = parser.parse_args()
 
-    print("=== Exp 4: Entity-Index Retrieval ===")
+    mode: str = "temporal" if args.temporal else "latest-only"
+    print(f"=== Exp 4: Entity-Index Retrieval ({mode}) ===")
     print(f"Source: {args.source}")
 
     # Load data
@@ -433,10 +554,18 @@ def main() -> None:
     per_question: list[dict[str, object]] = []
     ground_truth: list[dict[str, object]] = []
 
+    if args.temporal:
+        print(f"Temporal mode: breadth_cap={args.breadth_cap}")
+
     t1: float = time.monotonic()
     answer_in_ctx: int = 0
     for i, (question, answer_list) in enumerate(zip(questions, answers)):
-        ctx: str = multi_hop_retrieve(index, question)
+        if args.temporal:
+            ctx: str = multi_hop_retrieve_temporal(
+                index, question, breadth_cap=args.breadth_cap,
+            )
+        else:
+            ctx = multi_hop_retrieve(index, question)
         per_question.append({
             "id": i,
             "question": question,
