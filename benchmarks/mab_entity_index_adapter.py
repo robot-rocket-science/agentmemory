@@ -233,14 +233,14 @@ def extract_target_property(question: str) -> str | None:
 def multi_hop_retrieve(
     index: EntityIndex,
     question: str,
+    max_hops: int = 4,
 ) -> str:
-    """Execute a multi-hop query using entity-index lookups.
+    """Execute a multi-hop query using iterative entity-index lookups.
 
-    1. Extract the starting entity from the question
-    2. Look up all facts about that entity (resolved: newest wins)
-    3. For each fact, check if it's an intermediate value
-    4. Look up the intermediate value as an entity for hop 2
-    5. Assemble all found facts as the retrieval context
+    Starting from the entity extracted from the question, iteratively
+    chains through entity values up to max_hops deep. At each hop,
+    resolved facts about each entity are collected, and each fact's
+    value becomes a candidate entity for the next hop.
 
     Returns concatenated fact texts, newest first.
     """
@@ -248,23 +248,36 @@ def multi_hop_retrieve(
     if entity is None:
         return ""
 
-    # Hop 1: get all resolved facts about the entity
-    hop1_facts: list[EntityFact] = index.resolve(entity)
-    if not hop1_facts:
-        # Try partial match (entity might be a substring)
-        partial: str | None = index.find_partial_entity(entity)
-        if partial is not None:
-            hop1_facts = index.resolve(partial)
+    all_facts: list[EntityFact] = []
+    visited_entities: set[str] = set()
+    current_entities: list[str] = [entity]
 
-    # Hop 2: for each hop-1 value, look it up as an entity
-    hop2_facts: list[EntityFact] = []
-    for fact in hop1_facts:
-        value_facts: list[EntityFact] = index.resolve(fact.value)
-        hop2_facts.extend(value_facts)
+    for _hop in range(max_hops):
+        next_entities: list[str] = []
+        for ent in current_entities:
+            ent_lower: str = ent.lower()
+            if ent_lower in visited_entities:
+                continue
+            visited_entities.add(ent_lower)
 
-    # Assemble context: hop-1 facts first, then hop-2 facts
-    # Sort by serial descending (newest first) within each hop
-    all_facts: list[EntityFact] = hop1_facts + hop2_facts
+            facts: list[EntityFact] = index.resolve(ent)
+            if not facts:
+                partial: str | None = index.find_partial_entity(ent)
+                if partial is not None:
+                    facts = index.resolve(partial)
+                    visited_entities.add(partial)
+
+            all_facts.extend(facts)
+            for fact in facts:
+                if fact.value.lower() not in visited_entities:
+                    next_entities.append(fact.value)
+
+        if not next_entities:
+            break
+        # Cap breadth to prevent explosion
+        current_entities = next_entities[:15]
+
+    # Sort by serial descending (newest first)
     all_facts.sort(key=lambda f: f.serial, reverse=True)
 
     # Deduplicate
