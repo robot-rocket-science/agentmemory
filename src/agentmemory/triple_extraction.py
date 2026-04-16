@@ -96,6 +96,23 @@ _FACT_PATTERNS: list[tuple[re.Pattern[str], int, str, int]] = [
     (re.compile(r"^The religion of\s+(.+?)\s+is\s+(.+)$", re.I), 1, "religion", 2),
     # "The official language of X is Y"
     (re.compile(r"^The official language of\s+(.+?)\s+is\s+(.+)$", re.I), 1, "official_language", 2),
+    # --- Exp 5 additions: patterns covering the 4.9% miss rate ---
+    # "The name of the current head of the X government is Y"
+    (re.compile(r"^The name of the current head of (?:the\s+)?(.+?)\s+government\s+is\s+(.+)$", re.I), 1, "head_of_government", 2),
+    # "The name of the current head of state in X is Y"
+    (re.compile(r"^The name of the current head of state in\s+(.+?)\s+is\s+(.+)$", re.I), 1, "head_of_state", 2),
+    # "X was written in the language of Y"
+    (re.compile(r"^(.+?)\s+was written in the language of\s+(.+)$", re.I), 1, "written_in_language", 2),
+    # "X was founded in the city of Y"
+    (re.compile(r"^(.+?)\s+was founded in the city of\s+(.+)$", re.I), 1, "founded_in_city", 2),
+    # "The chief executive officer of X is Y"
+    (re.compile(r"^The (?:chief executive officer|CEO) of\s+(.+?)\s+is\s+(.+)$", re.I), 1, "ceo", 2),
+    # "X's child is Y"
+    (re.compile(r"^(.+?)'s child is\s+(.+)$", re.I), 1, "child", 2),
+    # Catch-all for "The <Title> of/is X is Y" (covers Prime Minister, Secretary General, etc.)
+    (re.compile(r"^The\s+(.+?)\s+(?:of|is)\s+(.+?)\s+is\s+(.+)$", re.I), 2, "title_holder", 3),
+    # "The <Title> is Y" (no "of", e.g., "The pope is Francis", "The Tánaiste is Simon Coveney")
+    (re.compile(r"^The\s+(.+?)\s+is\s+(.+)$", re.I), 1, "title_holder", 2),
 ]
 
 # Pattern to extract serial number from numbered list format: "123. fact text"
