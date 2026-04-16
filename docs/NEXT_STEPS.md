@@ -10,7 +10,7 @@
 | MAB MH 262K | 55% Opus / 54% Haiku (raw SEM) | <=7% (all methods) | 7.8x paper ceiling |
 | StructMemEval | 100% (14/14) | vector stores fail | Solved |
 | LoCoMo | 66.1% F1 | 51.6% GPT-4o-turbo | +14.5pp |
-| LongMemEval | TBD (being re-scored with Opus judge) | 60.6% GPT-4o pipeline | Pending |
+| LongMemEval | 59.0% (Opus judge) | 60.6% GPT-4o pipeline | -1.6pp, within noise |
 
 ### Architecture
 

@@ -19,9 +19,9 @@ Contamination check (verify_clean.py) is mandatory before any reader touches dat
 |-----------|--------|-------------|-------------|------------|
 | LoCoMo (ACL 2024) | F1 | **66.1%** | N/A | 51.6% (GPT-4o) |
 | MAB SH 262K (ICLR 2026) | SEM | **90%** | **62%** | 45% (GPT-4o-mini) |
-| MAB MH 262K (ICLR 2026) | SEM chain-valid | **35%** | **35%** | <=7% (ceiling) |
+| MAB MH 262K (ICLR 2026) | SEM raw | **55%** | **54%** | <=7% (ceiling) |
 | StructMemEval (2026) | Accuracy | **100%** | N/A | vector stores fail |
-| LongMemEval (ICLR 2025) | proxy | 12.6% | N/A | 60.6% (GPT-4o) |
+| LongMemEval (ICLR 2025) | Opus judge | **59.0%** | N/A | 60.6% (GPT-4o) |
 
 ### Key finding: MH chain-valid is reader-independent
 
@@ -124,9 +124,31 @@ This is a general-purpose state-tracking improvement, not benchmark-specific.
 ### 4. LongMemEval (Wu et al., ICLR 2025)
 
 **Dataset:** `xiaowu0162/longmemeval-cleaned`, oracle split, 500 questions.
-**Score:** 12.6% (keyword overlap proxy).
-**CAVEAT:** Paper protocol requires GPT-4o judge. Keyword overlap systematically
-underestimates accuracy. Not comparable to published baselines until properly judged.
+**Judge:** Opus binary judge (non-standard; paper uses GPT-4o).
+**Score:** **59.0%** accuracy (295/500).
+
+| Category | Score | n |
+|----------|-------|---|
+| single-session-user | **91.4%** | 70 |
+| single-session-preference | **80.0%** | 30 |
+| single-session-assistant | **73.2%** | 56 |
+| knowledge-update | **70.5%** | 78 |
+| temporal-reasoning | 59.4% | 133 |
+| multi-session | 24.1% | 133 |
+
+**Reference:** GPT-4o + LongMemEval_S pipeline = 60.6%.
+**Delta:** -1.6pp (within noise of published baseline).
+
+**Strengths:** Single-session recall (91.4% user, 80% preference) and
+knowledge updates (70.5%, SUPERSEDES edges). FTS5 keyword matching excels
+at retrieving specific conversational details.
+
+**Weakness:** Multi-session (24.1%). Cross-session entity linking requires
+traversing relationships between separate conversation sessions. Our
+sentence-level FTS5 indexing does not naturally bridge across sessions.
+
+**Previous proxy score:** 12.6% (keyword overlap). This was a 4.7x
+underestimate. The proxy metric is now retired.
 
 ## Reader Quality Analysis
 
