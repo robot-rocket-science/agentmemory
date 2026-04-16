@@ -436,33 +436,38 @@ def print_results(result: BenchmarkResult) -> None:
 
 
 def write_retrieve_results(result: BenchmarkResult, output_path: str) -> None:
-    """Write retrieval results to JSON for LLM-judge scoring."""
+    """Write retrieval results (NO ground truth) and separate GT file."""
     items: list[dict[str, object]] = []
+    gt_items: list[dict[str, object]] = []
     for qr in result.per_question:
-        answer_str: str
-        if isinstance(qr.answer, list):
-            answer_str = " | ".join(qr.answer)
-        else:
-            answer_str = qr.answer
-
+        # Retrieval file: NO answers, only context for LLM reader
         items.append({
             "question_id": qr.question_id,
             "question_type": qr.question_type,
             "question": qr.question,
             "question_date": qr.question_date,
-            "answer": answer_str,
-            "answer_raw": qr.answer,
             "retrieved_context": qr.retrieved_context,
             "num_beliefs": qr.num_beliefs,
             "retrieval_latency_ms": round(qr.retrieval_latency_ms, 2),
         })
+        # Ground truth file: answers for scoring AFTER generation
+        gt_items.append({
+            "question_id": qr.question_id,
+            "question_type": qr.question_type,
+            "answer": qr.answer,
+        })
 
     path: Path = Path(output_path)
+    gt_path: Path = path.with_name(path.stem + "_gt" + path.suffix)
     with path.open("w", encoding="utf-8") as f:
         json.dump(items, f, indent=2)
+    with gt_path.open("w", encoding="utf-8") as f:
+        json.dump(gt_items, f, indent=2)
 
     print(f"Wrote {len(items)} retrieval results to {output_path}")
-    print("Next step: run LLM judge (GPT-4o) on these results to score accuracy")
+    print(f"Wrote {len(gt_items)} ground truth items to {gt_path}")
+    print("ISOLATION: retrieval file contains NO ground truth answers")
+    print("Next step: run LLM reader on retrieval file, then score against GT")
 
 
 # ---------------------------------------------------------------------------

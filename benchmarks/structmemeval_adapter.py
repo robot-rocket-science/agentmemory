@@ -496,23 +496,34 @@ def main() -> None:
             if not args.retrieve_only:
                 print_case_result(case_result)
 
-    # Retrieve-only mode: dump for LLM judge
+    # Retrieve-only mode: retrieval (NO answers) + separate GT file
     if args.retrieve_only:
         all_items: list[dict[str, object]] = []
+        all_gt: list[dict[str, object]] = []
         for cr in task_result.cases:
             for pq in cr.per_query:
                 all_items.append({
                     "case_id": cr.case_id,
                     "task": cr.task,
                     "question": pq["question"],
-                    "reference_answer": pq["reference_answer"],
                     "context": pq["context"],
                 })
+                all_gt.append({
+                    "case_id": cr.case_id,
+                    "question": pq["question"],
+                    "reference_answer": pq["reference_answer"],
+                })
         retrieve_path: Path = Path(args.retrieve_only)
+        gt_path: Path = retrieve_path.with_name(
+            retrieve_path.stem + "_gt" + retrieve_path.suffix,
+        )
         with retrieve_path.open("w", encoding="utf-8") as f:
             json.dump(all_items, f, indent=2)
+        with gt_path.open("w", encoding="utf-8") as f:
+            json.dump(all_gt, f, indent=2)
         print(f"\nWrote {len(all_items)} retrieval results to {args.retrieve_only}")
-        print("Next step: run LLM judge to score context against reference answers")
+        print(f"Wrote {len(all_gt)} ground truth items to {gt_path}")
+        print("ISOLATION: retrieval file contains NO ground truth answers")
         return
 
     # Print full task summary

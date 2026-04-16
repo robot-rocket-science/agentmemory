@@ -238,6 +238,9 @@ class EpisodeResult:
     per_question: list[dict[str, object]] = field(
         default_factory=lambda: list[dict[str, object]](),
     )
+    ground_truth: list[dict[str, object]] = field(
+        default_factory=lambda: list[dict[str, object]](),
+    )
 
 
 @dataclass
@@ -261,6 +264,9 @@ class AggregateResult:
     per_question: list[dict[str, object]] = field(
         default_factory=lambda: list[dict[str, object]](),
     )
+    ground_truth: list[dict[str, object]] = field(
+        default_factory=lambda: list[dict[str, object]](),
+    )
 
 
 def aggregate_results(results: list[EpisodeResult]) -> AggregateResult:
@@ -273,6 +279,7 @@ def aggregate_results(results: list[EpisodeResult]) -> AggregateResult:
         agg.total_ingest_time_s += r.ingest_time_s
         agg.total_query_time_s += r.query_time_s
         agg.per_question.extend(r.per_question)
+        agg.ground_truth.extend(r.ground_truth)
 
         agg.domain_counts[r.domain] = agg.domain_counts.get(r.domain, 0) + 1
         agg.domain_qa_counts[r.domain] = (
@@ -324,11 +331,15 @@ def run_episode(
             "domain": episode.domain,
             "task_type": episode.task_type,
             "question": qa.question,
-            "answer": qa.answer,
             "qa_type": qa.qa_type,
             "qa_type_name": QA_TYPE_NAMES.get(qa.qa_type, "unknown"),
             "question_uuid": qa.question_uuid,
             "context": context,
+        })
+        result.ground_truth.append({
+            "question_uuid": qa.question_uuid,
+            "answer": qa.answer,
+            "qa_type": qa.qa_type,
         })
 
     result.query_time_s = time.monotonic() - t1
@@ -469,13 +480,19 @@ def main() -> None:
 
     agg: AggregateResult = aggregate_results(results)
 
-    # If retrieve-only, write question+context pairs for LLM judge
+    # Retrieve-only: retrieval (NO answers) + separate GT file
     if args.retrieve_only:
         retrieve_path: Path = Path(args.retrieve_only)
+        gt_path: Path = retrieve_path.with_name(
+            retrieve_path.stem + "_gt" + retrieve_path.suffix,
+        )
         with retrieve_path.open("w", encoding="utf-8") as f:
             json.dump(agg.per_question, f, indent=2)
+        with gt_path.open("w", encoding="utf-8") as f:
+            json.dump(agg.ground_truth, f, indent=2)
         print(f"\nWrote {agg.total_qa} retrieval results to {args.retrieve_only}")
-        print("Next step: run LLM judge to score answers against retrieved context")
+        print(f"Wrote {agg.total_qa} ground truth items to {gt_path}")
+        print("ISOLATION: retrieval file contains NO ground truth answers")
         return
 
     print_results(agg)

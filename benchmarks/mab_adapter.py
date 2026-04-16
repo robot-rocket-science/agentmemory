@@ -188,6 +188,9 @@ class MABResult:
     per_question: list[dict[str, object]] = field(
         default_factory=lambda: list[dict[str, object]](),
     )
+    ground_truth: list[dict[str, object]] = field(
+        default_factory=lambda: list[dict[str, object]](),
+    )
 
     def mean_score(self, metric: str) -> float:
         vals: list[float] = self.scores.get(metric, [])
@@ -207,6 +210,7 @@ def merge_results(results: list[MABResult], label: str = "ALL") -> MABResult:
         merged.ingest_time_s += r.ingest_time_s
         merged.query_time_s += r.query_time_s
         merged.per_question.extend(r.per_question)
+        merged.ground_truth.extend(r.ground_truth)
     return merged
 
 
@@ -373,16 +377,16 @@ def run_row(
             result.scores[metric].append(val)
 
         result.per_question.append({
+            "id": q_idx,
             "row_idx": row_idx,
-            "q_idx": q_idx,
             "source": row.source,
             "question": question,
-            "answers": answer_list,
-            "prediction": prediction[:500],
             "context": prediction,
-            "exact_match": round(scores["exact_match"], 4),
-            "substring_exact_match": round(scores["substring_exact_match"], 4),
-            "f1": round(scores["f1"], 4),
+        })
+        result.ground_truth.append({
+            "id": q_idx,
+            "row_idx": row_idx,
+            "answers": answer_list,
         })
 
     result.query_time_s = time.monotonic() - t1
@@ -494,17 +498,27 @@ def main() -> None:
             if not args.retrieve_only:
                 print_results(row_result)
 
-    # Retrieve-only mode: write question+context pairs for LLM subagent
+    # Retrieve-only mode: write question+context (NO answers) for LLM reader
+    # Ground truth written to a SEPARATE file for scoring after generation
     if args.retrieve_only:
         all_items: list[dict[str, object]] = []
+        all_gt: list[dict[str, object]] = []
         for r in results:
             all_items.extend(r.per_question)
+            all_gt.extend(r.ground_truth)
         retrieve_path: Path = Path(args.retrieve_only)
+        gt_path: Path = retrieve_path.with_name(
+            retrieve_path.stem + "_gt" + retrieve_path.suffix,
+        )
         with retrieve_path.open("w", encoding="utf-8") as f:
             json.dump(all_items, f, indent=2)
+        with gt_path.open("w", encoding="utf-8") as f:
+            json.dump(all_gt, f, indent=2)
         total_q: int = sum(r.total_questions for r in results)
         print(f"Wrote {total_q} retrieval results to {args.retrieve_only}")
-        print("Next step: run LLM subagent to produce answers from retrieved context")
+        print(f"Wrote {total_q} ground truth items to {gt_path}")
+        print("ISOLATION: retrieval file contains NO ground truth answers")
+        print("Next step: run LLM reader on retrieval file, then score against GT")
         return
 
     # Aggregate if multiple rows
