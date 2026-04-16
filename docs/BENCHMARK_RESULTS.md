@@ -205,3 +205,8 @@ All adapters in `benchmarks/`. Protocol in `docs/BENCHMARK_PROTOCOL.md`.
 - [EXP3_RESULTS.md](EXP3_RESULTS.md) - SUPERSEDES experiment (rejected hypotheses)
 - [EXP3_STRUCTURED_TRIPLES_PLAN.md](EXP3_STRUCTURED_TRIPLES_PLAN.md) - Exp 3 design
 - [WONDER_MULTIHOP_CONFLICT.md](WONDER_MULTIHOP_CONFLICT.md) - Research synthesis
+- [BENCHMARK_SESSION_LOG_V12.md](BENCHMARK_SESSION_LOG_V12.md) - v1.2 session (Exp 5, LongMemEval)
+- [EXP5_LLM_ENTITY_EXTRACTION.md](EXP5_LLM_ENTITY_EXTRACTION.md) - Exp 5 design
+- [EXP5_RESULTS.md](EXP5_RESULTS.md) - Exp 5 results
+- [CODE_AUDIT_EXP5.md](CODE_AUDIT_EXP5.md) - Benchmark code audit
+- [NEXT_STEPS.md](NEXT_STEPS.md) - Research priorities
