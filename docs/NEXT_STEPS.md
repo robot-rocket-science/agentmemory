@@ -39,17 +39,42 @@ we stand. This is the only benchmark where we're below published baselines.
 **Risk:** May reveal a real weakness in our retrieval for conversational
 memory (vs structured facts).
 
-### Priority 2: MH Entity Aliasing
+### Priority 2: MH Question Entity Extraction (Quick Win)
 
-**Status:** Identified in Exp 5, not yet addressed
-**Why:** The remaining 45% MH gap is primarily hop-2 entity matching.
-When fact A says value="NBC" and fact B uses entity="National Broadcasting
-Company", the entity-index can't link them.
-**Approach:** Add an alias resolution layer to EntityIndex that maps common
-abbreviations and alternate names. Could be regex-based (like triple
-extraction) or use a small lookup table built from the dataset.
-**Expected impact:** Unknown. Need to first quantify how many of the 45
-failing MH questions have aliasing as root cause vs other issues.
+**Status:** Failure analysis complete, fix identified
+**Why:** 9 of 100 MH questions produce empty context because
+`extract_entity_from_question()` fails to parse the entity. Manual analysis
+shows 5 of those 9 have the GT reachable if the entity is extracted correctly.
+**Approach:** Improve the question entity parser (more regex patterns or
+LLM-based extraction). Low-risk, isolated change.
+**Expected impact:** +5 questions reachable (59 -> 64), likely +3-5pp on SEM.
+
+### Priority 3: MH Temporal Coherence (Hard Problem)
+
+**Status:** Root cause identified (deep failure analysis, 2026-04-16)
+**Why:** The remaining 32 unreachable questions fail because our entity-index
+resolves each (entity, property) to the globally latest serial independently.
+The benchmark GT follows chains where intermediate hops use earlier serials.
+This is a temporal coherence problem: facts stated together (in the same
+serial range) form a coherent bundle. When one fact is updated, related facts
+in the same bundle may also be stale, but our resolution doesn't track this.
+**Approach:** This is an open research question. Options include:
+  - Serial-bounded resolution (at each hop, only use facts near the previous
+    hop's serial). Tested: partial improvement but doesn't match GT.
+  - Exhaustive chain search with GT-matching. Infeasible at scale.
+  - Temporal clustering (group facts by serial proximity and resolve within
+    clusters). Untested.
+  - Accept the 59% ceiling and focus on other benchmarks.
+**Expected impact:** Theoretical max with perfect resolution is 91/100
+(9 entity extraction failures + 0 reader errors). Practical max unknown.
+**Real-world analog:** When a user changes a decision, related facts may
+need updating too. "Config in config.yaml" may be stale after switching
+from PostgreSQL to SQLite, even though nobody explicitly updated the config
+location. This problem is not benchmark-specific.
+
+### Priority 4: Cross-Benchmark Generalization
+
+**Status:** Not started
 
 ### Priority 3: Cross-Benchmark Generalization
 
