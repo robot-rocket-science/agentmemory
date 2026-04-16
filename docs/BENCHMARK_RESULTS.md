@@ -1,4 +1,4 @@
-# Benchmark Results (v1.1.0)
+# Benchmark Results (v1.2.1)
 
 ## Methodology
 
@@ -13,15 +13,21 @@ Contamination check (verify_clean.py) is mandatory before any reader touches dat
 - **No embeddings, no vector DB** in the retrieval pipeline
 - **Protocol:** docs/BENCHMARK_PROTOCOL.md (automatic 0% on any contamination)
 
-## Results Summary (v1.1.0)
+## Results Summary (v1.2.1)
 
 | Benchmark | Metric | Opus Reader | Haiku Reader | Paper Best |
 |-----------|--------|-------------|-------------|------------|
 | LoCoMo (ACL 2024) | F1 | **66.1%** | N/A | 51.6% (GPT-4o) |
 | MAB SH 262K (ICLR 2026) | SEM | **90%** | **62%** | 45% (GPT-4o-mini) |
-| MAB MH 262K (ICLR 2026) | SEM raw | **55%** | **54%** | <=7% (ceiling) |
+| MAB MH 262K (ICLR 2026) | SEM | **60%** | **54%** | <=7% (ceiling) |
 | StructMemEval (2026) | Accuracy | **100%** | N/A | vector stores fail |
 | LongMemEval (ICLR 2025) | Opus judge | **59.0%** | N/A | 60.6% (GPT-4o) |
+
+### v1.2.1 changes (Exp 6: temporal coherence)
+
+MAB MH Opus improved from 58% to 60% (+2pp) via temporal branching
+(resolve_all at each hop). GT-reachable improved from 62% to 96% but
+reader chain resolution limits gains. See RESEARCH_FREEZE_20260416.md.
 
 ### Key finding: MH chain-valid is reader-independent
 
@@ -210,3 +216,6 @@ All adapters in `benchmarks/`. Protocol in `docs/BENCHMARK_PROTOCOL.md`.
 - [EXP5_RESULTS.md](EXP5_RESULTS.md) - Exp 5 results
 - [CODE_AUDIT_EXP5.md](CODE_AUDIT_EXP5.md) - Benchmark code audit
 - [NEXT_STEPS.md](NEXT_STEPS.md) - Research priorities
+- [EXP6_TEMPORAL_COHERENCE.md](EXP6_TEMPORAL_COHERENCE.md) - Exp 6 temporal coherence
+- [LONGMEMEVAL_MULTI_SESSION_ANALYSIS.md](LONGMEMEVAL_MULTI_SESSION_ANALYSIS.md) - Multi-session failure analysis
+- [RESEARCH_FREEZE_20260416.md](RESEARCH_FREEZE_20260416.md) - Research freeze with all ceilings and future levers
