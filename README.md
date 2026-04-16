@@ -202,13 +202,34 @@ Key settings:
 | `reason.depth` | `2` | BFS graph traversal depth |
 | `fts5.top_k` | `50` | Max FTS5 results per query |
 
+## Benchmarks
+
+Evaluated across 5 published benchmarks. All results are protocol-correct with
+contamination-proof isolation (separate GT files, verified by `verify_clean.py`).
+
+| Benchmark | Metric | agentmemory | Best Published | Delta |
+|---|---|---|---|---|
+| LoCoMo (ACL 2024) | F1 | **66.1%** | 51.6% (GPT-4o-turbo) | +14.5pp |
+| MAB SH 262K (ICLR 2026) | SEM | **60.0%** | 45% (GPT-4o-mini) | +15.0pp |
+| MAB MH 262K (ICLR 2026) | SEM | **32.0%** | <=7% (all methods) | **4.5x ceiling** |
+| StructMemEval (2026) | Accuracy | **100%** | vector stores fail | temporal fix |
+| LongMemEval (ICLR 2025) | proxy | 12.6% | 60.6% (GPT-4o) | needs LLM judge |
+
+**Multi-hop conflict resolution (MAB MH 262K):** All published methods score <=7%
+on this task. agentmemory's entity-index retrieval with SUPERSEDES-based conflict
+resolution achieves 32%, a 4.5x improvement over the field ceiling.
+
+agentmemory uses FTS5 + entity-index + HRR + BFS retrieval (no embeddings, no
+vector DB) with a 2000-token budget per query. Full methodology and per-benchmark
+details in [docs/BENCHMARK_RESULTS.md](docs/BENCHMARK_RESULTS.md).
+
 ## Development
 
 ```bash
 git clone https://github.com/yoshi280/agentmemory.git
 cd agentmemory
 uv sync --all-groups
-uv run pytest tests/ -x -q        # 285 tests
+uv run pytest tests/ -x -q        # 362 tests
 uv run pyright src/                # strict mode, 0 errors
 ```
 

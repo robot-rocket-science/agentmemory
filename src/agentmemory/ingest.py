@@ -30,6 +30,7 @@ from agentmemory.models import (
 from agentmemory.relationship_detector import detect_gap_closure, detect_relationships
 from agentmemory.store import MemoryStore
 from agentmemory.supersession import check_temporal_supersession
+from agentmemory.triple_extraction import FactTriple, extract_triple
 
 
 # ---------------------------------------------------------------------------
@@ -135,6 +136,60 @@ def extract_turn(
 
 
 # ---------------------------------------------------------------------------
+# Triple extraction: entity-level supersession
+# ---------------------------------------------------------------------------
+
+
+def _check_triple_supersession(store: MemoryStore, belief: object) -> None:
+    """Attempt to extract a structured triple from a belief's content.
+
+    If the belief text matches a known fact pattern (e.g., "X is a citizen of Y"),
+    search for existing beliefs about the same (entity, property) pair with a
+    different value. If found, supersede the older one.
+
+    This enables entity-level conflict resolution beyond Jaccard-based
+    temporal supersession. Falls through silently if no triple is extracted.
+    """
+    from agentmemory.models import Belief
+
+    if not isinstance(belief, Belief):
+        return
+
+    triple: FactTriple | None = extract_triple(belief.content)
+    if triple is None:
+        return
+
+    # Search for existing beliefs about the same entity
+    entity_query: str = triple.entity[:50]  # Cap query length
+    candidates = store.search(entity_query, top_k=10)
+
+    for candidate in candidates:
+        if candidate.id == belief.id:
+            continue
+        if candidate.valid_to is not None or candidate.superseded_by is not None:
+            continue
+
+        existing_triple: FactTriple | None = extract_triple(candidate.content)
+        if existing_triple is None:
+            continue
+
+        # Same entity + same property + different value = conflict
+        if (
+            existing_triple.entity.lower() == triple.entity.lower()
+            and existing_triple.property_name == triple.property_name
+            and existing_triple.value.lower() != triple.value.lower()
+        ):
+            # Newer belief supersedes older (by created_at timestamp)
+            # The belief just inserted is always newer than existing candidates
+            store.supersede_belief(
+                old_id=candidate.id,
+                new_id=belief.id,
+                reason="triple_conflict",
+            )
+            break  # Only supersede the first match
+
+
+# ---------------------------------------------------------------------------
 # Phase 2: Create beliefs from pre-classified sentences
 # ---------------------------------------------------------------------------
 
@@ -198,6 +253,7 @@ def create_beliefs_from_classified(
         check_temporal_supersession(store, belief)
         detect_relationships(store, belief)
         detect_gap_closure(store, belief)
+        _check_triple_supersession(store, belief)
 
         if cs.sentence_type == "CORRECTION":
             raw_words: list[str] = [

@@ -15,6 +15,7 @@ from agentmemory.hrr import HRRGraph
 from agentmemory.models import EDGE_CONTRADICTS, Belief
 from agentmemory.scoring import score_belief
 from agentmemory.store import MemoryStore
+from agentmemory.triple_extraction import FactTriple, extract_triple
 
 # Words that appear structurally in correction beliefs but carry no topical
 # signal. When the query contains these, deprioritize beliefs that match ONLY
@@ -79,6 +80,98 @@ class RetrievalResult:
 # Module-level HRR graph cache (built lazily on first retrieval with HRR)
 _hrr_graph: HRRGraph | None = None
 _hrr_edge_count: int = 0
+
+# Module-level entity index cache (built lazily on first entity-aware retrieval)
+_entity_index: dict[str, list[tuple[str, str, str]]] | None = None
+_entity_index_count: int = 0
+
+
+def _get_entity_index(store: MemoryStore) -> dict[str, list[tuple[str, str, str]]]:
+    """Build or return cached entity index from active beliefs.
+
+    Maps entity_lower -> [(belief_id, property_name, value), ...].
+    Only includes non-superseded beliefs. Rebuilds if belief count changes.
+    """
+    global _entity_index, _entity_index_count  # noqa: PLW0603
+    belief_count: int = store.count_active_beliefs()
+    if _entity_index is not None and belief_count == _entity_index_count:
+        return _entity_index
+
+    index: dict[str, list[tuple[str, str, str]]] = {}
+    all_beliefs: list[Belief] = store.get_all_active_beliefs(limit=50000)
+    for belief in all_beliefs:
+        triple: FactTriple | None = extract_triple(belief.content)
+        if triple is not None:
+            key: str = triple.entity.lower()
+            if key not in index:
+                index[key] = []
+            index[key].append((belief.id, triple.property_name, triple.value))
+            # Also index the value as an entity (enables hop-2 lookups)
+            val_key: str = triple.value.lower()
+            if val_key not in index:
+                index[val_key] = []
+            index[val_key].append((belief.id, f"_reverse_{triple.property_name}", triple.entity))
+
+    _entity_index = index
+    _entity_index_count = belief_count
+    return index
+
+
+def _entity_expand(
+    store: MemoryStore,
+    query: str,
+    top_k: int = 10,
+) -> list[Belief]:
+    """Find beliefs about entities mentioned in the query.
+
+    Extracts proper nouns and quoted strings from the query, looks them
+    up in the entity index, and returns matching beliefs. This enables
+    entity-level retrieval that FTS5 keyword matching misses.
+    """
+    index: dict[str, list[tuple[str, str, str]]] = _get_entity_index(store)
+    if not index:
+        return []
+
+    # Extract potential entity names from query
+    entity_candidates: list[str] = []
+
+    # Quoted strings
+    quoted: list[str] = re.findall(r'"([^"]+)"', query)
+    entity_candidates.extend(quoted)
+
+    # Proper noun phrases (2+ capitalized words)
+    proper_nouns: list[str] = re.findall(r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)', query)
+    entity_candidates.extend(proper_nouns)
+
+    # Single capitalized words (3+ chars, not common words)
+    common_words: frozenset[str] = frozenset({
+        "What", "Which", "Where", "When", "Who", "How", "The", "This",
+        "That", "Does", "Did", "Can", "Has", "Are", "Was", "Were",
+    })
+    singles: list[str] = [
+        w for w in re.findall(r'\b([A-Z][a-z]{2,})\b', query)
+        if w not in common_words
+    ]
+    entity_candidates.extend(singles)
+
+    # Look up each candidate in the entity index
+    found_ids: set[str] = set()
+    for candidate in entity_candidates:
+        key: str = candidate.lower()
+        if key in index:
+            for belief_id, _prop, _val in index[key]:
+                found_ids.add(belief_id)
+
+    # Batch lookup beliefs
+    beliefs: list[Belief] = []
+    for belief_id in found_ids:
+        belief: Belief | None = store.get_belief(belief_id)
+        if belief is not None and belief.valid_to is None:
+            beliefs.append(belief)
+        if len(beliefs) >= top_k:
+            break
+
+    return beliefs
 
 
 def _get_hrr_graph(store: MemoryStore) -> HRRGraph | None:
@@ -171,6 +264,7 @@ def retrieve(
     max_locked: int = 100,
     use_hrr: bool = True,
     use_bfs: bool = True,
+    temporal_sort: bool = False,
 ) -> RetrievalResult:
     """Full retrieval pipeline: L0 + L1 + FTS5 + HRR + BFS + scoring + compression.
 
@@ -182,6 +276,11 @@ def retrieve(
     3.5. BFS multi-hop from FTS5+HRR hits (L3).
     4. Merge all candidate sets, deduplicate.
     5. Score, sort, compress, pack into budget.
+
+    If temporal_sort is True, the final packed beliefs are re-sorted
+    chronologically (newest-first) after packing. This preserves the
+    relevance-based selection (score determines what fits in budget)
+    but presents results in temporal order for state-tracking queries.
     """
     current_time: datetime = datetime.now(timezone.utc)
     query_stripped: str = query.strip()
@@ -211,6 +310,11 @@ def retrieve(
         fts_beliefs = store.search(query_stripped, top_k=top_k)
         # CS-032: deprioritize beliefs matching only on negation words
         fts_beliefs = _filter_negation_noise(query_stripped, fts_beliefs, keep_top=top_k)
+
+    # Step 2.5: Entity-index expansion (L2.5).
+    entity_beliefs: list[Belief] = []
+    if query_stripped:
+        entity_beliefs = _entity_expand(store, query_stripped, top_k=10)
 
     # Step 3: HRR vocabulary-bridge expansion (L3).
     hrr_beliefs: list[Belief] = []
@@ -253,6 +357,11 @@ def retrieve(
             seen_ids.add(belief.id)
             candidates.append(belief)
 
+    for belief in entity_beliefs:
+        if belief.id not in seen_ids:
+            seen_ids.add(belief.id)
+            candidates.append(belief)
+
     for belief in hrr_beliefs:
         if belief.id not in seen_ids:
             seen_ids.add(belief.id)
@@ -289,6 +398,12 @@ def retrieve(
     budget_remaining: int = budget - total_tokens
 
     packed_scores: dict[str, float] = {b.id: scores[b.id] for b in packed}
+
+    # Step 8: temporal re-sort (newest-first) if requested.
+    # Selection is still relevance-based (score determines budget inclusion),
+    # but presentation order becomes chronological for state-tracking queries.
+    if temporal_sort:
+        packed.sort(key=lambda b: b.created_at, reverse=True)
 
     # Step 9: flag contradictions in result set (REQ-002).
     contradiction_warnings: list[str] = flag_contradictions(store, packed)
