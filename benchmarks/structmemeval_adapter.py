@@ -18,6 +18,7 @@ import json
 import tempfile
 import time
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Final
 
@@ -189,13 +190,32 @@ def discover_cases(data_dir: str, task: str, bench: str | None = None) -> list[C
 # ---------------------------------------------------------------------------
 
 
+def _synthetic_timestamp(session_idx: int, total_sessions: int) -> str:
+    """Generate synthetic narrative timestamps for sessions.
+
+    Spaces sessions 30 days apart so temporal decay can distinguish
+    old sessions from recent ones. The last session gets "now" (no decay),
+    the first session gets (total_sessions - 1) * 30 days ago.
+    """
+    from datetime import timedelta
+    now: datetime = datetime.now(timezone.utc)
+    months_ago: int = total_sessions - 1 - session_idx
+    dt: datetime = now - timedelta(days=months_ago * 30)
+    return dt.isoformat()
+
+
 def ingest_case(store: MemoryStore, case: Case) -> int:
     """Ingest all sessions of a case into agentmemory sequentially.
 
+    Sessions are assigned synthetic timestamps 30 days apart so that
+    temporal decay can distinguish old sessions from recent ones.
     Returns total messages ingested.
     """
     total_messages: int = 0
-    for session in case.sessions:
+    total_sessions: int = len(case.sessions)
+    for session_idx, session in enumerate(case.sessions):
+        narrative_ts: str = _synthetic_timestamp(session_idx, total_sessions)
+
         am_session = store.create_session(
             model="structmemeval-benchmark",
             project_context=f"{case.case_id} / {session.session_id}: {session.topic}",
@@ -209,6 +229,7 @@ def ingest_case(store: MemoryStore, case: Case) -> int:
             source="structmemeval",
             session_id=am_session.id,
             source_id=f"{case.case_id}:{session.session_id}:topic",
+            created_at=narrative_ts,
         )
 
         for idx, msg in enumerate(session.messages):
@@ -220,6 +241,7 @@ def ingest_case(store: MemoryStore, case: Case) -> int:
                 source="structmemeval",
                 session_id=am_session.id,
                 source_id=f"{case.case_id}:{session.session_id}:{idx}",
+                created_at=narrative_ts,
             )
             total_messages += 1
 
@@ -234,7 +256,11 @@ def ingest_case(store: MemoryStore, case: Case) -> int:
 
 
 def query_agentmemory(store: MemoryStore, question: str, budget: int = 2000) -> str:
-    """Query agentmemory and return retrieved belief content."""
+    """Query agentmemory and return retrieved belief content.
+
+    Uses temporal_sort=True so beliefs are presented newest-first,
+    which helps the reader identify the current state vs historical states.
+    """
     result = retrieve(
         store=store,
         query=question,
@@ -242,6 +268,7 @@ def query_agentmemory(store: MemoryStore, question: str, budget: int = 2000) -> 
         include_locked=False,
         use_hrr=True,
         use_bfs=True,
+        temporal_sort=True,
     )
     parts: list[str] = [b.content for b in result.beliefs]
     return " ".join(parts)

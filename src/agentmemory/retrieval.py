@@ -171,6 +171,7 @@ def retrieve(
     max_locked: int = 100,
     use_hrr: bool = True,
     use_bfs: bool = True,
+    temporal_sort: bool = False,
 ) -> RetrievalResult:
     """Full retrieval pipeline: L0 + L1 + FTS5 + HRR + BFS + scoring + compression.
 
@@ -182,6 +183,11 @@ def retrieve(
     3.5. BFS multi-hop from FTS5+HRR hits (L3).
     4. Merge all candidate sets, deduplicate.
     5. Score, sort, compress, pack into budget.
+
+    If temporal_sort is True, the final packed beliefs are re-sorted
+    chronologically (newest-first) after packing. This preserves the
+    relevance-based selection (score determines what fits in budget)
+    but presents results in temporal order for state-tracking queries.
     """
     current_time: datetime = datetime.now(timezone.utc)
     query_stripped: str = query.strip()
@@ -289,6 +295,12 @@ def retrieve(
     budget_remaining: int = budget - total_tokens
 
     packed_scores: dict[str, float] = {b.id: scores[b.id] for b in packed}
+
+    # Step 8: temporal re-sort (newest-first) if requested.
+    # Selection is still relevance-based (score determines budget inclusion),
+    # but presentation order becomes chronological for state-tracking queries.
+    if temporal_sort:
+        packed.sort(key=lambda b: b.created_at, reverse=True)
 
     # Step 9: flag contradictions in result set (REQ-002).
     contradiction_warnings: list[str] = flag_contradictions(store, packed)
