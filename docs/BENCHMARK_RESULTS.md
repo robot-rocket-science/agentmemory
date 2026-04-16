@@ -6,10 +6,11 @@ All benchmarks follow published protocols exactly. Retrieval and answer generati
 are fully isolated: retrieval output files contain NO ground truth answers. Ground
 truth is stored in separate `_gt.json` files used only for scoring after generation.
 
-- **Retrieval:** agentmemory FTS5 + HRR + BFS, 2000-token budget per query
+- **Retrieval:** agentmemory FTS5 + HRR + BFS + entity-index, 2000-token budget
 - **Reader:** Claude Opus 4.6 (answer generation from retrieved context only)
 - **Isolation:** Fresh SQLite DB per test case via tempfile
 - **No embeddings, no vector DB** in the retrieval pipeline
+- **Contamination prevention:** verify_clean.py gatekeeper on all retrieval files
 
 ## Results Summary
 
@@ -17,7 +18,7 @@ truth is stored in separate `_gt.json` files used only for scoring after generat
 |-----------|--------|-------------|----------------|-------|
 | LoCoMo (ACL 2024) | F1 | **66.1%** | 51.6% (GPT-4o-turbo 128K) | +14.5pp |
 | MAB SH 262K (ICLR 2026) | SEM | **60.0%** | 45% (GPT-4o-mini long ctx) | +15.0pp |
-| MAB MH 262K (ICLR 2026) | SEM | **6.0%** | <=7% (all methods ceiling) | at ceiling |
+| MAB MH 262K (ICLR 2026) | SEM | **32.0%** | <=7% (all methods ceiling) | **4.5x ceiling** |
 | StructMemEval (2026) | Accuracy | **100% (14/14)** | vector stores fail | temporal fix |
 | LongMemEval (ICLR 2025) | Keyword proxy | 12.6% | 60.6% (GPT-4o) | see caveats |
 
@@ -66,12 +67,27 @@ per paper's `eval_other_utils.py`.
 - GPT-4o long context: SH=88%, MH=10%
 - All methods MH ceiling: <=7%
 
-**Analysis:** agentmemory beats GPT-4o-mini on single-hop by 15pp. The retrieval
-pipeline finds the correct answer in context 98% of the time for SH and 29% for MH.
-The gap between retrieval (98%) and full pipeline (60%) on SH shows the reader
-struggles to identify which fact is newest when multiple conflicting facts are
-present. Multi-hop at 6% is within the field ceiling of 7%, confirming this task
-is genuinely unsolved at 262K scale.
+**Analysis:** agentmemory beats GPT-4o-mini on single-hop by 15pp.
+
+**Multi-hop progression (Experiments 1-4):**
+
+| Method | MH 262K SEM | Key Change |
+|--------|-------------|------------|
+| Baseline (FTS5 chunks) | 6% | Single FTS5 query, keyword matching |
+| Exp 3: SUPERSEDES edges | 7% | Conflict resolution (wrong bottleneck) |
+| Exp 3: Triples only | 10% | Granular decomposition helps slightly |
+| **Exp 4: Entity-index** | **32%** | **Direct entity lookup, hop chaining** |
+
+The Exp 4 result (32%) is 4.5x the published field ceiling of <=7%. The
+mechanism: during ingestion, facts are parsed into (entity, property, value,
+serial) triples and stored in an in-memory entity index. At query time,
+the entity name is extracted from the question, looked up directly (no FTS5),
+conflicts resolved by serial number, and the resolved value used as the
+entity for hop 2.
+
+Retrieval stats: 37% answer-in-context (vs 29% baseline). Reader accuracy
+when answer available: 86% (32/37). The remaining 63% failures are hop-2
+retrieval misses where the intermediate entity is not indexed as a key.
 
 ### 3. StructMemEval State Tracking (Shutova et al., 2026)
 
