@@ -1,6 +1,6 @@
 # Experiment 5: LLM Entity Extraction for Multi-Hop Retrieval
 
-## Status: DESIGN
+## Status: COMPLETE (see EXP5_RESULTS.md)
 
 ## Motivation
 
