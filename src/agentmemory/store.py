@@ -250,7 +250,6 @@ def _row_to_belief(row: sqlite3.Row) -> Belief:
         rigor_tier=row["rigor_tier"] if "rigor_tier" in keys else "hypothesis",
         method=row["method"] if "method" in keys else None,
         sample_size=row["sample_size"] if "sample_size" in keys else None,
-        scope=row["scope"] if "scope" in keys else "project",
         last_retrieved_at=row["last_retrieved_at"] if "last_retrieved_at" in keys else None,
         data_source=row["data_source"] if "data_source" in keys else "",
         independently_validated=bool(row["independently_validated"]) if "independently_validated" in keys else False,
@@ -292,16 +291,32 @@ def _row_to_checkpoint(row: sqlite3.Row) -> Checkpoint:
 class MemoryStore:
     """SQLite-backed memory store with FTS5 search and Bayesian belief tracking."""
 
-    def __init__(self, db_path: str | Path) -> None:
-        """Open or create the database. Enable WAL mode. Create tables if needed."""
+    def __init__(self, db_path: str | Path, readonly: bool = False) -> None:
+        """Open or create the database. Enable WAL mode. Create tables if needed.
+
+        When readonly=True, opens the database in read-only mode (no schema
+        init, no WAL). Used for cross-project queries where writes must be
+        prevented.
+        """
         self._db_path: Path = Path(db_path)
-        self._conn: sqlite3.Connection = sqlite3.connect(str(self._db_path))
+        self.readonly: bool = readonly
+        if readonly:
+            uri: str = f"file:{self._db_path}?mode=ro"
+            self._conn: sqlite3.Connection = sqlite3.connect(
+                uri, uri=True, check_same_thread=False,
+            )
+        else:
+            self._conn = sqlite3.connect(
+                str(self._db_path), check_same_thread=False,
+            )
         self._conn.row_factory = sqlite3.Row
-        self._conn.execute("PRAGMA journal_mode=WAL")
-        self._conn.execute("PRAGMA synchronous=NORMAL")
-        self._conn.execute("PRAGMA foreign_keys=ON")
+        if not readonly:
+            self._conn.execute("PRAGMA journal_mode=WAL")
+            self._conn.execute("PRAGMA synchronous=NORMAL")
+            self._conn.execute("PRAGMA foreign_keys=ON")
         self._last_traversed_edges: dict[str, list[tuple[int, int]]] = {}
-        self._init_schema()
+        if not readonly:
+            self._init_schema()
 
     def _init_schema(self) -> None:
         """Create all tables and FTS5 index if they don't exist."""
@@ -785,6 +800,32 @@ class MemoryStore:
             "UPDATE beliefs SET valid_to = ?, updated_at = ? WHERE id = ?",
             (ts, ts, belief_id),
         )
+        self._conn.commit()
+
+    def update_belief_content(
+        self,
+        belief_id: str,
+        new_content: str,
+        new_content_hash: str,
+    ) -> None:
+        """Update a belief's content and content_hash (for Obsidian import)."""
+        ts: str = _now()
+        self._conn.execute(
+            """UPDATE beliefs
+               SET content = ?, content_hash = ?, updated_at = ?
+               WHERE id = ?""",
+            (new_content, new_content_hash, ts, belief_id),
+        )
+        # Update FTS5 index
+        self._conn.execute(
+            "DELETE FROM search_index WHERE id = ?", (belief_id,)
+        )
+        belief: Belief | None = self.get_belief(belief_id)
+        if belief is not None:
+            self._conn.execute(
+                "INSERT INTO search_index (id, content, type) VALUES (?, ?, ?)",
+                (belief_id, new_content, belief.belief_type),
+            )
         self._conn.commit()
 
     # --- Edges ---
@@ -1346,8 +1387,8 @@ class MemoryStore:
             if row is not None:
                 beliefs.append(_row_to_belief(row))
 
-        # Update last_retrieved_at for all returned beliefs.
-        if beliefs:
+        # Update last_retrieved_at for all returned beliefs (skip in readonly mode).
+        if beliefs and not self.readonly:
             now: str = _now()
             returned_ids: list[str] = [b.id for b in beliefs]
             ph: str = ",".join("?" for _ in returned_ids)
@@ -2064,6 +2105,56 @@ class MemoryStore:
         ).fetchall()
         return [str(r["id"]) for r in rows]
 
+    def get_edges_by_belief_ids(
+        self,
+        belief_ids: list[str],
+    ) -> dict[str, list[Edge]]:
+        """Get all edges connected to any of the given belief IDs.
+
+        Returns a dict mapping belief_id -> list of Edge objects where
+        that belief is either from_id or to_id. Single query, no N+1.
+        """
+        if not belief_ids:
+            return {}
+        # Use a temp table for large IN-clause efficiency
+        self._conn.execute(
+            "CREATE TEMP TABLE IF NOT EXISTS _bulk_ids (id TEXT PRIMARY KEY)"
+        )
+        self._conn.execute("DELETE FROM _bulk_ids")
+        self._conn.executemany(
+            "INSERT OR IGNORE INTO _bulk_ids (id) VALUES (?)",
+            [(bid,) for bid in belief_ids],
+        )
+        rows: list[sqlite3.Row] = self._conn.execute(
+            """SELECT e.* FROM edges e
+               JOIN _bulk_ids b ON (e.from_id = b.id OR e.to_id = b.id)
+               WHERE e.pruned_at IS NULL"""
+        ).fetchall()
+        result: dict[str, list[Edge]] = {}
+        for row in rows:
+            edge: Edge = Edge(
+                id=int(row["id"]),
+                from_id=str(row["from_id"]),
+                to_id=str(row["to_id"]),
+                edge_type=str(row["edge_type"]),
+                weight=float(row["weight"]),
+                reason=str(row["reason"]),
+                created_at=str(row["created_at"]),
+                alpha=float(row["alpha"]) if row["alpha"] is not None else 1.0,
+                beta_param=float(row["beta_param"]) if row["beta_param"] is not None else 1.0,
+                traversal_count=int(row["traversal_count"]) if row["traversal_count"] is not None else 0,
+                last_traversed_at=str(row["last_traversed_at"]) if row["last_traversed_at"] else None,
+                pruned_at=str(row["pruned_at"]) if row["pruned_at"] else None,
+            )
+            fid: str = edge.from_id
+            tid: str = edge.to_id
+            if fid in belief_ids or fid in result:
+                result.setdefault(fid, []).append(edge)
+            if tid != fid and (tid in belief_ids or tid in result):
+                result.setdefault(tid, []).append(edge)
+        self._conn.execute("DELETE FROM _bulk_ids")
+        return result
+
     def count_edges_for(self, belief_id: str) -> int:
         """Count SUPPORTS + CONTRADICTS edges connected to a belief."""
         row: sqlite3.Row = self._conn.execute(
@@ -2282,36 +2373,6 @@ class MemoryStore:
         if row is None:
             return None
         return {k: str(row[k]) for k in row.keys()}
-
-    def promote_to_global(self, belief_id: str) -> bool:
-        """Mark a belief as global scope (cross-project).
-
-        Global beliefs are visible across all projects via the global DB.
-        Returns True if the belief was promoted, False if not found.
-        Requires user confirmation before calling (enforced by MCP tool).
-        """
-        row: sqlite3.Row | None = self._conn.execute(
-            "SELECT id FROM beliefs WHERE id = ? AND valid_to IS NULL",
-            (belief_id,),
-        ).fetchone()
-        if row is None:
-            return False
-        self._conn.execute(
-            "UPDATE beliefs SET scope = 'global', updated_at = ? WHERE id = ?",
-            (_now(), belief_id),
-        )
-        self._conn.commit()
-        return True
-
-    def get_global_beliefs(self, limit: int = 20) -> list[Belief]:
-        """Return beliefs marked as global scope (cross-project)."""
-        rows: list[sqlite3.Row] = self._conn.execute(
-            """SELECT * FROM beliefs
-               WHERE scope = 'global' AND valid_to IS NULL
-               ORDER BY confidence DESC LIMIT ?""",
-            (limit,),
-        ).fetchall()
-        return [_row_to_belief(r) for r in rows]
 
     def get_rigor_distribution(self) -> dict[str, int]:
         """Return count of active beliefs per rigor_tier."""
