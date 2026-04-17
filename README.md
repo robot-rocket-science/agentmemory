@@ -48,6 +48,20 @@ agentmemory stats
 agentmemory lock "always use strict typing"
 ```
 
+## Workflow
+
+The core loop is: discuss, explore, focus, build, repeat.
+
+1. **Discuss.** Start talking about a topic with your agent. agentmemory automatically captures decisions, corrections, and preferences from the conversation. You don't need to do anything special -- just work normally.
+
+2. **Explore.** When you want a wider view, run `/mem:wonder "topic"`. Wonder spawns parallel research agents that pull from the belief graph, web sources, and documentation to surface perspectives and hypotheses you haven't considered. It produces structured output with uncertainty signals so you can see what's well-supported vs. speculative.
+
+3. **Focus.** When you're ready to commit to a direction, run `/mem:reason "question"`. Reason does graph-aware hypothesis testing -- it traces evidence chains, identifies contradictions, and finds the highest-leverage entry points. It tells you what the evidence supports, where the gaps are, and what to investigate next.
+
+4. **Build.** Take the output from wonder/reason into a few more discussion turns to refine the plan, then implement. agentmemory captures what you build and the decisions behind it.
+
+5. **Repeat.** Next session, the agent already has the context. Wonder and reason get sharper as the belief graph grows, because there's more evidence to reason over and more connections to traverse.
+
 ## How It Works
 
 Conversations become scored beliefs. Beliefs get stronger when they help, weaker when they hurt. The system learns what matters over time.
