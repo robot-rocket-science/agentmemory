@@ -1882,6 +1882,41 @@ def cmd_batch_feedback(args: argparse.Namespace) -> None:
     print(f"Updated {updated} beliefs.")
 
 
+def cmd_sync_obsidian(args: argparse.Namespace) -> None:
+    """Export beliefs to an Obsidian vault as markdown files."""
+    from agentmemory.obsidian import (
+        ObsidianConfig,
+        SyncResult,
+        load_obsidian_config,
+        sync_vault,
+    )
+    store: MemoryStore = _get_store()
+
+    vault_path: str | None = getattr(args, "vault", None)
+    full: bool = getattr(args, "full", False)
+
+    config: ObsidianConfig | None = load_obsidian_config(vault_path)
+    if config is None:
+        print(
+            "Error: no vault path configured. Use --vault or set "
+            "obsidian.vault_path in ~/.agentmemory/config.json"
+        )
+        sys.exit(1)
+    if not config.vault_path.exists():
+        print(f"Error: vault path does not exist: {config.vault_path}")
+        sys.exit(1)
+
+    print(f"Syncing to {config.vault_path} ...")
+    result: SyncResult = sync_vault(store, config, full=full)
+    store.close()
+
+    print(f"Done in {result.elapsed_seconds}s:")
+    print(f"  Written:   {result.beliefs_written}")
+    print(f"  Unchanged: {result.beliefs_unchanged}")
+    print(f"  Archived:  {result.beliefs_archived}")
+    print(f"  Index:     {result.index_notes_written} notes")
+
+
 # ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
@@ -2130,6 +2165,19 @@ def main() -> None:
     p_batch.add_argument("--belief-type", default=None, help="Filter by belief_type")
     p_batch.add_argument("--classified-by", default=None, help="Filter by classified_by")
     p_batch.set_defaults(func=cmd_batch_feedback)
+
+    # sync-obsidian
+    p_sync_obs: argparse.ArgumentParser = subparsers.add_parser(
+        "sync-obsidian", help="Export beliefs to Obsidian vault"
+    )
+    p_sync_obs.add_argument(
+        "--vault", default=None, help="Obsidian vault path (default: from config)"
+    )
+    p_sync_obs.add_argument(
+        "--full", action="store_true", default=False,
+        help="Rewrite all files unconditionally"
+    )
+    p_sync_obs.set_defaults(func=cmd_sync_obsidian)
 
     args: argparse.Namespace = parser.parse_args()
 

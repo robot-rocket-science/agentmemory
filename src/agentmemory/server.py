@@ -1300,5 +1300,49 @@ def promote(belief_id: str) -> str:
     )
 
 
+@mcp.tool
+def sync_obsidian(
+    vault_path: str | None = None,
+    full: bool = False,
+) -> str:
+    """Sync beliefs to an Obsidian vault as markdown files.
+
+    Each belief becomes a .md file with YAML frontmatter and wikilinked
+    edges. Incremental by default (only writes changed beliefs).
+
+    Open the vault in Obsidian to get graph view, backlinks, search, and
+    Dataview queries over your entire belief network.
+
+    Args:
+        vault_path: Path to Obsidian vault root. Uses config if omitted.
+        full: If True, rewrite all files unconditionally.
+    """
+    from agentmemory.obsidian import (
+        ObsidianConfig,
+        SyncResult,
+        load_obsidian_config,
+        sync_vault,
+    )
+    store: MemoryStore = _get_store()
+    config: ObsidianConfig | None = load_obsidian_config(vault_path)
+    if config is None:
+        return (
+            "Error: no vault path configured. Pass vault_path argument or set "
+            "obsidian.vault_path in ~/.agentmemory/config.json"
+        )
+    if not config.vault_path.exists():
+        return f"Error: vault path does not exist: {config.vault_path}"
+
+    result: SyncResult = sync_vault(store, config, full=full)
+    return (
+        f"Obsidian sync complete ({result.elapsed_seconds}s):\n"
+        f"  Written: {result.beliefs_written}\n"
+        f"  Unchanged: {result.beliefs_unchanged}\n"
+        f"  Archived: {result.beliefs_archived}\n"
+        f"  Index notes: {result.index_notes_written}\n"
+        f"  Vault: {config.vault_path}"
+    )
+
+
 if __name__ == "__main__":
     mcp.run()

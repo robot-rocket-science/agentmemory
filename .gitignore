@@ -55,6 +55,11 @@ experiments/exp3_attribution.json
 # Corpus data
 corpus_manifest.json
 
+# Obsidian vault export (generated, not source)
+beliefs/
+_index/
+.agentmemory_sync.json
+
 # SQLite databases (runtime data, not source)
 *.db
 *.db-wal
