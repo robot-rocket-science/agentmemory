@@ -2064,6 +2064,56 @@ class MemoryStore:
         ).fetchall()
         return [str(r["id"]) for r in rows]
 
+    def get_edges_by_belief_ids(
+        self,
+        belief_ids: list[str],
+    ) -> dict[str, list[Edge]]:
+        """Get all edges connected to any of the given belief IDs.
+
+        Returns a dict mapping belief_id -> list of Edge objects where
+        that belief is either from_id or to_id. Single query, no N+1.
+        """
+        if not belief_ids:
+            return {}
+        # Use a temp table for large IN-clause efficiency
+        self._conn.execute(
+            "CREATE TEMP TABLE IF NOT EXISTS _bulk_ids (id TEXT PRIMARY KEY)"
+        )
+        self._conn.execute("DELETE FROM _bulk_ids")
+        self._conn.executemany(
+            "INSERT OR IGNORE INTO _bulk_ids (id) VALUES (?)",
+            [(bid,) for bid in belief_ids],
+        )
+        rows: list[sqlite3.Row] = self._conn.execute(
+            """SELECT e.* FROM edges e
+               JOIN _bulk_ids b ON (e.from_id = b.id OR e.to_id = b.id)
+               WHERE e.pruned_at IS NULL"""
+        ).fetchall()
+        result: dict[str, list[Edge]] = {}
+        for row in rows:
+            edge: Edge = Edge(
+                id=int(row["id"]),
+                from_id=str(row["from_id"]),
+                to_id=str(row["to_id"]),
+                edge_type=str(row["edge_type"]),
+                weight=float(row["weight"]),
+                reason=str(row["reason"]),
+                created_at=str(row["created_at"]),
+                alpha=float(row["alpha"]) if row["alpha"] is not None else 1.0,
+                beta_param=float(row["beta_param"]) if row["beta_param"] is not None else 1.0,
+                traversal_count=int(row["traversal_count"]) if row["traversal_count"] is not None else 0,
+                last_traversed_at=str(row["last_traversed_at"]) if row["last_traversed_at"] else None,
+                pruned_at=str(row["pruned_at"]) if row["pruned_at"] else None,
+            )
+            fid: str = edge.from_id
+            tid: str = edge.to_id
+            if fid in belief_ids or fid in result:
+                result.setdefault(fid, []).append(edge)
+            if tid != fid and (tid in belief_ids or tid in result):
+                result.setdefault(tid, []).append(edge)
+        self._conn.execute("DELETE FROM _bulk_ids")
+        return result
+
     def count_edges_for(self, belief_id: str) -> int:
         """Count SUPPORTS + CONTRADICTS edges connected to a belief."""
         row: sqlite3.Row = self._conn.execute(
