@@ -176,6 +176,21 @@ def _flush_feedback_on_exit() -> None:
 atexit.register(_flush_feedback_on_exit)
 
 
+def _sigterm_handler(signum: int, frame: object) -> None:
+    """Handle SIGTERM by flushing feedback before exit.
+
+    MCP servers inside Claude Code receive SIGTERM when the session ends.
+    atexit handlers don't always run on signal-based termination, so we
+    explicitly flush here.
+    """
+    _flush_feedback_on_exit()
+    raise SystemExit(0)
+
+
+import signal
+signal.signal(signal.SIGTERM, _sigterm_handler)
+
+
 def _resolve_server_db() -> Path:
     """Resolve DB path for the MCP server: AGENTMEMORY_DB env > cwd-based isolation."""
     import hashlib
@@ -271,6 +286,39 @@ def _emit_telemetry(store: MemoryStore, session_id: str) -> None:
         pass  # telemetry must never break the session
 
 
+def _resolve_stale_pending_feedback(store: MemoryStore, session_id: str) -> int:
+    """Resolve pending feedback from prior sessions that were never processed.
+
+    When the MCP server is killed (SIGKILL, crash, or unhandled termination),
+    retrieved beliefs stored in pending_feedback never get scored. This runs
+    at session start and marks all stale entries as "ignored" -- the beliefs
+    were retrieved but never confirmed as used.
+    """
+    pending: list[dict[str, str]] = store.get_pending_feedback()
+    if not pending:
+        return 0
+
+    count: int = 0
+    for entry in pending:
+        belief_id: str = entry["belief_id"]
+        prev_session: str = entry.get("session_id", "")
+        # Only resolve entries from prior sessions
+        if prev_session == session_id:
+            continue
+        store.record_test_result(
+            belief_id=belief_id,
+            session_id=prev_session or session_id,
+            outcome=OUTCOME_IGNORED,
+            detection_layer=LAYER_IMPLICIT,
+            outcome_detail="stale: pending from prior session, never matched",
+        )
+        count += 1
+
+    if count > 0:
+        store.clear_pending_feedback()
+    return count
+
+
 def _ensure_session() -> str:
     """Return the current session ID, creating a new session if needed."""
     global _session_id
@@ -283,6 +331,10 @@ def _ensure_session() -> str:
             _emit_telemetry(store, prev.id)
         session: Session = store.create_session()
         _session_id = session.id
+        # Resolve stale pending feedback from prior sessions
+        resolved: int = _resolve_stale_pending_feedback(store, _session_id)
+        if resolved > 0:
+            store.increment_session_metrics(_session_id, feedback_given=resolved)
     return _session_id
 
 
