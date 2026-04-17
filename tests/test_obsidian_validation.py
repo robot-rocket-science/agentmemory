@@ -166,7 +166,7 @@ def test_belief_types_known(live_conn: sqlite3.Connection) -> None:
     """All active belief types are in our known set."""
     known_types: set[str] = {
         "factual", "preference", "relational", "procedural",
-        "causal", "correction", "requirement",
+        "causal", "correction", "requirement", "speculative",
     }
     rows: list[sqlite3.Row] = live_conn.execute(
         "SELECT DISTINCT belief_type FROM beliefs WHERE valid_to IS NULL"
@@ -185,6 +185,7 @@ def test_edge_types_known(live_conn: sqlite3.Connection) -> None:
     known_types: set[str] = {
         "CITES", "RELATES_TO", "SUPERSEDES", "CONTRADICTS",
         "SUPPORTS", "TESTS", "IMPLEMENTS", "TEMPORAL_NEXT",
+        "SPECULATES", "DEPENDS_ON", "RESOLVES", "HIBERNATED",
     }
     rows: list[sqlite3.Row] = live_conn.execute(
         "SELECT DISTINCT edge_type FROM edges"

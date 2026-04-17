@@ -120,22 +120,33 @@ def test_cs002_locked_belief_ranks_above_unlocked(store: MemoryStore) -> None:
     )
 
 
-def test_cs002_lock_prevents_confidence_downgrade(store: MemoryStore) -> None:
-    """A 'harmful' outcome update must NOT decrease confidence of a locked belief."""
+def test_cs002_lock_resists_weak_evidence(store: MemoryStore) -> None:
+    """Weak 'harmful' evidence must NOT decrease confidence of a locked belief."""
     b: Belief = _insert_locked_belief(store)
-    original_confidence: float = b.confidence
     original_beta: float = b.beta_param
 
-    # Attempt to downgrade via 'harmful' outcome.
-    store.update_confidence(b.id, outcome="harmful", weight=10.0)
+    # Weak evidence (weight < 3.0) should be resisted
+    store.update_confidence(b.id, outcome="harmful", weight=1.0)
 
     updated: Belief | None = store.get_belief(b.id)
     assert updated is not None
     assert updated.beta_param == original_beta, (
-        f"Locked belief beta_param must not increase on 'harmful' outcome. "
+        f"Locked belief beta_param must not increase on weak 'harmful' evidence. "
         f"Before: {original_beta}, after: {updated.beta_param}"
     )
-    assert updated.confidence >= original_confidence, (
-        f"Locked belief confidence must not decrease. "
-        f"Before: {original_confidence:.4f}, after: {updated.confidence:.4f}"
+
+
+def test_cs002_lock_yields_to_strong_evidence(store: MemoryStore) -> None:
+    """Strong 'harmful' evidence (weight >= 3.0) CAN decrease locked belief confidence."""
+    b: Belief = _insert_locked_belief(store)
+    original_beta: float = b.beta_param
+
+    # Strong evidence (weight >= 3.0) should get through
+    store.update_confidence(b.id, outcome="harmful", weight=5.0)
+
+    updated: Belief | None = store.get_belief(b.id)
+    assert updated is not None
+    assert updated.beta_param > original_beta, (
+        f"Locked belief beta_param MUST increase on strong 'harmful' evidence. "
+        f"Before: {original_beta}, after: {updated.beta_param}"
     )
