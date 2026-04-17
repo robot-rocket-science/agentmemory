@@ -3,7 +3,7 @@
 
 Verifies that:
 1. search() populates _retrieval_buffer with belief IDs.
-2. ingest() appends text to _ingest_buffer.
+2. ingest() appends text to _signal_buffer.
 3. _process_auto_feedback() checks term overlap and records used/ignored.
 4. The tests table contains the correct auto-feedback records.
 """
@@ -48,11 +48,11 @@ def _reset_server_globals() -> Generator[None, None, None]:
     old_store: MemoryStore | None = server_mod._store
     old_session: str | None = server_mod._session_id
     old_retrieval: dict[str, list[tuple[str, str]]] = server_mod._retrieval_buffer
-    old_ingest: list[str] = server_mod._ingest_buffer
+    old_ingest: list[str] = server_mod._signal_buffer
     old_explicit: set[str] = server_mod._explicit_feedback_ids
 
     server_mod._retrieval_buffer = {}
-    server_mod._ingest_buffer = []
+    server_mod._signal_buffer = []
     server_mod._explicit_feedback_ids = set()
 
     yield
@@ -60,7 +60,7 @@ def _reset_server_globals() -> Generator[None, None, None]:
     server_mod._store = old_store
     server_mod._session_id = old_session
     server_mod._retrieval_buffer = old_retrieval
-    server_mod._ingest_buffer = old_ingest
+    server_mod._signal_buffer = old_ingest
     server_mod._explicit_feedback_ids = old_explicit
 
 
@@ -155,7 +155,7 @@ def test_auto_feedback_end_to_end(store: MemoryStore) -> None:
         "I configured the Python project to use uv as the package manager. "
         "We also set up database migrations with a proper schema versioning approach."
     )
-    server_mod._ingest_buffer.append(ingest_text)
+    server_mod._signal_buffer.append(ingest_text)
 
     # 6. Process auto-feedback (normally triggered by next search/ingest).
     count: int = server_mod._process_auto_feedback(session_id)
@@ -217,7 +217,7 @@ def test_auto_feedback_skips_explicit(store: MemoryStore) -> None:
     server_mod._retrieval_buffer[session_id] = [
         (b.id, now_ts) for b in beliefs
     ]
-    server_mod._ingest_buffer.append("uv package manager python database migrations schema")
+    server_mod._signal_buffer.append("uv package manager python database migrations schema")
 
     count: int = server_mod._process_auto_feedback(session_id)
     # Only 2 should get auto-feedback (belief 0 is skipped).
@@ -241,7 +241,7 @@ def test_auto_feedback_no_ingest_all_ignored(store: MemoryStore) -> None:
     server_mod._retrieval_buffer[session_id] = [
         (b.id, now_ts) for b in beliefs
     ]
-    # No ingest -- _ingest_buffer stays empty.
+    # No ingest -- _signal_buffer stays empty.
 
     count: int = server_mod._process_auto_feedback(session_id)
     assert count == 3

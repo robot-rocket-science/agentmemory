@@ -56,9 +56,10 @@ _session_id: str | None = None
 # Populated by search(), consumed by feedback() and auto-feedback.
 _retrieval_buffer: dict[str, list[tuple[str, str]]] = {}
 
-# Ingest buffer: text ingested since the last auto-feedback processing.
-# Populated by ingest(), consumed by _process_auto_feedback().
-_ingest_buffer: list[str] = []
+# Signal buffer: text from agent actions since the last auto-feedback processing.
+# Populated by search() queries, remember/correct/observe text, and ingest().
+# Consumed by _process_auto_feedback() for key-term matching.
+_signal_buffer: list[str] = []
 
 # Belief IDs that already received explicit feedback this session.
 # Auto-feedback skips these (explicit always wins).
@@ -93,22 +94,26 @@ def _extract_key_terms(text: str) -> list[str]:
 
 
 def _process_auto_feedback(session_id: str) -> int:
-    """Process the previous retrieval batch: infer used/ignored from ingested text.
+    """Process the previous retrieval batch: infer used/ignored from agent signals.
 
+    Signal sources: search queries, remember/correct/observe text, ingest text.
     Returns the number of auto-feedback events recorded.
     """
-    global _ingest_buffer
+    global _signal_buffer
 
     buffer: list[tuple[str, str]] | None = _retrieval_buffer.pop(session_id, None)
     if not buffer:
+        # Clear signal buffer even when no retrieval batch exists,
+        # so stale signals don't leak into the next batch.
+        _signal_buffer = []
         return 0
 
-    # Combine all ingested text since the retrieval
-    combined_ingested: str = " ".join(_ingest_buffer).lower()
-    _ingest_buffer = []
+    # Combine all signal text since the retrieval
+    combined_signal: str = " ".join(_signal_buffer).lower()
+    _signal_buffer = []
 
-    if not combined_ingested.strip():
-        # No ingested text -- everything is "ignored"
+    if not combined_signal.strip():
+        # No signal text -- everything is "ignored"
         store: MemoryStore = _get_store()
         count: int = 0
         for belief_id, _ts in buffer:
@@ -142,7 +147,7 @@ def _process_auto_feedback(session_id: str) -> int:
             continue
 
         unique_terms: set[str] = set(terms)
-        unique_matches: int = sum(1 for t in unique_terms if t in combined_ingested)
+        unique_matches: int = sum(1 for t in unique_terms if t in combined_signal)
 
         outcome: str = OUTCOME_USED if unique_matches >= _AUTO_FEEDBACK_MIN_MATCHES else OUTCOME_IGNORED
         detail: str = (
@@ -265,11 +270,11 @@ def _is_foreign_id(belief_id: str) -> bool:
 
 def _set_store(store: MemoryStore) -> None:  # pyright: ignore[reportUnusedFunction]
     """Override the module-level store. Used by tests."""
-    global _store, _session_id, _ingest_buffer
+    global _store, _session_id, _signal_buffer
     _store = store
     _session_id = None
     _retrieval_buffer.clear()
-    _ingest_buffer = []
+    _signal_buffer = []
     _explicit_feedback_ids.clear()
 
 
@@ -415,7 +420,12 @@ def search(
     store: MemoryStore = _get_store()
     session_id: str = _ensure_session()
 
-    # Process auto-feedback for the previous retrieval batch before this search
+    # The search query is a signal for the PREVIOUS batch: if the agent's
+    # next search overlaps with previously retrieved beliefs, those beliefs
+    # informed the agent's direction. Add BEFORE processing so it's included.
+    _signal_buffer.append(query)
+
+    # Process auto-feedback for the previous retrieval batch
     _process_auto_feedback(session_id)
 
     result: RetrievalResult = retrieve(
@@ -473,6 +483,7 @@ def remember(text: str) -> str:
     The belief is NOT locked until the user explicitly confirms via lock().
     Returns belief ID and prompts for user confirmation before locking.
     """
+    _signal_buffer.append(text)
     store: MemoryStore = _get_store()
     session_id: str = _ensure_session()
     belief: Belief = store.insert_belief(
@@ -504,6 +515,7 @@ def correct(text: str, replaces: str | None = None) -> str:
     If replaces is provided (a search query), finds the best matching
     existing belief and supersedes it.
     """
+    _signal_buffer.append(text)
     store: MemoryStore = _get_store()
     session_id: str = _ensure_session()
     belief: Belief = store.insert_belief(
@@ -584,6 +596,7 @@ def observe(text: str, source: str = "user") -> str:
 
     Returns the observation ID.
     """
+    _signal_buffer.append(text)
     store: MemoryStore = _get_store()
     session_id: str = _ensure_session()
     obs: Observation = store.insert_observation(
@@ -1104,10 +1117,10 @@ def ingest(text: str, source: str = "user") -> str:
     session_id: str = _ensure_session()
     result: IngestResult = ingest_turn(store, text, source, session_id=session_id)
 
-    # Feed ingested text into the auto-feedback buffer, then process.
+    # Feed ingested text into the signal buffer, then process.
     # Processing after append ensures the ingested text (agent's response to
     # previous search results) is included in the key-term matching.
-    _ingest_buffer.append(text)
+    _signal_buffer.append(text)
     auto_fb: int = _process_auto_feedback(session_id)
 
     store.increment_session_metrics(
