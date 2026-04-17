@@ -139,7 +139,7 @@ def belief_to_markdown(
 # Frontmatter parsing (for sync state comparison)
 # ---------------------------------------------------------------------------
 
-_FRONTMATTER_RE: Final[re.Pattern[str]] = re.compile(
+FRONTMATTER_RE: Final[re.Pattern[str]] = re.compile(
     r"^---\n(.*?)\n---\n", re.DOTALL
 )
 
@@ -150,7 +150,7 @@ def parse_belief_frontmatter(md_content: str) -> dict[str, str]:
     Returns a dict of key -> value (all strings). Only parses simple
     key: value pairs, not nested structures.
     """
-    match: re.Match[str] | None = _FRONTMATTER_RE.match(md_content)
+    match: re.Match[str] | None = FRONTMATTER_RE.match(md_content)
     if match is None:
         return {}
     result: dict[str, str] = {}
@@ -255,7 +255,7 @@ def _write_sync_state(
 # File writing
 # ---------------------------------------------------------------------------
 
-def _write_belief_file(
+def write_belief_file(
     belief: Belief,
     edges: list[tuple[str, str, str]],
     beliefs_dir: Path,
@@ -666,7 +666,7 @@ def sync_vault(
             unchanged += 1
             continue
 
-        _write_belief_file(belief, edges, beliefs_dir)
+        write_belief_file(belief, edges, beliefs_dir)
         new_hashes[belief.id] = file_hash
         written += 1
 
@@ -719,7 +719,7 @@ def _extract_body_text(md_content: str) -> str:
     section. Returns only the core belief text.
     """
     # Remove frontmatter
-    fm_match: re.Match[str] | None = _FRONTMATTER_RE.match(md_content)
+    fm_match: re.Match[str] | None = FRONTMATTER_RE.match(md_content)
     body: str = md_content[fm_match.end():] if fm_match else md_content
 
     # Remove H1 heading line (# belief_id)
