@@ -1434,5 +1434,44 @@ def graph_metrics(top_n: int = 20) -> str:
     return "\n".join(lines)
 
 
+@mcp.tool
+def link_docs(
+    project_path: str | None = None,
+    vault_path: str | None = None,
+) -> str:
+    """Export project documents to Obsidian vault with cross-reference links.
+
+    Scans the project for markdown documents (research reports, experiments,
+    case studies, etc.), extracts REQ-###, CS-###, Exp ## references, finds
+    beliefs that mention each document, and exports everything as linked
+    vault notes.
+
+    Args:
+        project_path: Project directory to scan. Uses cwd if omitted.
+        vault_path: Obsidian vault root. Uses config if omitted.
+    """
+    from agentmemory.doc_linker import LinkResult, link_documents
+    from agentmemory.obsidian import ObsidianConfig, load_obsidian_config
+    store: MemoryStore = _get_store()
+    config: ObsidianConfig | None = load_obsidian_config(vault_path)
+    if config is None:
+        return (
+            "Error: no vault path configured. Pass vault_path argument or set "
+            "obsidian.vault_path in ~/.agentmemory/config.json"
+        )
+    proj: Path = Path(project_path) if project_path else Path.cwd()
+    if not proj.exists():
+        return f"Error: project path does not exist: {proj}"
+
+    result: LinkResult = link_documents(store, proj, config.vault_path)
+    return (
+        f"Document linking complete ({result.elapsed_seconds}s):\n"
+        f"  Documents exported: {result.docs_exported}\n"
+        f"  Cross-references linked: {result.refs_linked}\n"
+        f"  Belief connections: {result.belief_refs_added}\n"
+        f"  Vault: {config.vault_path}/_docs/"
+    )
+
+
 if __name__ == "__main__":
     mcp.run()

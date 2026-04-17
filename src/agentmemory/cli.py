@@ -1969,6 +1969,35 @@ def cmd_import_obsidian(args: argparse.Namespace) -> None:
     store.close()
 
 
+def cmd_link_docs(args: argparse.Namespace) -> None:
+    """Export project documents to Obsidian vault with cross-references."""
+    from agentmemory.doc_linker import LinkResult, link_documents
+    from agentmemory.obsidian import ObsidianConfig, load_obsidian_config
+
+    store: MemoryStore = _get_store()
+    vault_path: str | None = getattr(args, "vault", None)
+    project: str | None = getattr(args, "project_dir", None)
+
+    config: ObsidianConfig | None = load_obsidian_config(vault_path)
+    if config is None:
+        print(
+            "Error: no vault path configured. Use --vault or set "
+            "obsidian.vault_path in ~/.agentmemory/config.json"
+        )
+        sys.exit(1)
+
+    proj_path: Path = Path(project).resolve() if project else Path.cwd()
+    print(f"Linking docs from {proj_path} to {config.vault_path}/docs/ ...")
+
+    result: LinkResult = link_documents(store, proj_path, config.vault_path)
+    store.close()
+
+    print(f"Done in {result.elapsed_seconds}s:")
+    print(f"  Documents:    {result.docs_exported}")
+    print(f"  References:   {result.refs_linked}")
+    print(f"  Belief links: {result.belief_refs_added}")
+
+
 # ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
@@ -2243,6 +2272,18 @@ def main() -> None:
         help="Apply changes (default: dry run)"
     )
     p_import_obs.set_defaults(func=cmd_import_obsidian)
+
+    # link-docs
+    p_link_docs: argparse.ArgumentParser = subparsers.add_parser(
+        "link-docs", help="Export project documents to Obsidian vault with cross-references"
+    )
+    p_link_docs.add_argument(
+        "--vault", default=None, help="Obsidian vault path (default: from config)"
+    )
+    p_link_docs.add_argument(
+        "--project-dir", default=None, help="Project directory to scan (default: cwd)"
+    )
+    p_link_docs.set_defaults(func=cmd_link_docs)
 
     args: argparse.Namespace = parser.parse_args()
 
