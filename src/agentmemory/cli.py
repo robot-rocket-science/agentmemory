@@ -1206,6 +1206,35 @@ def cmd_wonder(args: argparse.Namespace) -> None:
     if not connected and not high_uncertainty and not contradictions:
         print("\n(No graph connections, uncertainty flags, or contradictions found.)")
 
+    # Step 8: Create speculative belief nodes from high-uncertainty findings
+    # Re-open store for writes
+    store = _get_store()
+    from agentmemory.uncertainty import UncertaintyVector
+    speculative_created: int = 0
+    spec_ids: list[str] = []
+
+    # Source belief: use the highest-confidence direct result as the anchor
+    anchor_id: str | None = direct[0].id if direct else None
+
+    for b, unc in high_uncertainty[:5]:  # top 5 most uncertain
+        uv: UncertaintyVector = UncertaintyVector()  # all Beta(1,1)
+        spec: Belief = store.insert_speculative_belief(
+            content=b.content,
+            uncertainty_vector_json=uv.to_json(),
+            source_belief_id=anchor_id,
+            session_id=None,
+        )
+        spec_ids.append(spec.id)
+        speculative_created += 1
+
+    if speculative_created > 0:
+        print(f"\n## Speculative Nodes Created: {speculative_created}")
+        print("Use /mem:reason on these to test hypotheses and update uncertainty:")
+        for sid in spec_ids:
+            print(f"  - {sid}")
+
+    store.close()
+
 
 # ---------------------------------------------------------------------------
 # reason
@@ -1391,6 +1420,76 @@ def cmd_reason(args: argparse.Namespace) -> None:
         print("\n(No consequence paths or impasses found -- "
               "graph may be too sparse for path-based reasoning.)")
         print("Reason output is equivalent to a standard search at this graph density.")
+
+    # Step 8: Update speculative beliefs if any are in the result set
+    from agentmemory.uncertainty import (
+        UncertaintyVector,
+        DIMENSION_FEASIBILITY,
+        DIMENSION_VALUE,
+    )
+    store = _get_store()
+    speculative_updated: int = 0
+
+    for b in result.beliefs:
+        if b.temporal_direction != "forward" or b.uncertainty_vector is None:
+            continue
+
+        uv: UncertaintyVector = UncertaintyVector.from_json(b.uncertainty_vector)
+
+        # Evidence from consequence paths: if this belief appears in paths
+        # with high compound confidence, increase feasibility
+        in_path: bool = any(
+            any(pb.id == b.id for pb, _, _ in path)
+            for path in paths
+        )
+        if in_path and has_high_conf:
+            uv.update_dimension(DIMENSION_FEASIBILITY, True, weight=2.0)
+
+        # Evidence from impasses: constraint failures reduce value
+        belief_in_impasse: bool = any(
+            b.id in (imp.description or "")
+            for imp in impasses
+        )
+        if has_constraint_failure or belief_in_impasse:
+            uv.update_dimension(DIMENSION_VALUE, False, weight=2.0)
+
+        # Supporting evidence: if high-confidence beliefs support this topic
+        if has_high_conf and not has_constraint_failure:
+            uv.update_dimension(DIMENSION_VALUE, True, weight=1.0)
+
+        # Update in DB
+        h_score: float = uv.hibernation_score()
+        store.update_uncertainty(b.id, uv.to_json(), h_score)
+        speculative_updated += 1
+
+        # Create RESOLVES edge from seed beliefs to this speculative belief
+        for seed in result.beliefs[:3]:
+            if seed.id != b.id:
+                store.insert_edge(
+                    seed.id, b.id, "RESOLVES", 1.0,
+                    f"reason:{verdict.split(' -- ')[0].lower()}",
+                )
+
+    if speculative_updated > 0:
+        print(f"\nSPECULATIVE UPDATES: {speculative_updated} belief(s) updated")
+        print(f"  Verdict applied: {verdict.split(' -- ')[0]}")
+        # Show updated uncertainty summaries
+        for b in result.beliefs:
+            if b.temporal_direction != "forward" or b.uncertainty_vector is None:
+                continue
+            updated_b: Belief | None = store.get_belief(b.id)
+            if updated_b is not None and updated_b.uncertainty_vector is not None:
+                uv_updated: UncertaintyVector = UncertaintyVector.from_json(
+                    updated_b.uncertainty_vector
+                )
+                summary: dict[str, dict[str, float]] = uv_updated.dimension_summary()
+                h: float = updated_b.hibernation_score if updated_b.hibernation_score is not None else 0.0
+                print(f"  {b.id}: hibernation={h:.3f}")
+                for dim_name, dim_data in summary.items():
+                    print(f"    {dim_name}: mean={dim_data['mean']:.3f}, "
+                          f"voi={dim_data['voi']:.4f}")
+
+    store.close()
 
 
 # ---------------------------------------------------------------------------

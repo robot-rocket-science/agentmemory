@@ -2620,6 +2620,102 @@ class MemoryStore:
         ).fetchall()
         return [_row_to_belief(r) for r in rows]
 
+    # --- Speculative beliefs ---
+
+    def get_speculative_beliefs(self, limit: int = 50) -> list[Belief]:
+        """Get all active forward-looking beliefs, ordered by creation time."""
+        rows: list[sqlite3.Row] = self._conn.execute(
+            """SELECT * FROM beliefs
+               WHERE valid_to IS NULL AND temporal_direction = 'forward'
+               ORDER BY created_at DESC LIMIT ?""",
+            (limit,),
+        ).fetchall()
+        return [_row_to_belief(r) for r in rows]
+
+    def get_highest_entropy_beliefs(self, limit: int = 10) -> list[Belief]:
+        """Get speculative beliefs with the most uncertainty (highest joint entropy).
+
+        Returns beliefs that have uncertainty_vector set, sorted by
+        mean variance (proxy for entropy, avoids computing digamma in SQL).
+        The caller should compute exact entropy from the returned vectors.
+        """
+        rows: list[sqlite3.Row] = self._conn.execute(
+            """SELECT * FROM beliefs
+               WHERE valid_to IS NULL
+                 AND temporal_direction = 'forward'
+                 AND uncertainty_vector IS NOT NULL
+               ORDER BY created_at DESC LIMIT ?""",
+            (limit,),
+        ).fetchall()
+        return [_row_to_belief(r) for r in rows]
+
+    def get_hibernated_beliefs(self, threshold: float = 0.2, limit: int = 20) -> list[Belief]:
+        """Get speculative beliefs below the hibernation threshold."""
+        rows: list[sqlite3.Row] = self._conn.execute(
+            """SELECT * FROM beliefs
+               WHERE valid_to IS NULL
+                 AND temporal_direction = 'forward'
+                 AND hibernation_score IS NOT NULL
+                 AND hibernation_score < ?
+               ORDER BY hibernation_score ASC LIMIT ?""",
+            (threshold, limit),
+        ).fetchall()
+        return [_row_to_belief(r) for r in rows]
+
+    def insert_speculative_belief(
+        self,
+        content: str,
+        uncertainty_vector_json: str,
+        source_belief_id: str | None = None,
+        activation_condition: str | None = None,
+        session_id: str | None = None,
+    ) -> Belief:
+        """Create a forward-looking speculative belief with uncertainty vector.
+
+        Optionally links to the source belief via a SPECULATES edge.
+        """
+        belief: Belief = self.insert_belief(
+            content=content,
+            belief_type="speculative",
+            source_type="agent_inferred",
+            alpha=1.0,
+            beta_param=1.0,
+            session_id=session_id,
+        )
+        # Set speculative fields
+        self._conn.execute(
+            """UPDATE beliefs SET temporal_direction = 'forward',
+               uncertainty_vector = ?, activation_condition = ?
+               WHERE id = ?""",
+            (uncertainty_vector_json, activation_condition, belief.id),
+        )
+        self._conn.commit()
+
+        # Create SPECULATES edge from source belief
+        if source_belief_id is not None:
+            self.insert_edge(
+                source_belief_id, belief.id, "SPECULATES", 1.0, "wonder",
+            )
+
+        # Re-read to get updated fields
+        updated: Belief | None = self.get_belief(belief.id)
+        return updated if updated is not None else belief
+
+    def update_uncertainty(
+        self,
+        belief_id: str,
+        uncertainty_vector_json: str,
+        hibernation_score: float | None = None,
+    ) -> bool:
+        """Update the uncertainty vector and hibernation score on a speculative belief."""
+        cursor: sqlite3.Cursor = self._conn.execute(
+            """UPDATE beliefs SET uncertainty_vector = ?, hibernation_score = ?,
+               updated_at = ? WHERE id = ? AND valid_to IS NULL""",
+            (uncertainty_vector_json, hibernation_score, _now(), belief_id),
+        )
+        self._conn.commit()
+        return cursor.rowcount > 0
+
     # --- Test results ---
 
     def record_test_result(
