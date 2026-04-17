@@ -1,0 +1,12 @@
+name = "dry-term-30e8"
+main = "src/index.js"
+compatibility_date = "2026-04-17"
+
+[[d1_databases]]
+binding = "TELEMETRY_DB"
+database_name = "agentmemory-telemetry"
+database_id = "4704e38d-1366-4d13-ac03-c1563096d9f3"
+
+[[send_email]]
+name = "EMAIL"
+destination_address = "jonsobol@gmail.com"

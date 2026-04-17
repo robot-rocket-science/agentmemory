@@ -11,7 +11,7 @@ from typing import Any, cast
 
 _CONFIG_PATH: Path = Path.home() / ".agentmemory" / "config.json"
 
-_DEFAULTS: dict[str, dict[str, int | bool]] = {
+_DEFAULTS: dict[str, dict[str, int | bool | str]] = {
     "wonder": {
         "max_agents": 4,
     },
@@ -28,6 +28,16 @@ _DEFAULTS: dict[str, dict[str, int | bool]] = {
     },
     "ingest": {
         "use_llm": True,
+    },
+    "obsidian": {
+        "vault_path": "",
+        "beliefs_subfolder": "beliefs",
+        "auto_sync": False,
+    },
+    "telemetry": {
+        "enabled": False,
+        "endpoint": "https://robotrocketscience.com/api/telemetry",
+        "sent_lines": 0,
     },
 }
 
@@ -49,7 +59,7 @@ def load_config() -> dict[str, Any]:
     for section, defaults in _DEFAULTS.items():
         user_raw: object = config.get(section, {})
         user_section: dict[str, Any] = cast("dict[str, Any]", user_raw) if isinstance(user_raw, dict) else {}
-        merged_section: dict[str, int | bool] = {}
+        merged_section: dict[str, int | bool | str] = {}
         for key, default_val in defaults.items():
             raw_val: object = user_section.get(key, default_val)
             if raw_val is None:
@@ -60,6 +70,8 @@ def load_config() -> dict[str, Any]:
                     merged_section[key] = raw_val
                 else:
                     merged_section[key] = str(raw_val).lower() in ("true", "1", "yes")
+            elif isinstance(default_val, str):
+                merged_section[key] = str(raw_val)
             else:
                 merged_section[key] = int(str(raw_val))
         merged[section] = merged_section
@@ -91,11 +103,27 @@ def get_setting(section: str, key: str) -> int:
         raw_val: object = section_data.get(key)
         if raw_val is not None:
             return int(str(raw_val))
-    default_section: dict[str, int | bool] | None = _DEFAULTS.get(section)
+    default_section: dict[str, int | bool | str] | None = _DEFAULTS.get(section)
     if default_section is not None:
-        val: int | bool = default_section.get(key, 0)
-        return int(val)
+        val: int | bool | str = default_section.get(key, 0)
+        return int(str(val))
     return 0
+
+
+def get_str_setting(section: str, key: str) -> str:
+    """Get a single string setting value with defaults applied."""
+    config: dict[str, Any] = load_config()
+    section_raw: object = config.get(section, {})
+    if isinstance(section_raw, dict):
+        section_data: dict[str, Any] = cast("dict[str, Any]", section_raw)
+        raw_val: object = section_data.get(key)
+        if raw_val is not None:
+            return str(raw_val)
+    default_section: dict[str, int | bool | str] | None = _DEFAULTS.get(section)
+    if default_section is not None:
+        val: int | bool | str = default_section.get(key, "")
+        return str(val)
+    return ""
 
 
 def get_bool_setting(section: str, key: str) -> bool:
@@ -109,8 +137,8 @@ def get_bool_setting(section: str, key: str) -> bool:
             if isinstance(raw_val, bool):
                 return raw_val
             return str(raw_val).lower() in ("true", "1", "yes")
-    default_section: dict[str, int | bool] | None = _DEFAULTS.get(section)
+    default_section: dict[str, int | bool | str] | None = _DEFAULTS.get(section)
     if default_section is not None:
-        val: int | bool = default_section.get(key, False)
+        val: int | bool | str = default_section.get(key, False)
         return bool(val)
     return False

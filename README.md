@@ -8,45 +8,113 @@ It records what you discuss, what you decide, what you correct, and what works. 
 
 ## Installation
 
+### Prerequisites
+
+Install [uv](https://docs.astral.sh/uv/) (fast Python package manager) if you don't have it:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+You also need [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and working.
+
+### Step 1: Install agentmemory
+
 ```bash
 uv pip install git+https://github.com/yoshi280/agentmemory.git
+```
 
-# Set up Claude Code integration (commands, hooks, MCP config)
+Verify it installed:
+
+```bash
+agentmemory --help
+```
+
+If you get `command not found`, try installing as a tool instead:
+
+```bash
+uv tool install git+https://github.com/yoshi280/agentmemory.git
+```
+
+### Step 2: Run setup
+
+```bash
 agentmemory setup
 ```
 
-Restart Claude Code after setup. Commands appear as `/mem:*`.
+This does three things:
+1. Writes `/mem:*` slash commands to `~/.claude/commands/mem/`
+2. Registers the MCP server in your project's `.mcp.json`
+3. Adds session hooks to `~/.claude/settings.json` (context injection, conversation logging)
+
+### Step 3: Restart Claude Code
+
+Close and reopen Claude Code. The MCP server starts automatically on launch.
+
+### Step 4: Verify it works
+
+In Claude Code, run:
+
+```
+/mem:status
+```
+
+You should see a status report with belief counts, session info, and system health. If you see an error, check Troubleshooting below.
+
+### Step 5: Onboard your project
+
+```
+/mem:onboard .
+```
+
+This scans your project directory and ingests structure from git history, code, docs, and configuration. Takes 10-30 seconds depending on project size.
+
+That's it. agentmemory is now running. It will automatically capture decisions, corrections, and context from your conversations. Next session, your agent starts with that context already loaded.
 
 ### Troubleshooting
 
-- **"agentmemory: command not found"** -- Make sure `uv` installed it globally: `uv tool install agentmemory` or check your PATH.
-- **MCP tools not responding** -- Restart Claude Code. The MCP server caches the module on startup.
-- **Slash commands missing** -- Run `agentmemory setup` again. It writes command definitions to `~/.claude/commands/mem/`.
-- **SQLite lock errors** -- Run `python3 -c "import sqlite3; sqlite3.connect('~/.agentmemory/projects/<hash>/memory.db').execute('PRAGMA wal_checkpoint(TRUNCATE)')"` to clear the WAL.
+| Problem | Fix |
+|---------|-----|
+| `agentmemory: command not found` | Run `uv tool install git+https://github.com/yoshi280/agentmemory.git` or check that `~/.local/bin` is in your PATH |
+| `/mem:status` returns an error | Restart Claude Code. The MCP server needs a fresh start after setup |
+| Slash commands not showing up | Run `agentmemory setup` again, then restart Claude Code |
+| MCP tools not responding | Check `.mcp.json` exists in your project root. If not, run `agentmemory setup` from the project directory |
+| SQLite lock errors | Run `agentmemory health` to diagnose, or manually clear the WAL: `python3 -c "import sqlite3; sqlite3.connect('~/.agentmemory/projects/<hash>/memory.db').execute('PRAGMA wal_checkpoint(TRUNCATE)')"` |
 
 ## Quick Start
 
-After setup, the MCP server runs automatically inside Claude Code:
+Once installed, these are the commands you'll use most:
 
 ```
-/mem:onboard .              # Scan and ingest current project
-/mem:search "retrieval"     # Search beliefs
-/mem:core 10                # Top 10 beliefs by confidence
+/mem:search "topic"         # Find what the agent knows about a topic
+/mem:core 10                # See the top 10 highest-confidence beliefs
+/mem:wonder "topic"         # Broad research with graph context
+/mem:reason "question"      # Focused hypothesis testing against evidence
 /mem:stats                  # System analytics
-/mem:locked                 # Show locked constraints
-/mem:wonder "topic"         # Deep research with graph context
-/mem:reason "hypothesis"    # Test a hypothesis against evidence
+/mem:locked                 # Show locked constraints (non-negotiable rules)
 ```
 
-Or use the CLI directly:
+From the CLI:
 
 ```bash
-agentmemory onboard /path/to/project
 agentmemory search "query terms"
 agentmemory core --top 10
 agentmemory stats
-agentmemory lock "always use strict typing"
 ```
+
+## Workflow
+
+The core loop is: discuss, explore, focus, build, repeat.
+
+1. **Discuss.** Start talking about a topic with your agent. agentmemory automatically captures decisions, corrections, and preferences from the conversation. You don't need to do anything special -- just work normally.
+
+2. **Explore.** When you want a wider view, run `/mem:wonder "topic"`. Wonder spawns parallel research agents that pull from the belief graph, web sources, and documentation to surface perspectives and hypotheses you haven't considered. It produces structured output with uncertainty signals so you can see what's well-supported vs. speculative.
+
+3. **Focus.** When you're ready to commit to a direction, run `/mem:reason "question"`. Reason does graph-aware hypothesis testing -- it traces evidence chains, identifies contradictions, and finds the highest-leverage entry points. It tells you what the evidence supports, where the gaps are, and what to investigate next.
+
+4. **Build.** Take the output from wonder/reason into a few more discussion turns to refine the plan, then implement. agentmemory captures what you build and the decisions behind it.
+
+5. **Repeat.** Next session, the agent already has the context. Wonder and reason get sharper as the belief graph grows, because there's more evidence to reason over and more connections to traverse.
 
 ## How It Works
 
@@ -54,20 +122,20 @@ Conversations become scored beliefs. Beliefs get stronger when they help, weaker
 
 - **Bayesian confidence** -- Beta-Bernoulli model with Thompson sampling. Beliefs that help get stronger; beliefs that hurt get weaker.
 - **Multi-layer retrieval** -- Locked constraints (L0) + behavioral directives (L1) + FTS5 keyword search (L2) + HRR structural bridge + BFS graph traversal (L3). Compressed to fit a token budget.
-- **Graph-backed knowledge** -- 7 edge types (SUPERSEDES, CONTRADICTS, SUPPORTS, CALLS, CITES, TESTS, IMPLEMENTS) enable multi-hop traversal and contradiction detection.
+- **Graph-backed knowledge** -- 12 edge types (SUPERSEDES, CONTRADICTS, SUPPORTS, CALLS, CITES, TESTS, IMPLEMENTS, RELATES_TO, TEMPORAL_NEXT, CO_CHANGED, CONTAINS, COMMIT_TOUCHES) enable multi-hop traversal and contradiction detection.
 - **Correction detection** -- 92% accuracy, zero LLM cost. Corrections auto-create high-confidence beliefs.
 - **LLM classification** -- Haiku classifies belief type/persistence at 99% accuracy, ~$0.005/session.
-- **Project onboarding** -- Scanner extracts structure from git history, AST, docs, citations, and directives.
-- **Temporal decay** -- Content-aware half-lives (corrections never decay, facts decay in 14 days). Session velocity scaling.
+- **Project onboarding** -- 8 extractors pull structure from git history, AST, docs, citations, tests, implementations, and directives.
+- **Temporal decay** -- Content-aware half-lives (facts 14 days, corrections 8 weeks, requirements 24 weeks). Session velocity scaling.
 - **Per-project isolation** -- Each project gets its own SQLite database at `~/.agentmemory/projects/<hash>/`.
 
 ## Privacy and Security
 
 These are verifiable properties of the codebase, not marketing claims. Each can be confirmed by reading the source.
 
-**Your data never leaves your machine.** The MCP server, retrieval pipeline, scoring, and all belief operations run locally using SQLite and pure math (Bayesian updates, FTS5, HRR). Zero network libraries are imported (`grep -r "requests\|httpx\|urllib\|socket" src/` returns nothing). The only network call in the entire system is the optional LLM classification step during onboarding, which uses Claude Code subagents (not direct API calls from agentmemory).
+**Your data never leaves your machine.** The MCP server, retrieval pipeline, scoring, and all belief operations run locally using SQLite and pure math (Bayesian updates, FTS5, HRR). The only network-capable code is `telemetry.py` (stdlib `urllib.request`), which is only invoked when you explicitly run `agentmemory send-telemetry` after opting in. No network calls happen during normal operation. The LLM classification step during onboarding uses Claude Code subagents (not direct API calls from agentmemory).
 
-**No telemetry by default.** Telemetry is disabled on install (`config.py` defaults `telemetry.enabled = false`). If you opt in during `agentmemory setup`, only content-free metrics are recorded: token counts, correction rates, feedback ratios, belief lifecycle counts. No belief content, project paths, file paths, session IDs, or user-identifying information is ever included. Data is stored locally at `~/.agentmemory/telemetry.jsonl` and never transmitted. If you would like to share your usage data to help us improve agentmemory, please send the data to data@robotrocketscience.com. Disable anytime with `/mem:disable-telemetry`.
+**No telemetry by default.** Telemetry is disabled on install (`config.py` defaults `telemetry.enabled = false`). If you opt in during `agentmemory setup`, only content-free metrics are recorded: token counts, correction rates, feedback ratios, belief lifecycle counts. No belief content, project paths, file paths, session IDs, or user-identifying information is ever included. Data is stored locally at `~/.agentmemory/telemetry.jsonl` and never transmitted automatically. To share your usage data, run `agentmemory send-telemetry` -- it shows you exactly what will be sent and asks for confirmation before transmitting. You can also email telemetry data to data@robotrocketscience.com. Disable anytime with `/mem:disable-telemetry`.
 
 **Per-project isolation.** Each project gets a separate SQLite database keyed by SHA-256 hash of the project path. Beliefs from project A cannot leak into project B. Cross-project queries require explicit opt-in via the `project_path` parameter and are read-only (no feedback or confidence updates to the foreign database). Mutation tools (`feedback`, `lock`, `delete`) reject cross-project belief IDs.
 
@@ -102,6 +170,32 @@ All commands are available as Claude Code slash commands after setup.
 | `/mem:disable` | Disable agentmemory for the session |
 | `/mem:enable` | Re-enable agentmemory |
 | `/mem:help` | Command reference |
+
+## Obsidian Integration
+
+agentmemory can sync its belief graph into an [Obsidian](https://obsidian.md) vault. Each belief becomes a markdown note with YAML frontmatter and wikilinked edges, so you can browse, search, and visualize your agent's knowledge using Obsidian's graph view and Dataview plugin.
+
+![Obsidian graph view of an agentmemory belief network](docs/images/obsidian-graph.png)
+
+### Setup
+
+```bash
+# Point agentmemory at your vault
+agentmemory settings obsidian.vault_path ~/obsidian-vault
+
+# Sync beliefs to the vault (incremental, only writes changes)
+agentmemory sync-obsidian
+```
+
+Or from Claude Code:
+
+```
+/mem:settings obsidian.vault_path ~/obsidian-vault
+```
+
+Sync is one-way by default (agentmemory -> Obsidian). Beliefs appear as markdown files in a `beliefs/` subfolder with auto-generated index notes grouped by type, confidence, and recency. The sync is incremental -- it tracks content hashes and only writes files that changed.
+
+For bidirectional sync, use `/mem:import-obsidian` to pull edits made in Obsidian back into the belief store.
 
 ## Architecture
 
@@ -218,7 +312,7 @@ Research article at [robotrocketscience.com/projects/agentmemory](https://robotr
 
 ## Research
 
-85+ experiments during core development, plus 6 benchmark-phase experiments.
+84 experiments during core development, plus 6 benchmark-phase experiments.
 Each experiment had a pre-registered hypothesis, measurement protocol,
 documented results, and an explicit proceed/revise/abandon decision.
 

@@ -24,7 +24,9 @@ from agentmemory.retrieval import RetrievalResult, retrieve
 from agentmemory.store import MemoryStore
 
 
-_JSONL_PATH: Path = Path.home() / ".claude" / "conversation-logs" / "turns.jsonl"
+_LOGS_DIR: Path = Path.home() / ".claude" / "conversation-logs"
+_JSONL_PATH: Path = _LOGS_DIR / "turns.jsonl"
+_ARCHIVE_DIR: Path = _LOGS_DIR / "archive"
 
 # Patterns that indicate a user decision, directive, or correction.
 _DECISION_PATTERNS: list[re.Pattern[str]] = [
@@ -65,12 +67,14 @@ def _extract_decision_query(text: str) -> str:
     return " ".join(key_words)
 
 
-def _load_sessions(
-    jsonl_path: Path,
-) -> dict[str, list[dict[str, str]]]:
-    """Load JSONL and group turns by session_id, ordered by timestamp."""
-    sessions: dict[str, list[dict[str, str]]] = defaultdict(list)
-    with jsonl_path.open("r", encoding="utf-8") as fh:
+def _load_jsonl_into(
+    path: Path,
+    sessions: dict[str, list[dict[str, str]]],
+) -> None:
+    """Parse a single JSONL file and append turns into sessions dict."""
+    if not path.exists():
+        return
+    with path.open("r", encoding="utf-8") as fh:
         for line_raw in fh:
             line_raw = line_raw.strip()
             if not line_raw:
@@ -92,6 +96,20 @@ def _load_sessions(
                 "text": text,
                 "timestamp": ts,
             })
+
+
+def _load_sessions() -> dict[str, list[dict[str, str]]]:
+    """Load all JSONL logs (current + archive) grouped by session_id."""
+    sessions: dict[str, list[dict[str, str]]] = defaultdict(list)
+
+    # Current log
+    _load_jsonl_into(_JSONL_PATH, sessions)
+
+    # Archived logs
+    if _ARCHIVE_DIR.is_dir():
+        for archive_file in sorted(_ARCHIVE_DIR.glob("*.jsonl")):
+            _load_jsonl_into(archive_file, sessions)
+
     # Sort each session's turns by timestamp
     for turns in sessions.values():
         turns.sort(key=lambda t: t["timestamp"])
@@ -104,20 +122,29 @@ def replay_store(tmp_path: Path) -> MemoryStore:
     return MemoryStore(tmp_path / "replay.db")
 
 
+def _has_logs() -> bool:
+    """Check if any conversation logs exist (current or archive)."""
+    if _JSONL_PATH.exists():
+        return True
+    if _ARCHIVE_DIR.is_dir() and any(_ARCHIVE_DIR.glob("*.jsonl")):
+        return True
+    return False
+
+
 @pytest.mark.skipif(
-    not _JSONL_PATH.exists(),
-    reason="No conversation logs at ~/.claude/conversation-logs/turns.jsonl",
+    not _has_logs(),
+    reason="No conversation logs at ~/.claude/conversation-logs/",
 )
 def test_req001_decisions_persist_across_sessions(replay_store: MemoryStore) -> None:
     """Decisions from early sessions must be retrievable after later sessions.
 
-    1. Load real conversation logs, group by session.
+    1. Load real conversation logs (current + archive), group by session.
     2. Order sessions chronologically.
     3. Ingest first 5 sessions. Extract decision-like turns.
     4. Ingest remaining sessions (additional noise/context).
     5. Verify >= 80% of early decisions are retrievable.
     """
-    sessions: dict[str, list[dict[str, str]]] = _load_sessions(_JSONL_PATH)
+    sessions: dict[str, list[dict[str, str]]] = _load_sessions()
 
     # Order sessions by earliest timestamp
     session_order: list[str] = sorted(

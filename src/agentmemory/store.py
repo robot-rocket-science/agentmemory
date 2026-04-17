@@ -250,10 +250,13 @@ def _row_to_belief(row: sqlite3.Row) -> Belief:
         rigor_tier=row["rigor_tier"] if "rigor_tier" in keys else "hypothesis",
         method=row["method"] if "method" in keys else None,
         sample_size=row["sample_size"] if "sample_size" in keys else None,
-        scope=row["scope"] if "scope" in keys else "project",
         last_retrieved_at=row["last_retrieved_at"] if "last_retrieved_at" in keys else None,
         data_source=row["data_source"] if "data_source" in keys else "",
         independently_validated=bool(row["independently_validated"]) if "independently_validated" in keys else False,
+        temporal_direction=row["temporal_direction"] if "temporal_direction" in keys else "backward",
+        uncertainty_vector=row["uncertainty_vector"] if "uncertainty_vector" in keys else None,
+        hibernation_score=float(row["hibernation_score"]) if "hibernation_score" in keys and row["hibernation_score"] is not None else None,
+        activation_condition=row["activation_condition"] if "activation_condition" in keys else None,
     )
 
 
@@ -292,18 +295,32 @@ def _row_to_checkpoint(row: sqlite3.Row) -> Checkpoint:
 class MemoryStore:
     """SQLite-backed memory store with FTS5 search and Bayesian belief tracking."""
 
-    def __init__(self, db_path: str | Path) -> None:
-        """Open or create the database. Enable WAL mode. Create tables if needed."""
+    def __init__(self, db_path: str | Path, readonly: bool = False) -> None:
+        """Open or create the database. Enable WAL mode. Create tables if needed.
+
+        When readonly=True, opens the database in read-only mode (no schema
+        init, no WAL). Used for cross-project queries where writes must be
+        prevented.
+        """
         self._db_path: Path = Path(db_path)
-        self._conn: sqlite3.Connection = sqlite3.connect(
-            str(self._db_path), check_same_thread=False,
-        )
+        self.readonly: bool = readonly
+        if readonly:
+            uri: str = f"file:{self._db_path}?mode=ro"
+            self._conn: sqlite3.Connection = sqlite3.connect(
+                uri, uri=True, check_same_thread=False,
+            )
+        else:
+            self._conn = sqlite3.connect(
+                str(self._db_path), check_same_thread=False,
+            )
         self._conn.row_factory = sqlite3.Row
-        self._conn.execute("PRAGMA journal_mode=WAL")
-        self._conn.execute("PRAGMA synchronous=NORMAL")
-        self._conn.execute("PRAGMA foreign_keys=ON")
+        if not readonly:
+            self._conn.execute("PRAGMA journal_mode=WAL")
+            self._conn.execute("PRAGMA synchronous=NORMAL")
+            self._conn.execute("PRAGMA foreign_keys=ON")
         self._last_traversed_edges: dict[str, list[tuple[int, int]]] = {}
-        self._init_schema()
+        if not readonly:
+            self._init_schema()
 
     def _init_schema(self) -> None:
         """Create all tables and FTS5 index if they don't exist."""
@@ -312,7 +329,6 @@ class MemoryStore:
         self._migrate_sessions()
         self._migrate_beliefs()
         self._migrate_edges()
-        self._fix_auto_locked_beliefs()
 
     def _migrate_beliefs(self) -> None:
         """Run belief-table migrations."""
@@ -371,6 +387,26 @@ class MemoryStore:
             self._conn.execute(
                 "ALTER TABLE beliefs ADD COLUMN independently_validated INTEGER NOT NULL DEFAULT 0"
             )
+        # Speculative beliefs: forward-looking temporal direction
+        if "temporal_direction" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE beliefs ADD COLUMN temporal_direction TEXT NOT NULL DEFAULT 'backward'"
+            )
+        # Multi-dimensional uncertainty vector (JSON array of [alpha, beta] pairs)
+        if "uncertainty_vector" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE beliefs ADD COLUMN uncertainty_vector TEXT"
+            )
+        # Hibernation score for soft-closing speculative branches
+        if "hibernation_score" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE beliefs ADD COLUMN hibernation_score REAL"
+            )
+        # Event-based activation condition for prospective beliefs
+        if "activation_condition" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE beliefs ADD COLUMN activation_condition TEXT"
+            )
         self._conn.commit()
         # Create index on session_id (safe to run even if already exists)
         self._conn.execute(
@@ -391,41 +427,12 @@ class MemoryStore:
             )
             self._conn.commit()
 
-    def _fix_auto_locked_beliefs(self) -> int:
-        """Unlock beliefs that were auto-locked by the removed backfill_lock_corrections.
-
-        Only beliefs explicitly locked via the lock() tool (which records a 'locked'
-        event in confidence_history) should remain locked. All others were spuriously
-        auto-locked during bulk ingestion and should be unlocked.
-
-        Returns the number of beliefs unlocked.
-        """
-        # Find beliefs with explicit lock events (keep these)
-        explicit_ids: list[str] = [
-            r[0] for r in self._conn.execute(
-                """SELECT DISTINCT ch.belief_id
-                   FROM confidence_history ch
-                   JOIN beliefs b ON b.id = ch.belief_id
-                   WHERE ch.event_type = 'locked'
-                     AND b.locked = 1
-                     AND b.valid_to IS NULL"""
-            ).fetchall()
-        ]
-
-        ts: str = _now()
-        if explicit_ids:
-            ph: str = ",".join("?" * len(explicit_ids))
-            cursor: sqlite3.Cursor = self._conn.execute(
-                f"UPDATE beliefs SET locked = 0, updated_at = ? "
-                f"WHERE locked = 1 AND valid_to IS NULL AND id NOT IN ({ph})",
-                [ts, *explicit_ids],
-            )
-        else:
-            cursor = self._conn.execute(
-                "UPDATE beliefs SET locked = 0, updated_at = ? "
-                "WHERE locked = 1 AND valid_to IS NULL",
-                (ts,),
-            )
+    def backfill_lock_corrections(self) -> int:
+        """Lock all correction-type beliefs that are currently unlocked.
+        Returns the number of beliefs locked."""
+        cursor: sqlite3.Cursor = self._conn.execute(
+            "UPDATE beliefs SET locked = 1 WHERE belief_type = 'correction' AND locked = 0"
+        )
         self._conn.commit()
         return cursor.rowcount
 
@@ -854,6 +861,32 @@ class MemoryStore:
             "UPDATE beliefs SET valid_to = ?, updated_at = ? WHERE id = ?",
             (ts, ts, belief_id),
         )
+        self._conn.commit()
+
+    def update_belief_content(
+        self,
+        belief_id: str,
+        new_content: str,
+        new_content_hash: str,
+    ) -> None:
+        """Update a belief's content and content_hash (for Obsidian import)."""
+        ts: str = _now()
+        self._conn.execute(
+            """UPDATE beliefs
+               SET content = ?, content_hash = ?, updated_at = ?
+               WHERE id = ?""",
+            (new_content, new_content_hash, ts, belief_id),
+        )
+        # Update FTS5 index
+        self._conn.execute(
+            "DELETE FROM search_index WHERE id = ?", (belief_id,)
+        )
+        belief: Belief | None = self.get_belief(belief_id)
+        if belief is not None:
+            self._conn.execute(
+                "INSERT INTO search_index (id, content, type) VALUES (?, ?, ?)",
+                (belief_id, new_content, belief.belief_type),
+            )
         self._conn.commit()
 
     # --- Edges ---
@@ -1415,8 +1448,8 @@ class MemoryStore:
             if row is not None:
                 beliefs.append(_row_to_belief(row))
 
-        # Update last_retrieved_at for all returned beliefs.
-        if beliefs:
+        # Update last_retrieved_at for all returned beliefs (skip in readonly mode).
+        if beliefs and not self.readonly:
             now: str = _now()
             returned_ids: list[str] = [b.id for b in beliefs]
             ph: str = ",".join("?" for _ in returned_ids)
@@ -2133,6 +2166,56 @@ class MemoryStore:
         ).fetchall()
         return [str(r["id"]) for r in rows]
 
+    def get_edges_by_belief_ids(
+        self,
+        belief_ids: list[str],
+    ) -> dict[str, list[Edge]]:
+        """Get all edges connected to any of the given belief IDs.
+
+        Returns a dict mapping belief_id -> list of Edge objects where
+        that belief is either from_id or to_id. Single query, no N+1.
+        """
+        if not belief_ids:
+            return {}
+        # Use a temp table for large IN-clause efficiency
+        self._conn.execute(
+            "CREATE TEMP TABLE IF NOT EXISTS _bulk_ids (id TEXT PRIMARY KEY)"
+        )
+        self._conn.execute("DELETE FROM _bulk_ids")
+        self._conn.executemany(
+            "INSERT OR IGNORE INTO _bulk_ids (id) VALUES (?)",
+            [(bid,) for bid in belief_ids],
+        )
+        rows: list[sqlite3.Row] = self._conn.execute(
+            """SELECT e.* FROM edges e
+               JOIN _bulk_ids b ON (e.from_id = b.id OR e.to_id = b.id)
+               WHERE e.pruned_at IS NULL"""
+        ).fetchall()
+        result: dict[str, list[Edge]] = {}
+        for row in rows:
+            edge: Edge = Edge(
+                id=int(row["id"]),
+                from_id=str(row["from_id"]),
+                to_id=str(row["to_id"]),
+                edge_type=str(row["edge_type"]),
+                weight=float(row["weight"]),
+                reason=str(row["reason"]),
+                created_at=str(row["created_at"]),
+                alpha=float(row["alpha"]) if row["alpha"] is not None else 1.0,
+                beta_param=float(row["beta_param"]) if row["beta_param"] is not None else 1.0,
+                traversal_count=int(row["traversal_count"]) if row["traversal_count"] is not None else 0,
+                last_traversed_at=str(row["last_traversed_at"]) if row["last_traversed_at"] else None,
+                pruned_at=str(row["pruned_at"]) if row["pruned_at"] else None,
+            )
+            fid: str = edge.from_id
+            tid: str = edge.to_id
+            if fid in belief_ids or fid in result:
+                result.setdefault(fid, []).append(edge)
+            if tid != fid and (tid in belief_ids or tid in result):
+                result.setdefault(tid, []).append(edge)
+        self._conn.execute("DELETE FROM _bulk_ids")
+        return result
+
     def count_edges_for(self, belief_id: str) -> int:
         """Count SUPPORTS + CONTRADICTS edges connected to a belief."""
         row: sqlite3.Row = self._conn.execute(
@@ -2351,36 +2434,6 @@ class MemoryStore:
         if row is None:
             return None
         return {k: str(row[k]) for k in row.keys()}
-
-    def promote_to_global(self, belief_id: str) -> bool:
-        """Mark a belief as global scope (cross-project).
-
-        Global beliefs are visible across all projects via the global DB.
-        Returns True if the belief was promoted, False if not found.
-        Requires user confirmation before calling (enforced by MCP tool).
-        """
-        row: sqlite3.Row | None = self._conn.execute(
-            "SELECT id FROM beliefs WHERE id = ? AND valid_to IS NULL",
-            (belief_id,),
-        ).fetchone()
-        if row is None:
-            return False
-        self._conn.execute(
-            "UPDATE beliefs SET scope = 'global', updated_at = ? WHERE id = ?",
-            (_now(), belief_id),
-        )
-        self._conn.commit()
-        return True
-
-    def get_global_beliefs(self, limit: int = 20) -> list[Belief]:
-        """Return beliefs marked as global scope (cross-project)."""
-        rows: list[sqlite3.Row] = self._conn.execute(
-            """SELECT * FROM beliefs
-               WHERE scope = 'global' AND valid_to IS NULL
-               ORDER BY confidence DESC LIMIT ?""",
-            (limit,),
-        ).fetchall()
-        return [_row_to_belief(r) for r in rows]
 
     def get_rigor_distribution(self) -> dict[str, int]:
         """Return count of active beliefs per rigor_tier."""
@@ -2603,6 +2656,102 @@ class MemoryStore:
             (limit,),
         ).fetchall()
         return [_row_to_belief(r) for r in rows]
+
+    # --- Speculative beliefs ---
+
+    def get_speculative_beliefs(self, limit: int = 50) -> list[Belief]:
+        """Get all active forward-looking beliefs, ordered by creation time."""
+        rows: list[sqlite3.Row] = self._conn.execute(
+            """SELECT * FROM beliefs
+               WHERE valid_to IS NULL AND temporal_direction = 'forward'
+               ORDER BY created_at DESC LIMIT ?""",
+            (limit,),
+        ).fetchall()
+        return [_row_to_belief(r) for r in rows]
+
+    def get_highest_entropy_beliefs(self, limit: int = 10) -> list[Belief]:
+        """Get speculative beliefs with the most uncertainty (highest joint entropy).
+
+        Returns beliefs that have uncertainty_vector set, sorted by
+        mean variance (proxy for entropy, avoids computing digamma in SQL).
+        The caller should compute exact entropy from the returned vectors.
+        """
+        rows: list[sqlite3.Row] = self._conn.execute(
+            """SELECT * FROM beliefs
+               WHERE valid_to IS NULL
+                 AND temporal_direction = 'forward'
+                 AND uncertainty_vector IS NOT NULL
+               ORDER BY created_at DESC LIMIT ?""",
+            (limit,),
+        ).fetchall()
+        return [_row_to_belief(r) for r in rows]
+
+    def get_hibernated_beliefs(self, threshold: float = 0.2, limit: int = 20) -> list[Belief]:
+        """Get speculative beliefs below the hibernation threshold."""
+        rows: list[sqlite3.Row] = self._conn.execute(
+            """SELECT * FROM beliefs
+               WHERE valid_to IS NULL
+                 AND temporal_direction = 'forward'
+                 AND hibernation_score IS NOT NULL
+                 AND hibernation_score < ?
+               ORDER BY hibernation_score ASC LIMIT ?""",
+            (threshold, limit),
+        ).fetchall()
+        return [_row_to_belief(r) for r in rows]
+
+    def insert_speculative_belief(
+        self,
+        content: str,
+        uncertainty_vector_json: str,
+        source_belief_id: str | None = None,
+        activation_condition: str | None = None,
+        session_id: str | None = None,
+    ) -> Belief:
+        """Create a forward-looking speculative belief with uncertainty vector.
+
+        Optionally links to the source belief via a SPECULATES edge.
+        """
+        belief: Belief = self.insert_belief(
+            content=content,
+            belief_type="speculative",
+            source_type="agent_inferred",
+            alpha=1.0,
+            beta_param=1.0,
+            session_id=session_id,
+        )
+        # Set speculative fields
+        self._conn.execute(
+            """UPDATE beliefs SET temporal_direction = 'forward',
+               uncertainty_vector = ?, activation_condition = ?
+               WHERE id = ?""",
+            (uncertainty_vector_json, activation_condition, belief.id),
+        )
+        self._conn.commit()
+
+        # Create SPECULATES edge from source belief
+        if source_belief_id is not None:
+            self.insert_edge(
+                source_belief_id, belief.id, "SPECULATES", 1.0, "wonder",
+            )
+
+        # Re-read to get updated fields
+        updated: Belief | None = self.get_belief(belief.id)
+        return updated if updated is not None else belief
+
+    def update_uncertainty(
+        self,
+        belief_id: str,
+        uncertainty_vector_json: str,
+        hibernation_score: float | None = None,
+    ) -> bool:
+        """Update the uncertainty vector and hibernation score on a speculative belief."""
+        cursor: sqlite3.Cursor = self._conn.execute(
+            """UPDATE beliefs SET uncertainty_vector = ?, hibernation_score = ?,
+               updated_at = ? WHERE id = ? AND valid_to IS NULL""",
+            (uncertainty_vector_json, hibernation_score, _now(), belief_id),
+        )
+        self._conn.commit()
+        return cursor.rowcount > 0
 
     # --- Test results ---
 

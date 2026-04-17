@@ -82,7 +82,15 @@ def _resolve_db_path() -> Path:
 
 
 def _get_store() -> MemoryStore:
+    """Create store. Uses VaultStore if obsidian.vault_path is configured."""
     db_path: Path = _resolve_db_path()
+    from agentmemory.config import get_str_setting
+    vault_str: str = get_str_setting("obsidian", "vault_path")
+    if vault_str:
+        vault_path: Path = Path(vault_str)
+        if vault_path.exists():
+            from agentmemory.vault_store import VaultStore
+            return VaultStore(vault_path, db_path)  # type: ignore[return-value]
     return MemoryStore(db_path)
 
 
@@ -289,6 +297,42 @@ _COMMAND_DEFS: dict[str, dict[str, str]] = {
             "Resume calling agentmemory MCP tools as normal per CLAUDE.md instructions."
         ),
     },
+    "enable-telemetry": {
+        "description": "Enable anonymous telemetry logging.",
+        "argument_hint": "",
+        "tools": "Bash",
+        "objective": "Enable anonymous telemetry and confirm to the user.",
+        "process": (
+            "1. Run: `uv run agentmemory enable-telemetry`\n"
+            "2. Display the output to the user.\n"
+            "3. Confirm that only content-free metrics are collected (token spend,\n"
+            "   correction rates, feedback health) and data stays local at\n"
+            "   ~/.agentmemory/telemetry.jsonl.\n"
+        ),
+    },
+    "disable-telemetry": {
+        "description": "Disable anonymous telemetry logging.",
+        "argument_hint": "",
+        "tools": "Bash",
+        "objective": "Disable anonymous telemetry and confirm to the user.",
+        "process": (
+            "1. Run: `uv run agentmemory disable-telemetry`\n"
+            "2. Display the output to the user.\n"
+            "3. Confirm telemetry is now disabled. No further data will be written\n"
+            "   to ~/.agentmemory/telemetry.jsonl until re-enabled.\n"
+        ),
+    },
+    "send-telemetry": {
+        "description": "Send unsent telemetry snapshots to help improve agentmemory.",
+        "argument_hint": "",
+        "tools": "Bash",
+        "objective": "Show the user their unsent telemetry data and send it with explicit confirmation.",
+        "process": (
+            "1. Run: `uv run agentmemory send-telemetry`\n"
+            "2. The command will show a preview of what will be sent and ask for confirmation.\n"
+            "3. Display the result to the user.\n"
+        ),
+    },
     "help": {
         "description": "Show available mem commands and usage guide.",
         "argument_hint": "",
@@ -308,6 +352,9 @@ _COMMAND_DEFS: dict[str, dict[str, str]] = {
             "  /mem:settings           View or update settings\n"
             "  /mem:disable            Stop agentmemory for this session\n"
             "  /mem:enable             Resume agentmemory\n"
+            "  /mem:enable-telemetry   Enable anonymous performance logging\n"
+            "  /mem:disable-telemetry  Disable anonymous performance logging\n"
+            "  /mem:send-telemetry     Send unsent snapshots (shows data, asks first)\n"
             "  /mem:help               This reference\n"
         ),
     },
@@ -402,7 +449,134 @@ def cmd_setup(args: argparse.Namespace) -> None:
         if smoke.stderr:
             print(f"  {smoke.stderr[:200]}", file=sys.stderr)
 
+    # Step 7: Obsidian vault setup
+    _setup_obsidian_vault()
+
+    # Step 8: Telemetry opt-in
+    _setup_telemetry()
+
     print(f"\nDone. Restart Claude Code, then run /mem:onboard . on your project.")
+
+
+def _setup_obsidian_vault() -> None:
+    """Detect or configure Obsidian vault integration."""
+    from agentmemory.config import get_str_setting, load_config, save_config
+
+    print("\n  Obsidian vault integration...")
+
+    # Check if already configured
+    existing: str = get_str_setting("obsidian", "vault_path")
+    if existing and Path(existing).exists():
+        print(f"  Vault already configured: {existing}")
+        return
+
+    # Auto-detect: look for .obsidian/ in cwd or parent dirs
+    vault_path: Path | None = None
+    check: Path = Path.cwd()
+    for _ in range(5):  # up to 5 levels
+        if (check / ".obsidian").is_dir():
+            vault_path = check
+            break
+        parent: Path = check.parent
+        if parent == check:
+            break
+        check = parent
+
+    if vault_path is None:
+        # Create vault in project root
+        vault_path = Path.cwd()
+        obsidian_dir: Path = vault_path / ".obsidian"
+        obsidian_dir.mkdir(exist_ok=True)
+        # Write minimal config
+        (obsidian_dir / "core-plugins.json").write_text(
+            '{\n  "file-explorer": true,\n  "global-search": true,\n'
+            '  "graph": true,\n  "backlink": true,\n  "outgoing-link": true,\n'
+            '  "tag-pane": true,\n  "properties": true,\n  "daily-notes": true\n}\n',
+            encoding="utf-8",
+        )
+        print(f"  Created Obsidian vault config at {obsidian_dir}")
+
+    # Save vault_path to config
+    config: dict[str, object] = load_config()
+    obs_config: dict[str, object] = {
+        "vault_path": str(vault_path),
+        "beliefs_subfolder": "beliefs",
+        "auto_sync": False,
+    }
+    config["obsidian"] = obs_config
+    save_config(config)  # type: ignore[arg-type]
+    print(f"  Vault path saved: {vault_path}")
+
+    # Create vault directories
+    for subdir in ("beliefs", "_index", "_dashboards", "_docs", "_canvas"):
+        (vault_path / subdir).mkdir(exist_ok=True)
+    print("  Created vault directories (beliefs, _index, _dashboards, _docs, _canvas)")
+
+    # Add to .gitignore if not already present
+    gitignore: Path = vault_path / ".gitignore"
+    entries: list[str] = ["beliefs/", "_index/", "_dashboards/", "_docs/",
+                          "_canvas/", ".agentmemory_sync.json"]
+    if gitignore.exists():
+        existing_text: str = gitignore.read_text(encoding="utf-8")
+        missing: list[str] = [e for e in entries if e not in existing_text]
+        if missing:
+            with open(gitignore, "a", encoding="utf-8") as f:
+                f.write("\n# Obsidian vault export (generated, not source)\n")
+                for entry in missing:
+                    f.write(entry + "\n")
+            print(f"  Added {len(missing)} entries to .gitignore")
+
+    # Check if Obsidian app is installed
+    obsidian_app: Path = Path("/Applications/Obsidian.app")
+    if not obsidian_app.exists():
+        print("  Note: Obsidian app not found at /Applications/Obsidian.app")
+        print("  Install from https://obsidian.md to use graph view and dashboards")
+
+
+def _setup_telemetry() -> None:
+    """Prompt user to opt in to anonymous telemetry during setup."""
+    from agentmemory.config import get_bool_setting, load_config, save_config
+
+    telem_path: str = str(Path.home() / ".agentmemory" / "telemetry.jsonl")
+
+    print("\n  Anonymous telemetry...")
+    print("  agentmemory can collect anonymous performance metrics to help")
+    print("  improve the system. Here is exactly what we collect:\n")
+    print("    Per session:")
+    print("      - token counts (retrieval, classification)")
+    print("      - beliefs created, corrections detected")
+    print("      - searches performed, feedback given")
+    print("      - session duration, velocity tier")
+    print("    Aggregate:")
+    print("      - belief counts by type/source/confidence bucket")
+    print("      - active/superseded/locked totals, churn rate, orphan count")
+    print("      - graph edge counts by type, avg edges per belief")
+    print("      - feedback outcome distribution, feedback rate")
+    print("      - rolling 7-session and 30-session averages\n")
+    print("    NOT collected (ever):")
+    print("      - belief content, project paths, file paths")
+    print("      - session IDs, user names, identifying information\n")
+    print(f"  Data file: {telem_path}")
+    print("  Inspect it anytime. It is plain JSONL, one snapshot per line.")
+    print("  Nothing is sent without your explicit permission (send-telemetry).")
+    print("  Disable collection anytime with /mem:disable-telemetry\n")
+
+    current: bool = get_bool_setting("telemetry", "enabled")
+    if current:
+        print("  Telemetry is currently: ENABLED")
+    else:
+        print("  Telemetry is currently: DISABLED")
+
+    answer: str = input("  Enable anonymous telemetry? [y/N]: ").strip().lower()
+    enabled: bool = answer in ("y", "yes")
+
+    config: dict[str, object] = load_config()
+    telem_config: dict[str, object] = {"enabled": enabled}
+    config["telemetry"] = telem_config
+    save_config(config)  # type: ignore[arg-type]
+
+    status: str = "ENABLED" if enabled else "DISABLED"
+    print(f"  Telemetry {status}. Change anytime with /mem:enable-telemetry or /mem:disable-telemetry")
 
 
 # ---------------------------------------------------------------------------
@@ -564,6 +738,31 @@ def cmd_onboard(args: argparse.Namespace) -> None:
         if link_edges > 0:
             print(f"  Total semantic edges: {link_edges}")
 
+    # --- Obsidian vault sync ---
+    # If vault is configured, sync beliefs + link documents
+    from agentmemory.config import get_str_setting
+    vault_str: str = get_str_setting("obsidian", "vault_path")
+    vault_sync_count: int = 0
+    doc_link_count: int = 0
+    if vault_str and Path(vault_str).exists():
+        print("\nSyncing to Obsidian vault...")
+        from agentmemory.obsidian import ObsidianConfig, SyncResult, sync_vault
+        obs_config: ObsidianConfig = ObsidianConfig(vault_path=Path(vault_str))
+        sync_result: SyncResult = sync_vault(store, obs_config, full=True)
+        vault_sync_count = sync_result.beliefs_written
+        print(f"  Beliefs synced: {sync_result.beliefs_written}")
+        print(f"  Index notes: {sync_result.index_notes_written}")
+
+        print("Linking project documents...")
+        from agentmemory.doc_linker import LinkResult, link_documents
+        link_result: LinkResult = link_documents(
+            store, project_path, Path(vault_str)
+        )
+        doc_link_count = link_result.docs_exported
+        print(f"  Documents: {link_result.docs_exported}")
+        print(f"  Cross-references: {link_result.refs_linked}")
+        print(f"  Belief links: {link_result.belief_refs_added}")
+
     store.close()
 
     timing_parts: list[str] = [f"{k}={v:.2f}s" for k, v in scan.timings.items()]
@@ -572,6 +771,8 @@ def cmd_onboard(args: argparse.Namespace) -> None:
     print(f"  Beliefs: {aggregate.beliefs_created}")
     print(f"  Corrections: {aggregate.corrections_detected}")
     print(f"  Edges: {edge_count} structural + {link_edges} semantic")
+    if vault_sync_count > 0:
+        print(f"  Vault: {vault_sync_count} beliefs + {doc_link_count} docs")
     print(f"  Timing: {', '.join(timing_parts)}")
 
 
@@ -1032,6 +1233,63 @@ def cmd_wonder(args: argparse.Namespace) -> None:
     if not connected and not high_uncertainty and not contradictions:
         print("\n(No graph connections, uncertainty flags, or contradictions found.)")
 
+    # Step 8: Create speculative belief nodes
+    # Sources: high-uncertainty beliefs, contradictions, and the query itself
+    store = _get_store()
+    from agentmemory.uncertainty import UncertaintyVector
+    speculative_created: int = 0
+    spec_ids: list[str] = []
+
+    # Source belief: use the highest-confidence direct result as the anchor
+    anchor_id: str | None = direct[0].id if direct else None
+
+    # 8a: From high-uncertainty beliefs (if any)
+    for b, unc in high_uncertainty[:3]:
+        uv: UncertaintyVector = UncertaintyVector()
+        spec: Belief = store.insert_speculative_belief(
+            content=f"[hypothesis] {b.content}",
+            uncertainty_vector_json=uv.to_json(),
+            source_belief_id=anchor_id,
+            session_id=None,
+        )
+        spec_ids.append(spec.id)
+        speculative_created += 1
+
+    # 8b: From contradictions (each contradiction is a fork point)
+    for a, b in contradictions[:2]:
+        uv = UncertaintyVector()
+        spec = store.insert_speculative_belief(
+            content=f"[fork] resolve: \"{a.content[:80]}\" vs \"{b.content[:80]}\"",
+            uncertainty_vector_json=uv.to_json(),
+            source_belief_id=a.id,
+            session_id=None,
+        )
+        spec_ids.append(spec.id)
+        speculative_created += 1
+
+    # 8c: From the query itself (always create at least one speculative node
+    # representing the open question, so there's something to reason about)
+    if speculative_created == 0 and direct:
+        uv = UncertaintyVector()
+        spec = store.insert_speculative_belief(
+            content=f"[open question] {query}",
+            uncertainty_vector_json=uv.to_json(),
+            source_belief_id=anchor_id,
+            session_id=None,
+        )
+        spec_ids.append(spec.id)
+        speculative_created += 1
+
+    if speculative_created > 0:
+        print(f"\n## Speculative Nodes Created: {speculative_created}")
+        print("Use /mem:reason on these to test hypotheses and update uncertainty:")
+        for sid in spec_ids:
+            b_spec: Belief | None = store.get_belief(sid)
+            label: str = b_spec.content[:80] if b_spec else sid
+            print(f"  - {sid}: {label}")
+
+    store.close()
+
 
 # ---------------------------------------------------------------------------
 # reason
@@ -1217,6 +1475,76 @@ def cmd_reason(args: argparse.Namespace) -> None:
         print("\n(No consequence paths or impasses found -- "
               "graph may be too sparse for path-based reasoning.)")
         print("Reason output is equivalent to a standard search at this graph density.")
+
+    # Step 8: Update speculative beliefs if any are in the result set
+    from agentmemory.uncertainty import (
+        UncertaintyVector,
+        DIMENSION_FEASIBILITY,
+        DIMENSION_VALUE,
+    )
+    store = _get_store()
+    speculative_updated: int = 0
+
+    for b in result.beliefs:
+        if b.temporal_direction != "forward" or b.uncertainty_vector is None:
+            continue
+
+        uv: UncertaintyVector = UncertaintyVector.from_json(b.uncertainty_vector)
+
+        # Evidence from consequence paths: if this belief appears in paths
+        # with high compound confidence, increase feasibility
+        in_path: bool = any(
+            any(pb.id == b.id for pb, _, _ in path)
+            for path in paths
+        )
+        if in_path and has_high_conf:
+            uv.update_dimension(DIMENSION_FEASIBILITY, True, weight=2.0)
+
+        # Evidence from impasses: constraint failures reduce value
+        belief_in_impasse: bool = any(
+            b.id in (imp.description or "")
+            for imp in impasses
+        )
+        if has_constraint_failure or belief_in_impasse:
+            uv.update_dimension(DIMENSION_VALUE, False, weight=2.0)
+
+        # Supporting evidence: if high-confidence beliefs support this topic
+        if has_high_conf and not has_constraint_failure:
+            uv.update_dimension(DIMENSION_VALUE, True, weight=1.0)
+
+        # Update in DB
+        h_score: float = uv.hibernation_score()
+        store.update_uncertainty(b.id, uv.to_json(), h_score)
+        speculative_updated += 1
+
+        # Create RESOLVES edge from seed beliefs to this speculative belief
+        for seed in result.beliefs[:3]:
+            if seed.id != b.id:
+                store.insert_edge(
+                    seed.id, b.id, "RESOLVES", 1.0,
+                    f"reason:{verdict.split(' -- ')[0].lower()}",
+                )
+
+    if speculative_updated > 0:
+        print(f"\nSPECULATIVE UPDATES: {speculative_updated} belief(s) updated")
+        print(f"  Verdict applied: {verdict.split(' -- ')[0]}")
+        # Show updated uncertainty summaries
+        for b in result.beliefs:
+            if b.temporal_direction != "forward" or b.uncertainty_vector is None:
+                continue
+            updated_b: Belief | None = store.get_belief(b.id)
+            if updated_b is not None and updated_b.uncertainty_vector is not None:
+                uv_updated: UncertaintyVector = UncertaintyVector.from_json(
+                    updated_b.uncertainty_vector
+                )
+                summary: dict[str, dict[str, float]] = uv_updated.dimension_summary()
+                h: float = updated_b.hibernation_score if updated_b.hibernation_score is not None else 0.0
+                print(f"  {b.id}: hibernation={h:.3f}")
+                for dim_name, dim_data in summary.items():
+                    print(f"    {dim_name}: mean={dim_data['mean']:.3f}, "
+                          f"voi={dim_data['voi']:.4f}")
+
+    store.close()
 
 
 # ---------------------------------------------------------------------------
@@ -1882,6 +2210,241 @@ def cmd_batch_feedback(args: argparse.Namespace) -> None:
     print(f"Updated {updated} beliefs.")
 
 
+def cmd_sync_obsidian(args: argparse.Namespace) -> None:
+    """Export beliefs to an Obsidian vault as markdown files."""
+    from agentmemory.obsidian import (
+        ObsidianConfig,
+        SyncResult,
+        load_obsidian_config,
+        sync_vault,
+    )
+    store: MemoryStore = _get_store()
+
+    vault_path: str | None = getattr(args, "vault", None)
+    full: bool = getattr(args, "full", False)
+
+    config: ObsidianConfig | None = load_obsidian_config(vault_path)
+    if config is None:
+        print(
+            "Error: no vault path configured. Use --vault or set "
+            "obsidian.vault_path in ~/.agentmemory/config.json"
+        )
+        sys.exit(1)
+    if not config.vault_path.exists():
+        print(f"Error: vault path does not exist: {config.vault_path}")
+        sys.exit(1)
+
+    print(f"Syncing to {config.vault_path} ...")
+    result: SyncResult = sync_vault(store, config, full=full)
+    store.close()
+
+    print(f"Done in {result.elapsed_seconds}s:")
+    print(f"  Written:   {result.beliefs_written}")
+    print(f"  Unchanged: {result.beliefs_unchanged}")
+    print(f"  Archived:  {result.beliefs_archived}")
+    print(f"  Index:     {result.index_notes_written} notes")
+
+
+def cmd_import_obsidian(args: argparse.Namespace) -> None:
+    """Import changes from Obsidian vault back into agentmemory."""
+    from agentmemory.obsidian import (
+        ImportResult,
+        ObsidianConfig,
+        VaultChange,
+        detect_vault_changes,
+        import_vault_changes,
+        load_obsidian_config,
+    )
+    store: MemoryStore = _get_store()
+
+    vault_path: str | None = getattr(args, "vault", None)
+    dry_run: bool = not getattr(args, "apply", False)
+
+    config: ObsidianConfig | None = load_obsidian_config(vault_path)
+    if config is None:
+        print(
+            "Error: no vault path configured. Use --vault or set "
+            "obsidian.vault_path in ~/.agentmemory/config.json"
+        )
+        sys.exit(1)
+    if not config.vault_path.exists():
+        print(f"Error: vault path does not exist: {config.vault_path}")
+        sys.exit(1)
+
+    changes: list[VaultChange] = detect_vault_changes(config)
+    if not changes:
+        print("No changes detected in vault since last sync.")
+        store.close()
+        return
+
+    if dry_run:
+        print(f"Detected {len(changes)} change(s) (dry run):")
+        for c in changes:
+            preview: str = (c.new_text or "")[:60]
+            print(f"  [{c.change_type}] {c.belief_id}: {preview}")
+        print("\nRe-run with --apply to import changes.")
+    else:
+        result: ImportResult = import_vault_changes(store, changes)
+        print(f"Import complete:")
+        print(f"  Modified: {result.modified}")
+        print(f"  New:      {result.new_beliefs}")
+        print(f"  Deleted:  {result.deleted}")
+        if result.errors:
+            print("  Errors:")
+            for e in result.errors:
+                print(f"    - {e}")
+
+    store.close()
+
+
+def cmd_link_docs(args: argparse.Namespace) -> None:
+    """Export project documents to Obsidian vault with cross-references."""
+    from agentmemory.doc_linker import LinkResult, link_documents
+    from agentmemory.obsidian import ObsidianConfig, load_obsidian_config
+
+    store: MemoryStore = _get_store()
+    vault_path: str | None = getattr(args, "vault", None)
+    project: str | None = getattr(args, "project_dir", None)
+
+    config: ObsidianConfig | None = load_obsidian_config(vault_path)
+    if config is None:
+        print(
+            "Error: no vault path configured. Use --vault or set "
+            "obsidian.vault_path in ~/.agentmemory/config.json"
+        )
+        sys.exit(1)
+
+    proj_path: Path = Path(project).resolve() if project else Path.cwd()
+    print(f"Linking docs from {proj_path} to {config.vault_path}/docs/ ...")
+
+    result: LinkResult = link_documents(store, proj_path, config.vault_path)
+    store.close()
+
+    print(f"Done in {result.elapsed_seconds}s:")
+    print(f"  Documents:    {result.docs_exported}")
+    print(f"  References:   {result.refs_linked}")
+    print(f"  Belief links: {result.belief_refs_added}")
+
+
+def cmd_rebuild_index(args: argparse.Namespace) -> None:
+    """Rebuild SQLite index from vault .md files."""
+    from agentmemory.vault_store import RebuildResult, VaultStore
+
+    vault_path: str | None = getattr(args, "vault", None)
+    if vault_path is None:
+        from agentmemory.config import get_str_setting
+        vault_path = get_str_setting("obsidian", "vault_path")
+    if not vault_path:
+        print("Error: no vault path. Use --vault or set obsidian.vault_path")
+        sys.exit(1)
+
+    vp: Path = Path(vault_path)
+    if not vp.exists():
+        print(f"Error: vault path does not exist: {vp}")
+        sys.exit(1)
+
+    db_path: Path = _resolve_db_path()
+    print(f"Rebuilding index from {vp}/beliefs/ -> {db_path} ...")
+
+    vs: VaultStore = VaultStore(vp, db_path)
+    result: RebuildResult = vs.rebuild_index()
+    vs.close()
+
+    print(f"Done in {result.elapsed_seconds}s:")
+    print(f"  Beliefs indexed: {result.beliefs_indexed}")
+    print(f"  Edges created:   {result.edges_created}")
+    if result.errors:
+        print(f"  Errors: {len(result.errors)}")
+        for e in result.errors[:10]:
+            print(f"    - {e}")
+
+
+# ---------------------------------------------------------------------------
+# telemetry toggle
+# ---------------------------------------------------------------------------
+
+
+def cmd_enable_telemetry(args: argparse.Namespace) -> None:
+    """Enable anonymous telemetry."""
+    from agentmemory.config import load_config, save_config
+
+    config: dict[str, object] = load_config()
+    telem: dict[str, object] = {"enabled": True}
+    config["telemetry"] = telem
+    save_config(config)  # type: ignore[arg-type]
+    print("Telemetry ENABLED.")
+    print("Content-free performance metrics will be appended to ~/.agentmemory/telemetry.jsonl")
+    print("Disable anytime: agentmemory disable-telemetry (or /mem:disable-telemetry)")
+
+
+def cmd_disable_telemetry(args: argparse.Namespace) -> None:
+    """Disable anonymous telemetry."""
+    from agentmemory.config import load_config, save_config
+
+    config: dict[str, object] = load_config()
+    telem: dict[str, object] = {"enabled": False}
+    config["telemetry"] = telem
+    save_config(config)  # type: ignore[arg-type]
+    print("Telemetry DISABLED.")
+    print("No further data will be written to ~/.agentmemory/telemetry.jsonl")
+    print("Re-enable anytime: agentmemory enable-telemetry (or /mem:enable-telemetry)")
+
+
+def cmd_send_telemetry(args: argparse.Namespace) -> None:
+    """Send unsent telemetry snapshots to the project maintainers."""
+    import json as _json
+
+    from agentmemory.config import get_str_setting
+    from agentmemory.telemetry import get_unsent_lines, mark_sent, send_telemetry
+
+    unsent, offset = get_unsent_lines()
+    if not unsent:
+        print("No unsent telemetry snapshots.")
+        return
+
+    endpoint: str = get_str_setting("telemetry", "endpoint")
+    if not endpoint:
+        print("Error: no telemetry endpoint configured.", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"  {len(unsent)} unsent snapshot(s) to send to:")
+    print(f"  {endpoint}\n")
+    print("  Payload preview (each line is one session snapshot):")
+    print("  " + "-" * 60)
+    for i, line in enumerate(unsent):
+        try:
+            obj: dict[str, object] = _json.loads(line)
+            ts: object = obj.get("ts", "?")
+            session: object = obj.get("session", {})
+            beliefs: object = obj.get("beliefs", {})
+            s_created: object = session.get("beliefs_created", 0) if isinstance(session, dict) else 0  # type: ignore[union-attr]
+            b_active: object = beliefs.get("total_active", 0) if isinstance(beliefs, dict) else 0  # type: ignore[union-attr]
+            print(f"  [{i + 1}] ts={ts}  beliefs_created={s_created}  total_active={b_active}")
+        except (ValueError, AttributeError):
+            print(f"  [{i + 1}] (unparseable line)")
+    print("  " + "-" * 60)
+    print(f"\n  Data file: {Path.home() / '.agentmemory' / 'telemetry.jsonl'}")
+    print("  Open the file to inspect the full payload before sending.\n")
+
+    answer: str = input("  Send this data? [y/N]: ").strip().lower()
+    if answer not in ("y", "yes"):
+        print("  Cancelled. Nothing was sent.")
+        return
+
+    try:
+        result: dict[str, object] = send_telemetry(endpoint, unsent)
+        accepted: object = result.get("accepted", 0)
+        rejected: object = result.get("rejected", 0)
+        print(f"\n  Sent. Accepted: {accepted}, Rejected: {rejected}")
+        if isinstance(accepted, int) and accepted > 0:
+            mark_sent(offset + len(unsent))
+            print("  Offset updated. These snapshots won't be sent again.")
+    except Exception as exc:
+        print(f"\n  Send failed: {exc}", file=sys.stderr)
+        print("  Your data is still local. Try again later.")
+        sys.exit(1)
+
+
 # ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
@@ -2130,6 +2693,68 @@ def main() -> None:
     p_batch.add_argument("--belief-type", default=None, help="Filter by belief_type")
     p_batch.add_argument("--classified-by", default=None, help="Filter by classified_by")
     p_batch.set_defaults(func=cmd_batch_feedback)
+
+    # sync-obsidian
+    p_sync_obs: argparse.ArgumentParser = subparsers.add_parser(
+        "sync-obsidian", help="Export beliefs to Obsidian vault"
+    )
+    p_sync_obs.add_argument(
+        "--vault", default=None, help="Obsidian vault path (default: from config)"
+    )
+    p_sync_obs.add_argument(
+        "--full", action="store_true", default=False,
+        help="Rewrite all files unconditionally"
+    )
+    p_sync_obs.set_defaults(func=cmd_sync_obsidian)
+
+    # import-obsidian
+    p_import_obs: argparse.ArgumentParser = subparsers.add_parser(
+        "import-obsidian", help="Import vault edits back into agentmemory"
+    )
+    p_import_obs.add_argument(
+        "--vault", default=None, help="Obsidian vault path (default: from config)"
+    )
+    p_import_obs.add_argument(
+        "--apply", action="store_true", default=False,
+        help="Apply changes (default: dry run)"
+    )
+    p_import_obs.set_defaults(func=cmd_import_obsidian)
+
+    # link-docs
+    p_link_docs: argparse.ArgumentParser = subparsers.add_parser(
+        "link-docs", help="Export project documents to Obsidian vault with cross-references"
+    )
+    p_link_docs.add_argument(
+        "--vault", default=None, help="Obsidian vault path (default: from config)"
+    )
+    p_link_docs.add_argument(
+        "--project-dir", default=None, help="Project directory to scan (default: cwd)"
+    )
+    p_link_docs.set_defaults(func=cmd_link_docs)
+
+    # rebuild-index
+    p_rebuild_idx: argparse.ArgumentParser = subparsers.add_parser(
+        "rebuild-index", help="Rebuild SQLite index from vault .md files"
+    )
+    p_rebuild_idx.add_argument(
+        "--vault", default=None, help="Obsidian vault path (default: from config)"
+    )
+    p_rebuild_idx.set_defaults(func=cmd_rebuild_index)
+
+    p_enable_telem: argparse.ArgumentParser = subparsers.add_parser(
+        "enable-telemetry", help="Enable anonymous telemetry logging"
+    )
+    p_enable_telem.set_defaults(func=cmd_enable_telemetry)
+
+    p_disable_telem: argparse.ArgumentParser = subparsers.add_parser(
+        "disable-telemetry", help="Disable anonymous telemetry logging"
+    )
+    p_disable_telem.set_defaults(func=cmd_disable_telemetry)
+
+    p_send_telem: argparse.ArgumentParser = subparsers.add_parser(
+        "send-telemetry", help="Send unsent telemetry snapshots (with confirmation)"
+    )
+    p_send_telem.set_defaults(func=cmd_send_telemetry)
 
     args: argparse.Namespace = parser.parse_args()
 
