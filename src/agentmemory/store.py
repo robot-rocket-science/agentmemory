@@ -646,7 +646,12 @@ class MemoryStore:
         )
 
     def lock_belief(self, belief_id: str) -> None:
-        """Mark a belief as locked. Locked beliefs cannot have confidence reduced."""
+        """Mark a belief as locked.
+
+        Locked beliefs have a higher evidence threshold for confidence
+        reduction (require weight >= 3.0 for harmful feedback), but they
+        are NOT immune to evidence. They can also be superseded and unlocked.
+        """
         ts: str = _now()
         self._conn.execute(
             "UPDATE beliefs SET locked = 1, updated_at = ? WHERE id = ?",
@@ -658,6 +663,25 @@ class MemoryStore:
         if row is not None:
             self._record_confidence(belief_id, row["alpha"], row["beta_param"], "locked")
         self._conn.commit()
+
+    def unlock_belief(self, belief_id: str) -> bool:
+        """Remove the lock from a belief, allowing normal confidence updates.
+
+        Returns True if the belief was unlocked, False if not found.
+        """
+        ts: str = _now()
+        cursor: sqlite3.Cursor = self._conn.execute(
+            "UPDATE beliefs SET locked = 0, updated_at = ? WHERE id = ? AND locked = 1",
+            (ts, belief_id),
+        )
+        if cursor.rowcount > 0:
+            row: sqlite3.Row | None = self._conn.execute(
+                "SELECT alpha, beta_param FROM beliefs WHERE id = ?", (belief_id,)
+            ).fetchone()
+            if row is not None:
+                self._record_confidence(belief_id, row["alpha"], row["beta_param"], "unlocked")
+        self._conn.commit()
+        return cursor.rowcount > 0
 
     def delete_belief(self, belief_id: str) -> bool:
         """Soft-delete a belief by setting valid_to = now.
@@ -691,13 +715,15 @@ class MemoryStore:
     def supersede_belief(self, old_id: str, new_id: str, reason: str) -> None:
         """Mark old belief as superseded. Sets valid_to, creates a SUPERSEDES edge.
 
-        Locked beliefs cannot be superseded -- they are authoritative (REQ-020).
+        Locked beliefs CAN be superseded when evidence is sufficient.
+        The lock is preserved on the old belief for audit trail, but
+        valid_to is set so it no longer appears in active queries.
         """
         old_row: sqlite3.Row | None = self._conn.execute(
             "SELECT locked FROM beliefs WHERE id = ?", (old_id,)
         ).fetchone()
-        if old_row is not None and bool(old_row["locked"]):
-            return  # Locked beliefs are immune to supersession.
+        if old_row is None:
+            return
 
         ts: str = _now()
         self._conn.execute(
@@ -729,12 +755,18 @@ class MemoryStore:
             (belief_id, alpha, beta_param, event_type, event_detail, ts),
         )
 
+    # Minimum evidence weight required to reduce confidence on locked beliefs.
+    # Casual noise (weight=1.0) is filtered; strong evidence (weight>=3.0) gets through.
+    LOCKED_EVIDENCE_THRESHOLD: float = 3.0
+
     def update_confidence(
         self, belief_id: str, outcome: str, weight: float = 1.0,
     ) -> bool:
         """Bayesian update: 'used' increments alpha, 'harmful' increments beta_param.
 
-        Locked beliefs cannot have beta_param increased (confidence floor preserved).
+        Locked beliefs require stronger evidence (weight >= LOCKED_EVIDENCE_THRESHOLD)
+        to have beta_param increased. They are NOT immune to evidence, just resistant
+        to casual noise.
         Returns True if the belief dropped below 0.5 confidence (TB-15 warning).
         """
         row: sqlite3.Row | None = self._conn.execute(
@@ -754,7 +786,12 @@ class MemoryStore:
         if outcome == "used":
             alpha += weight
         elif outcome == "harmful":
-            if not is_locked:
+            if is_locked:
+                # Locked beliefs require stronger evidence to downgrade
+                if weight >= self.LOCKED_EVIDENCE_THRESHOLD:
+                    beta += weight
+                # else: evidence too weak, silently ignored
+            else:
                 beta += weight
         # ignored and contradicted do not adjust parameters
 

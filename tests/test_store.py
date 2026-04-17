@@ -207,10 +207,28 @@ def test_lock_belief(store: MemoryStore) -> None:
     assert updated.locked is True
 
 
-def test_locked_belief_confidence_cannot_decrease(store: MemoryStore) -> None:
-    """Applying 'harmful' outcome to a locked belief must not reduce confidence."""
+def test_locked_belief_resists_weak_evidence(store: MemoryStore) -> None:
+    """Weak 'harmful' evidence (weight < 3.0) must not reduce locked belief confidence."""
     belief = store.insert_belief(
         "use uv always", BELIEF_FACTUAL, BSRC_USER_STATED,
+        alpha=10.0, beta_param=1.0
+    )
+    store.lock_belief(belief.id)
+    original_beta: float = belief.beta_param
+
+    store.update_confidence(belief.id, OUTCOME_HARMFUL, weight=1.0)
+
+    updated = store.get_belief(belief.id)
+    assert updated is not None
+    assert abs(updated.beta_param - original_beta) < 1e-9, (
+        "Locked belief beta_param must not increase on weak harmful evidence"
+    )
+
+
+def test_locked_belief_yields_to_strong_evidence(store: MemoryStore) -> None:
+    """Strong 'harmful' evidence (weight >= 3.0) CAN reduce locked belief confidence."""
+    belief = store.insert_belief(
+        "robotrocketscience is public", BELIEF_FACTUAL, BSRC_USER_STATED,
         alpha=10.0, beta_param=1.0
     )
     store.lock_belief(belief.id)
@@ -220,9 +238,40 @@ def test_locked_belief_confidence_cannot_decrease(store: MemoryStore) -> None:
 
     updated = store.get_belief(belief.id)
     assert updated is not None
-    assert abs(updated.beta_param - original_beta) < 1e-9, (
-        "Locked belief beta_param must not increase on harmful outcome"
+    assert updated.beta_param > original_beta, (
+        "Locked belief beta_param MUST increase on strong harmful evidence"
     )
+
+
+def test_locked_belief_can_be_unlocked(store: MemoryStore) -> None:
+    """Locked beliefs can be unlocked."""
+    belief = store.insert_belief(
+        "temporary rule", BELIEF_FACTUAL, BSRC_USER_STATED,
+    )
+    store.lock_belief(belief.id)
+    assert store.get_belief(belief.id) is not None
+    assert store.get_belief(belief.id).locked is True  # type: ignore[union-attr]
+
+    result: bool = store.unlock_belief(belief.id)
+    assert result is True
+    updated = store.get_belief(belief.id)
+    assert updated is not None
+    assert updated.locked is False
+
+
+def test_locked_belief_can_be_superseded(store: MemoryStore) -> None:
+    """Locked beliefs can be superseded by stronger evidence."""
+    old = store.insert_belief(
+        "old locked fact", BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
+    )
+    store.lock_belief(old.id)
+    new = store.insert_belief(
+        "new corrected fact", "correction", "user_corrected",
+    )
+    store.supersede_belief(old.id, new.id, "evidence override")
+    updated = store.get_belief(old.id)
+    assert updated is not None
+    assert updated.valid_to is not None, "Locked belief must be supersedable"
 
 
 def test_unlocked_belief_confidence_decreases_on_harmful(store: MemoryStore) -> None:
