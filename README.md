@@ -10,7 +10,7 @@ It records what you discuss, what you decide, what you correct, and what works. 
 
 ### Prerequisites
 
-**Python 3.12+** and **[uv](https://docs.astral.sh/uv/)** (fast Python package manager):
+**[uv](https://docs.astral.sh/uv/)** (Python package manager). uv handles Python installation automatically -- you don't need Python installed separately.
 
 ```bash
 # Install uv if you don't have it
