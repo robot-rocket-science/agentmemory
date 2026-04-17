@@ -125,7 +125,7 @@ Built on SQLite (WAL mode), FTS5 full-text search, Bayesian confidence tracking,
 ## Installation
 
 ```bash
-uv pip install git+https://github.com/robotrocketscience/agentmemory.git
+uv pip install git+https://github.com/yoshi280/agentmemory.git
 
 # Set up Claude Code integration (commands, hooks, MCP config)
 agentmemory setup
