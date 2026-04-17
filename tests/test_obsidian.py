@@ -287,13 +287,21 @@ def test_sync_vault_index_notes(store: MemoryStore, vault_path: Path) -> None:
     config: ObsidianConfig = ObsidianConfig(vault_path=vault_path)
     result: SyncResult = sync_vault(store, config, full=True)
 
-    assert result.index_notes_written == 5
+    assert result.index_notes_written == 11  # 5 index + 6 dashboards
     index_dir: Path = vault_path / "_index"
     assert (index_dir / "by-type.md").exists()
     assert (index_dir / "locked.md").exists()
     assert (index_dir / "recent.md").exists()
     assert (index_dir / "by-confidence.md").exists()
     assert (index_dir / "corrections.md").exists()
+    # Dataview dashboards
+    dash_dir: Path = vault_path / "_dashboards"
+    assert (dash_dir / "overview.md").exists()
+    assert (dash_dir / "corrections.md").exists()
+    assert (dash_dir / "stale.md").exists()
+    assert (dash_dir / "high-confidence.md").exists()
+    assert (dash_dir / "sessions.md").exists()
+    assert (dash_dir / "locked.md").exists()
 
     # Locked index should contain our belief
     locked_content: str = (index_dir / "locked.md").read_text(encoding="utf-8")

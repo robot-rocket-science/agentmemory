@@ -466,7 +466,7 @@ def generate_index_notes(
     store: MemoryStore,
     config: ObsidianConfig,
 ) -> int:
-    """Generate all index notes. Returns count of files written."""
+    """Generate all index and dashboard notes. Returns count of files written."""
     index_dir: Path = config.vault_path / config.index_subfolder
     index_dir.mkdir(parents=True, exist_ok=True)
 
@@ -475,7 +475,123 @@ def generate_index_notes(
     _generate_recent_index(beliefs, index_dir)
     _generate_confidence_index(beliefs, index_dir)
     _generate_corrections_index(beliefs, store, index_dir)
-    return 5
+
+    # Dataview dashboards (require Dataview plugin to render)
+    dash_dir: Path = config.vault_path / "_dashboards"
+    dash_dir.mkdir(parents=True, exist_ok=True)
+    count: int = _generate_dataview_dashboards(beliefs, dash_dir)
+    return 5 + count
+
+
+# ---------------------------------------------------------------------------
+# Dataview dashboard generation
+# ---------------------------------------------------------------------------
+
+def _generate_dataview_dashboards(beliefs: list[Belief], dash_dir: Path) -> int:
+    """Generate Dataview-powered dashboard notes. Returns count written."""
+    # Counts for the overview
+    total: int = len(beliefs)
+    locked_count: int = sum(1 for b in beliefs if b.locked)
+    type_counts: dict[str, int] = {}
+    for b in beliefs:
+        type_counts[b.belief_type] = type_counts.get(b.belief_type, 0) + 1
+    type_summary: str = ", ".join(f"{t}: {c}" for t, c in sorted(type_counts.items()))
+
+    # 1. Overview dashboard
+    (dash_dir / "overview.md").write_text(
+        "---\nauto_generated: true\n---\n\n"
+        "# Belief Overview\n\n"
+        f"**Total active beliefs:** {total}\n"
+        f"**Locked:** {locked_count}\n"
+        f"**By type:** {type_summary}\n\n"
+        "## All Beliefs by Type\n\n"
+        "```dataview\n"
+        "TABLE type, confidence, source, locked, rigor\n"
+        'FROM "beliefs"\n'
+        "SORT confidence DESC\n"
+        "LIMIT 100\n"
+        "```\n\n"
+        "## Type Distribution\n\n"
+        "```dataview\n"
+        "TABLE length(rows) AS Count\n"
+        'FROM "beliefs"\n'
+        "GROUP BY type\n"
+        "SORT length(rows) DESC\n"
+        "```\n",
+        encoding="utf-8",
+    )
+
+    # 2. Corrections dashboard
+    (dash_dir / "corrections.md").write_text(
+        "---\nauto_generated: true\n---\n\n"
+        "# Corrections\n\n"
+        "```dataview\n"
+        "TABLE confidence, source, created, superseded_by\n"
+        'FROM "beliefs"\n'
+        'WHERE type = "correction"\n'
+        "SORT created DESC\n"
+        "LIMIT 100\n"
+        "```\n",
+        encoding="utf-8",
+    )
+
+    # 3. Stale beliefs dashboard
+    (dash_dir / "stale.md").write_text(
+        "---\nauto_generated: true\n---\n\n"
+        "# Stale Beliefs\n\n"
+        "Beliefs not updated in 30+ days.\n\n"
+        "```dataview\n"
+        "TABLE type, confidence, source, updated\n"
+        'FROM "beliefs"\n'
+        'WHERE date(now) - date(updated) > dur(30 days)\n'
+        "SORT updated ASC\n"
+        "LIMIT 100\n"
+        "```\n",
+        encoding="utf-8",
+    )
+
+    # 4. High confidence dashboard
+    (dash_dir / "high-confidence.md").write_text(
+        "---\nauto_generated: true\n---\n\n"
+        "# High-Confidence Beliefs\n\n"
+        "```dataview\n"
+        "TABLE type, confidence, source, locked\n"
+        'FROM "beliefs"\n'
+        "WHERE confidence >= 0.9\n"
+        "SORT confidence DESC\n"
+        "LIMIT 100\n"
+        "```\n",
+        encoding="utf-8",
+    )
+
+    # 5. Sessions dashboard
+    (dash_dir / "sessions.md").write_text(
+        "---\nauto_generated: true\n---\n\n"
+        "# Beliefs by Session\n\n"
+        "```dataview\n"
+        "TABLE length(rows) AS Count, min(rows.created) AS Started\n"
+        'FROM "beliefs"\n'
+        "GROUP BY session\n"
+        "SORT min(rows.created) DESC\n"
+        "LIMIT 50\n"
+        "```\n",
+        encoding="utf-8",
+    )
+
+    # 6. Locked beliefs dashboard
+    (dash_dir / "locked.md").write_text(
+        "---\nauto_generated: true\n---\n\n"
+        "# Locked Beliefs\n\n"
+        "```dataview\n"
+        "TABLE type, confidence, source, created\n"
+        'FROM "beliefs"\n'
+        "WHERE locked = true\n"
+        "SORT confidence DESC\n"
+        "```\n",
+        encoding="utf-8",
+    )
+
+    return 6
 
 
 # ---------------------------------------------------------------------------

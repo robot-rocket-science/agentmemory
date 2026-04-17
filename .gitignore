@@ -58,6 +58,7 @@ corpus_manifest.json
 # Obsidian vault export (generated, not source)
 beliefs/
 _index/
+_dashboards/
 .agentmemory_sync.json
 
 # SQLite databases (runtime data, not source)
