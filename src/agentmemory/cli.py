@@ -2394,8 +2394,13 @@ def cmd_send_telemetry(args: argparse.Namespace) -> None:
     """Send unsent telemetry snapshots to the project maintainers."""
     import json as _json
 
-    from agentmemory.config import get_str_setting
+    from agentmemory.config import get_setting, get_str_setting
     from agentmemory.telemetry import get_unsent_lines, mark_sent, send_telemetry
+
+    enabled: bool = bool(get_setting("telemetry", "enabled"))
+    if not enabled:
+        print("Telemetry is disabled. Enable it first with: agentmemory enable-telemetry")
+        sys.exit(1)
 
     unsent, offset = get_unsent_lines()
     if not unsent:
