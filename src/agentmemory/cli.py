@@ -1206,8 +1206,8 @@ def cmd_wonder(args: argparse.Namespace) -> None:
     if not connected and not high_uncertainty and not contradictions:
         print("\n(No graph connections, uncertainty flags, or contradictions found.)")
 
-    # Step 8: Create speculative belief nodes from high-uncertainty findings
-    # Re-open store for writes
+    # Step 8: Create speculative belief nodes
+    # Sources: high-uncertainty beliefs, contradictions, and the query itself
     store = _get_store()
     from agentmemory.uncertainty import UncertaintyVector
     speculative_created: int = 0
@@ -1216,10 +1216,36 @@ def cmd_wonder(args: argparse.Namespace) -> None:
     # Source belief: use the highest-confidence direct result as the anchor
     anchor_id: str | None = direct[0].id if direct else None
 
-    for b, unc in high_uncertainty[:5]:  # top 5 most uncertain
-        uv: UncertaintyVector = UncertaintyVector()  # all Beta(1,1)
+    # 8a: From high-uncertainty beliefs (if any)
+    for b, unc in high_uncertainty[:3]:
+        uv: UncertaintyVector = UncertaintyVector()
         spec: Belief = store.insert_speculative_belief(
-            content=b.content,
+            content=f"[hypothesis] {b.content}",
+            uncertainty_vector_json=uv.to_json(),
+            source_belief_id=anchor_id,
+            session_id=None,
+        )
+        spec_ids.append(spec.id)
+        speculative_created += 1
+
+    # 8b: From contradictions (each contradiction is a fork point)
+    for a, b in contradictions[:2]:
+        uv = UncertaintyVector()
+        spec = store.insert_speculative_belief(
+            content=f"[fork] resolve: \"{a.content[:80]}\" vs \"{b.content[:80]}\"",
+            uncertainty_vector_json=uv.to_json(),
+            source_belief_id=a.id,
+            session_id=None,
+        )
+        spec_ids.append(spec.id)
+        speculative_created += 1
+
+    # 8c: From the query itself (always create at least one speculative node
+    # representing the open question, so there's something to reason about)
+    if speculative_created == 0 and direct:
+        uv = UncertaintyVector()
+        spec = store.insert_speculative_belief(
+            content=f"[open question] {query}",
             uncertainty_vector_json=uv.to_json(),
             source_belief_id=anchor_id,
             session_id=None,
@@ -1231,7 +1257,9 @@ def cmd_wonder(args: argparse.Namespace) -> None:
         print(f"\n## Speculative Nodes Created: {speculative_created}")
         print("Use /mem:reason on these to test hypotheses and update uncertainty:")
         for sid in spec_ids:
-            print(f"  - {sid}")
+            b_spec: Belief | None = store.get_belief(sid)
+            label: str = b_spec.content[:80] if b_spec else sid
+            print(f"  - {sid}: {label}")
 
     store.close()
 
