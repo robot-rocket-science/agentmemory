@@ -77,17 +77,20 @@ class SearchResult:
 
 
 def format_ba_injection(result: SearchResult) -> str:
-    """Format search results as three-zone ba protocol injection.
+    """Format search results as four-zone ba protocol injection.
 
     Zone 1 - OPERATIONAL STATE: recent corrections and state changes (< 72h)
     Zone 2 - STANDING CONSTRAINTS: locked beliefs as bare imperatives
-    Zone 3 - BACKGROUND: everything else, assume true unless Zone 1 overrides
+    Zone 3 - ACTIVE HYPOTHESES: speculative beliefs under investigation
+    Zone 4 - BACKGROUND: everything else, assume true unless Zone 1 overrides
 
     This replaces the flat scored list with structured context that mirrors
-    high-context communication: deviations first, rules second, assumptions last.
+    high-context communication: deviations first, rules second, open questions
+    third, assumptions last.
     """
     state_changes: list[ScoredBelief] = []
     constraints: list[ScoredBelief] = []
+    hypotheses: list[ScoredBelief] = []
     background: list[ScoredBelief] = []
 
     for b in result.beliefs:
@@ -98,11 +101,14 @@ def format_ba_injection(result: SearchResult) -> str:
         )
         is_supersession: bool = b.via == "supersession"
         is_recent_observation: bool = b.via == "recent_observation"
+        is_speculative: bool = b.belief_type == "speculative"
 
         if is_recent_correction or is_supersession or is_recent_observation:
             state_changes.append(b)
         elif b.locked:
             constraints.append(b)
+        elif is_speculative:
+            hypotheses.append(b)
         else:
             background.append(b)
 
@@ -125,6 +131,12 @@ def format_ba_injection(result: SearchResult) -> str:
         for b in constraints:
             # Bare imperative, no scores or metadata
             lines.append(f"- {b.content}")
+        sections.append("\n".join(lines))
+
+    if hypotheses:
+        lines = ["== ACTIVE HYPOTHESES =="]
+        for b in hypotheses:
+            lines.append(f"[?] {b.content}")
         sections.append("\n".join(lines))
 
     if background:

@@ -282,6 +282,12 @@ def test_ba_format_three_zones() -> None:
                 belief_type="preference", source_type="user_stated",
                 locked=True, confidence=0.95, score=3.0, age_days=30.0, via="fts5",
             ),
+            # Speculative belief -> ACTIVE HYPOTHESES
+            ScoredBelief(
+                id="s1", content="should we add embedding retrieval?",
+                belief_type="speculative", source_type="agent_inferred",
+                locked=False, confidence=0.5, score=1.5, age_days=0.1, via="fts5",
+            ),
             # Regular fact -> BACKGROUND
             ScoredBelief(
                 id="b1", content="agentmemory uses SQLite with FTS5",
@@ -294,9 +300,10 @@ def test_ba_format_three_zones() -> None:
 
     output: str = format_ba_injection(result)
 
-    # All three zones present
+    # All four zones present
     assert "== OPERATIONAL STATE ==" in output
     assert "== STANDING CONSTRAINTS ==" in output
+    assert "== ACTIVE HYPOTHESES ==" in output
     assert "== BACKGROUND ==" in output
 
     # Correction in operational state with [!] prefix
@@ -304,7 +311,10 @@ def test_ba_format_three_zones() -> None:
 
     # Locked belief as bare imperative (no score, no percentage)
     assert "- always use uv for Python" in output
-    assert "%" not in output.split("STANDING CONSTRAINTS")[1].split("BACKGROUND")[0]
+    assert "%" not in output.split("STANDING CONSTRAINTS")[1].split("ACTIVE HYPOTHESES")[0]
+
+    # Speculative belief with [?] prefix
+    assert "[?] should we add embedding retrieval?" in output
 
     # Background fact as dash-prefixed
     assert "- agentmemory uses SQLite" in output
@@ -312,11 +322,12 @@ def test_ba_format_three_zones() -> None:
     # Source docs present
     assert "ARCHITECTURE.md" in output
 
-    # Operational state comes BEFORE constraints and background
+    # Zone ordering: state < constraints < hypotheses < background
     state_pos: int = output.index("OPERATIONAL STATE")
     constraint_pos: int = output.index("STANDING CONSTRAINTS")
+    hyp_pos: int = output.index("ACTIVE HYPOTHESES")
     bg_pos: int = output.index("BACKGROUND")
-    assert state_pos < constraint_pos < bg_pos
+    assert state_pos < constraint_pos < hyp_pos < bg_pos
 
 
 def test_ba_format_no_state_changes() -> None:
