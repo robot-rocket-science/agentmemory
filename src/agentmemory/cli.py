@@ -1917,6 +1917,58 @@ def cmd_sync_obsidian(args: argparse.Namespace) -> None:
     print(f"  Index:     {result.index_notes_written} notes")
 
 
+def cmd_import_obsidian(args: argparse.Namespace) -> None:
+    """Import changes from Obsidian vault back into agentmemory."""
+    from agentmemory.obsidian import (
+        ImportResult,
+        ObsidianConfig,
+        VaultChange,
+        detect_vault_changes,
+        import_vault_changes,
+        load_obsidian_config,
+    )
+    store: MemoryStore = _get_store()
+
+    vault_path: str | None = getattr(args, "vault", None)
+    dry_run: bool = not getattr(args, "apply", False)
+
+    config: ObsidianConfig | None = load_obsidian_config(vault_path)
+    if config is None:
+        print(
+            "Error: no vault path configured. Use --vault or set "
+            "obsidian.vault_path in ~/.agentmemory/config.json"
+        )
+        sys.exit(1)
+    if not config.vault_path.exists():
+        print(f"Error: vault path does not exist: {config.vault_path}")
+        sys.exit(1)
+
+    changes: list[VaultChange] = detect_vault_changes(config)
+    if not changes:
+        print("No changes detected in vault since last sync.")
+        store.close()
+        return
+
+    if dry_run:
+        print(f"Detected {len(changes)} change(s) (dry run):")
+        for c in changes:
+            preview: str = (c.new_text or "")[:60]
+            print(f"  [{c.change_type}] {c.belief_id}: {preview}")
+        print("\nRe-run with --apply to import changes.")
+    else:
+        result: ImportResult = import_vault_changes(store, changes)
+        print(f"Import complete:")
+        print(f"  Modified: {result.modified}")
+        print(f"  New:      {result.new_beliefs}")
+        print(f"  Deleted:  {result.deleted}")
+        if result.errors:
+            print("  Errors:")
+            for e in result.errors:
+                print(f"    - {e}")
+
+    store.close()
+
+
 # ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
@@ -2178,6 +2230,19 @@ def main() -> None:
         help="Rewrite all files unconditionally"
     )
     p_sync_obs.set_defaults(func=cmd_sync_obsidian)
+
+    # import-obsidian
+    p_import_obs: argparse.ArgumentParser = subparsers.add_parser(
+        "import-obsidian", help="Import vault edits back into agentmemory"
+    )
+    p_import_obs.add_argument(
+        "--vault", default=None, help="Obsidian vault path (default: from config)"
+    )
+    p_import_obs.add_argument(
+        "--apply", action="store_true", default=False,
+        help="Apply changes (default: dry run)"
+    )
+    p_import_obs.set_defaults(func=cmd_import_obsidian)
 
     args: argparse.Namespace = parser.parse_args()
 

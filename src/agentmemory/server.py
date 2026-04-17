@@ -1344,5 +1344,62 @@ def sync_obsidian(
     )
 
 
+@mcp.tool
+def import_obsidian(
+    vault_path: str | None = None,
+    dry_run: bool = True,
+) -> str:
+    """Import changes made in Obsidian back into agentmemory.
+
+    Detects belief files that were edited, created, or deleted in Obsidian
+    since the last sync, and applies those changes to the database.
+
+    Args:
+        vault_path: Path to Obsidian vault root. Uses config if omitted.
+        dry_run: If True (default), report changes without applying them.
+    """
+    from agentmemory.obsidian import (
+        ImportResult,
+        ObsidianConfig,
+        VaultChange,
+        detect_vault_changes,
+        import_vault_changes,
+        load_obsidian_config,
+    )
+    store: MemoryStore = _get_store()
+    config: ObsidianConfig | None = load_obsidian_config(vault_path)
+    if config is None:
+        return (
+            "Error: no vault path configured. Pass vault_path argument or set "
+            "obsidian.vault_path in ~/.agentmemory/config.json"
+        )
+    if not config.vault_path.exists():
+        return f"Error: vault path does not exist: {config.vault_path}"
+
+    changes: list[VaultChange] = detect_vault_changes(config)
+    if not changes:
+        return "No changes detected in vault since last sync."
+
+    if dry_run:
+        lines: list[str] = [f"Detected {len(changes)} change(s) (dry run):"]
+        for c in changes:
+            preview: str = (c.new_text or "")[:60]
+            lines.append(f"  [{c.change_type}] {c.belief_id}: {preview}")
+        lines.append("\nRe-run with dry_run=False to apply.")
+        return "\n".join(lines)
+
+    result: ImportResult = import_vault_changes(store, changes)
+    error_lines: str = ""
+    if result.errors:
+        error_lines = "\n  Errors:\n" + "\n".join(f"    - {e}" for e in result.errors)
+    return (
+        f"Import complete:\n"
+        f"  Modified: {result.modified}\n"
+        f"  New: {result.new_beliefs}\n"
+        f"  Deleted: {result.deleted}"
+        f"{error_lines}"
+    )
+
+
 if __name__ == "__main__":
     mcp.run()

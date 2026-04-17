@@ -10,6 +10,7 @@ import pytest
 
 from agentmemory.models import (
     BELIEF_FACTUAL,
+    Belief,
     BSRC_AGENT_INFERRED,
     OBS_TYPE_USER_STATEMENT,
     SRC_USER,
@@ -387,3 +388,136 @@ def test_sync_performance_bulk(store: MemoryStore, vault_path: Path) -> None:
     assert result.beliefs_written == 0
     assert result.beliefs_unchanged == 1000
     assert incr_elapsed < 1.0, f"Incremental sync took {incr_elapsed:.2f}s (expected <1s)"
+
+
+# ---------------------------------------------------------------------------
+# Bidirectional sync tests (Play B)
+# ---------------------------------------------------------------------------
+
+
+def test_detect_no_changes(store: MemoryStore, vault_path: Path) -> None:
+    """No changes detected after a clean sync."""
+    from agentmemory.obsidian import detect_vault_changes
+
+    _make_belief(store, "Untouched belief")
+    config: ObsidianConfig = ObsidianConfig(vault_path=vault_path)
+    sync_vault(store, config, full=True)
+
+    changes = detect_vault_changes(config)
+    assert len(changes) == 0
+
+
+def test_detect_modified_file(store: MemoryStore, vault_path: Path) -> None:
+    """Editing a belief file is detected as modified."""
+    from agentmemory.obsidian import VaultChange, detect_vault_changes
+
+    bid: str = _make_belief(store, "Original content")
+    config: ObsidianConfig = ObsidianConfig(vault_path=vault_path)
+    sync_vault(store, config, full=True)
+
+    # Simulate user editing the file in Obsidian
+    md_path: Path = vault_path / "beliefs" / f"{bid}.md"
+    content: str = md_path.read_text(encoding="utf-8")
+    # Change the content_hash in frontmatter to simulate an edit
+    modified: str = content.replace("Original content", "Edited in Obsidian")
+    md_path.write_text(modified, encoding="utf-8")
+
+    changes: list[VaultChange] = detect_vault_changes(config)
+    assert len(changes) == 1
+    assert changes[0].change_type == "modified"
+    assert changes[0].belief_id == bid
+    assert changes[0].new_text is not None
+    assert "Edited in Obsidian" in changes[0].new_text
+
+
+def test_detect_deleted_file(store: MemoryStore, vault_path: Path) -> None:
+    """Deleting a belief file is detected as deleted."""
+    from agentmemory.obsidian import detect_vault_changes
+
+    bid: str = _make_belief(store, "Will be deleted")
+    config: ObsidianConfig = ObsidianConfig(vault_path=vault_path)
+    sync_vault(store, config, full=True)
+
+    # Simulate user deleting the file
+    (vault_path / "beliefs" / f"{bid}.md").unlink()
+
+    changes = detect_vault_changes(config)
+    assert len(changes) == 1
+    assert changes[0].change_type == "deleted"
+    assert changes[0].belief_id == bid
+
+
+def test_detect_new_file(store: MemoryStore, vault_path: Path) -> None:
+    """A new .md file in beliefs/ is detected as new."""
+    from agentmemory.obsidian import detect_vault_changes
+
+    config: ObsidianConfig = ObsidianConfig(vault_path=vault_path)
+    # Sync with empty DB to create the directory and sync state
+    sync_vault(store, config, full=True)
+
+    # Simulate user creating a new note in Obsidian
+    new_path: Path = vault_path / "beliefs" / "aabbccddeeff.md"
+    new_path.write_text(
+        "---\nid: aabbccddeeff\ncontent_hash: newfile12345\n---\n\n"
+        "# aabbccddeeff\n\nA belief created in Obsidian.\n",
+        encoding="utf-8",
+    )
+
+    changes = detect_vault_changes(config)
+    assert len(changes) == 1
+    assert changes[0].change_type == "new"
+    assert changes[0].belief_id == "aabbccddeeff"
+    assert changes[0].new_text is not None
+    assert "created in Obsidian" in changes[0].new_text
+
+
+def test_import_modified(store: MemoryStore, vault_path: Path) -> None:
+    """Importing a modified file updates the belief in the DB."""
+    from agentmemory.obsidian import (
+        ImportResult,
+        detect_vault_changes,
+        import_vault_changes,
+    )
+
+    bid: str = _make_belief(store, "Before edit")
+    config: ObsidianConfig = ObsidianConfig(vault_path=vault_path)
+    sync_vault(store, config, full=True)
+
+    # Edit the file
+    md_path: Path = vault_path / "beliefs" / f"{bid}.md"
+    content: str = md_path.read_text(encoding="utf-8")
+    md_path.write_text(
+        content.replace("Before edit", "After edit in Obsidian"),
+        encoding="utf-8",
+    )
+
+    changes = detect_vault_changes(config)
+    result: ImportResult = import_vault_changes(store, changes)
+
+    assert result.modified == 1
+    updated: Belief | None = store.get_belief(bid)
+    assert updated is not None
+    assert "After edit in Obsidian" in updated.content
+
+
+def test_import_deleted(store: MemoryStore, vault_path: Path) -> None:
+    """Importing a deletion soft-deletes the belief."""
+    from agentmemory.obsidian import (
+        ImportResult,
+        detect_vault_changes,
+        import_vault_changes,
+    )
+
+    bid: str = _make_belief(store, "To be deleted via Obsidian")
+    config: ObsidianConfig = ObsidianConfig(vault_path=vault_path)
+    sync_vault(store, config, full=True)
+
+    (vault_path / "beliefs" / f"{bid}.md").unlink()
+
+    changes = detect_vault_changes(config)
+    result: ImportResult = import_vault_changes(store, changes)
+
+    assert result.deleted == 1
+    deleted_belief: Belief | None = store.get_belief(bid)
+    assert deleted_belief is not None
+    assert deleted_belief.valid_to is not None

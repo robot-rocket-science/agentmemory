@@ -787,6 +787,32 @@ class MemoryStore:
         )
         self._conn.commit()
 
+    def update_belief_content(
+        self,
+        belief_id: str,
+        new_content: str,
+        new_content_hash: str,
+    ) -> None:
+        """Update a belief's content and content_hash (for Obsidian import)."""
+        ts: str = _now()
+        self._conn.execute(
+            """UPDATE beliefs
+               SET content = ?, content_hash = ?, updated_at = ?
+               WHERE id = ?""",
+            (new_content, new_content_hash, ts, belief_id),
+        )
+        # Update FTS5 index
+        self._conn.execute(
+            "DELETE FROM search_index WHERE id = ?", (belief_id,)
+        )
+        belief: Belief | None = self.get_belief(belief_id)
+        if belief is not None:
+            self._conn.execute(
+                "INSERT INTO search_index (id, content, type) VALUES (?, ?, ?)",
+                (belief_id, new_content, belief.belief_type),
+            )
+        self._conn.commit()
+
     # --- Edges ---
 
     def insert_edge(

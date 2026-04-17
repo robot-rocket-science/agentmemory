@@ -644,20 +644,27 @@ def sync_vault(
     # Bulk-fetch all edges
     all_edges: dict[str, list[Edge]] = store.get_edges_by_belief_ids(belief_ids)
 
-    # Write changed beliefs
+    # Write changed beliefs. Sync state stores hash of the file content
+    # (not the belief content_hash) so we can detect external edits.
+    import hashlib as _hl
     written: int = 0
     unchanged: int = 0
     new_hashes: dict[str, str] = {}
 
     for belief in all_beliefs:
-        new_hashes[belief.id] = belief.content_hash
-        if not full and prev_hashes.get(belief.id) == belief.content_hash:
-            unchanged += 1
-            continue
         edges: list[tuple[str, str, str]] = collect_edges_for_belief(
             belief.id, all_edges
         )
+        file_content: str = belief_to_markdown(belief, edges)
+        file_hash: str = _hl.sha256(file_content.encode("utf-8")).hexdigest()[:12]
+
+        if not full and prev_hashes.get(belief.id) == file_hash:
+            new_hashes[belief.id] = file_hash
+            unchanged += 1
+            continue
+
         _write_belief_file(belief, edges, beliefs_dir)
+        new_hashes[belief.id] = file_hash
         written += 1
 
     # Archive stale files
@@ -677,4 +684,179 @@ def sync_vault(
         beliefs_unchanged=unchanged,
         index_notes_written=index_count,
         elapsed_seconds=round(elapsed, 2),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Play B: Bidirectional sync (vault -> agentmemory)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class VaultChange:
+    """A change detected in the vault relative to sync state."""
+    belief_id: str
+    change_type: str  # "modified" | "new" | "deleted"
+    md_content: str | None = None
+    new_text: str | None = None  # extracted body text (for modified/new)
+
+
+@dataclass
+class ImportResult:
+    """Result of importing vault changes."""
+    modified: int
+    new_beliefs: int
+    deleted: int
+    errors: list[str]
+
+
+def _extract_body_text(md_content: str) -> str:
+    """Extract the belief content text from a markdown file body.
+
+    Strips frontmatter, the H1 heading (belief ID), and the Relationships
+    section. Returns only the core belief text.
+    """
+    # Remove frontmatter
+    fm_match: re.Match[str] | None = _FRONTMATTER_RE.match(md_content)
+    body: str = md_content[fm_match.end():] if fm_match else md_content
+
+    # Remove H1 heading line (# belief_id)
+    lines: list[str] = body.strip().split("\n")
+    filtered: list[str] = []
+    in_relationships: bool = False
+    for line in lines:
+        if line.startswith("# ") and len(line) == 14:  # "# " + 12-char hex
+            continue
+        if line.startswith("## Relationships"):
+            in_relationships = True
+            continue
+        if in_relationships:
+            # Skip everything in the relationships section
+            if line.startswith("## "):
+                in_relationships = False
+            else:
+                continue
+        filtered.append(line)
+
+    return "\n".join(filtered).strip()
+
+
+def detect_vault_changes(config: ObsidianConfig) -> list[VaultChange]:
+    """Compare vault files against sync state to find user edits.
+
+    Returns a list of VaultChange objects describing what changed.
+    A file is "modified" if its body text differs from what we wrote.
+    A file is "new" if its belief ID is not in sync state.
+    A file is "deleted" if it was in sync state but the .md file is gone.
+    """
+    prev_hashes: dict[str, str] = _read_sync_state(config.vault_path)
+    beliefs_dir: Path = config.vault_path / config.beliefs_subfolder
+    changes: list[VaultChange] = []
+
+    if not beliefs_dir.exists():
+        return changes
+
+    # Check existing files. We compare the entire file content hash
+    # against what we stored at sync time. If the file was edited in
+    # Obsidian (body text changed, frontmatter tweaked, anything), the
+    # file hash will differ.
+    import hashlib as _hl
+    seen_ids: set[str] = set()
+    for md_file in beliefs_dir.glob("*.md"):
+        belief_id: str = md_file.stem
+        seen_ids.add(belief_id)
+        md_content: str = md_file.read_text(encoding="utf-8")
+        file_hash: str = _hl.sha256(md_content.encode("utf-8")).hexdigest()[:12]
+
+        if belief_id not in prev_hashes:
+            # New file created in Obsidian
+            body_text: str = _extract_body_text(md_content)
+            if body_text:
+                changes.append(VaultChange(
+                    belief_id=belief_id,
+                    change_type="new",
+                    md_content=md_content,
+                    new_text=body_text,
+                ))
+        elif file_hash != prev_hashes.get(belief_id, ""):
+            # File was modified externally
+            body_text = _extract_body_text(md_content)
+            changes.append(VaultChange(
+                belief_id=belief_id,
+                change_type="modified",
+                md_content=md_content,
+                new_text=body_text,
+            ))
+
+    # Check for deletions
+    for bid in prev_hashes:
+        if bid not in seen_ids:
+            changes.append(VaultChange(
+                belief_id=bid,
+                change_type="deleted",
+            ))
+
+    return changes
+
+
+def import_vault_changes(
+    store: MemoryStore,
+    changes: list[VaultChange],
+) -> ImportResult:
+    """Apply vault changes back to the store.
+
+    Modified: update belief content, recompute content_hash.
+    New: create a new belief with user_stated source.
+    Deleted: soft-delete the belief.
+    """
+    import hashlib
+
+    modified: int = 0
+    new_beliefs: int = 0
+    deleted: int = 0
+    errors: list[str] = []
+
+    for change in changes:
+        if change.change_type == "deleted":
+            existing: Belief | None = store.get_belief(change.belief_id)
+            if existing is not None:
+                store.soft_delete_belief(change.belief_id)
+                deleted += 1
+            else:
+                errors.append(f"Delete: belief {change.belief_id} not found in DB")
+
+        elif change.change_type == "modified":
+            if change.new_text is None:
+                errors.append(f"Modified: no text for {change.belief_id}")
+                continue
+            existing = store.get_belief(change.belief_id)
+            if existing is None:
+                errors.append(f"Modified: belief {change.belief_id} not found in DB")
+                continue
+            # Update content and hash
+            new_hash: str = hashlib.sha256(
+                change.new_text.encode("utf-8")
+            ).hexdigest()[:12]
+            store.update_belief_content(
+                change.belief_id, change.new_text, new_hash
+            )
+            modified += 1
+
+        elif change.change_type == "new":
+            if change.new_text is None:
+                errors.append(f"New: no text for {change.belief_id}")
+                continue
+            store.insert_belief(
+                content=change.new_text,
+                belief_type="factual",
+                source_type="user_stated",
+                alpha=9.0,
+                beta_param=0.5,
+            )
+            new_beliefs += 1
+
+    return ImportResult(
+        modified=modified,
+        new_beliefs=new_beliefs,
+        deleted=deleted,
+        errors=errors,
     )
