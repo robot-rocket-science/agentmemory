@@ -13,6 +13,7 @@ from agentmemory.hook_search import (
     detect_action_targets,
     extract_entity_candidates,
     extract_query_words,
+    format_ba_injection,
     search_for_prompt,
 )
 from agentmemory.models import BELIEF_FACTUAL, BSRC_AGENT_INFERRED, BSRC_USER_CORRECTED, Belief
@@ -263,3 +264,74 @@ def test_recent_observations_surface(tmp_path: Path) -> None:
 
     db.close()
     store.close()
+
+
+def test_ba_format_three_zones() -> None:
+    """Ba formatter separates beliefs into state changes, constraints, background."""
+    result: SearchResult = SearchResult(
+        beliefs=[
+            # Recent correction -> OPERATIONAL STATE
+            ScoredBelief(
+                id="c1", content="robotrocketscience is locked, use yoshi280",
+                belief_type="correction", source_type="user_corrected",
+                locked=False, confidence=0.9, score=5.0, age_days=0.5, via="entity",
+            ),
+            # Locked belief -> STANDING CONSTRAINTS
+            ScoredBelief(
+                id="l1", content="always use uv for Python",
+                belief_type="preference", source_type="user_stated",
+                locked=True, confidence=0.95, score=3.0, age_days=30.0, via="fts5",
+            ),
+            # Regular fact -> BACKGROUND
+            ScoredBelief(
+                id="b1", content="agentmemory uses SQLite with FTS5",
+                belief_type="factual", source_type="agent_inferred",
+                locked=False, confidence=0.7, score=1.0, age_days=10.0, via="fts5",
+            ),
+        ],
+        source_docs=["ARCHITECTURE.md"],
+    )
+
+    output: str = format_ba_injection(result)
+
+    # All three zones present
+    assert "== OPERATIONAL STATE ==" in output
+    assert "== STANDING CONSTRAINTS ==" in output
+    assert "== BACKGROUND ==" in output
+
+    # Correction in operational state with [!] prefix
+    assert "[!] robotrocketscience is locked" in output
+
+    # Locked belief as bare imperative (no score, no percentage)
+    assert "- always use uv for Python" in output
+    assert "%" not in output.split("STANDING CONSTRAINTS")[1].split("BACKGROUND")[0]
+
+    # Background fact as dash-prefixed
+    assert "- agentmemory uses SQLite" in output
+
+    # Source docs present
+    assert "ARCHITECTURE.md" in output
+
+    # Operational state comes BEFORE constraints and background
+    state_pos: int = output.index("OPERATIONAL STATE")
+    constraint_pos: int = output.index("STANDING CONSTRAINTS")
+    bg_pos: int = output.index("BACKGROUND")
+    assert state_pos < constraint_pos < bg_pos
+
+
+def test_ba_format_no_state_changes() -> None:
+    """When there are no state changes, that zone is omitted."""
+    result: SearchResult = SearchResult(
+        beliefs=[
+            ScoredBelief(
+                id="l1", content="never use em dashes",
+                belief_type="preference", source_type="user_stated",
+                locked=True, confidence=0.95, score=3.0, age_days=30.0, via="fts5",
+            ),
+        ],
+    )
+
+    output: str = format_ba_injection(result)
+    assert "OPERATIONAL STATE" not in output
+    assert "== STANDING CONSTRAINTS ==" in output
+    assert "- never use em dashes" in output

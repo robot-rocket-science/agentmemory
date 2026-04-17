@@ -76,6 +76,76 @@ class SearchResult:
     source_docs: list[str] = field(default_factory=lambda: [])
 
 
+def format_ba_injection(result: SearchResult) -> str:
+    """Format search results as three-zone ba protocol injection.
+
+    Zone 1 - OPERATIONAL STATE: recent corrections and state changes (< 72h)
+    Zone 2 - STANDING CONSTRAINTS: locked beliefs as bare imperatives
+    Zone 3 - BACKGROUND: everything else, assume true unless Zone 1 overrides
+
+    This replaces the flat scored list with structured context that mirrors
+    high-context communication: deviations first, rules second, assumptions last.
+    """
+    state_changes: list[ScoredBelief] = []
+    constraints: list[ScoredBelief] = []
+    background: list[ScoredBelief] = []
+
+    for b in result.beliefs:
+        is_recent_correction: bool = (
+            b.belief_type in ("correction", "observation")
+            and b.age_days is not None
+            and b.age_days < 3.0
+        )
+        is_supersession: bool = b.via == "supersession"
+        is_recent_observation: bool = b.via == "recent_observation"
+
+        if is_recent_correction or is_supersession or is_recent_observation:
+            state_changes.append(b)
+        elif b.locked:
+            constraints.append(b)
+        else:
+            background.append(b)
+
+    sections: list[str] = []
+
+    if state_changes:
+        lines: list[str] = ["== OPERATIONAL STATE =="]
+        for b in state_changes:
+            age_tag: str = ""
+            if b.age_days is not None:
+                if b.age_days < 1:
+                    age_tag = f" (changed <1d ago)"
+                else:
+                    age_tag = f" (changed {b.age_days:.0f}d ago)"
+            lines.append(f"[!] {b.content}{age_tag}")
+        sections.append("\n".join(lines))
+
+    if constraints:
+        lines = ["== STANDING CONSTRAINTS =="]
+        for b in constraints:
+            # Bare imperative, no scores or metadata
+            lines.append(f"- {b.content}")
+        sections.append("\n".join(lines))
+
+    if background:
+        lines = ["== BACKGROUND =="]
+        for b in background:
+            lines.append(f"- {b.content}")
+        sections.append("\n".join(lines))
+
+    if not sections:
+        return ""
+
+    header: str = f"AGENTMEMORY: {len(result.beliefs)} belief(s) relevant to your prompt:"
+    body: str = "\n\n".join(sections)
+    footer: str = ""
+    if result.source_docs:
+        footer = "\n\nSource documents (read for deeper context):\n"
+        footer += "\n".join(f"- {p}" for p in result.source_docs)
+
+    return f"{header}\n{body}{footer}"
+
+
 # ---------------------------------------------------------------------------
 # Query construction
 # ---------------------------------------------------------------------------
