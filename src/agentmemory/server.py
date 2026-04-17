@@ -236,6 +236,18 @@ def _resolve_project_db(project_path: str) -> Path | None:
     return None
 
 
+_FOREIGN_ID_ERROR: str = (
+    "This belief ID is from a cross-project search (contains ':'). "
+    "Mutation operations (feedback, lock, delete) are not allowed on "
+    "foreign project beliefs to prevent feedback loop interference."
+)
+
+
+def _is_foreign_id(belief_id: str) -> bool:
+    """Return True if belief_id was prefixed by cross-project search."""
+    return ":" in belief_id
+
+
 def _set_store(store: MemoryStore) -> None:  # pyright: ignore[reportUnusedFunction]
     """Override the module-level store. Used by tests."""
     global _store, _session_id, _ingest_buffer
@@ -302,19 +314,32 @@ def search(
                 f"No memory database found for project: {project_path}. "
                 f"The project must be onboarded first (use onboard())."
             )
-        cross_store: MemoryStore = MemoryStore(target_db)
-        result: RetrievalResult = retrieve(
-            cross_store, query, budget=budget, temporal_sort=temporal_sort,
-        )
+        cross_store: MemoryStore = MemoryStore(target_db, readonly=True)
+        try:
+            result: RetrievalResult = retrieve(
+                cross_store, query, budget=budget, temporal_sort=temporal_sort,
+            )
+        finally:
+            cross_store.close()
         if not result.beliefs:
             return f"No beliefs found in {project_path} matching your query."
+        # Prefix belief IDs with project hash so they are visually foreign
+        # and rejected by mutation tools (feedback, lock, delete).
+        project_hash: str = target_db.parent.name
         lines: list[str] = [
             f"Found {len(result.beliefs)} belief(s) from {project_path} "
-            f"({result.total_tokens} tokens, {result.budget_remaining} remaining):"
+            f"({result.total_tokens} tokens, {result.budget_remaining} remaining):",
+            "NOTE: These are read-only cross-project results. "
+            "Do not pass these IDs to feedback(), lock(), or delete().",
         ]
         for belief in result.beliefs:
             score: float | None = result.scores.get(belief.id)
-            lines.append(_format_belief(belief, score))
+            foreign_id: str = f"{project_hash}:{belief.id}"
+            score_part: str = f", score: {score:.3f}" if score is not None else ""
+            lines.append(
+                f"[{belief.confidence:.0%}] {belief.content} "
+                f"(ID: {foreign_id}, type: {belief.belief_type}{score_part})"
+            )
         return "\n".join(lines)
 
     store: MemoryStore = _get_store()
@@ -463,6 +488,8 @@ def lock(belief_id: str) -> str:
 
     Returns confirmation or error if belief not found.
     """
+    if _is_foreign_id(belief_id):
+        return _FOREIGN_ID_ERROR
     store: MemoryStore = _get_store()
     session_id: str = _ensure_session()
     belief: Belief | None = store.get_belief(belief_id)
@@ -656,6 +683,11 @@ def onboard(project_path: str) -> str:
     if not path.is_dir():
         return f"Not a directory: {path}"
 
+    # Detect cross-project onboard for provenance tagging
+    current_project: Path = Path.cwd().resolve()
+    is_foreign: bool = path != current_project
+    source_project_tag: str = str(path) if is_foreign else ""
+
     # Check for incremental onboarding: use last onboard commit if available
     store_pre: MemoryStore = _get_store()
     last_run: dict[str, str] | None = store_pre.get_last_onboarding(str(path))
@@ -694,14 +726,17 @@ def onboard(project_path: str) -> str:
         observations_created += 1
 
         for text, src in extracted.sentences:
-            all_sentences.append({
+            sentence: dict[str, str] = {
                 "text": text,
                 "source": src,
                 "observation_id": extracted.observation.id,
                 "created_at": node.date or "",
                 "is_correction": str(extracted.full_text_is_correction),
                 "full_text": node.content,
-            })
+            }
+            if source_project_tag:
+                sentence["source_project"] = source_project_tag
+            all_sentences.append(sentence)
 
     # Store structural edges for HRR graph encoding
     for edge in scan.edges:
@@ -854,6 +889,10 @@ def create_beliefs(classified_json: str) -> str:
                 author=author,
             ))
 
+        # Thread cross-project provenance if present
+        source_project: str = obs_items[0].get("source_project", "")
+        provenance: str = f"onboard:{source_project}" if source_project else ""
+
         result: IngestResult = create_beliefs_from_classified(
             store=store,
             observation=obs,
@@ -863,6 +902,7 @@ def create_beliefs(classified_json: str) -> str:
             full_text=full_text,
             created_at=created_at,
             classified_by="llm",
+            data_source=provenance,
         )
         total_created += result.beliefs_created
 
@@ -1174,6 +1214,8 @@ def delete(belief_id: str) -> str:
     Args:
         belief_id: The belief ID to delete (e.g. "a1b2c3d4e5f6").
     """
+    if _is_foreign_id(belief_id):
+        return _FOREIGN_ID_ERROR
     store: MemoryStore = _get_store()
     belief: Belief | None = store.get_belief(belief_id)
     if belief is None:
@@ -1198,6 +1240,12 @@ def bulk_delete(belief_ids: list[str]) -> str:
     Args:
         belief_ids: List of belief IDs to delete.
     """
+    foreign: list[str] = [bid for bid in belief_ids if _is_foreign_id(bid)]
+    if foreign:
+        return (
+            f"Rejected: {len(foreign)} foreign ID(s) detected (contain ':'). "
+            f"{_FOREIGN_ID_ERROR}"
+        )
     store: MemoryStore = _get_store()
     deleted: int = store.bulk_delete_beliefs(belief_ids)
     skipped: int = len(belief_ids) - deleted
@@ -1293,6 +1341,8 @@ def feedback(belief_id: str, outcome: str, detail: str = "") -> str:
         outcome: One of "used", "ignored", or "harmful".
         detail: Optional context about why (e.g. "contradicted by user correction").
     """
+    if _is_foreign_id(belief_id):
+        return _FOREIGN_ID_ERROR
     if outcome not in _VALID_OUTCOMES:
         return f"Invalid outcome '{outcome}'. Must be one of: {', '.join(sorted(_VALID_OUTCOMES))}"
 
@@ -1333,34 +1383,6 @@ def feedback(belief_id: str, outcome: str, detail: str = "") -> str:
         f"  confidence: {belief.confidence:.3f} -> {updated.confidence:.3f}\n"
         f"  alpha: {belief.alpha} -> {updated.alpha}, "
         f"beta: {belief.beta_param} -> {updated.beta_param}{drop_warn}"
-    )
-
-
-@mcp.tool
-def promote(belief_id: str) -> str:
-    """Promote a belief to global scope (visible across all projects).
-
-    Only call this AFTER the user has explicitly confirmed they want the
-    belief promoted. Global beliefs are loaded in every project's context.
-    Useful for behavioral rules like "always use pyright strict mode"
-    that apply regardless of which project is active.
-
-    Returns confirmation or error if belief not found.
-    """
-    store: MemoryStore = _get_store()
-    belief: Belief | None = store.get_belief(belief_id)
-    if belief is None:
-        return f"Error: no belief found with ID {belief_id}"
-    if belief.scope == "global":
-        return f"Already global (ID: {belief.id}): {belief.content[:80]}"
-
-    ok: bool = store.promote_to_global(belief_id)
-    if not ok:
-        return f"Error: could not promote belief {belief_id}"
-
-    return (
-        f"Promoted to global scope (ID: {belief.id}): {belief.content[:80]}\n"
-        f"This belief will now be visible in all projects."
     )
 
 

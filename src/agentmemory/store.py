@@ -250,7 +250,6 @@ def _row_to_belief(row: sqlite3.Row) -> Belief:
         rigor_tier=row["rigor_tier"] if "rigor_tier" in keys else "hypothesis",
         method=row["method"] if "method" in keys else None,
         sample_size=row["sample_size"] if "sample_size" in keys else None,
-        scope=row["scope"] if "scope" in keys else "project",
         last_retrieved_at=row["last_retrieved_at"] if "last_retrieved_at" in keys else None,
         data_source=row["data_source"] if "data_source" in keys else "",
         independently_validated=bool(row["independently_validated"]) if "independently_validated" in keys else False,
@@ -292,18 +291,32 @@ def _row_to_checkpoint(row: sqlite3.Row) -> Checkpoint:
 class MemoryStore:
     """SQLite-backed memory store with FTS5 search and Bayesian belief tracking."""
 
-    def __init__(self, db_path: str | Path) -> None:
-        """Open or create the database. Enable WAL mode. Create tables if needed."""
+    def __init__(self, db_path: str | Path, readonly: bool = False) -> None:
+        """Open or create the database. Enable WAL mode. Create tables if needed.
+
+        When readonly=True, opens the database in read-only mode (no schema
+        init, no WAL). Used for cross-project queries where writes must be
+        prevented.
+        """
         self._db_path: Path = Path(db_path)
-        self._conn: sqlite3.Connection = sqlite3.connect(
-            str(self._db_path), check_same_thread=False,
-        )
+        self.readonly: bool = readonly
+        if readonly:
+            uri: str = f"file:{self._db_path}?mode=ro"
+            self._conn: sqlite3.Connection = sqlite3.connect(
+                uri, uri=True, check_same_thread=False,
+            )
+        else:
+            self._conn = sqlite3.connect(
+                str(self._db_path), check_same_thread=False,
+            )
         self._conn.row_factory = sqlite3.Row
-        self._conn.execute("PRAGMA journal_mode=WAL")
-        self._conn.execute("PRAGMA synchronous=NORMAL")
-        self._conn.execute("PRAGMA foreign_keys=ON")
+        if not readonly:
+            self._conn.execute("PRAGMA journal_mode=WAL")
+            self._conn.execute("PRAGMA synchronous=NORMAL")
+            self._conn.execute("PRAGMA foreign_keys=ON")
         self._last_traversed_edges: dict[str, list[tuple[int, int]]] = {}
-        self._init_schema()
+        if not readonly:
+            self._init_schema()
 
     def _init_schema(self) -> None:
         """Create all tables and FTS5 index if they don't exist."""
@@ -1374,8 +1387,8 @@ class MemoryStore:
             if row is not None:
                 beliefs.append(_row_to_belief(row))
 
-        # Update last_retrieved_at for all returned beliefs.
-        if beliefs:
+        # Update last_retrieved_at for all returned beliefs (skip in readonly mode).
+        if beliefs and not self.readonly:
             now: str = _now()
             returned_ids: list[str] = [b.id for b in beliefs]
             ph: str = ",".join("?" for _ in returned_ids)
@@ -2360,36 +2373,6 @@ class MemoryStore:
         if row is None:
             return None
         return {k: str(row[k]) for k in row.keys()}
-
-    def promote_to_global(self, belief_id: str) -> bool:
-        """Mark a belief as global scope (cross-project).
-
-        Global beliefs are visible across all projects via the global DB.
-        Returns True if the belief was promoted, False if not found.
-        Requires user confirmation before calling (enforced by MCP tool).
-        """
-        row: sqlite3.Row | None = self._conn.execute(
-            "SELECT id FROM beliefs WHERE id = ? AND valid_to IS NULL",
-            (belief_id,),
-        ).fetchone()
-        if row is None:
-            return False
-        self._conn.execute(
-            "UPDATE beliefs SET scope = 'global', updated_at = ? WHERE id = ?",
-            (_now(), belief_id),
-        )
-        self._conn.commit()
-        return True
-
-    def get_global_beliefs(self, limit: int = 20) -> list[Belief]:
-        """Return beliefs marked as global scope (cross-project)."""
-        rows: list[sqlite3.Row] = self._conn.execute(
-            """SELECT * FROM beliefs
-               WHERE scope = 'global' AND valid_to IS NULL
-               ORDER BY confidence DESC LIMIT ?""",
-            (limit,),
-        ).fetchall()
-        return [_row_to_belief(r) for r in rows]
 
     def get_rigor_distribution(self) -> dict[str, int]:
         """Return count of active beliefs per rigor_tier."""

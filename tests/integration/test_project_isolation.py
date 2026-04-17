@@ -3,10 +3,14 @@
 Verifies that separate database files have no data leakage between them.
 Each MemoryStore instance operating on a different DB path must be fully
 independent -- beliefs inserted in one must never appear in another.
+Also validates cross-project feedback firewall and readonly store mode.
 """
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
+
+import pytest
 
 from agentmemory.models import BELIEF_FACTUAL, BSRC_AGENT_INFERRED, Belief
 from agentmemory.store import MemoryStore
@@ -60,3 +64,61 @@ def test_separate_dbs_no_leakage(tmp_path: Path) -> None:
         "Store B must find its own Vue belief"
     )
     store_b2.close()
+
+
+def test_foreign_id_detection() -> None:
+    """IDs with ':' are detected as foreign (cross-project)."""
+    import agentmemory.server as _srv
+    is_foreign = _srv._is_foreign_id  # pyright: ignore[reportPrivateUsage]
+    assert is_foreign("abc123:def456") is True
+    assert is_foreign("4b0f8c37972f:a1b2c3d4e5f6") is True
+    assert is_foreign("a1b2c3d4e5f6") is False
+    assert is_foreign("") is False
+
+
+def test_readonly_store_rejects_writes(tmp_path: Path) -> None:
+    """A readonly store must reject insert_belief with OperationalError."""
+    db: Path = tmp_path / "ro.db"
+    # Create the DB first with a normal store
+    rw_store: MemoryStore = MemoryStore(db)
+    rw_store.insert_belief(
+        content="seed belief",
+        belief_type=BELIEF_FACTUAL,
+        source_type=BSRC_AGENT_INFERRED,
+    )
+    rw_store.close()
+
+    # Open readonly
+    ro_store: MemoryStore = MemoryStore(db, readonly=True)
+    assert ro_store.readonly is True
+
+    # Reads must work
+    results: list[Belief] = ro_store.search("seed")
+    assert len(results) == 1
+
+    # Writes must fail
+    with pytest.raises(sqlite3.OperationalError):
+        ro_store.insert_belief(
+            content="should fail",
+            belief_type=BELIEF_FACTUAL,
+            source_type=BSRC_AGENT_INFERRED,
+        )
+    ro_store.close()
+
+
+def test_readonly_store_skips_schema_init(tmp_path: Path) -> None:
+    """A readonly store must not attempt schema creation."""
+    db: Path = tmp_path / "ro2.db"
+    # Create DB normally first
+    rw_store: MemoryStore = MemoryStore(db)
+    rw_store.close()
+
+    # Reopen readonly -- should not crash even though schema already exists
+    ro_store: MemoryStore = MemoryStore(db, readonly=True)
+    ro_store.close()
+
+
+def test_promote_to_global_removed() -> None:
+    """promote_to_global and get_global_beliefs must no longer exist."""
+    assert not hasattr(MemoryStore, "promote_to_global")
+    assert not hasattr(MemoryStore, "get_global_beliefs")

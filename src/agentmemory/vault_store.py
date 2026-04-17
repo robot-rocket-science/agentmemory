@@ -304,16 +304,15 @@ class VaultStore:
                     """INSERT OR IGNORE INTO beliefs
                        (id, content_hash, content, belief_type, alpha, beta_param,
                         source_type, locked, created_at, updated_at,
-                        classified_by, rigor_tier, data_source, scope)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        classified_by, rigor_tier, data_source)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (belief_id, content_hash, belief_text,
                      fm.get("type", "factual"), alpha, beta,
                      fm.get("source", "agent_inferred"), locked_int,
                      ts, updated,
                      fm.get("classified_by", "offline"),
                      fm.get("rigor", "hypothesis"),
-                     fm.get("data_source", ""),
-                     fm.get("scope", "project")),
+                     fm.get("data_source", "")),
                 )
                 # Add to FTS5 index
                 self.index.query(

@@ -205,6 +205,7 @@ def create_beliefs_from_classified(
     event_time: str | None = None,
     session_id: str | None = None,
     classified_by: str = "offline",
+    data_source: str = "",
 ) -> IngestResult:
     """Create beliefs from pre-classified sentences.
 
@@ -246,6 +247,7 @@ def create_beliefs_from_classified(
             event_time=event_time,
             session_id=session_id,
             classified_by=classified_by,
+            data_source=data_source,
         )
         result.beliefs_created += 1
         result.sentences_persisted += 1

@@ -99,7 +99,6 @@ def belief_to_markdown(
     lines.append(f"beta: {belief.beta_param}")
     lines.append(f"source: {belief.source_type}")
     lines.append(f"locked: {'true' if belief.locked else 'false'}")
-    lines.append(f"scope: {belief.scope}")
     if belief.rigor_tier:
         lines.append(f"rigor: {belief.rigor_tier}")
     lines.append(f"content_hash: {belief.content_hash}")
