@@ -88,14 +88,9 @@ def belief_to_markdown(
     Returns:
         Full markdown file content with YAML frontmatter.
     """
-    # Build tags (locked is a frontmatter property, not a tag, to avoid
-    # duplicate graph nodes in Obsidian)
-    tags: list[str] = [f"belief/{belief.belief_type}"]
-    if belief.rigor_tier and belief.rigor_tier != "hypothesis":
-        tags.append(f"rigor/{belief.rigor_tier}")
-    tags.append(f"source/{belief.source_type}")
-
-    # Frontmatter
+    # Frontmatter properties only -- no tags. Obsidian creates separate graph
+    # nodes for tags (#belief/correction) AND property values (correction),
+    # causing duplicate hubs. Properties are queryable via Dataview and search.
     lines: list[str] = ["---"]
     lines.append(f"id: {belief.id}")
     lines.append(f"type: {belief.belief_type}")
@@ -119,10 +114,6 @@ def belief_to_markdown(
     # Aliases for wikilink resolution
     lines.append("aliases:")
     lines.append(f"  - {belief.id}")
-    # Tags
-    lines.append("tags:")
-    for tag in tags:
-        lines.append(f"  - {tag}")
     lines.append("---")
     lines.append("")
 
@@ -319,7 +310,7 @@ def _generate_by_type_index(beliefs: list[Belief], index_dir: Path) -> None:
 
     lines: list[str] = [
         "---",
-        "tags: [index, auto-generated]",
+        "auto_generated: true",
         "---",
         "",
         "# Beliefs by Type",
@@ -348,7 +339,7 @@ def _generate_locked_index(beliefs: list[Belief], index_dir: Path) -> None:
 
     lines: list[str] = [
         "---",
-        "tags: [index, auto-generated, locked]",
+        "auto_generated: true",
         "---",
         "",
         f"# Locked Beliefs ({len(locked)})",
@@ -374,7 +365,7 @@ def _generate_recent_index(
 
     lines: list[str] = [
         "---",
-        "tags: [index, auto-generated]",
+        "auto_generated: true",
         "---",
         "",
         f"# Recent Beliefs (last {limit})",
@@ -404,7 +395,7 @@ def _generate_confidence_index(beliefs: list[Belief], index_dir: Path) -> None:
 
     lines: list[str] = [
         "---",
-        "tags: [index, auto-generated]",
+        "auto_generated: true",
         "---",
         "",
         "# Beliefs by Confidence",
@@ -451,7 +442,7 @@ def _generate_corrections_index(
 
     lines: list[str] = [
         "---",
-        "tags: [index, auto-generated, correction]",
+        "auto_generated: true",
         "---",
         "",
         f"# Corrections ({len(corrections)})",
