@@ -88,10 +88,9 @@ def belief_to_markdown(
     Returns:
         Full markdown file content with YAML frontmatter.
     """
-    # Build tags
+    # Build tags (locked is a frontmatter property, not a tag, to avoid
+    # duplicate graph nodes in Obsidian)
     tags: list[str] = [f"belief/{belief.belief_type}"]
-    if belief.locked:
-        tags.append("locked")
     if belief.rigor_tier and belief.rigor_tier != "hypothesis":
         tags.append(f"rigor/{belief.rigor_tier}")
     tags.append(f"source/{belief.source_type}")

@@ -126,8 +126,8 @@ def test_belief_to_markdown_special_chars(store: MemoryStore) -> None:
     assert '{"key": "value"}' in md
 
 
-def test_belief_to_markdown_locked_tags(store: MemoryStore) -> None:
-    """Locked beliefs get the 'locked' tag."""
+def test_belief_to_markdown_locked_property(store: MemoryStore) -> None:
+    """Locked beliefs have locked: true in frontmatter (not as a tag)."""
     bid: str = _make_belief(store, "Never use em dashes", locked=True)
     belief = store.get_belief(bid)
     assert belief is not None
@@ -135,7 +135,10 @@ def test_belief_to_markdown_locked_tags(store: MemoryStore) -> None:
     md: str = belief_to_markdown(belief, [])
 
     assert "locked: true" in md
-    assert "  - locked" in md
+    # locked should NOT be a tag (avoids duplicate graph nodes in Obsidian)
+    lines: list[str] = md.split("\n")
+    tag_lines: list[str] = [l for l in lines if l.strip() == "- locked"]
+    assert len(tag_lines) == 0
 
 
 def test_belief_to_markdown_aliases(store: MemoryStore) -> None:
