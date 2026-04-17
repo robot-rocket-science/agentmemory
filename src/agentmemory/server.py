@@ -206,6 +206,21 @@ def _get_store() -> MemoryStore:
     return _store
 
 
+def _resolve_project_db(project_path: str) -> Path | None:
+    """Resolve the DB path for an arbitrary project directory.
+
+    Returns the memory.db path if the project has been onboarded,
+    or None if no database exists for that project.
+    """
+    import hashlib
+    abs_path: str = str(Path(project_path).expanduser().resolve())
+    path_hash: str = hashlib.sha256(abs_path.encode()).hexdigest()[:12]
+    db_path: Path = Path.home() / ".agentmemory" / "projects" / path_hash / "memory.db"
+    if db_path.exists():
+        return db_path
+    return None
+
+
 def _set_store(store: MemoryStore) -> None:  # pyright: ignore[reportUnusedFunction]
     """Override the module-level store. Used by tests."""
     global _store, _session_id, _ingest_buffer
@@ -243,7 +258,12 @@ def _format_belief(belief: Belief, score: float | None = None) -> str:
 
 
 @mcp.tool
-def search(query: str, budget: int = 2000, temporal_sort: bool = False) -> str:
+def search(
+    query: str,
+    budget: int = 2000,
+    temporal_sort: bool = False,
+    project_path: str = "",
+) -> str:
     """Search for beliefs relevant to the query.
 
     Returns formatted text of matching beliefs with confidence scores.
@@ -252,7 +272,36 @@ def search(query: str, budget: int = 2000, temporal_sort: bool = False) -> str:
     If temporal_sort is True, results are re-sorted newest-first after
     relevance-based selection. Useful for state-tracking queries where
     the most recent information should appear first.
+
+    If project_path is provided, searches that project's memory database
+    instead of the current session's database. Useful when working on a
+    task in project A but needing context from project B. The target
+    project must have been previously onboarded. Read-only: no feedback
+    or session metrics are recorded for cross-project queries.
     """
+    # Cross-project search: open a temporary read-only store
+    if project_path:
+        target_db: Path | None = _resolve_project_db(project_path)
+        if target_db is None:
+            return (
+                f"No memory database found for project: {project_path}. "
+                f"The project must be onboarded first (use onboard())."
+            )
+        cross_store: MemoryStore = MemoryStore(target_db)
+        result: RetrievalResult = retrieve(
+            cross_store, query, budget=budget, temporal_sort=temporal_sort,
+        )
+        if not result.beliefs:
+            return f"No beliefs found in {project_path} matching your query."
+        lines: list[str] = [
+            f"Found {len(result.beliefs)} belief(s) from {project_path} "
+            f"({result.total_tokens} tokens, {result.budget_remaining} remaining):"
+        ]
+        for belief in result.beliefs:
+            score: float | None = result.scores.get(belief.id)
+            lines.append(_format_belief(belief, score))
+        return "\n".join(lines)
+
     store: MemoryStore = _get_store()
     session_id: str = _ensure_session()
 
