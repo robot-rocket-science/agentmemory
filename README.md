@@ -10,13 +10,16 @@ It records what you discuss, what you decide, what you correct, and what works. 
 
 ### Prerequisites
 
-Install [uv](https://docs.astral.sh/uv/) (fast Python package manager) if you don't have it:
+**Python 3.12+** and **[uv](https://docs.astral.sh/uv/)** (fast Python package manager):
 
 ```bash
+# Install uv if you don't have it
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-You also need [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and working.
+**[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** (or any MCP-compatible agent CLI). agentmemory runs as an MCP server inside the agent.
+
+**[Obsidian](https://obsidian.md)** (optional). For browsing and visualizing the belief graph. Not required for core functionality.
 
 ### Step 1: Install agentmemory
 
