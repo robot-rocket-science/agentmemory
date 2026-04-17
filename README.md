@@ -72,7 +72,7 @@ Conversations become scored beliefs. Beliefs get stronger when they help, weaker
 - **Correction detection** -- 92% accuracy, zero LLM cost. Corrections auto-create high-confidence beliefs.
 - **LLM classification** -- Haiku classifies belief type/persistence at 99% accuracy, ~$0.005/session.
 - **Project onboarding** -- 8 extractors pull structure from git history, AST, docs, citations, tests, implementations, and directives.
-- **Temporal decay** -- Content-aware half-lives (corrections never decay, facts decay in 14 days). Session velocity scaling.
+- **Temporal decay** -- Content-aware half-lives (facts 14 days, corrections 8 weeks, requirements 24 weeks). Session velocity scaling.
 - **Per-project isolation** -- Each project gets its own SQLite database at `~/.agentmemory/projects/<hash>/`.
 
 ## Privacy and Security
