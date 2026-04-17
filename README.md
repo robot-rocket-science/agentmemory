@@ -1,5 +1,7 @@
 # agentmemory
 
+**[Read the full writeup at robotrocketscience.com/projects/agentmemory](https://robotrocketscience.com/projects/agentmemory)**
+
 Persistent, graph-backed memory for AI coding agents. Turns conversation into scored beliefs, retrieves the best ones when asked, and learns from feedback.
 
 Built on SQLite (WAL mode), FTS5 full-text search, Bayesian confidence tracking, and holographic reduced representations (HRR) for structural retrieval. Ships as a CLI and an MCP server for Claude Code.
