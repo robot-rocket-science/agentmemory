@@ -295,7 +295,9 @@ class MemoryStore:
     def __init__(self, db_path: str | Path) -> None:
         """Open or create the database. Enable WAL mode. Create tables if needed."""
         self._db_path: Path = Path(db_path)
-        self._conn: sqlite3.Connection = sqlite3.connect(str(self._db_path))
+        self._conn: sqlite3.Connection = sqlite3.connect(
+            str(self._db_path), check_same_thread=False,
+        )
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA synchronous=NORMAL")
