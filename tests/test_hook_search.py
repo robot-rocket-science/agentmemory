@@ -8,6 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from agentmemory.hook_search import (
+    ScoredBelief,
     SearchResult,
     detect_action_targets,
     extract_entity_candidates,
@@ -228,6 +229,37 @@ def test_supersession_following(tmp_path: Path) -> None:
     assert not found_old, "Superseded belief should not appear"
     # New belief should appear via either FTS5 match on 'deploy' or supersession following
     assert found_new or len(result.beliefs) > 0, "Replacement belief should surface"
+
+    db.close()
+    store.close()
+
+
+def test_recent_observations_surface(tmp_path: Path) -> None:
+    """Recent observations mentioning prompt entities surface even without beliefs."""
+    db_path: Path = tmp_path / "obs.db"
+    store: MemoryStore = MemoryStore(db_path)
+
+    # Create an observation (not a belief) about robotrocketscience being locked
+    store.insert_observation(
+        content="The gh CLI shows robotrocketscience repos return 404. The account appears locked by GitHub.",
+        observation_type="conversation",
+        source_type="assistant",
+    )
+
+    import sqlite3
+    db: sqlite3.Connection = sqlite3.connect(str(db_path))
+    db.row_factory = sqlite3.Row
+
+    result: SearchResult = search_for_prompt(db, "push to robotrocketscience")
+
+    # The observation should surface via the recent observations layer
+    contents: list[str] = [b.content for b in result.beliefs]
+    found_obs: bool = any("locked" in c or "404" in c for c in contents)
+    assert found_obs, f"Recent observation not found in results: {contents}"
+
+    # Verify it's tagged as an observation
+    obs_results: list[ScoredBelief] = [b for b in result.beliefs if b.via == "recent_observation"]
+    assert len(obs_results) > 0, "Should be tagged as recent_observation"
 
     db.close()
     store.close()

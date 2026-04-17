@@ -340,6 +340,57 @@ def search_for_prompt(
             all_scored.append(sb)
             seen_ids.add(r["id"])
 
+    # --- Layer 5: Recent observations (unclassified discoveries) ---
+    # The ingest pipeline creates observations immediately but beliefs only
+    # after classification. This layer surfaces raw observations from the
+    # last 24 hours that match prompt entities, catching agent discoveries
+    # that haven't been classified into beliefs yet.
+    if all_entities:
+        try:
+            # Check if observations are in the FTS index
+            obs_rows: list[sqlite3.Row] = db.execute(
+                """SELECT o.id, o.content, o.source_type, o.created_at
+                   FROM observations o
+                   WHERE o.created_at > datetime('now', '-24 hours')
+                   ORDER BY o.created_at DESC
+                   LIMIT 20""",
+            ).fetchall()
+            for r in obs_rows:
+                obs_content: str = r["content"] or ""
+                obs_id: str = r["id"]
+                if obs_id in seen_ids:
+                    continue
+                # Check if any entity appears in the observation
+                obs_lower: str = obs_content.lower()
+                if any(e.lower() in obs_lower for e in all_entities):
+                    # Score as a high-priority recent observation
+                    age_h_obs: float = 0.0
+                    created_obs: str = r["created_at"] or ""
+                    if created_obs:
+                        try:
+                            ct_obs: datetime = datetime.fromisoformat(created_obs)
+                            if ct_obs.tzinfo is None:
+                                ct_obs = ct_obs.replace(tzinfo=timezone.utc)
+                            age_h_obs = max(0.0, (now - ct_obs).total_seconds() / 3600.0)
+                        except (ValueError, TypeError):
+                            pass
+                    recency_obs: float = 1.0 + 0.5 ** (age_h_obs / 6.0)  # 6h half-life for observations
+                    obs_score: float = 1.5 * recency_obs  # base score with strong recency
+                    all_scored.append(ScoredBelief(
+                        id=obs_id,
+                        content=obs_content[:300],  # truncate long observations
+                        belief_type="observation",
+                        source_type=r["source_type"] or "unknown",
+                        locked=False,
+                        confidence=0.5,  # unscored
+                        score=obs_score,
+                        age_days=age_h_obs / 24.0,
+                        via="recent_observation",
+                    ))
+                    seen_ids.add(obs_id)
+        except sqlite3.OperationalError:
+            pass
+
     # --- Score, sort, pack ---
     all_scored.sort(key=lambda x: x.score, reverse=True)
 
