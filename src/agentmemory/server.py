@@ -258,11 +258,29 @@ def _set_store(store: MemoryStore) -> None:  # pyright: ignore[reportUnusedFunct
     _explicit_feedback_ids.clear()
 
 
+def _emit_telemetry(store: MemoryStore, session_id: str) -> None:
+    """Write a telemetry snapshot for a completed session (if enabled)."""
+    try:
+        from agentmemory.config import get_bool_setting
+        if not get_bool_setting("telemetry", "enabled"):
+            return
+        from agentmemory.telemetry import collect_snapshot, write_snapshot
+        snapshot = collect_snapshot(store, session_id)
+        write_snapshot(snapshot)
+    except Exception:
+        pass  # telemetry must never break the session
+
+
 def _ensure_session() -> str:
     """Return the current session ID, creating a new session if needed."""
     global _session_id
     if _session_id is None:
         store: MemoryStore = _get_store()
+        # Complete previous session and emit telemetry if one exists
+        incomplete: list[Session] = store.find_incomplete_sessions()
+        for prev in incomplete:
+            store.complete_session(prev.id)
+            _emit_telemetry(store, prev.id)
         session: Session = store.create_session()
         _session_id = session.id
     return _session_id

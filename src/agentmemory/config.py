@@ -34,6 +34,9 @@ _DEFAULTS: dict[str, dict[str, int | bool | str]] = {
         "beliefs_subfolder": "beliefs",
         "auto_sync": False,
     },
+    "telemetry": {
+        "enabled": False,
+    },
 }
 
 

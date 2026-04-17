@@ -297,6 +297,31 @@ _COMMAND_DEFS: dict[str, dict[str, str]] = {
             "Resume calling agentmemory MCP tools as normal per CLAUDE.md instructions."
         ),
     },
+    "enable-telemetry": {
+        "description": "Enable anonymous telemetry logging.",
+        "argument_hint": "",
+        "tools": "Bash",
+        "objective": "Enable anonymous telemetry and confirm to the user.",
+        "process": (
+            "1. Run: `uv run agentmemory enable-telemetry`\n"
+            "2. Display the output to the user.\n"
+            "3. Confirm that only content-free metrics are collected (token spend,\n"
+            "   correction rates, feedback health) and data stays local at\n"
+            "   ~/.agentmemory/telemetry.jsonl.\n"
+        ),
+    },
+    "disable-telemetry": {
+        "description": "Disable anonymous telemetry logging.",
+        "argument_hint": "",
+        "tools": "Bash",
+        "objective": "Disable anonymous telemetry and confirm to the user.",
+        "process": (
+            "1. Run: `uv run agentmemory disable-telemetry`\n"
+            "2. Display the output to the user.\n"
+            "3. Confirm telemetry is now disabled. No further data will be written\n"
+            "   to ~/.agentmemory/telemetry.jsonl until re-enabled.\n"
+        ),
+    },
     "help": {
         "description": "Show available mem commands and usage guide.",
         "argument_hint": "",
@@ -316,6 +341,8 @@ _COMMAND_DEFS: dict[str, dict[str, str]] = {
             "  /mem:settings           View or update settings\n"
             "  /mem:disable            Stop agentmemory for this session\n"
             "  /mem:enable             Resume agentmemory\n"
+            "  /mem:enable-telemetry   Enable anonymous performance logging\n"
+            "  /mem:disable-telemetry  Disable anonymous performance logging\n"
             "  /mem:help               This reference\n"
         ),
     },
@@ -413,6 +440,9 @@ def cmd_setup(args: argparse.Namespace) -> None:
     # Step 7: Obsidian vault setup
     _setup_obsidian_vault()
 
+    # Step 8: Telemetry opt-in
+    _setup_telemetry()
+
     print(f"\nDone. Restart Claude Code, then run /mem:onboard . on your project.")
 
 
@@ -489,6 +519,37 @@ def _setup_obsidian_vault() -> None:
     if not obsidian_app.exists():
         print("  Note: Obsidian app not found at /Applications/Obsidian.app")
         print("  Install from https://obsidian.md to use graph view and dashboards")
+
+
+def _setup_telemetry() -> None:
+    """Prompt user to opt in to anonymous telemetry during setup."""
+    from agentmemory.config import get_bool_setting, load_config, save_config
+
+    print("\n  Anonymous telemetry...")
+    print("  agentmemory can collect anonymous performance metrics to help")
+    print("  improve the system. Only content-free data is recorded:")
+    print("    - token spend, correction rates, feedback loop efficiency")
+    print("    - belief lifecycle counts, graph density metrics")
+    print("    - NO belief content, project paths, or identifying information")
+    print("  Data is stored locally at ~/.agentmemory/telemetry.jsonl")
+    print("  You can disable at any time with /mem:disable-telemetry")
+
+    current: bool = get_bool_setting("telemetry", "enabled")
+    if current:
+        print(f"  Telemetry is currently: ENABLED")
+    else:
+        print(f"  Telemetry is currently: DISABLED")
+
+    answer: str = input("  Enable anonymous telemetry? [y/N]: ").strip().lower()
+    enabled: bool = answer in ("y", "yes")
+
+    config: dict[str, object] = load_config()
+    telem_config: dict[str, object] = {"enabled": enabled}
+    config["telemetry"] = telem_config
+    save_config(config)  # type: ignore[arg-type]
+
+    status: str = "ENABLED" if enabled else "DISABLED"
+    print(f"  Telemetry {status}. Change anytime with /mem:enable-telemetry or /mem:disable-telemetry")
 
 
 # ---------------------------------------------------------------------------
@@ -2145,6 +2206,37 @@ def cmd_rebuild_index(args: argparse.Namespace) -> None:
 
 
 # ---------------------------------------------------------------------------
+# telemetry toggle
+# ---------------------------------------------------------------------------
+
+
+def cmd_enable_telemetry(args: argparse.Namespace) -> None:
+    """Enable anonymous telemetry."""
+    from agentmemory.config import load_config, save_config
+
+    config: dict[str, object] = load_config()
+    telem: dict[str, object] = {"enabled": True}
+    config["telemetry"] = telem
+    save_config(config)  # type: ignore[arg-type]
+    print("Telemetry ENABLED.")
+    print("Content-free performance metrics will be appended to ~/.agentmemory/telemetry.jsonl")
+    print("Disable anytime: agentmemory disable-telemetry (or /mem:disable-telemetry)")
+
+
+def cmd_disable_telemetry(args: argparse.Namespace) -> None:
+    """Disable anonymous telemetry."""
+    from agentmemory.config import load_config, save_config
+
+    config: dict[str, object] = load_config()
+    telem: dict[str, object] = {"enabled": False}
+    config["telemetry"] = telem
+    save_config(config)  # type: ignore[arg-type]
+    print("Telemetry DISABLED.")
+    print("No further data will be written to ~/.agentmemory/telemetry.jsonl")
+    print("Re-enable anytime: agentmemory enable-telemetry (or /mem:enable-telemetry)")
+
+
+# ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
 
@@ -2439,6 +2531,16 @@ def main() -> None:
         "--vault", default=None, help="Obsidian vault path (default: from config)"
     )
     p_rebuild_idx.set_defaults(func=cmd_rebuild_index)
+
+    p_enable_telem: argparse.ArgumentParser = subparsers.add_parser(
+        "enable-telemetry", help="Enable anonymous telemetry logging"
+    )
+    p_enable_telem.set_defaults(func=cmd_enable_telemetry)
+
+    p_disable_telem: argparse.ArgumentParser = subparsers.add_parser(
+        "disable-telemetry", help="Disable anonymous telemetry logging"
+    )
+    p_disable_telem.set_defaults(func=cmd_disable_telemetry)
 
     args: argparse.Namespace = parser.parse_args()
 
