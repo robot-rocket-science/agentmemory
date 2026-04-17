@@ -280,13 +280,73 @@ Key research documents in `docs/`:
 
 Experiment logs in `research/EXPERIMENTS.md`. Case studies in `research/CASE_STUDIES.md`.
 
+## v2: Obsidian Vault Integration
+
+v2 adds Obsidian as the source of truth for beliefs. SQLite becomes a derived
+read-optimized index, rebuildable from the vault at any time.
+
+### Prerequisites
+
+1. **Obsidian** (free for personal use): https://obsidian.md/download
+   - macOS: download .dmg or `brew install --cask obsidian`
+   - Linux: AppImage, Snap, or Flatpak from the download page
+   - Windows: installer from the download page
+
+2. **Recommended Obsidian plugins** (install via Settings > Community Plugins):
+   - **Dataview** -- live queryable dashboards over belief metadata
+   - **Graph Analysis** -- centrality, community detection metrics
+
+### Setup
+
+```bash
+# Install agentmemory
+uv pip install agentmemory
+
+# Run setup (detects Obsidian, configures vault, creates directories)
+agentmemory setup
+
+# Onboard a project (scans files, creates beliefs, syncs to vault, links docs)
+agentmemory onboard /path/to/project
+```
+
+Setup will:
+- Detect or create an Obsidian vault in your project root
+- Save the vault path to `~/.agentmemory/config.json`
+- Create vault directories: `beliefs/`, `_index/`, `_dashboards/`, `_docs/`
+- Add generated directories to `.gitignore`
+- Check if the Obsidian app is installed
+
+### Vault Commands
+
+```bash
+agentmemory sync-obsidian [--vault PATH] [--full]   # Export beliefs to vault
+agentmemory import-obsidian [--vault PATH] [--apply] # Import vault edits back
+agentmemory link-docs [--vault PATH]                 # Link project docs to beliefs
+agentmemory rebuild-index [--vault PATH]             # Rebuild SQLite from vault
+```
+
+### How It Works
+
+When vault mode is active (vault_path configured), every write goes to both:
+1. `.md` file in `beliefs/` (source of truth, human-editable in Obsidian)
+2. SQLite index (derived, for fast FTS5 + HRR + BFS retrieval)
+
+Open the vault in Obsidian to get:
+- **Graph view** of your entire belief network (16K+ nodes with edges)
+- **Backlinks panel** showing all beliefs that reference the current one
+- **Dataview dashboards** for corrections, stale beliefs, confidence tiers
+- **Document links** connecting research reports, experiments, and case studies to the beliefs they produced
+- **Human editing** with changes flowing back into agentmemory on next sync
+
+If SQLite is lost or corrupted, `rebuild-index` reconstructs it from the vault.
+
 ## Development
 
 ```bash
-git clone https://github.com/robotrocketscience/agentmemory.git
+git clone <repo-url>
 cd agentmemory
 uv sync --all-groups
-uv run pytest tests/ -x -q        # 362 tests
+uv run pytest tests/ -x -q
 uv run pyright src/                # strict mode, 0 errors
 ```
 
