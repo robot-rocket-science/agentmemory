@@ -8,44 +8,90 @@ It records what you discuss, what you decide, what you correct, and what works. 
 
 ## Installation
 
+You need [uv](https://docs.astral.sh/uv/) (Python package manager) and [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed first.
+
+### Step 1: Install agentmemory
+
 ```bash
 uv pip install git+https://github.com/yoshi280/agentmemory.git
+```
 
-# Set up Claude Code integration (commands, hooks, MCP config)
+Verify it installed:
+
+```bash
+agentmemory --help
+```
+
+If you get `command not found`, try installing as a tool instead:
+
+```bash
+uv tool install git+https://github.com/yoshi280/agentmemory.git
+```
+
+### Step 2: Run setup
+
+```bash
 agentmemory setup
 ```
 
-Restart Claude Code after setup. Commands appear as `/mem:*`.
+This does three things:
+1. Writes `/mem:*` slash commands to `~/.claude/commands/mem/`
+2. Registers the MCP server in your project's `.mcp.json`
+3. Adds session hooks to `~/.claude/settings.json` (context injection, conversation logging)
+
+### Step 3: Restart Claude Code
+
+Close and reopen Claude Code. The MCP server starts automatically on launch.
+
+### Step 4: Verify it works
+
+In Claude Code, run:
+
+```
+/mem:status
+```
+
+You should see a status report with belief counts, session info, and system health. If you see an error, check Troubleshooting below.
+
+### Step 5: Onboard your project
+
+```
+/mem:onboard .
+```
+
+This scans your project directory and ingests structure from git history, code, docs, and configuration. Takes 10-30 seconds depending on project size.
+
+That's it. agentmemory is now running. It will automatically capture decisions, corrections, and context from your conversations. Next session, your agent starts with that context already loaded.
 
 ### Troubleshooting
 
-- **"agentmemory: command not found"** -- Make sure `uv` installed it globally: `uv tool install agentmemory` or check your PATH.
-- **MCP tools not responding** -- Restart Claude Code. The MCP server caches the module on startup.
-- **Slash commands missing** -- Run `agentmemory setup` again. It writes command definitions to `~/.claude/commands/mem/`.
-- **SQLite lock errors** -- Run `python3 -c "import sqlite3; sqlite3.connect('~/.agentmemory/projects/<hash>/memory.db').execute('PRAGMA wal_checkpoint(TRUNCATE)')"` to clear the WAL.
+| Problem | Fix |
+|---------|-----|
+| `agentmemory: command not found` | Run `uv tool install git+https://github.com/yoshi280/agentmemory.git` or check that `~/.local/bin` is in your PATH |
+| `/mem:status` returns an error | Restart Claude Code. The MCP server needs a fresh start after setup |
+| Slash commands not showing up | Run `agentmemory setup` again, then restart Claude Code |
+| MCP tools not responding | Check `.mcp.json` exists in your project root. If not, run `agentmemory setup` from the project directory |
+| SQLite lock errors | Run `agentmemory health` to diagnose, or manually clear the WAL: `python3 -c "import sqlite3; sqlite3.connect('~/.agentmemory/projects/<hash>/memory.db').execute('PRAGMA wal_checkpoint(TRUNCATE)')"` |
 
 ## Quick Start
 
-After setup, the MCP server runs automatically inside Claude Code:
+Once installed, these are the commands you'll use most:
 
 ```
-/mem:onboard .              # Scan and ingest current project
-/mem:search "retrieval"     # Search beliefs
-/mem:core 10                # Top 10 beliefs by confidence
+/mem:search "topic"         # Find what the agent knows about a topic
+/mem:core 10                # See the top 10 highest-confidence beliefs
+/mem:wonder "topic"         # Broad research with graph context
+/mem:reason "question"      # Focused hypothesis testing against evidence
 /mem:stats                  # System analytics
-/mem:locked                 # Show locked constraints
-/mem:wonder "topic"         # Deep research with graph context
-/mem:reason "hypothesis"    # Test a hypothesis against evidence
+/mem:locked                 # Show locked constraints (non-negotiable rules)
 ```
 
-Or use the CLI directly:
+From the CLI:
 
 ```bash
-agentmemory onboard /path/to/project
 agentmemory search "query terms"
 agentmemory core --top 10
 agentmemory stats
-agentmemory lock "always use strict typing"
 ```
 
 ## Workflow
