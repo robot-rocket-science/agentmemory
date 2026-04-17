@@ -35,7 +35,7 @@ _DEFAULTS: dict[str, dict[str, int | bool | str]] = {
         "auto_sync": False,
     },
     "telemetry": {
-        "enabled": True,
+        "enabled": False,
     },
 }
 

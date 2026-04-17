@@ -254,3 +254,72 @@ def test_multiple_snapshots_append(tmp_path: Path) -> None:
         assert data["v"] == 1
 
     store.close()
+
+
+def test_emit_telemetry_respects_disabled(tmp_path: Path) -> None:
+    """When telemetry is disabled in config, _emit_telemetry writes nothing."""
+    import pytest
+
+    db: Path = tmp_path / "disabled.db"
+    store: MemoryStore = MemoryStore(db)
+    s = store.create_session()
+    store.complete_session(s.id)
+
+    # Override config to disable telemetry
+    from agentmemory import config as _cfg
+    mp = pytest.MonkeyPatch()
+    mp.setattr(_cfg, "_CONFIG_PATH", tmp_path / "config.json")
+    (tmp_path / "config.json").write_text(
+        '{"telemetry": {"enabled": false}}', encoding="utf-8"
+    )
+
+    # Override telemetry output path
+    out: Path = tmp_path / "telemetry.jsonl"
+    from agentmemory import telemetry as _tel
+    mp.setattr(_tel, "_default_path", lambda: out)
+
+    from agentmemory import server as _srv
+    _srv._emit_telemetry(store, s.id)  # pyright: ignore[reportPrivateUsage]
+
+    # File should not exist (telemetry disabled)
+    assert not out.exists()
+
+    store.close()
+    mp.undo()
+
+
+def test_emit_telemetry_writes_when_enabled(tmp_path: Path) -> None:
+    """When telemetry is enabled, _emit_telemetry writes a snapshot."""
+    import pytest
+
+    db: Path = tmp_path / "enabled.db"
+    store: MemoryStore = MemoryStore(db)
+    s = store.create_session()
+    store.increment_session_metrics(s.id, searches_performed=1)
+    store.complete_session(s.id)
+
+    # Override config to enable telemetry
+    from agentmemory import config as _cfg
+    mp = pytest.MonkeyPatch()
+    mp.setattr(_cfg, "_CONFIG_PATH", tmp_path / "config.json")
+    (tmp_path / "config.json").write_text(
+        '{"telemetry": {"enabled": true}}', encoding="utf-8"
+    )
+
+    # Override default telemetry path
+    from agentmemory import telemetry as _tel
+    out: Path = tmp_path / "telemetry.jsonl"
+    mp.setattr(_tel, "_default_path", lambda: out)
+
+    from agentmemory import server as _srv
+    _srv._emit_telemetry(store, s.id)  # pyright: ignore[reportPrivateUsage]
+
+    # File should exist with one line
+    assert out.exists()
+    lines: list[str] = out.read_text(encoding="utf-8").strip().splitlines()
+    assert len(lines) == 1
+    data: dict[str, object] = json.loads(lines[0])
+    assert data["v"] == 1
+
+    store.close()
+    mp.undo()
