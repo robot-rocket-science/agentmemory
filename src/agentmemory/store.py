@@ -253,6 +253,10 @@ def _row_to_belief(row: sqlite3.Row) -> Belief:
         last_retrieved_at=row["last_retrieved_at"] if "last_retrieved_at" in keys else None,
         data_source=row["data_source"] if "data_source" in keys else "",
         independently_validated=bool(row["independently_validated"]) if "independently_validated" in keys else False,
+        temporal_direction=row["temporal_direction"] if "temporal_direction" in keys else "backward",
+        uncertainty_vector=row["uncertainty_vector"] if "uncertainty_vector" in keys else None,
+        hibernation_score=float(row["hibernation_score"]) if "hibernation_score" in keys and row["hibernation_score"] is not None else None,
+        activation_condition=row["activation_condition"] if "activation_condition" in keys else None,
     )
 
 
@@ -382,6 +386,26 @@ class MemoryStore:
         if "independently_validated" not in col_names:
             self._conn.execute(
                 "ALTER TABLE beliefs ADD COLUMN independently_validated INTEGER NOT NULL DEFAULT 0"
+            )
+        # Speculative beliefs: forward-looking temporal direction
+        if "temporal_direction" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE beliefs ADD COLUMN temporal_direction TEXT NOT NULL DEFAULT 'backward'"
+            )
+        # Multi-dimensional uncertainty vector (JSON array of [alpha, beta] pairs)
+        if "uncertainty_vector" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE beliefs ADD COLUMN uncertainty_vector TEXT"
+            )
+        # Hibernation score for soft-closing speculative branches
+        if "hibernation_score" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE beliefs ADD COLUMN hibernation_score REAL"
+            )
+        # Event-based activation condition for prospective beliefs
+        if "activation_condition" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE beliefs ADD COLUMN activation_condition TEXT"
             )
         self._conn.commit()
         # Create index on session_id (safe to run even if already exists)

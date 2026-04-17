@@ -52,6 +52,16 @@ EDGE_TESTS: Final[str] = "TESTS"
 EDGE_IMPLEMENTS: Final[str] = "IMPLEMENTS"
 EDGE_TEMPORAL_NEXT: Final[str] = "TEMPORAL_NEXT"
 
+# Speculative edge types (forward-looking beliefs)
+EDGE_SPECULATES: Final[str] = "SPECULATES"       # current state -> possible future
+EDGE_DEPENDS_ON: Final[str] = "DEPENDS_ON"        # speculative node -> condition required
+EDGE_RESOLVES: Final[str] = "RESOLVES"            # evidence/experiment -> speculative node
+EDGE_HIBERNATED: Final[str] = "HIBERNATED"        # soft-closed branch marker
+
+# Temporal directions
+TEMPORAL_BACKWARD: Final[str] = "backward"
+TEMPORAL_FORWARD: Final[str] = "forward"
+
 # Test outcomes
 OUTCOME_USED: Final[str] = "used"
 OUTCOME_IGNORED: Final[str] = "ignored"
@@ -111,6 +121,10 @@ class Belief:
     last_retrieved_at: str | None = None  # ISO 8601 timestamp of last retrieval
     data_source: str = ""               # Where belief came from (REQ-023: e.g. "documentation", "git_log")
     independently_validated: bool = False  # Has external verification (REQ-023)
+    temporal_direction: str = "backward"    # "backward" (factual) or "forward" (speculative)
+    uncertainty_vector: str | None = None   # JSON array of [alpha,beta] pairs per uncertainty dimension
+    hibernation_score: float | None = None  # Soft-close score for speculative branches
+    activation_condition: str | None = None # Event-based trigger for prospective beliefs
 
 
 @dataclass
