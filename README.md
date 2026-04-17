@@ -68,10 +68,10 @@ Conversations become scored beliefs. Beliefs get stronger when they help, weaker
 
 - **Bayesian confidence** -- Beta-Bernoulli model with Thompson sampling. Beliefs that help get stronger; beliefs that hurt get weaker.
 - **Multi-layer retrieval** -- Locked constraints (L0) + behavioral directives (L1) + FTS5 keyword search (L2) + HRR structural bridge + BFS graph traversal (L3). Compressed to fit a token budget.
-- **Graph-backed knowledge** -- 7 edge types (SUPERSEDES, CONTRADICTS, SUPPORTS, CALLS, CITES, TESTS, IMPLEMENTS) enable multi-hop traversal and contradiction detection.
+- **Graph-backed knowledge** -- 12 edge types (SUPERSEDES, CONTRADICTS, SUPPORTS, CALLS, CITES, TESTS, IMPLEMENTS, RELATES_TO, TEMPORAL_NEXT, CO_CHANGED, CONTAINS, COMMIT_TOUCHES) enable multi-hop traversal and contradiction detection.
 - **Correction detection** -- 92% accuracy, zero LLM cost. Corrections auto-create high-confidence beliefs.
 - **LLM classification** -- Haiku classifies belief type/persistence at 99% accuracy, ~$0.005/session.
-- **Project onboarding** -- Scanner extracts structure from git history, AST, docs, citations, and directives.
+- **Project onboarding** -- 8 extractors pull structure from git history, AST, docs, citations, tests, implementations, and directives.
 - **Temporal decay** -- Content-aware half-lives (corrections never decay, facts decay in 14 days). Session velocity scaling.
 - **Per-project isolation** -- Each project gets its own SQLite database at `~/.agentmemory/projects/<hash>/`.
 
@@ -79,9 +79,9 @@ Conversations become scored beliefs. Beliefs get stronger when they help, weaker
 
 These are verifiable properties of the codebase, not marketing claims. Each can be confirmed by reading the source.
 
-**Your data never leaves your machine.** The MCP server, retrieval pipeline, scoring, and all belief operations run locally using SQLite and pure math (Bayesian updates, FTS5, HRR). Zero network libraries are imported (`grep -r "requests\|httpx\|urllib\|socket" src/` returns nothing). The only network call in the entire system is the optional LLM classification step during onboarding, which uses Claude Code subagents (not direct API calls from agentmemory).
+**Your data never leaves your machine.** The MCP server, retrieval pipeline, scoring, and all belief operations run locally using SQLite and pure math (Bayesian updates, FTS5, HRR). The only network-capable code is `telemetry.py` (stdlib `urllib.request`), which is only invoked when you explicitly run `agentmemory send-telemetry` after opting in. No network calls happen during normal operation. The LLM classification step during onboarding uses Claude Code subagents (not direct API calls from agentmemory).
 
-**No telemetry by default.** Telemetry is disabled on install (`config.py` defaults `telemetry.enabled = false`). If you opt in during `agentmemory setup`, only content-free metrics are recorded: token counts, correction rates, feedback ratios, belief lifecycle counts. No belief content, project paths, file paths, session IDs, or user-identifying information is ever included. Data is stored locally at `~/.agentmemory/telemetry.jsonl` and never transmitted. If you would like to share your usage data to help us improve agentmemory, please send the data to data@robotrocketscience.com. Disable anytime with `/mem:disable-telemetry`.
+**No telemetry by default.** Telemetry is disabled on install (`config.py` defaults `telemetry.enabled = false`). If you opt in during `agentmemory setup`, only content-free metrics are recorded: token counts, correction rates, feedback ratios, belief lifecycle counts. No belief content, project paths, file paths, session IDs, or user-identifying information is ever included. Data is stored locally at `~/.agentmemory/telemetry.jsonl` and never transmitted automatically. To share your usage data, run `agentmemory send-telemetry` -- it shows you exactly what will be sent and asks for confirmation before transmitting. You can also email telemetry data to data@robotrocketscience.com. Disable anytime with `/mem:disable-telemetry`.
 
 **Per-project isolation.** Each project gets a separate SQLite database keyed by SHA-256 hash of the project path. Beliefs from project A cannot leak into project B. Cross-project queries require explicit opt-in via the `project_path` parameter and are read-only (no feedback or confidence updates to the foreign database). Mutation tools (`feedback`, `lock`, `delete`) reject cross-project belief IDs.
 
@@ -232,7 +232,7 @@ Research article at [robotrocketscience.com/projects/agentmemory](https://robotr
 
 ## Research
 
-85+ experiments during core development, plus 6 benchmark-phase experiments.
+84 experiments during core development, plus 6 benchmark-phase experiments.
 Each experiment had a pre-registered hypothesis, measurement protocol,
 documented results, and an explicit proceed/revise/abandon decision.
 
