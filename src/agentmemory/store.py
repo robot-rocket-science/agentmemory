@@ -310,6 +310,7 @@ class MemoryStore:
         self._migrate_sessions()
         self._migrate_beliefs()
         self._migrate_edges()
+        self._fix_auto_locked_beliefs()
 
     def _migrate_beliefs(self) -> None:
         """Run belief-table migrations."""
@@ -388,12 +389,41 @@ class MemoryStore:
             )
             self._conn.commit()
 
-    def backfill_lock_corrections(self) -> int:
-        """Lock all correction-type beliefs that are currently unlocked.
-        Returns the number of beliefs locked."""
-        cursor: sqlite3.Cursor = self._conn.execute(
-            "UPDATE beliefs SET locked = 1 WHERE belief_type = 'correction' AND locked = 0"
-        )
+    def _fix_auto_locked_beliefs(self) -> int:
+        """Unlock beliefs that were auto-locked by the removed backfill_lock_corrections.
+
+        Only beliefs explicitly locked via the lock() tool (which records a 'locked'
+        event in confidence_history) should remain locked. All others were spuriously
+        auto-locked during bulk ingestion and should be unlocked.
+
+        Returns the number of beliefs unlocked.
+        """
+        # Find beliefs with explicit lock events (keep these)
+        explicit_ids: list[str] = [
+            r[0] for r in self._conn.execute(
+                """SELECT DISTINCT ch.belief_id
+                   FROM confidence_history ch
+                   JOIN beliefs b ON b.id = ch.belief_id
+                   WHERE ch.event_type = 'locked'
+                     AND b.locked = 1
+                     AND b.valid_to IS NULL"""
+            ).fetchall()
+        ]
+
+        ts: str = _now()
+        if explicit_ids:
+            ph: str = ",".join("?" * len(explicit_ids))
+            cursor: sqlite3.Cursor = self._conn.execute(
+                f"UPDATE beliefs SET locked = 0, updated_at = ? "
+                f"WHERE locked = 1 AND valid_to IS NULL AND id NOT IN ({ph})",
+                [ts, *explicit_ids],
+            )
+        else:
+            cursor = self._conn.execute(
+                "UPDATE beliefs SET locked = 0, updated_at = ? "
+                "WHERE locked = 1 AND valid_to IS NULL",
+                (ts,),
+            )
         self._conn.commit()
         return cursor.rowcount
 
