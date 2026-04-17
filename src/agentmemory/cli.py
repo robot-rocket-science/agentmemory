@@ -82,7 +82,15 @@ def _resolve_db_path() -> Path:
 
 
 def _get_store() -> MemoryStore:
+    """Create store. Uses VaultStore if obsidian.vault_path is configured."""
     db_path: Path = _resolve_db_path()
+    from agentmemory.config import get_str_setting
+    vault_str: str = get_str_setting("obsidian", "vault_path")
+    if vault_str:
+        vault_path: Path = Path(vault_str)
+        if vault_path.exists():
+            from agentmemory.vault_store import VaultStore
+            return VaultStore(vault_path, db_path)  # type: ignore[return-value]
     return MemoryStore(db_path)
 
 
@@ -1998,6 +2006,39 @@ def cmd_link_docs(args: argparse.Namespace) -> None:
     print(f"  Belief links: {result.belief_refs_added}")
 
 
+def cmd_rebuild_index(args: argparse.Namespace) -> None:
+    """Rebuild SQLite index from vault .md files."""
+    from agentmemory.vault_store import RebuildResult, VaultStore
+
+    vault_path: str | None = getattr(args, "vault", None)
+    if vault_path is None:
+        from agentmemory.config import get_str_setting
+        vault_path = get_str_setting("obsidian", "vault_path")
+    if not vault_path:
+        print("Error: no vault path. Use --vault or set obsidian.vault_path")
+        sys.exit(1)
+
+    vp: Path = Path(vault_path)
+    if not vp.exists():
+        print(f"Error: vault path does not exist: {vp}")
+        sys.exit(1)
+
+    db_path: Path = _resolve_db_path()
+    print(f"Rebuilding index from {vp}/beliefs/ -> {db_path} ...")
+
+    vs: VaultStore = VaultStore(vp, db_path)
+    result: RebuildResult = vs.rebuild_index()
+    vs.close()
+
+    print(f"Done in {result.elapsed_seconds}s:")
+    print(f"  Beliefs indexed: {result.beliefs_indexed}")
+    print(f"  Edges created:   {result.edges_created}")
+    if result.errors:
+        print(f"  Errors: {len(result.errors)}")
+        for e in result.errors[:10]:
+            print(f"    - {e}")
+
+
 # ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
@@ -2284,6 +2325,15 @@ def main() -> None:
         "--project-dir", default=None, help="Project directory to scan (default: cwd)"
     )
     p_link_docs.set_defaults(func=cmd_link_docs)
+
+    # rebuild-index
+    p_rebuild_idx: argparse.ArgumentParser = subparsers.add_parser(
+        "rebuild-index", help="Rebuild SQLite index from vault .md files"
+    )
+    p_rebuild_idx.add_argument(
+        "--vault", default=None, help="Obsidian vault path (default: from config)"
+    )
+    p_rebuild_idx.set_defaults(func=cmd_rebuild_index)
 
     args: argparse.Namespace = parser.parse_args()
 

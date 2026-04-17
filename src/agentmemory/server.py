@@ -198,10 +198,25 @@ def _resolve_server_db() -> Path:
 
 
 def _get_store() -> MemoryStore:
-    """Return the module-level MemoryStore, creating it on first call."""
+    """Return the module-level store, creating it on first call.
+
+    If obsidian.vault_path is configured, returns a VaultStore (vault-first
+    with SQLite index). Otherwise returns a plain MemoryStore (v1 behavior).
+    VaultStore delegates all reads via __getattr__ to its MemoryStore index,
+    so it is a drop-in replacement anywhere MemoryStore is expected.
+    """
     global _store
     if _store is None:
         db_path: Path = _resolve_server_db()
+        from agentmemory.config import get_str_setting
+        vault_str: str = get_str_setting("obsidian", "vault_path")
+        if vault_str:
+            vault_path: Path = Path(vault_str)
+            if vault_path.exists():
+                from agentmemory.vault_store import VaultStore
+                vs: VaultStore = VaultStore(vault_path, db_path)
+                _store = vs  # type: ignore[assignment]
+                return vs  # type: ignore[return-value]
         _store = MemoryStore(db_path)
     return _store
 
