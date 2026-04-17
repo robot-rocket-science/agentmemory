@@ -123,7 +123,7 @@ Built on SQLite (WAL mode), FTS5 full-text search, Bayesian confidence tracking,
 ## Installation
 
 ```bash
-pip install agentmemory    # or: uv tool install agentmemory
+uv tool install agentmemory
 
 # Set up Claude Code integration (commands, hooks, MCP config)
 agentmemory setup
@@ -144,6 +144,46 @@ After `agentmemory setup`, the MCP server runs automatically. Use it through Cla
 /mem:stats                  # System analytics
 /mem:locked                 # Show locked constraints
 ```
+
+### `/mem:` Command Reference
+
+All commands are available as Claude Code slash commands after setup.
+
+| Command | Description |
+|---------|-------------|
+| `/mem:search <query>` | Search beliefs relevant to a query. Uses the full retrieval pipeline (FTS5 + scoring + packing into token budget). Supports `--temporal` for newest-first re-ranking. |
+| `/mem:remember <text>` | Store a new belief. Automatically classified by type (factual, preference, correction, requirement, procedural). |
+| `/mem:correct <text>` | Record a user correction. Stored at high confidence (94.7%) and triggers supersession of conflicting beliefs. Prompts to lock. |
+| `/mem:lock <belief_id>` | Lock a belief permanently. Locked beliefs cannot decay, are immune to feedback, and are injected into every prompt. Only the user can unlock. |
+| `/mem:locked` | Show all locked beliefs (non-negotiable constraints). |
+| `/mem:onboard <path>` | Scan a project directory and ingest structure: git history, AST, docs, citations, directives. Creates beliefs, edges, and entity index. |
+| `/mem:status` | System analytics: belief count by type, confidence distribution, scoring features, session metrics. |
+| `/mem:core [n]` | Show the top N highest-confidence beliefs. Default 10. |
+| `/mem:stats` | Detailed analytics: confidence distribution, beliefs by type, age breakdown. |
+| `/mem:timeline` | Temporal view of beliefs. Supports `--since` and `--until` for date ranges. |
+| `/mem:evolution <topic>` | Track how beliefs about a topic changed over time. Shows supersession chains. |
+| `/mem:diff` | Compare belief state between two points in time. |
+| `/mem:reason <question>` | Graph-aware reasoning: retrieves beliefs, follows edges, synthesizes an answer using structural context. |
+| `/mem:wonder <topic>` | Deep-dive research on a hypothesis or question using memory graph context and uncertainty analysis. |
+| `/mem:feedback <id> <outcome>` | Manually provide feedback on a belief. Outcomes: `used`, `harmful`, `ignored`, `contradicted`. Updates Bayesian confidence. |
+| `/mem:delete <id>` | Soft-delete a belief. Excluded from search/retrieval but remains in database. |
+| `/mem:promote <id>` | Promote a belief to global scope (visible across all projects). |
+| `/mem:snapshot` | Save a point-in-time snapshot of belief state for later comparison. |
+| `/mem:new-belief <text>` | Store a new belief (alias for remember). |
+| `/mem:settings` | View or update agentmemory settings (LLM model, retrieval depth, FTS5 top_k). |
+| `/mem:disable` | Disable agentmemory for the rest of the current session. |
+| `/mem:enable` | Re-enable agentmemory after `/mem:disable`. |
+| `/mem:help` | Show available commands and usage guide. |
+| `/mem:health` | Run diagnostics: DB integrity, index consistency, orphaned edges. |
+
+**Vault commands (v2, requires Obsidian):**
+
+| Command | Description |
+|---------|-------------|
+| `/mem:sync-obsidian` | Export beliefs to Obsidian vault. Incremental by default, `--full` for complete re-export. |
+| `/mem:import-obsidian` | Detect and import human edits from vault back into agentmemory. Use `--apply` to commit changes. |
+| `/mem:link-docs` | Link project documents (.md, .py, etc.) to beliefs via cross-references (REQ-###, CS-###, Exp ##). |
+| `/mem:graph-metrics` | Compute PageRank and degree centrality over the belief graph. Shows most structurally important beliefs. |
 
 ### As a CLI
 
@@ -202,7 +242,7 @@ Key settings:
 | `reason.depth` | `2` | BFS graph traversal depth |
 | `fts5.top_k` | `50` | Max FTS5 results per query |
 
-## Benchmarks (v1.2.1)
+## Benchmarks (v1.0)
 
 Evaluated across 5 published benchmarks. All results are protocol-correct with
 contamination-proof isolation (separate GT files, verified by `verify_clean.py`).
@@ -300,7 +340,7 @@ read-optimized index, rebuildable from the vault at any time.
 
 ```bash
 # Install agentmemory
-uv pip install agentmemory
+uv tool install agentmemory
 
 # Run setup (detects Obsidian, configures vault, creates directories)
 agentmemory setup
