@@ -179,18 +179,21 @@ def collect_edges_for_belief(
     if not edges:
         return []
     result: list[tuple[str, str, str]] = []
-    seen: set[int] = set()
+    # Dedup by (other_id, display_type) to prevent symmetric edges
+    # (A->B RELATES_TO and B->A RELATES_TO) from both appearing
+    seen_pairs: set[tuple[str, str]] = set()
     for edge in edges:
-        if edge.id in seen:
-            continue
-        seen.add(edge.id)
         if edge.from_id == belief_id:
-            # Outgoing edge
-            result.append((edge.to_id, edge.edge_type, edge.reason))
+            other_id: str = edge.to_id
+            display_type: str = edge.edge_type
         else:
-            # Incoming edge: reverse the label
-            label: str = _INCOMING_LABELS.get(edge.edge_type, edge.edge_type)
-            result.append((edge.from_id, label, edge.reason))
+            other_id = edge.from_id
+            display_type = _INCOMING_LABELS.get(edge.edge_type, edge.edge_type)
+        pair: tuple[str, str] = (other_id, display_type)
+        if pair in seen_pairs:
+            continue
+        seen_pairs.add(pair)
+        result.append((other_id, display_type, edge.reason))
     return result
 
 
@@ -860,3 +863,100 @@ def import_vault_changes(
         deleted=deleted,
         errors=errors,
     )
+
+
+# ---------------------------------------------------------------------------
+# Canvas export: reasoning traces as JSON Canvas
+# ---------------------------------------------------------------------------
+
+def beliefs_to_canvas(
+    beliefs: list[Belief],
+    edges: list[Edge],
+    title: str = "Belief Graph",
+    output_path: Path | None = None,
+) -> dict[str, object]:
+    """Export beliefs and edges as a JSON Canvas (jsoncanvas.org v1.0).
+
+    Layout: grid arrangement with beliefs as text nodes and edges as
+    labeled connections. The canvas file can be opened in Obsidian.
+
+    Args:
+        beliefs: Beliefs to include as nodes.
+        edges: Edges between beliefs to include as connections.
+        title: Title for the canvas (used in filename if output_path not given).
+        output_path: Where to write the .canvas file. If None, returns dict only.
+
+    Returns:
+        The canvas data as a dict (also written to file if output_path given).
+    """
+    import math
+
+    # Build node positions in a grid
+    cols: int = max(1, int(math.ceil(math.sqrt(len(beliefs)))))
+    node_width: int = 400
+    node_height: int = 200
+    gap_x: int = 50
+    gap_y: int = 50
+
+    belief_id_set: set[str] = {b.id for b in beliefs}
+    canvas_nodes: list[dict[str, object]] = []
+
+    for i, belief in enumerate(beliefs):
+        row: int = i // cols
+        col: int = i % cols
+        x: int = col * (node_width + gap_x)
+        y: int = row * (node_height + gap_y)
+
+        # Color by type
+        color: str = ""
+        if belief.locked:
+            color = "1"  # red
+        elif belief.belief_type == "correction":
+            color = "5"  # purple
+        elif belief.belief_type == "requirement":
+            color = "4"  # green
+        elif belief.belief_type == "preference":
+            color = "6"  # cyan
+
+        node: dict[str, object] = {
+            "id": belief.id,
+            "type": "text",
+            "x": x,
+            "y": y,
+            "width": node_width,
+            "height": node_height,
+            "text": (
+                f"**{belief.belief_type}** ({belief.confidence:.0%})\n\n"
+                f"{belief.content[:200]}"
+            ),
+        }
+        if color:
+            node["color"] = color
+        canvas_nodes.append(node)
+
+    # Build edges (only between beliefs in this canvas)
+    canvas_edges: list[dict[str, object]] = []
+    for edge in edges:
+        if edge.from_id in belief_id_set and edge.to_id in belief_id_set:
+            canvas_edges.append({
+                "id": f"e{edge.id}",
+                "fromNode": edge.from_id,
+                "toNode": edge.to_id,
+                "fromEnd": "none",
+                "toEnd": "arrow",
+                "label": edge.edge_type,
+            })
+
+    canvas: dict[str, object] = {
+        "nodes": canvas_nodes,
+        "edges": canvas_edges,
+    }
+
+    if output_path is not None:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(
+            json.dumps(canvas, indent=2) + "\n",
+            encoding="utf-8",
+        )
+
+    return canvas

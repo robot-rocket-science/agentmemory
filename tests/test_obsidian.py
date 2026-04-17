@@ -20,6 +20,7 @@ from agentmemory.obsidian import (
     ObsidianConfig,
     SyncResult,
     belief_to_markdown,
+    beliefs_to_canvas,
     collect_edges_for_belief,
     parse_belief_frontmatter,
     sync_vault,
@@ -521,3 +522,53 @@ def test_import_deleted(store: MemoryStore, vault_path: Path) -> None:
     deleted_belief: Belief | None = store.get_belief(bid)
     assert deleted_belief is not None
     assert deleted_belief.valid_to is not None
+
+
+# ---------------------------------------------------------------------------
+# Canvas export tests
+# ---------------------------------------------------------------------------
+
+
+def test_canvas_basic(store: MemoryStore, vault_path: Path) -> None:
+    """Canvas export produces valid JSON with nodes and edges."""
+    bid1: str = _make_belief(store, "Canvas node one")
+    bid2: str = _make_belief(store, "Canvas node two")
+    b1: Belief | None = store.get_belief(bid1)
+    b2: Belief | None = store.get_belief(bid2)
+    assert b1 is not None and b2 is not None
+
+    edge_id: int = store.insert_edge(bid1, bid2, "SUPPORTS", reason="test")
+
+    from agentmemory.models import Edge as EdgeModel
+    edges: list[EdgeModel] = [EdgeModel(
+        id=edge_id, from_id=bid1, to_id=bid2,
+        edge_type="SUPPORTS", weight=1.0, reason="test",
+        created_at="2026-01-01T00:00:00Z",
+    )]
+
+    canvas_path: Path = vault_path / "_canvas" / "test.canvas"
+    result: dict[str, object] = beliefs_to_canvas(
+        [b1, b2], edges, title="Test", output_path=canvas_path
+    )
+
+    assert "nodes" in result
+    assert "edges" in result
+    assert canvas_path.exists()
+
+    import json
+    from typing import Any, cast
+    data: dict[str, Any] = cast("dict[str, Any]", json.loads(
+        canvas_path.read_text(encoding="utf-8")
+    ))
+    nodes: list[Any] = cast("list[Any]", data["nodes"])
+    assert len(nodes) == 2
+    canvas_edges: list[Any] = cast("list[Any]", data["edges"])
+    assert len(canvas_edges) == 1
+
+
+def test_canvas_empty(store: MemoryStore) -> None:
+    """Canvas with no beliefs produces empty nodes/edges."""
+    from typing import Any, cast
+    result: dict[str, object] = beliefs_to_canvas([], [], title="Empty")
+    nodes: list[Any] = cast("list[Any]", result["nodes"])
+    assert len(nodes) == 0
