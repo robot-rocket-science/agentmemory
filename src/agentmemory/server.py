@@ -1401,5 +1401,38 @@ def import_obsidian(
     )
 
 
+@mcp.tool
+def graph_metrics(top_n: int = 20) -> str:
+    """Compute structural importance of beliefs using PageRank and degree.
+
+    Returns the top N structurally important beliefs -- the hub nodes
+    that connect the most knowledge in the belief graph.
+
+    Args:
+        top_n: Number of top beliefs to return (default 20).
+    """
+    from agentmemory.graph_metrics import compute_structural_importance
+    store: MemoryStore = _get_store()
+    importance: dict[str, float] = compute_structural_importance(store)
+
+    if not importance:
+        return "No edges in belief graph. Graph metrics require connected beliefs."
+
+    top: list[tuple[str, float]] = sorted(
+        importance.items(), key=lambda x: x[1], reverse=True
+    )[:top_n]
+
+    lines: list[str] = [f"Top {len(top)} structurally important beliefs:"]
+    for bid, score in top:
+        belief: Belief | None = store.get_belief(bid)
+        preview: str = belief.content[:70] if belief else "(not found)"
+        locked: str = " [LOCKED]" if belief and belief.locked else ""
+        lines.append(f"  {score:.3f}{locked} [{bid}] {preview}")
+
+    total: int = len(importance)
+    lines.append(f"\n{total} beliefs with edges in graph.")
+    return "\n".join(lines)
+
+
 if __name__ == "__main__":
     mcp.run()
