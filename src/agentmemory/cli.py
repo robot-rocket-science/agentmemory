@@ -410,7 +410,85 @@ def cmd_setup(args: argparse.Namespace) -> None:
         if smoke.stderr:
             print(f"  {smoke.stderr[:200]}", file=sys.stderr)
 
+    # Step 7: Obsidian vault setup
+    _setup_obsidian_vault()
+
     print(f"\nDone. Restart Claude Code, then run /mem:onboard . on your project.")
+
+
+def _setup_obsidian_vault() -> None:
+    """Detect or configure Obsidian vault integration."""
+    from agentmemory.config import get_str_setting, load_config, save_config
+
+    print("\n  Obsidian vault integration...")
+
+    # Check if already configured
+    existing: str = get_str_setting("obsidian", "vault_path")
+    if existing and Path(existing).exists():
+        print(f"  Vault already configured: {existing}")
+        return
+
+    # Auto-detect: look for .obsidian/ in cwd or parent dirs
+    vault_path: Path | None = None
+    check: Path = Path.cwd()
+    for _ in range(5):  # up to 5 levels
+        if (check / ".obsidian").is_dir():
+            vault_path = check
+            break
+        parent: Path = check.parent
+        if parent == check:
+            break
+        check = parent
+
+    if vault_path is None:
+        # Create vault in project root
+        vault_path = Path.cwd()
+        obsidian_dir: Path = vault_path / ".obsidian"
+        obsidian_dir.mkdir(exist_ok=True)
+        # Write minimal config
+        (obsidian_dir / "core-plugins.json").write_text(
+            '{\n  "file-explorer": true,\n  "global-search": true,\n'
+            '  "graph": true,\n  "backlink": true,\n  "outgoing-link": true,\n'
+            '  "tag-pane": true,\n  "properties": true,\n  "daily-notes": true\n}\n',
+            encoding="utf-8",
+        )
+        print(f"  Created Obsidian vault config at {obsidian_dir}")
+
+    # Save vault_path to config
+    config: dict[str, object] = load_config()
+    obs_config: dict[str, object] = {
+        "vault_path": str(vault_path),
+        "beliefs_subfolder": "beliefs",
+        "auto_sync": False,
+    }
+    config["obsidian"] = obs_config
+    save_config(config)  # type: ignore[arg-type]
+    print(f"  Vault path saved: {vault_path}")
+
+    # Create vault directories
+    for subdir in ("beliefs", "_index", "_dashboards", "_docs", "_canvas"):
+        (vault_path / subdir).mkdir(exist_ok=True)
+    print("  Created vault directories (beliefs, _index, _dashboards, _docs, _canvas)")
+
+    # Add to .gitignore if not already present
+    gitignore: Path = vault_path / ".gitignore"
+    entries: list[str] = ["beliefs/", "_index/", "_dashboards/", "_docs/",
+                          "_canvas/", ".agentmemory_sync.json"]
+    if gitignore.exists():
+        existing_text: str = gitignore.read_text(encoding="utf-8")
+        missing: list[str] = [e for e in entries if e not in existing_text]
+        if missing:
+            with open(gitignore, "a", encoding="utf-8") as f:
+                f.write("\n# Obsidian vault export (generated, not source)\n")
+                for entry in missing:
+                    f.write(entry + "\n")
+            print(f"  Added {len(missing)} entries to .gitignore")
+
+    # Check if Obsidian app is installed
+    obsidian_app: Path = Path("/Applications/Obsidian.app")
+    if not obsidian_app.exists():
+        print("  Note: Obsidian app not found at /Applications/Obsidian.app")
+        print("  Install from https://obsidian.md to use graph view and dashboards")
 
 
 # ---------------------------------------------------------------------------
@@ -572,6 +650,31 @@ def cmd_onboard(args: argparse.Namespace) -> None:
         if link_edges > 0:
             print(f"  Total semantic edges: {link_edges}")
 
+    # --- Obsidian vault sync ---
+    # If vault is configured, sync beliefs + link documents
+    from agentmemory.config import get_str_setting
+    vault_str: str = get_str_setting("obsidian", "vault_path")
+    vault_sync_count: int = 0
+    doc_link_count: int = 0
+    if vault_str and Path(vault_str).exists():
+        print("\nSyncing to Obsidian vault...")
+        from agentmemory.obsidian import ObsidianConfig, SyncResult, sync_vault
+        obs_config: ObsidianConfig = ObsidianConfig(vault_path=Path(vault_str))
+        sync_result: SyncResult = sync_vault(store, obs_config, full=True)
+        vault_sync_count = sync_result.beliefs_written
+        print(f"  Beliefs synced: {sync_result.beliefs_written}")
+        print(f"  Index notes: {sync_result.index_notes_written}")
+
+        print("Linking project documents...")
+        from agentmemory.doc_linker import LinkResult, link_documents
+        link_result: LinkResult = link_documents(
+            store, project_path, Path(vault_str)
+        )
+        doc_link_count = link_result.docs_exported
+        print(f"  Documents: {link_result.docs_exported}")
+        print(f"  Cross-references: {link_result.refs_linked}")
+        print(f"  Belief links: {link_result.belief_refs_added}")
+
     store.close()
 
     timing_parts: list[str] = [f"{k}={v:.2f}s" for k, v in scan.timings.items()]
@@ -580,6 +683,8 @@ def cmd_onboard(args: argparse.Namespace) -> None:
     print(f"  Beliefs: {aggregate.beliefs_created}")
     print(f"  Corrections: {aggregate.corrections_detected}")
     print(f"  Edges: {edge_count} structural + {link_edges} semantic")
+    if vault_sync_count > 0:
+        print(f"  Vault: {vault_sync_count} beliefs + {doc_link_count} docs")
     print(f"  Timing: {', '.join(timing_parts)}")
 
 
