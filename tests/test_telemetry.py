@@ -6,6 +6,7 @@ Verifies that:
 3. Rolling windows aggregate properly
 4. JSONL output format is correct
 5. Telemetry can be disabled via config
+6. Send-telemetry offset tracking and payload construction
 """
 from __future__ import annotations
 
@@ -21,6 +22,8 @@ from agentmemory.telemetry import (
     collect_rolling_window,
     collect_session_metrics,
     collect_snapshot,
+    get_unsent_lines,
+    mark_sent,
     write_snapshot,
 )
 
@@ -322,4 +325,96 @@ def test_emit_telemetry_writes_when_enabled(tmp_path: Path) -> None:
     assert data["v"] == 1
 
     store.close()
+    mp.undo()
+
+
+def test_get_unsent_lines_no_file(tmp_path: Path) -> None:
+    """Returns empty list when telemetry file does not exist."""
+    import pytest
+    from agentmemory import config as _cfg, telemetry as _tel
+
+    mp = pytest.MonkeyPatch()
+    mp.setattr(_tel, "_default_path", lambda: tmp_path / "nope.jsonl")
+    mp.setattr(_cfg, "_CONFIG_PATH", tmp_path / "config.json")
+    (tmp_path / "config.json").write_text(
+        '{"telemetry": {"enabled": true, "sent_lines": 0}}', encoding="utf-8"
+    )
+
+    lines, offset = get_unsent_lines()
+    assert lines == []
+    assert offset == 0
+    mp.undo()
+
+
+def test_get_unsent_lines_with_offset(tmp_path: Path) -> None:
+    """Only returns lines after the sent_lines offset."""
+    import pytest
+    from agentmemory import config as _cfg, telemetry as _tel
+
+    mp = pytest.MonkeyPatch()
+    out: Path = tmp_path / "telemetry.jsonl"
+    out.write_text(
+        '{"v":1,"ts":"a"}\n{"v":1,"ts":"b"}\n{"v":1,"ts":"c"}\n',
+        encoding="utf-8",
+    )
+    mp.setattr(_tel, "_default_path", lambda: out)
+    mp.setattr(_cfg, "_CONFIG_PATH", tmp_path / "config.json")
+    (tmp_path / "config.json").write_text(
+        '{"telemetry": {"enabled": true, "sent_lines": 1}}', encoding="utf-8"
+    )
+
+    lines, offset = get_unsent_lines()
+    assert offset == 1
+    assert len(lines) == 2
+    assert '"ts":"b"' in lines[0]
+    assert '"ts":"c"' in lines[1]
+    mp.undo()
+
+
+def test_mark_sent_updates_config(tmp_path: Path) -> None:
+    """mark_sent persists the new offset to config."""
+    import pytest
+    from agentmemory import config as _cfg
+
+    mp = pytest.MonkeyPatch()
+    cfg_path: Path = tmp_path / "config.json"
+    cfg_path.write_text(
+        '{"telemetry": {"enabled": true, "sent_lines": 0}}', encoding="utf-8"
+    )
+    mp.setattr(_cfg, "_CONFIG_PATH", cfg_path)
+
+    mark_sent(5)
+
+    data: dict[str, object] = json.loads(cfg_path.read_text(encoding="utf-8"))
+    assert data["telemetry"]["sent_lines"] == 5  # type: ignore[index]
+    mp.undo()
+
+
+def test_get_unsent_after_mark_sent(tmp_path: Path) -> None:
+    """After mark_sent, get_unsent_lines returns nothing for already-sent data."""
+    import pytest
+    from agentmemory import config as _cfg, telemetry as _tel
+
+    mp = pytest.MonkeyPatch()
+    out: Path = tmp_path / "telemetry.jsonl"
+    out.write_text('{"v":1,"ts":"a"}\n{"v":1,"ts":"b"}\n', encoding="utf-8")
+    mp.setattr(_tel, "_default_path", lambda: out)
+
+    cfg_path: Path = tmp_path / "config.json"
+    cfg_path.write_text(
+        '{"telemetry": {"enabled": true, "sent_lines": 0}}', encoding="utf-8"
+    )
+    mp.setattr(_cfg, "_CONFIG_PATH", cfg_path)
+
+    # First call: 2 unsent
+    lines, offset = get_unsent_lines()
+    assert len(lines) == 2
+
+    # Mark both as sent
+    mark_sent(offset + len(lines))
+
+    # Second call: 0 unsent
+    lines2, offset2 = get_unsent_lines()
+    assert len(lines2) == 0
+    assert offset2 == 2
     mp.undo()

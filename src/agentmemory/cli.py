@@ -322,6 +322,17 @@ _COMMAND_DEFS: dict[str, dict[str, str]] = {
             "   to ~/.agentmemory/telemetry.jsonl until re-enabled.\n"
         ),
     },
+    "send-telemetry": {
+        "description": "Send unsent telemetry snapshots to help improve agentmemory.",
+        "argument_hint": "",
+        "tools": "Bash",
+        "objective": "Show the user their unsent telemetry data and send it with explicit confirmation.",
+        "process": (
+            "1. Run: `uv run agentmemory send-telemetry`\n"
+            "2. The command will show a preview of what will be sent and ask for confirmation.\n"
+            "3. Display the result to the user.\n"
+        ),
+    },
     "help": {
         "description": "Show available mem commands and usage guide.",
         "argument_hint": "",
@@ -343,6 +354,7 @@ _COMMAND_DEFS: dict[str, dict[str, str]] = {
             "  /mem:enable             Resume agentmemory\n"
             "  /mem:enable-telemetry   Enable anonymous performance logging\n"
             "  /mem:disable-telemetry  Disable anonymous performance logging\n"
+            "  /mem:send-telemetry     Send unsent snapshots (shows data, asks first)\n"
             "  /mem:help               This reference\n"
         ),
     },
@@ -525,20 +537,35 @@ def _setup_telemetry() -> None:
     """Prompt user to opt in to anonymous telemetry during setup."""
     from agentmemory.config import get_bool_setting, load_config, save_config
 
+    telem_path: str = str(Path.home() / ".agentmemory" / "telemetry.jsonl")
+
     print("\n  Anonymous telemetry...")
     print("  agentmemory can collect anonymous performance metrics to help")
-    print("  improve the system. Only content-free data is recorded:")
-    print("    - token spend, correction rates, feedback loop efficiency")
-    print("    - belief lifecycle counts, graph density metrics")
-    print("    - NO belief content, project paths, or identifying information")
-    print("  Data is stored locally at ~/.agentmemory/telemetry.jsonl")
-    print("  You can disable at any time with /mem:disable-telemetry")
+    print("  improve the system. Here is exactly what we collect:\n")
+    print("    Per session:")
+    print("      - token counts (retrieval, classification)")
+    print("      - beliefs created, corrections detected")
+    print("      - searches performed, feedback given")
+    print("      - session duration, velocity tier")
+    print("    Aggregate:")
+    print("      - belief counts by type/source/confidence bucket")
+    print("      - active/superseded/locked totals, churn rate, orphan count")
+    print("      - graph edge counts by type, avg edges per belief")
+    print("      - feedback outcome distribution, feedback rate")
+    print("      - rolling 7-session and 30-session averages\n")
+    print("    NOT collected (ever):")
+    print("      - belief content, project paths, file paths")
+    print("      - session IDs, user names, identifying information\n")
+    print(f"  Data file: {telem_path}")
+    print("  Inspect it anytime. It is plain JSONL, one snapshot per line.")
+    print("  Nothing is sent without your explicit permission (send-telemetry).")
+    print("  Disable collection anytime with /mem:disable-telemetry\n")
 
     current: bool = get_bool_setting("telemetry", "enabled")
     if current:
-        print(f"  Telemetry is currently: ENABLED")
+        print("  Telemetry is currently: ENABLED")
     else:
-        print(f"  Telemetry is currently: DISABLED")
+        print("  Telemetry is currently: DISABLED")
 
     answer: str = input("  Enable anonymous telemetry? [y/N]: ").strip().lower()
     enabled: bool = answer in ("y", "yes")
@@ -2363,6 +2390,61 @@ def cmd_disable_telemetry(args: argparse.Namespace) -> None:
     print("Re-enable anytime: agentmemory enable-telemetry (or /mem:enable-telemetry)")
 
 
+def cmd_send_telemetry(args: argparse.Namespace) -> None:
+    """Send unsent telemetry snapshots to the project maintainers."""
+    import json as _json
+
+    from agentmemory.config import get_str_setting
+    from agentmemory.telemetry import get_unsent_lines, mark_sent, send_telemetry
+
+    unsent, offset = get_unsent_lines()
+    if not unsent:
+        print("No unsent telemetry snapshots.")
+        return
+
+    endpoint: str = get_str_setting("telemetry", "endpoint")
+    if not endpoint:
+        print("Error: no telemetry endpoint configured.", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"  {len(unsent)} unsent snapshot(s) to send to:")
+    print(f"  {endpoint}\n")
+    print("  Payload preview (each line is one session snapshot):")
+    print("  " + "-" * 60)
+    for i, line in enumerate(unsent):
+        try:
+            obj: dict[str, object] = _json.loads(line)
+            ts: object = obj.get("ts", "?")
+            session: object = obj.get("session", {})
+            beliefs: object = obj.get("beliefs", {})
+            s_created: object = session.get("beliefs_created", 0) if isinstance(session, dict) else 0  # type: ignore[union-attr]
+            b_active: object = beliefs.get("total_active", 0) if isinstance(beliefs, dict) else 0  # type: ignore[union-attr]
+            print(f"  [{i + 1}] ts={ts}  beliefs_created={s_created}  total_active={b_active}")
+        except (ValueError, AttributeError):
+            print(f"  [{i + 1}] (unparseable line)")
+    print("  " + "-" * 60)
+    print(f"\n  Data file: {Path.home() / '.agentmemory' / 'telemetry.jsonl'}")
+    print("  Open the file to inspect the full payload before sending.\n")
+
+    answer: str = input("  Send this data? [y/N]: ").strip().lower()
+    if answer not in ("y", "yes"):
+        print("  Cancelled. Nothing was sent.")
+        return
+
+    try:
+        result: dict[str, object] = send_telemetry(endpoint, unsent)
+        accepted: object = result.get("accepted", 0)
+        rejected: object = result.get("rejected", 0)
+        print(f"\n  Sent. Accepted: {accepted}, Rejected: {rejected}")
+        if isinstance(accepted, int) and accepted > 0:
+            mark_sent(offset + len(unsent))
+            print("  Offset updated. These snapshots won't be sent again.")
+    except Exception as exc:
+        print(f"\n  Send failed: {exc}", file=sys.stderr)
+        print("  Your data is still local. Try again later.")
+        sys.exit(1)
+
+
 # ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
@@ -2668,6 +2750,11 @@ def main() -> None:
         "disable-telemetry", help="Disable anonymous telemetry logging"
     )
     p_disable_telem.set_defaults(func=cmd_disable_telemetry)
+
+    p_send_telem: argparse.ArgumentParser = subparsers.add_parser(
+        "send-telemetry", help="Send unsent telemetry snapshots (with confirmation)"
+    )
+    p_send_telem.set_defaults(func=cmd_send_telemetry)
 
     args: argparse.Namespace = parser.parse_args()
 

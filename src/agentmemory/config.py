@@ -36,6 +36,8 @@ _DEFAULTS: dict[str, dict[str, int | bool | str]] = {
     },
     "telemetry": {
         "enabled": False,
+        "endpoint": "https://robotrocketscience.com/api/telemetry",
+        "sent_lines": 0,
     },
 }
 

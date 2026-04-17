@@ -13,10 +13,11 @@ Users can disable telemetry via config: {"telemetry": {"enabled": false}}
 from __future__ import annotations
 
 import json
+import urllib.request
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from agentmemory.store import MemoryStore
 
@@ -314,3 +315,50 @@ def write_snapshot(snapshot: TelemetrySnapshot, path: Path | None = None) -> Pat
     with open(out, "a", encoding="utf-8") as f:
         f.write(line + "\n")
     return out
+
+
+def get_unsent_lines(path: Path | None = None) -> tuple[list[str], int]:
+    """Return unsent JSONL lines and the current offset.
+
+    Reads the sent_lines offset from config, returns lines after that offset.
+    """
+    from agentmemory.config import get_setting
+
+    out: Path = path or _default_path()
+    if not out.exists():
+        return [], 0
+
+    sent: int = get_setting("telemetry", "sent_lines")
+    with open(out, encoding="utf-8") as f:
+        all_lines: list[str] = [ln for ln in f if ln.strip()]
+
+    unsent: list[str] = all_lines[sent:]
+    return unsent, sent
+
+
+def send_telemetry(endpoint: str, lines: list[str]) -> dict[str, Any]:
+    """POST JSONL lines to the telemetry endpoint. Returns the response body."""
+    payload: bytes = "\n".join(ln.strip() for ln in lines).encode("utf-8")
+    req = urllib.request.Request(
+        endpoint,
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            "User-Agent": "agentmemory/1.0",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        body: str = resp.read().decode("utf-8")
+        return json.loads(body)
+
+
+def mark_sent(total_lines: int) -> None:
+    """Update the sent_lines offset in config."""
+    from agentmemory.config import load_config, save_config
+
+    config: dict[str, Any] = load_config()
+    telem: dict[str, Any] = cast("dict[str, Any]", config.get("telemetry", {}))
+    telem["sent_lines"] = total_lines
+    config["telemetry"] = telem
+    save_config(config)
