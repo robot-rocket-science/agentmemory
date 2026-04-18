@@ -3,6 +3,7 @@
 Provides direct commands that execute without LLM involvement:
   agentmemory setup              -- install commands, MCP config, commit hook
   agentmemory onboard <path>     -- scan and ingest a project
+  agentmemory ingest <jsonl>     -- ingest a JSONL conversation log
   agentmemory stats              -- detailed analytics
   agentmemory health             -- diagnostics
   agentmemory core [--top N]     -- top N beliefs by confidence
@@ -41,7 +42,7 @@ from agentmemory.commit_tracker import (
     load_config as load_commit_config,
     save_config as save_commit_config,
 )
-from agentmemory.ingest import IngestResult, ingest_turn
+from agentmemory.ingest import IngestResult, ingest_jsonl, ingest_turn
 from agentmemory.models import Belief, Edge
 from agentmemory.retrieval import RetrievalResult, retrieve
 from agentmemory.scoring import score_belief, uncertainty_score
@@ -596,6 +597,28 @@ def _setup_telemetry() -> None:
 
     status: str = "ENABLED" if enabled else "DISABLED"
     print(f"  Telemetry {status}. Change anytime with /mem:enable-telemetry or /mem:disable-telemetry")
+
+
+# ---------------------------------------------------------------------------
+# ingest
+# ---------------------------------------------------------------------------
+
+
+def cmd_ingest(args: argparse.Namespace) -> None:
+    """Ingest a JSONL conversation log into agentmemory."""
+    jsonl_path: Path = Path(args.path).expanduser().resolve()
+    if not jsonl_path.is_file():
+        print(f"File not found: {jsonl_path}", file=sys.stderr)
+        sys.exit(1)
+
+    store: MemoryStore = _get_store()
+    print(f"Ingesting {jsonl_path.name} ...")
+    result: IngestResult = ingest_jsonl(store, jsonl_path)
+    print(
+        f"Done: {result.observations_created} observations, "
+        f"{result.beliefs_created} beliefs, "
+        f"{result.corrections_detected} corrections"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -2507,6 +2530,13 @@ def main() -> None:
         help="Run Haiku semantic linking after ingestion (~$0.01-0.05)",
     )
     p_onboard.set_defaults(func=cmd_onboard)
+
+    # ingest
+    p_ingest: argparse.ArgumentParser = subparsers.add_parser(
+        "ingest", help="Ingest a JSONL conversation log"
+    )
+    p_ingest.add_argument("path", help="Path to JSONL file")
+    p_ingest.set_defaults(func=cmd_ingest)
 
     # stats
     p_stats: argparse.ArgumentParser = subparsers.add_parser(
