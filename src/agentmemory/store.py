@@ -5,11 +5,13 @@ All writes are synchronous and durable before return.
 """
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import sqlite3
 import threading
 import uuid
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -325,6 +327,20 @@ class MemoryStore:
         self._last_traversed_edges: dict[str, list[tuple[int, int]]] = {}
         if not readonly:
             self._init_schema()
+
+    @contextlib.contextmanager
+    def transaction(self) -> Iterator[None]:
+        """Context manager for batching writes in a single transaction.
+
+        Defers commits until the block exits. Rolls back on exception.
+        """
+        self._conn.execute("BEGIN IMMEDIATE")
+        try:
+            yield
+            self._conn.commit()
+        except BaseException:
+            self._conn.rollback()
+            raise
 
     def _init_schema(self) -> None:
         """Create all tables and FTS5 index if they don't exist."""
@@ -1428,6 +1444,27 @@ class MemoryStore:
         if row_id is None:
             raise RuntimeError("graph_edge insert did not return a rowid")
         return row_id
+
+    def batch_insert_graph_edges(
+        self,
+        edges: list[tuple[str, str, str, float, str]],
+    ) -> int:
+        """Bulk-insert structural graph edges in a single transaction.
+
+        Each tuple is (from_id, to_id, edge_type, weight, reason).
+        Returns the number of edges inserted.
+        """
+        if not edges:
+            return 0
+        ts: str = _now()
+        rows = [(f, t, et, w, r, ts) for f, t, et, w, r in edges]
+        self._conn.executemany(
+            """INSERT INTO graph_edges (from_id, to_id, edge_type, weight, reason, created_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            rows,
+        )
+        self._conn.commit()
+        return len(rows)
 
     def get_all_edge_triples(self) -> list[tuple[str, str, str]]:
         """Return all edges (belief + graph) as triples for HRR encoding."""

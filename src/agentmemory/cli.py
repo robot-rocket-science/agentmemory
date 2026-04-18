@@ -679,19 +679,12 @@ def cmd_onboard(args: argparse.Namespace) -> None:
     print(f"  Mapped {len(node_to_belief)} scanner nodes to belief IDs")
 
     # Store structural edges, translating scanner IDs to belief IDs where possible
-    edge_count: int = 0
+    edge_batch: list[tuple[str, str, str, float, str]] = []
     for edge in scan.edges:
-        # Use belief IDs if we have them, otherwise keep scanner IDs
         src: str = node_to_belief.get(edge.src, edge.src)
         tgt: str = node_to_belief.get(edge.tgt, edge.tgt)
-        store.insert_graph_edge(
-            from_id=src,
-            to_id=tgt,
-            edge_type=edge.edge_type,
-            weight=edge.weight,
-            reason="scanner",
-        )
-        edge_count += 1
+        edge_batch.append((src, tgt, edge.edge_type, edge.weight, "scanner"))
+    edge_count: int = store.batch_insert_graph_edges(edge_batch)
     if edge_count > 0:
         print(f"  Stored {edge_count} structural edges")
 
