@@ -1,3 +1,4 @@
+# pyright: reportPrivateUsage=false
 """Tests for the UserPromptSubmit hook search pipeline.
 
 Validates entity-aware query expansion, correction-priority scoring,
@@ -346,3 +347,167 @@ def test_ba_format_no_state_changes() -> None:
     assert "OPERATIONAL STATE" not in output
     assert "== STANDING CONSTRAINTS ==" in output
     assert "- never use em dashes" in output
+
+
+# ---------------------------------------------------------------------------
+# Hook feedback loop tests (agentmemory#177cbfc)
+# ---------------------------------------------------------------------------
+
+from agentmemory.hook_search import _process_pending_feedback
+
+
+def test_hook_feedback_loop_records_pending(tmp_path: Path) -> None:
+    """search_for_prompt() records pending feedback for returned beliefs."""
+    store: MemoryStore = _make_store(tmp_path)
+    import sqlite3
+    db: sqlite3.Connection = sqlite3.connect(str(tmp_path / "hook.db"))
+    db.row_factory = sqlite3.Row
+
+    result: SearchResult = search_for_prompt(db, "deploy to cloudflare")
+
+    # Pending feedback should be recorded
+    pending: list[sqlite3.Row] = db.execute(
+        "SELECT * FROM pending_feedback"
+    ).fetchall()
+    assert len(pending) > 0, "No pending feedback recorded"
+
+    # Pending entries should match returned belief IDs
+    pending_ids: set[str] = {r["belief_id"] for r in pending}
+    result_ids: set[str] = {b.id for b in result.beliefs}
+    assert pending_ids == result_ids, (
+        f"Pending IDs {pending_ids} don't match result IDs {result_ids}"
+    )
+
+    db.close()
+    store.close()
+
+
+def test_hook_feedback_loop_updates_alpha(tmp_path: Path) -> None:
+    """Next search processes pending feedback and updates alpha for matched beliefs."""
+    store: MemoryStore = _make_store(tmp_path)
+    import sqlite3
+    db: sqlite3.Connection = sqlite3.connect(str(tmp_path / "hook.db"))
+    db.row_factory = sqlite3.Row
+
+    # First search: retrieves beliefs about cloudflare/deploy
+    search_for_prompt(db, "deploy to cloudflare")
+
+    # Record alpha before feedback
+    row: sqlite3.Row = db.execute(
+        "SELECT id, alpha FROM beliefs WHERE content LIKE '%cloudflare%' AND valid_to IS NULL"
+    ).fetchone()
+    assert row is not None
+    old_alpha: float = row["alpha"]
+
+    # Second search: prompt mentions cloudflare and builds again, triggering feedback match
+    # Need 2+ matching terms: "cloudflare" + "builds" from the belief content
+    search_for_prompt(db, "push builds to cloudflare pages")
+
+    # Alpha should have increased (term overlap: cloudflare, deploy)
+    new_row: sqlite3.Row = db.execute(
+        "SELECT alpha FROM beliefs WHERE id = ?", (row["id"],)
+    ).fetchone()
+    new_alpha: float = new_row["alpha"]
+    assert new_alpha > old_alpha, (
+        f"Alpha should increase from {old_alpha}, got {new_alpha}"
+    )
+
+    db.close()
+    store.close()
+
+
+def test_hook_feedback_loop_clears_processed(tmp_path: Path) -> None:
+    """Pending feedback entries are cleared after processing."""
+    store: MemoryStore = _make_store(tmp_path)
+    import sqlite3
+    db: sqlite3.Connection = sqlite3.connect(str(tmp_path / "hook.db"))
+    db.row_factory = sqlite3.Row
+
+    # First search creates pending entries
+    search_for_prompt(db, "deploy to cloudflare")
+    pending_before: int = db.execute("SELECT COUNT(*) FROM pending_feedback").fetchone()[0]
+    assert pending_before > 0
+
+    # Second search processes old entries and creates new ones
+    search_for_prompt(db, "configure wrangler deploy")
+    pending_after: int = db.execute("SELECT COUNT(*) FROM pending_feedback").fetchone()[0]
+
+    # Old entries should be cleared; new entries from second search remain
+    # The count should be the number of beliefs returned by the second search,
+    # not the sum of both searches
+    assert pending_after <= pending_before, (
+        f"Pending should not grow: before={pending_before}, after={pending_after}"
+    )
+
+    db.close()
+    store.close()
+
+
+def test_hook_feedback_no_match_no_update(tmp_path: Path) -> None:
+    """When prompt terms don't overlap with pending beliefs, alpha stays unchanged."""
+    store: MemoryStore = _make_store(tmp_path)
+    import sqlite3
+    db: sqlite3.Connection = sqlite3.connect(str(tmp_path / "hook.db"))
+    db.row_factory = sqlite3.Row
+
+    # First search: retrieves beliefs about cloudflare/deploy
+    search_for_prompt(db, "deploy to cloudflare")
+
+    # Record all alphas
+    alphas_before: dict[str, float] = {}
+    for row in db.execute("SELECT id, alpha FROM beliefs WHERE valid_to IS NULL").fetchall():
+        alphas_before[row["id"]] = row["alpha"]
+
+    # Second search: completely different topic, no overlap
+    search_for_prompt(db, "what is quantum computing theory")
+
+    # Check that cloudflare belief alpha did NOT change (no term overlap)
+    for row in db.execute("SELECT id, alpha FROM beliefs WHERE valid_to IS NULL AND content LIKE '%cloudflare%'").fetchall():
+        assert row["alpha"] == alphas_before[row["id"]], (
+            f"Alpha should not change for unmatched belief: {alphas_before[row['id']]} -> {row['alpha']}"
+        )
+
+    db.close()
+    store.close()
+
+
+def test_hook_feedback_updates_last_retrieved_at(tmp_path: Path) -> None:
+    """search_for_prompt() updates last_retrieved_at for returned beliefs."""
+    store: MemoryStore = _make_store(tmp_path)
+    import sqlite3
+    db: sqlite3.Connection = sqlite3.connect(str(tmp_path / "hook.db"))
+    db.row_factory = sqlite3.Row
+
+    # Verify no last_retrieved_at initially
+    row: sqlite3.Row = db.execute(
+        "SELECT last_retrieved_at FROM beliefs WHERE content LIKE '%cloudflare%' AND valid_to IS NULL"
+    ).fetchone()
+    assert row is not None
+    assert row["last_retrieved_at"] is None
+
+    # Search retrieves the belief
+    search_for_prompt(db, "deploy to cloudflare")
+
+    # last_retrieved_at should now be set
+    row_after: sqlite3.Row = db.execute(
+        "SELECT last_retrieved_at FROM beliefs WHERE content LIKE '%cloudflare%' AND valid_to IS NULL"
+    ).fetchone()
+    assert row_after["last_retrieved_at"] is not None
+
+    db.close()
+    store.close()
+
+
+def test_process_pending_feedback_empty_table(tmp_path: Path) -> None:
+    """_process_pending_feedback handles empty pending_feedback table gracefully."""
+    store: MemoryStore = _make_store(tmp_path)
+    import sqlite3
+    db: sqlite3.Connection = sqlite3.connect(str(tmp_path / "hook.db"))
+    db.row_factory = sqlite3.Row
+
+    # Process with no pending entries
+    used: int = _process_pending_feedback(db, "some prompt text")
+    assert used == 0
+
+    db.close()
+    store.close()
