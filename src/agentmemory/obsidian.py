@@ -653,6 +653,8 @@ def sync_vault(
     unchanged: int = 0
     new_hashes: dict[str, str] = {}
 
+    # Pre-render all markdown content, then batch-write changed files
+    pending_writes: list[tuple[Path, str]] = []
     for belief in all_beliefs:
         edges: list[tuple[str, str, str]] = collect_edges_for_belief(
             belief.id, all_edges
@@ -665,9 +667,14 @@ def sync_vault(
             unchanged += 1
             continue
 
-        write_belief_file(belief, edges, beliefs_dir)
+        target: Path = beliefs_dir / f"{belief.id}.md"
+        pending_writes.append((target, file_content))
         new_hashes[belief.id] = file_hash
         written += 1
+
+    # Batch write: single temp dir creation, sequential writes
+    for target, content in pending_writes:
+        target.write_text(content, encoding="utf-8")
 
     # Archive stale files
     archived: int = _archive_stale_files(active_ids, beliefs_dir, archive_dir)
