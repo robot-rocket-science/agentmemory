@@ -1315,11 +1315,15 @@ def delete(belief_id: str) -> str:
         return f"Error: no belief found with ID {belief_id}"
     if belief.valid_to is not None:
         return f"Already deleted (ID: {belief.id}): {belief.content}"
+    if belief.locked:
+        return (
+            f"Refused: belief {belief_id} is locked. "
+            "Unlock it first with unlock(), or supersede it with correct()."
+        )
     store.delete_belief(belief_id)
     return (
         f"Deleted (ID: {belief.id}): {belief.content} "
-        f"[was: {belief.belief_type}, confidence: {belief.confidence:.0%}, "
-        f"locked: {belief.locked}]"
+        f"[was: {belief.belief_type}, confidence: {belief.confidence:.0%}]"
     )
 
 
@@ -1340,9 +1344,19 @@ def bulk_delete(belief_ids: list[str]) -> str:
             f"{_FOREIGN_ID_ERROR}"
         )
     store: MemoryStore = _get_store()
-    deleted: int = store.bulk_delete_beliefs(belief_ids)
-    skipped: int = len(belief_ids) - deleted
+    locked_ids: list[str] = []
+    deletable_ids: list[str] = []
+    for bid in belief_ids:
+        b: Belief | None = store.get_belief(bid)
+        if b is not None and b.locked:
+            locked_ids.append(bid)
+        else:
+            deletable_ids.append(bid)
+    deleted: int = store.bulk_delete_beliefs(deletable_ids)
+    skipped: int = len(deletable_ids) - deleted
     result: str = f"Deleted {deleted} of {len(belief_ids)} beliefs."
+    if locked_ids:
+        result += f" {len(locked_ids)} locked belief(s) refused (unlock first)."
     if skipped > 0:
         result += f" {skipped} were already deleted or not found."
     return result
