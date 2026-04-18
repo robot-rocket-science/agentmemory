@@ -210,6 +210,20 @@ Evaluated across 5 published benchmarks. All results are protocol-correct with
 contamination-proof isolation (separate GT files, verified by `verify_clean.py`).
 No embeddings, no vector DB.
 
+**A note on these results.** I run and publish benchmarks because I believe
+objective, replicable methodology and transparent result reporting matter, and
+that readers deserve to see them. I place limited personal weight on the
+numbers themselves. V&V for agent memory systems is a specialized area where
+I do not have deep hands-on experience, and I cannot be fully confident that
+Claude and I have exercised these systems as rigorously as a dedicated
+evaluator would. What I can commit to is the scientific rigor I was trained
+on and the professional engineering standards I am obligated to uphold:
+pre-registered hypotheses, contamination protocols, protocol-correct
+evaluation, and full methodology disclosure. I welcome constructive
+criticism, independent replication, and analysis that refutes or supports any
+of these claims, and I would be glad to collaborate with anyone interested in
+strengthening the evaluation.
+
 | Benchmark | Metric | agentmemory | Best Published | Delta |
 |---|---|---|---|---|
 | LoCoMo (ACL 2024) | F1 | **66.1%** | 51.6% (GPT-4o-turbo) | +14.5pp |
