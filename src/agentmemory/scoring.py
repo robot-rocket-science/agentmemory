@@ -116,7 +116,9 @@ def lock_boost_typed(belief: Belief, query_terms: list[str], boost: float = 2.0)
 
 def thompson_sample(alpha: float, beta_param: float) -> float:
     """Sample from Beta(alpha, beta_param) for Thompson sampling ranking."""
-    return random.betavariate(alpha, beta_param)
+    safe_alpha: float = max(alpha, 1e-6)
+    safe_beta: float = max(beta_param, 1e-6)
+    return random.betavariate(safe_alpha, safe_beta)
 
 
 def uncertainty_score(alpha: float, beta_param: float) -> float:
