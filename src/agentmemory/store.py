@@ -1706,13 +1706,14 @@ class MemoryStore:
         """
         if topic:
             # FTS5 search with temporal filtering
+            safe_topic: str = self._sanitize_fts5_query(topic)
             sql: str = """
                 SELECT b.* FROM search_index si
                 JOIN beliefs b ON b.id = si.id
                 WHERE search_index MATCH ?
                   AND b.valid_to IS NULL
             """
-            params: list[object] = [topic]
+            params: list[object] = [safe_topic]
             if start:
                 sql += " AND b.created_at >= ?"
                 params.append(start)
@@ -1792,12 +1793,13 @@ class MemoryStore:
             return chain[:limit]
 
         if topic:
+            safe_topic: str = self._sanitize_fts5_query(topic)
             rows: list[sqlite3.Row] = self._conn.execute(
                 """SELECT b.* FROM search_index si
                    JOIN beliefs b ON b.id = si.id
                    WHERE search_index MATCH ?
                    ORDER BY b.created_at ASC LIMIT ?""",
-                (topic, limit),
+                (safe_topic, limit),
             ).fetchall()
             return [_row_to_belief(r) for r in rows]
 
@@ -1848,6 +1850,7 @@ class MemoryStore:
 
         Returns beliefs created before at_time that had not been superseded by then.
         """
+        safe_query: str = self._sanitize_fts5_query(query)
         rows: list[sqlite3.Row] = self._conn.execute(
             """SELECT b.* FROM search_index si
                JOIN beliefs b ON b.id = si.id
@@ -1856,7 +1859,7 @@ class MemoryStore:
                  AND (b.valid_to IS NULL OR b.valid_to > ?)
                ORDER BY rank
                LIMIT ?""",
-            (query, at_time, at_time, top_k),
+            (safe_query, at_time, at_time, top_k),
         ).fetchall()
         return [_row_to_belief(r) for r in rows]
 
