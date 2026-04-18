@@ -115,7 +115,7 @@ Wonder is divergent -- cast a wide net, see what is out there. Reason is converg
 >
 > I welcome constructive criticism, independent replication, and analysis that refutes or supports any of these claims, and I would be glad to collaborate with anyone interested in strengthening the evaluation.
 
-Evaluated across 5 published benchmarks (v1.1.1 through v1.2.1). All results are protocol-correct with contamination-proof isolation (separate GT files, verified by `verify_clean.py`). No embeddings, no vector DB.
+Evaluated across 5 published benchmarks (v1.0 through v1.2.1). All results are protocol-correct with contamination-proof isolation (separate GT files, verified by `verify_clean.py`). No embeddings, no vector DB.
 
 | Benchmark | Metric | agentmemory | Best Published | Delta |
 |---|---|---|---|---|
