@@ -58,6 +58,30 @@ EDGE_DEPENDS_ON: Final[str] = "DEPENDS_ON"        # speculative node -> conditio
 EDGE_RESOLVES: Final[str] = "RESOLVES"            # evidence/experiment -> speculative node
 EDGE_HIBERNATED: Final[str] = "HIBERNATED"        # soft-closed branch marker
 
+# Edge-type valence multipliers for propagation.
+# Positive = propagate in same direction, negative = invert valence.
+EDGE_VALENCE: dict[str, float] = {
+    "SUPPORTS":      1.0,
+    "DEPENDS_ON":    0.8,
+    "IMPLEMENTS":    0.7,
+    "CITES":         0.5,
+    "TESTS":         0.5,
+    "RESOLVES":      0.5,
+    "RELATES_TO":    0.3,
+    "SPECULATES":    0.3,
+    "CONTRADICTS":  -0.5,   # inverts the valence sign
+    "SUPERSEDES":    0.0,   # historical, no propagation
+    "TEMPORAL_NEXT": 0.0,   # structural, no propagation
+    "HIBERNATED":    0.0,   # inactive, no propagation
+}
+
+# Valence propagation parameters
+VALENCE_DECAY: Final[float] = 0.5       # attenuation per hop
+VALENCE_MAX_HOPS: Final[int] = 3        # maximum propagation depth
+VALENCE_MIN_THRESHOLD: Final[float] = 0.05  # stop below this
+CONFIRM_WEIGHT: Final[float] = 2.0      # weight for explicit confirm()
+SESSION_HUB_BOOST: Final[float] = 2.0   # extra weight for hub beliefs
+
 # Temporal directions
 TEMPORAL_BACKWARD: Final[str] = "backward"
 TEMPORAL_FORWARD: Final[str] = "forward"
@@ -67,6 +91,19 @@ OUTCOME_USED: Final[str] = "used"
 OUTCOME_IGNORED: Final[str] = "ignored"
 OUTCOME_CONTRADICTED: Final[str] = "contradicted"
 OUTCOME_HARMFUL: Final[str] = "harmful"
+OUTCOME_CONFIRMED: Final[str] = "confirmed"
+OUTCOME_WEAK: Final[str] = "weak"
+
+# Valence map: string outcome -> continuous score [-1.0, +1.0]
+# Positive = alpha boost, negative = beta boost, zero = no change.
+VALENCE_MAP: dict[str, float] = {
+    "confirmed":    +1.0,
+    "used":         +0.5,
+    "ignored":       0.0,
+    "contradicted":  0.0,
+    "weak":         -0.3,
+    "harmful":      -1.0,
+}
 
 # Detection layers
 LAYER_EXPLICIT: Final[str] = "explicit"

@@ -33,9 +33,13 @@ from agentmemory.models import (
     LAYER_EXPLICIT,
     LAYER_IMPLICIT,
     OBS_TYPE_USER_STATEMENT,
+    OUTCOME_CONFIRMED,
     OUTCOME_HARMFUL,
     OUTCOME_IGNORED,
     OUTCOME_USED,
+    OUTCOME_WEAK,
+    VALENCE_MAP,
+    CONFIRM_WEIGHT,
     Belief,
     Observation,
     Session,
@@ -141,7 +145,7 @@ def _process_auto_feedback(session_id: str) -> int:
         if belief is None:
             continue
 
-        # Key-term overlap check
+        # Key-term overlap check with gradient scoring
         terms: list[str] = _extract_key_terms(belief.content)
         if not terms:
             continue
@@ -149,9 +153,15 @@ def _process_auto_feedback(session_id: str) -> int:
         unique_terms: set[str] = set(terms)
         unique_matches: int = sum(1 for t in unique_terms if t in combined_signal)
 
+        # Gradient valence: overlap ratio instead of binary threshold
+        overlap_ratio: float = unique_matches / max(len(unique_terms), 1)
+        valence_score: float = min(1.0, overlap_ratio)
+
+        # Legacy outcome for backward compat in tests table
         outcome: str = OUTCOME_USED if unique_matches >= _AUTO_FEEDBACK_MIN_MATCHES else OUTCOME_IGNORED
         detail: str = (
-            f"auto: {unique_matches}/{len(unique_terms)} key terms matched"
+            f"auto: {unique_matches}/{len(unique_terms)} key terms matched "
+            f"(valence: {valence_score:+.2f})"
         )
 
         store.record_test_result(
@@ -160,11 +170,10 @@ def _process_auto_feedback(session_id: str) -> int:
             outcome=outcome,
             detection_layer=LAYER_IMPLICIT,
             outcome_detail=detail,
+            valence=valence_score if valence_score > 0 else None,
         )
 
-        # Propagate feedback to edges that led to this belief (slime mold dynamics).
-        # Edges that led to "used" beliefs get stronger; edges that led to "ignored"
-        # beliefs get weaker. Hop distance discounts the update.
+        # Propagate feedback to edges that led to this belief.
         traversed: list[tuple[int, int]] | None = getattr(
             store, "_last_traversed_edges", {},
         ).get(belief_id)
@@ -1348,7 +1357,10 @@ def bulk_delete(belief_ids: list[str]) -> str:
     return result
 
 
-_VALID_OUTCOMES: frozenset[str] = frozenset({OUTCOME_USED, OUTCOME_IGNORED, OUTCOME_HARMFUL})
+_VALID_OUTCOMES: frozenset[str] = frozenset({
+    OUTCOME_USED, OUTCOME_IGNORED, OUTCOME_HARMFUL,
+    OUTCOME_CONFIRMED, OUTCOME_WEAK,
+})
 
 
 @mcp.tool
@@ -1427,11 +1439,12 @@ def feedback(belief_id: str, outcome: str, detail: str = "") -> str:
 
     Call this after using (or deciding not to use) a belief from search results.
     This closes the feedback loop: beliefs that help get stronger, beliefs that
-    hurt get weaker (unless locked).
+    hurt get weaker (unless locked). Valence propagates through edges to
+    connected beliefs.
 
     Args:
         belief_id: The belief ID from search results (e.g. "a1b2c3d4e5f6").
-        outcome: One of "used", "ignored", or "harmful".
+        outcome: One of "confirmed", "used", "ignored", "weak", or "harmful".
         detail: Optional context about why (e.g. "contradicted by user correction").
     """
     if _is_foreign_id(belief_id):
@@ -1446,12 +1459,16 @@ def feedback(belief_id: str, outcome: str, detail: str = "") -> str:
     if belief is None:
         return f"Belief {belief_id} not found."
 
+    # Map string outcome to continuous valence
+    valence_score: float = VALENCE_MAP.get(outcome, 0.0)
+
     test: TestResult = store.record_test_result(
         belief_id=belief_id,
         session_id=session_id,
         outcome=outcome,
         detection_layer=LAYER_EXPLICIT,
         outcome_detail=detail or None,
+        valence=valence_score,
     )
 
     # Mark as explicitly rated so auto-feedback skips it
@@ -1463,6 +1480,11 @@ def feedback(belief_id: str, outcome: str, detail: str = "") -> str:
         store, "_last_traversed_edges", {},
     ).get(belief_id)
     store.propagate_feedback_to_edges(belief_id, outcome, traversed)
+
+    # Propagate valence through the graph (multi-hop, edge-type modulated)
+    propagated: int = 0
+    if valence_score != 0.0:
+        propagated = store.propagate_valence(belief_id, valence_score)
 
     # Re-read to get updated confidence
     updated: Belief | None = store.get_belief(belief_id)
@@ -1477,11 +1499,139 @@ def feedback(belief_id: str, outcome: str, detail: str = "") -> str:
             f"\n  WARNING: Belief dropped below 50% confidence. "
             f'Review: "{snippet}"'
         )
+    prop_note: str = f"\n  Valence {valence_score:+.1f} propagated to {propagated} connected beliefs" if propagated > 0 else ""
     return (
         f"Feedback recorded for {belief_id}: {outcome}{lock_note}\n"
         f"  confidence: {belief.confidence:.3f} -> {updated.confidence:.3f}\n"
         f"  alpha: {belief.alpha} -> {updated.alpha}, "
-        f"beta: {belief.beta_param} -> {updated.beta_param}{drop_warn}"
+        f"beta: {belief.beta_param} -> {updated.beta_param}{drop_warn}{prop_note}"
+    )
+
+
+@mcp.tool
+def confirm(belief_id: str, detail: str = "") -> str:
+    """Confirm a belief is correct and valuable. Positive counterpart to correct().
+
+    Use when the user explicitly validates a belief ("yes, exactly right",
+    "beautiful", etc.) or when a response built on a belief receives strong
+    positive feedback.
+
+    Does NOT create a new belief (unlike correct()). Reinforces the existing
+    graph structure around this belief via valence propagation.
+
+    Args:
+        belief_id: The belief ID to confirm (e.g. "a1b2c3d4e5f6").
+        detail: Optional context (e.g. "user said 'beautiful' about this").
+    """
+    if _is_foreign_id(belief_id):
+        return _FOREIGN_ID_ERROR
+
+    store: MemoryStore = _get_store()
+    session_id: str = _ensure_session()
+
+    belief: Belief | None = store.get_belief(belief_id)
+    if belief is None:
+        return f"Belief {belief_id} not found."
+
+    test: TestResult = store.record_test_result(
+        belief_id=belief_id,
+        session_id=session_id,
+        outcome=OUTCOME_CONFIRMED,
+        detection_layer=LAYER_EXPLICIT,
+        outcome_detail=detail or "explicit confirmation",
+        evidence_weight=CONFIRM_WEIGHT,
+        valence=1.0,
+    )
+
+    _explicit_feedback_ids.add(belief_id)
+    store.increment_session_metrics(session_id, feedback_given=1)
+
+    # Propagate positive valence through the graph
+    propagated: int = store.propagate_valence(belief_id, 1.0)
+
+    updated: Belief | None = store.get_belief(belief_id)
+    if updated is None:
+        return f"Confirmed (test #{test.id}) but belief disappeared."
+
+    prop_note: str = f"\n  Valence +1.0 propagated to {propagated} connected beliefs" if propagated > 0 else ""
+    return (
+        f"Confirmed {belief_id}:{prop_note}\n"
+        f"  confidence: {belief.confidence:.3f} -> {updated.confidence:.3f}\n"
+        f"  alpha: {belief.alpha} -> {updated.alpha}, "
+        f"beta: {belief.beta_param} -> {updated.beta_param}"
+    )
+
+
+@mcp.tool
+def session_quality(score: float, detail: str = "") -> str:
+    """Rate the overall quality of this session's memory contributions.
+
+    Propagates valence through the retrieval subgraph of this session.
+    Hub beliefs (high connectivity within the session) receive more weight.
+    Peripheral beliefs receive attenuated valence via edge propagation.
+
+    Args:
+        score: -1.0 (memory was counterproductive) to +1.0 (memory was essential).
+        detail: Optional context about the rating.
+    """
+    import math
+
+    if score < -1.0 or score > 1.0:
+        return "Score must be between -1.0 and +1.0"
+
+    store: MemoryStore = _get_store()
+    session_id: str = _ensure_session()
+
+    belief_ids, edges, centrality = store.get_session_retrieval_subgraph(session_id)
+    if not belief_ids:
+        return "No beliefs were retrieved during this session."
+
+    store.set_session_quality(session_id, score)
+
+    # Hub-weighted valence distribution
+    max_degree: int = max(centrality.values()) if centrality else 1
+    total_updated: int = 0
+
+    for bid in belief_ids:
+        degree: int = centrality.get(bid, 0)
+        # Hub boost: beliefs with higher degree get proportionally more weight
+        hub_factor: float = 1.0 + (degree / max(max_degree, 1))
+        # Base weight diluted by sqrt(n), then scaled by hub factor
+        per_belief_valence: float = score * hub_factor / math.sqrt(len(belief_ids))
+
+        if abs(per_belief_valence) < 0.01:
+            continue
+
+        belief: Belief | None = store.get_belief(bid)
+        if belief is None:
+            continue
+
+        store.record_test_result(
+            belief_id=bid,
+            session_id=session_id,
+            outcome=OUTCOME_USED if score > 0 else OUTCOME_IGNORED,
+            detection_layer=LAYER_IMPLICIT,
+            outcome_detail=f"session_quality: {score:+.2f}, hub_factor: {hub_factor:.2f}",
+            valence=per_belief_valence,
+        )
+        total_updated += 1
+
+    # Propagate from hub beliefs only (top 20% by degree)
+    propagated: int = 0
+    if centrality:
+        degree_threshold: int = max(1, int(max_degree * 0.8))
+        hub_ids: list[str] = [
+            bid for bid, deg in centrality.items() if deg >= degree_threshold
+        ]
+        for hub_id in hub_ids[:10]:  # cap to avoid runaway
+            propagated += store.propagate_valence(hub_id, score)
+
+    return (
+        f"Session quality {score:+.2f} applied:\n"
+        f"  {total_updated} beliefs updated directly\n"
+        f"  {propagated} additional beliefs reached via hub propagation\n"
+        f"  {len(edges)} edges in retrieval subgraph\n"
+        f"  Hub beliefs: {sum(1 for d in centrality.values() if d >= max(1, int(max_degree * 0.8)))}"
     )
 
 

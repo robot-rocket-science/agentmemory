@@ -329,6 +329,7 @@ class MemoryStore:
         self._migrate_sessions()
         self._migrate_beliefs()
         self._migrate_edges()
+        self._migrate_tests()
 
     def _migrate_beliefs(self) -> None:
         """Run belief-table migrations."""
@@ -465,6 +466,10 @@ class MemoryStore:
             self._conn.execute(
                 "ALTER TABLE sessions ADD COLUMN topics_json TEXT"
             )
+        if "quality_score" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE sessions ADD COLUMN quality_score REAL"
+            )
         self._conn.commit()
 
     def _migrate_edges(self) -> None:
@@ -492,6 +497,18 @@ class MemoryStore:
         if "pruned_at" not in col_names:
             self._conn.execute(
                 "ALTER TABLE edges ADD COLUMN pruned_at TEXT"
+            )
+        self._conn.commit()
+
+    def _migrate_tests(self) -> None:
+        """Add valence column to tests table if missing."""
+        cols: list[sqlite3.Row] = self._conn.execute(
+            "PRAGMA table_info(tests)"
+        ).fetchall()
+        col_names: set[str] = {row["name"] for row in cols}
+        if "valence" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE tests ADD COLUMN valence REAL"
             )
         self._conn.commit()
 
@@ -761,8 +778,19 @@ class MemoryStore:
 
     def update_confidence(
         self, belief_id: str, outcome: str, weight: float = 1.0,
+        valence: float | None = None,
     ) -> bool:
-        """Bayesian update: 'used' increments alpha, 'harmful' increments beta_param.
+        """Bayesian update via outcome string or continuous valence.
+
+        If valence is provided, it overrides the outcome-based logic:
+          valence > 0: alpha += abs(valence) * weight
+          valence < 0: beta  += abs(valence) * weight
+          valence == 0: no change
+
+        If valence is None, falls back to legacy outcome-based updates:
+          'used'/'confirmed': alpha += weight
+          'harmful': beta += weight (locked beliefs require stronger evidence)
+          'ignored'/'contradicted'/'weak': no change (weak uses valence path)
 
         Locked beliefs require stronger evidence (weight >= LOCKED_EVIDENCE_THRESHOLD)
         to have beta_param increased. They are NOT immune to evidence, just resistant
@@ -783,17 +811,27 @@ class MemoryStore:
         is_locked: bool = bool(row["locked"])
         ts: str = _now()
 
-        if outcome == "used":
-            alpha += weight
-        elif outcome == "harmful":
-            if is_locked:
-                # Locked beliefs require stronger evidence to downgrade
-                if weight >= self.LOCKED_EVIDENCE_THRESHOLD:
+        if valence is not None:
+            # Continuous valence path
+            if valence > 0:
+                alpha += abs(valence) * weight
+            elif valence < 0:
+                if is_locked:
+                    if abs(valence) * weight >= self.LOCKED_EVIDENCE_THRESHOLD:
+                        beta += abs(valence) * weight
+                else:
+                    beta += abs(valence) * weight
+        else:
+            # Legacy discrete outcome path
+            if outcome in ("used", "confirmed"):
+                alpha += weight
+            elif outcome == "harmful":
+                if is_locked:
+                    if weight >= self.LOCKED_EVIDENCE_THRESHOLD:
+                        beta += weight
+                else:
                     beta += weight
-                # else: evidence too weak, silently ignored
-            else:
-                beta += weight
-        # ignored and contradicted do not adjust parameters
+            # ignored, contradicted, weak: no change via legacy path
 
         self._conn.execute(
             "UPDATE beliefs SET alpha = ?, beta_param = ?, updated_at = ? WHERE id = ?",
@@ -2350,6 +2388,167 @@ class MemoryStore:
             self._conn.commit()
         return updated
 
+    def propagate_valence(
+        self,
+        belief_id: str,
+        valence: float,
+        decay: float = 0.5,
+        max_hops: int = 3,
+        min_threshold: float = 0.05,
+    ) -> int:
+        """Propagate valence through the belief graph via edge-type modulation.
+
+        Positive valence strengthens connected beliefs (alpha boost).
+        Negative valence weakens them (beta boost).
+        CONTRADICTS edges invert the sign -- confirming A weakens A's contradictions.
+
+        Returns the number of beliefs updated by propagation.
+        """
+        from agentmemory.models import EDGE_VALENCE
+
+        updated: int = 0
+        visited: set[str] = {belief_id}
+        # BFS frontier: (belief_id, current_valence_magnitude)
+        frontier: list[tuple[str, float]] = [(belief_id, valence)]
+
+        for _hop in range(max_hops):
+            next_frontier: list[tuple[str, float]] = []
+            for current_id, current_valence in frontier:
+                # Find all edges from/to this belief
+                rows: list[sqlite3.Row] = self._conn.execute(
+                    """SELECT id, from_id, to_id, edge_type
+                       FROM edges
+                       WHERE (from_id = ? OR to_id = ?) AND pruned_at IS NULL""",
+                    (current_id, current_id),
+                ).fetchall()
+
+                for row in rows:
+                    neighbor_id: str = (
+                        str(row["to_id"]) if str(row["from_id"]) == current_id
+                        else str(row["from_id"])
+                    )
+                    if neighbor_id in visited:
+                        continue
+
+                    edge_type: str = str(row["edge_type"])
+                    multiplier: float = EDGE_VALENCE.get(edge_type, 0.0)
+                    if multiplier == 0.0:
+                        continue
+
+                    # Apply decay and edge-type modulation.
+                    # Negative multiplier (CONTRADICTS) inverts the valence sign.
+                    propagated: float = current_valence * decay * multiplier
+
+                    if abs(propagated) < min_threshold:
+                        continue
+
+                    visited.add(neighbor_id)
+
+                    # Apply the propagated valence to this neighbor's confidence
+                    if propagated > 0:
+                        self._apply_valence_update(neighbor_id, alpha_delta=propagated)
+                    else:
+                        self._apply_valence_update(neighbor_id, beta_delta=abs(propagated))
+
+                    # Also update the edge's own confidence
+                    edge_id: int = int(str(row["id"]))
+                    if propagated > 0:
+                        self.update_edge_confidence(edge_id, "used", weight=abs(propagated))
+                    else:
+                        self.update_edge_confidence(edge_id, "harmful", weight=abs(propagated))
+
+                    updated += 1
+                    next_frontier.append((neighbor_id, propagated))
+
+            frontier = next_frontier
+            if not frontier:
+                break
+
+        if updated > 0:
+            self._conn.commit()
+        return updated
+
+    def _apply_valence_update(
+        self,
+        belief_id: str,
+        alpha_delta: float = 0.0,
+        beta_delta: float = 0.0,
+    ) -> None:
+        """Apply a raw alpha/beta adjustment to a belief. No locking check.
+
+        Used by propagate_valence for indirect updates where the locked
+        evidence threshold does not apply (the originating signal already
+        passed the threshold check on the seed belief).
+        """
+        row: sqlite3.Row | None = self._conn.execute(
+            "SELECT alpha, beta_param, locked FROM beliefs WHERE id = ?",
+            (belief_id,),
+        ).fetchone()
+        if row is None:
+            return
+        alpha: float = row["alpha"] + alpha_delta
+        beta: float = row["beta_param"] + beta_delta
+        is_locked: bool = bool(row["locked"])
+        # Locked beliefs resist indirect negative valence
+        if is_locked and beta_delta > 0:
+            return
+        ts: str = _now()
+        self._conn.execute(
+            "UPDATE beliefs SET alpha = ?, beta_param = ?, updated_at = ? WHERE id = ?",
+            (alpha, beta, ts, belief_id),
+        )
+        self._record_confidence(belief_id, alpha, beta, "valence_propagation")
+
+    def get_session_retrieval_subgraph(
+        self, session_id: str,
+    ) -> tuple[list[str], list[tuple[str, str, str, int]], dict[str, int]]:
+        """Build the induced subgraph of beliefs retrieved during a session.
+
+        Returns:
+            belief_ids: list of unique belief IDs retrieved in the session
+            edges: list of (from_id, to_id, edge_type, edge_id) for edges
+                   where both endpoints are in the retrieved set
+            centrality: dict mapping belief_id -> degree in the subgraph
+        """
+        rows: list[sqlite3.Row] = self._conn.execute(
+            "SELECT DISTINCT belief_id FROM tests WHERE session_id = ?",
+            (session_id,),
+        ).fetchall()
+        belief_ids: list[str] = [str(r["belief_id"]) for r in rows]
+        if not belief_ids:
+            return [], [], {}
+
+        id_set: set[str] = set(belief_ids)
+        placeholders: str = ",".join("?" for _ in belief_ids)
+
+        edge_rows: list[sqlite3.Row] = self._conn.execute(
+            f"""SELECT id, from_id, to_id, edge_type FROM edges
+                WHERE from_id IN ({placeholders})
+                AND to_id IN ({placeholders})
+                AND pruned_at IS NULL""",
+            belief_ids + belief_ids,
+        ).fetchall()
+
+        edges: list[tuple[str, str, str, int]] = []
+        centrality: dict[str, int] = {bid: 0 for bid in belief_ids}
+        for row in edge_rows:
+            fid: str = str(row["from_id"])
+            tid: str = str(row["to_id"])
+            if fid in id_set and tid in id_set:
+                edges.append((fid, tid, str(row["edge_type"]), int(str(row["id"]))))
+                centrality[fid] = centrality.get(fid, 0) + 1
+                centrality[tid] = centrality.get(tid, 0) + 1
+
+        return belief_ids, edges, centrality
+
+    def set_session_quality(self, session_id: str, score: float) -> None:
+        """Record the quality score for a session."""
+        self._conn.execute(
+            "UPDATE sessions SET quality_score = ? WHERE id = ?",
+            (score, session_id),
+        )
+        self._conn.commit()
+
     def get_edge_health(self) -> dict[str, object]:
         """Edge-specific health metrics."""
         def count(sql: str) -> int:
@@ -2764,22 +2963,23 @@ class MemoryStore:
         retrieval_context: str | None = None,
         outcome_detail: str | None = None,
         evidence_weight: float = 1.0,
+        valence: float | None = None,
     ) -> TestResult:
         """Record the outcome of a belief retrieval. Also updates belief confidence."""
         ts: str = _now()
         cursor: sqlite3.Cursor = self._conn.execute(
             """INSERT INTO tests
                (belief_id, session_id, retrieval_context, outcome, outcome_detail,
-                detection_layer, evidence_weight, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                detection_layer, evidence_weight, valence, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (belief_id, session_id, retrieval_context, outcome, outcome_detail,
-             detection_layer, evidence_weight, ts),
+             detection_layer, evidence_weight, valence, ts),
         )
         self._conn.commit()
         row_id: int | None = cursor.lastrowid
         if row_id is None:
             raise RuntimeError("TestResult insert did not return a rowid")
-        self.update_confidence(belief_id, outcome, evidence_weight)
+        self.update_confidence(belief_id, outcome, evidence_weight, valence=valence)
         return TestResult(
             id=row_id,
             belief_id=belief_id,

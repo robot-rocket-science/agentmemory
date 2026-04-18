@@ -288,11 +288,11 @@ def test_feedback_used_increases_alpha() -> None:
     result: str = feedback(belief.id, "used")
 
     assert "Feedback recorded" in result
-    assert "9.0 -> 10.0" in result  # alpha increased
+    assert "9.0 -> 9.5" in result  # alpha increased by valence 0.5
 
     updated: Belief | None = store.get_belief(belief.id)
     assert updated is not None
-    assert updated.alpha == pytest.approx(10.0)  # pyright: ignore[reportUnknownMemberType]
+    assert updated.alpha == pytest.approx(9.5)  # pyright: ignore[reportUnknownMemberType]
     assert updated.beta_param == pytest.approx(1.0)  # pyright: ignore[reportUnknownMemberType]
 
 
