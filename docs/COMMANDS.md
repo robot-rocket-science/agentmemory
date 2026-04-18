@@ -7,24 +7,24 @@ All commands are available as Claude Code slash commands after setup.
 | Command | Description |
 |---------|-------------|
 | `/mem:search <query>` | Search beliefs relevant to a query |
-| `/mem:remember <text>` | Store a new belief |
-| `/mem:correct <text>` | Record a user correction (supersedes conflicting beliefs) |
+| `/mem:new-belief <text>` | Store a new belief |
 | `/mem:lock <belief_id>` | Lock a belief as a permanent constraint |
+| `/mem:unlock <belief_id>` | Unlock a belief |
 | `/mem:locked` | Show all locked beliefs |
 | `/mem:onboard <path>` | Scan and ingest a project directory |
-| `/mem:status` | System analytics |
 | `/mem:core [n]` | Top N beliefs by confidence |
 | `/mem:stats` | Detailed analytics |
+| `/mem:health` | Run diagnostics on the memory system |
 | `/mem:reason <question>` | Graph-aware hypothesis testing |
 | `/mem:wonder <topic>` | Deep research with graph context |
-| `/mem:feedback <id> <outcome>` | Provide feedback on a belief (used/harmful/ignored) |
 | `/mem:delete <id>` | Soft-delete a belief |
+| `/mem:demote` | Demote least-relevant locked beliefs to regular beliefs |
 | `/mem:settings` | View or update settings |
-| `/mem:enable-telemetry` | Enable anonymous performance logging |
-| `/mem:disable-telemetry` | Disable anonymous performance logging |
 | `/mem:disable` | Disable agentmemory for the session |
 | `/mem:enable` | Re-enable agentmemory |
 | `/mem:help` | Command reference |
+
+Additional tools are available via MCP (called by the agent automatically): `remember`, `correct`, `observe`, `feedback`, `ingest`, `search`, `status`, `create_beliefs`, `reclassify`, `bulk_delete`, `snapshot`, `timeline`, `evolution`, `diff`, `graph_metrics`, `link_docs`, `import_obsidian`, `sync_obsidian`.
 
 All commands also work from the terminal without Claude Code:
 

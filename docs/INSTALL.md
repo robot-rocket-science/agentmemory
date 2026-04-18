@@ -42,7 +42,7 @@ agentmemory setup
 This does three things:
 1. Writes `/mem:*` slash commands to `~/.claude/commands/mem/`
 2. Registers the MCP server in your project's `.mcp.json`
-3. Adds session hooks to `~/.claude/settings.json` (context injection, conversation logging)
+3. Adds PreToolUse hooks to `~/.claude/settings.json` (commit tracking, directive gate)
 
 ## Step 3: Restart Claude Code
 
