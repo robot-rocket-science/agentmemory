@@ -605,13 +605,17 @@ def _setup_telemetry() -> None:
 
 def cmd_onboard(args: argparse.Namespace) -> None:
     """Scan a project directory and ingest into memory."""
+    import time as _time
+
     project_path: Path = Path(args.path).expanduser().resolve()
     if not project_path.is_dir():
         print(f"Error: not a directory: {project_path}", file=sys.stderr)
         sys.exit(1)
 
+    t_start: float = _time.perf_counter()
     print(f"Scanning {project_path.name}...")
     scan: ScanResult = scan_project(project_path)
+    t_scan: float = _time.perf_counter()
 
     print(f"  Signals: git={scan.manifest.has_git}, "
           f"docs={scan.manifest.doc_count}, "
@@ -678,6 +682,7 @@ def cmd_onboard(args: argparse.Namespace) -> None:
             if ingested % 500 == 0:
                 print(f"  ...{ingested}/{total}")
 
+    t_ingest: float = _time.perf_counter()
     print(f"  Mapped {len(node_to_belief)} scanner nodes to belief IDs")
 
     # Store structural edges, translating scanner IDs to belief IDs where possible
@@ -687,6 +692,7 @@ def cmd_onboard(args: argparse.Namespace) -> None:
         tgt: str = node_to_belief.get(edge.tgt, edge.tgt)
         edge_batch.append((src, tgt, edge.edge_type, edge.weight, "scanner"))
     edge_count: int = store.batch_insert_graph_edges(edge_batch)
+    t_edges: float = _time.perf_counter()
     if edge_count > 0:
         print(f"  Stored {edge_count} structural edges")
 
@@ -778,8 +784,18 @@ def cmd_onboard(args: argparse.Namespace) -> None:
         print(f"  Belief links: {link_result.belief_refs_added}")
 
     store.close()
+    t_end: float = _time.perf_counter()
 
-    timing_parts: list[str] = [f"{k}={v:.2f}s" for k, v in scan.timings.items()]
+    scan_parts: list[str] = [f"{k}={v:.2f}s" for k, v in scan.timings.items()]
+    phase_parts: list[str] = [
+        f"scan={t_scan - t_start:.2f}s",
+        f"ingest={t_ingest - t_scan:.2f}s",
+        f"edges={t_edges - t_ingest:.2f}s",
+    ]
+    if vault_sync_count > 0:
+        phase_parts.append(f"vault={t_end - t_edges:.2f}s")
+    phase_parts.append(f"total={t_end - t_start:.2f}s")
+
     print(f"\nDone.")
     print(f"  Observations: {aggregate.observations_created}")
     print(f"  Beliefs: {aggregate.beliefs_created}")
@@ -787,7 +803,8 @@ def cmd_onboard(args: argparse.Namespace) -> None:
     print(f"  Edges: {edge_count} structural + {link_edges} semantic")
     if vault_sync_count > 0:
         print(f"  Vault: {vault_sync_count} beliefs + {doc_link_count} docs")
-    print(f"  Timing: {', '.join(timing_parts)}")
+    print(f"  Timing (scan): {', '.join(scan_parts)}")
+    print(f"  Timing (pipeline): {', '.join(phase_parts)}")
 
 
 # ---------------------------------------------------------------------------
