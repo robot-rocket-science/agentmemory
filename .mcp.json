@@ -3,7 +3,7 @@
     "agentmemory": {
       "type": "stdio",
       "command": "uv",
-      "args": ["run", "--project", "/Users/thelorax/projects/agentmemory", "python", "-m", "agentmemory.server"],
+      "args": ["run", "--project", ".", "python", "-m", "agentmemory.server"],
       "env": {}
     }
   }

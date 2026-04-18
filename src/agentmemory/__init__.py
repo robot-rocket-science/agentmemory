@@ -4,7 +4,7 @@ from __future__ import annotations
 from agentmemory.models import Belief, Observation
 from agentmemory.store import MemoryStore
 
-__version__ = "0.1.0"
+__version__ = "1.2.3"
 
 __all__ = [
     "MemoryStore",
