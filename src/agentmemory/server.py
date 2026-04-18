@@ -161,6 +161,16 @@ def _process_auto_feedback(session_id: str) -> int:
             detection_layer=LAYER_IMPLICIT,
             outcome_detail=detail,
         )
+
+        # Propagate feedback to edges that led to this belief (slime mold dynamics).
+        # Edges that led to "used" beliefs get stronger; edges that led to "ignored"
+        # beliefs get weaker. Hop distance discounts the update.
+        traversed: list[tuple[int, int]] | None = getattr(
+            store, "_last_traversed_edges", {},
+        ).get(belief_id)
+        if traversed:
+            store.propagate_feedback_to_edges(belief_id, outcome, traversed)
+
         count += 1
 
     if count > 0:
@@ -1447,6 +1457,12 @@ def feedback(belief_id: str, outcome: str, detail: str = "") -> str:
     # Mark as explicitly rated so auto-feedback skips it
     _explicit_feedback_ids.add(belief_id)
     store.increment_session_metrics(session_id, feedback_given=1)
+
+    # Propagate to edges (explicit feedback is strongest signal)
+    traversed: list[tuple[int, int]] | None = getattr(
+        store, "_last_traversed_edges", {},
+    ).get(belief_id)
+    store.propagate_feedback_to_edges(belief_id, outcome, traversed)
 
     # Re-read to get updated confidence
     updated: Belief | None = store.get_belief(belief_id)
