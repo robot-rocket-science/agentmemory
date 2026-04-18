@@ -305,6 +305,69 @@ def follow_supersession(
 # Main search
 # ---------------------------------------------------------------------------
 
+def _process_pending_feedback(
+    db: sqlite3.Connection,
+    prompt: str,
+    min_matches: int = 2,
+) -> int:
+    """Process pending feedback from the previous search against this prompt.
+
+    Matches key terms from previously retrieved beliefs against the current
+    prompt text. Beliefs whose terms appear in the prompt are marked 'used',
+    others 'ignored'. This closes the feedback loop for hook-based retrieval.
+
+    Returns the number of 'used' outcomes recorded.
+    """
+    try:
+        pending: list[sqlite3.Row] = db.execute(
+            "SELECT id, belief_id, belief_content FROM pending_feedback LIMIT 100"
+        ).fetchall()
+    except sqlite3.OperationalError:
+        return 0
+
+    if not pending:
+        return 0
+
+    prompt_lower: str = prompt.lower()
+    prompt_terms: set[str] = set(re.findall(r"[a-zA-Z0-9_]+", prompt_lower))
+    used_count: int = 0
+    now_str: str = datetime.now(timezone.utc).isoformat()
+    pending_ids: list[int] = []
+
+    for row in pending:
+        pending_ids.append(row["id"])
+        belief_id: str = row["belief_id"]
+        content: str = row["belief_content"] or ""
+
+        # Extract key terms from belief content
+        terms: list[str] = [
+            w for w in re.findall(r"[a-zA-Z0-9_]+", content.lower())
+            if len(w) >= 3
+        ]
+        if not terms:
+            continue
+
+        unique_terms: set[str] = set(terms)
+        matched: int = len(unique_terms & prompt_terms)
+
+        if matched >= min_matches:
+            # "used" -- belief content overlaps with prompt
+            db.execute(
+                "UPDATE beliefs SET alpha = alpha + 0.3, updated_at = ? WHERE id = ?",
+                (now_str, belief_id),
+            )
+            used_count += 1
+        # "ignored" -- no alpha/beta change (existing behavior)
+
+    # Clear processed entries
+    if pending_ids:
+        ph: str = ",".join("?" * len(pending_ids))
+        db.execute(f"DELETE FROM pending_feedback WHERE id IN ({ph})", pending_ids)
+        db.commit()
+
+    return used_count
+
+
 def search_for_prompt(
     db: sqlite3.Connection,
     prompt: str,
@@ -312,12 +375,17 @@ def search_for_prompt(
 ) -> SearchResult:
     """Run the full search pipeline for a user prompt.
 
-    1. FTS5 keyword search
-    2. Entity-aware secondary search (user corrections mentioning prompt entities)
-    3. Action-context detection (search for beliefs about action targets)
-    4. Supersession-chain following (surface replacements for superseded beliefs)
-    5. Score, deduplicate, pack into budget
+    1. Process pending feedback from previous search (closes feedback loop)
+    2. FTS5 keyword search
+    3. Entity-aware secondary search (user corrections mentioning prompt entities)
+    4. Action-context detection (search for beliefs about action targets)
+    5. Supersession-chain following (surface replacements for superseded beliefs)
+    6. Score, deduplicate, pack into budget
+    7. Record new pending feedback for this search's results
     """
+    # Process feedback from previous turn before running new search
+    _process_pending_feedback(db, prompt)
+
     query_words: list[str] = extract_query_words(prompt)
     if not query_words:
         return SearchResult()
@@ -526,5 +594,29 @@ def search_for_prompt(
                 source_docs = [str(r[0]) for r in id_rows if r[0]]
             except sqlite3.OperationalError:
                 pass
+
+    # --- Record retrieval for feedback loop ---
+    # Update last_retrieved_at and insert pending_feedback so the
+    # auto-feedback path (commit-check hook) can close the loop.
+    # This is the fix for onboarded beliefs never getting confidence
+    # updates: hook_search previously did zero writes.
+    if packed:
+        now_str: str = now.isoformat()
+        belief_ids_packed: list[str] = [b.id for b in packed]
+        ph_upd: str = ",".join("?" * len(belief_ids_packed))
+        try:
+            db.execute(
+                f"UPDATE beliefs SET last_retrieved_at = ? WHERE id IN ({ph_upd})",
+                [now_str, *belief_ids_packed],
+            )
+            # Insert pending feedback (batch insert for speed)
+            db.executemany(
+                "INSERT INTO pending_feedback (belief_id, belief_content, session_id, created_at) "
+                "VALUES (?, ?, NULL, ?)",
+                [(b.id, b.content[:200], now_str) for b in packed],
+            )
+            db.commit()
+        except sqlite3.OperationalError:
+            pass  # readonly or missing table -- degrade silently
 
     return SearchResult(beliefs=packed, source_docs=source_docs[:5])
