@@ -864,7 +864,11 @@ class MemoryStore:
                             beta += weight
                     else:
                         beta += weight
-                # ignored, contradicted, weak: no change via legacy path
+                elif outcome == "ignored" and not is_locked:
+                    # Weak evidence of irrelevance: retrieved but not acted on.
+                    # 0.1 weight means ~10 ignores = 1 "used" signal.
+                    # Locked beliefs are exempt -- they represent user constraints.
+                    beta += 0.1 * weight
 
             self._conn.execute(
                 "UPDATE beliefs SET alpha = ?, beta_param = ?, updated_at = ? WHERE id = ?",
@@ -1813,8 +1817,14 @@ class MemoryStore:
                 sql += " AND b.created_at <= ?"
                 params.append(end)
             if session_id:
-                sql += " AND b.session_id = ?"
-                params.append(session_id)
+                sql += (
+                    " AND (b.session_id = ?"
+                    " OR b.id IN ("
+                    "   SELECT e.belief_id FROM evidence e"
+                    "   JOIN observations o ON e.observation_id = o.id"
+                    "   WHERE o.session_id = ?))"
+                )
+                params.extend([session_id, session_id])
             sql += " ORDER BY b.created_at ASC LIMIT ?"
             params.append(limit)
         else:
@@ -1827,8 +1837,14 @@ class MemoryStore:
                 sql += " AND created_at <= ?"
                 params.append(end)
             if session_id:
-                sql += " AND session_id = ?"
-                params.append(session_id)
+                sql += (
+                    " AND (session_id = ?"
+                    " OR id IN ("
+                    "   SELECT e.belief_id FROM evidence e"
+                    "   JOIN observations o ON e.observation_id = o.id"
+                    "   WHERE o.session_id = ?))"
+                )
+                params.extend([session_id, session_id])
             sql += " ORDER BY created_at ASC LIMIT ?"
             params.append(limit)
 

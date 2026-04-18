@@ -531,6 +531,7 @@ def remember(text: str) -> str:
         beta_param=0.5,
         locked=False,
         classified_by="user",
+        session_id=session_id,
     )
     detect_relationships(store, belief)
     store.checkpoint(session_id, "remember", belief.content, [belief.id])
@@ -566,6 +567,7 @@ def correct(text: str, replaces: str | None = None) -> str:
         beta_param=0.5,
         locked=False,
         classified_by="user",
+        session_id=session_id,
     )
     detect_relationships(store, belief)
 

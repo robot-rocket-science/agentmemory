@@ -526,7 +526,14 @@ def _process_pending_feedback(
                 (now_str, belief_id),
             )
             used_count += 1
-        # "ignored" -- no alpha/beta change (existing behavior)
+        else:
+            # "ignored" -- weak evidence of irrelevance (0.1 beta increment)
+            # Skip locked beliefs -- they represent user constraints
+            db.execute(
+                "UPDATE beliefs SET beta_param = beta_param + 0.1, updated_at = ? "
+                "WHERE id = ? AND locked = 0",
+                (now_str, belief_id),
+            )
 
     # Clear processed entries
     if pending_ids:
