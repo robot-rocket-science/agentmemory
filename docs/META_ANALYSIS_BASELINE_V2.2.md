@@ -181,7 +181,56 @@ The key shift: 2,004 beliefs move from B (default prior) to C (differentiated).
 | Token cost growth | Avg tokens/search | Stable or declining |
 | Correction rate | % user messages that are corrections | < 1.0% (from 1.1%) |
 
-## 10. Methodology Notes
+## 10. Prior Reports and Protocol Alignment
+
+This baseline builds on several prior analyses. For apples-to-apples comparison
+across versions, use the same metrics and methods as these established reports.
+
+### Prior Baselines
+
+| Report | Date | Key Metrics | Location |
+|--------|------|-------------|----------|
+| Memory Quality Audit | Apr 11 | DB inventory, confidence dist, source types | research/MEMORY_QUALITY_AUDIT.md |
+| Exp 6 Phase C | Apr 9 | Override rate/day (OVERRIDES.md ground truth) | experiments/exp6_historical_analysis.md |
+| Exp 58b | Apr 10 | Correction prevention rate (top-K, 218 decisions) | experiments/exp58b_results.md |
+| Exp 58c | Apr 10 | Velocity-scaled decay, maturity inflation | experiments/exp58c_results.md |
+| Exp 64 | Apr 12 | Token budget sweep, compilation vs on-demand | experiments/exp64_preprompt_compilation_results.md |
+| Benchmark Suite | Apr 14 | LoCoMo, MAB, StructMem, LongMem scores | docs/BENCHMARK_RESULTS.md |
+| Wonder Baseline | Apr 16 | Wonder precision (24% on 15K beliefs) | docs/WONDER_BASELINE.md |
+| Design vs Reality | Apr 11 | 32-point scorecard, built vs promised | research/DESIGN_VS_REALITY.md |
+
+### Metric Lineage
+
+| This Report's Metric | Prior Protocol | How to Compare |
+|----------------------|----------------|----------------|
+| Correction rate (1.1%) | Exp 6 override rate (1.80/day) | Exp 6 uses OVERRIDES.md ground truth; this report uses keyword detection in JSONL. Not directly comparable -- Exp 6 is higher fidelity |
+| Confidence distribution | MEMORY_QUALITY_AUDIT (98.4% at 0.90) | Same SQL query, same bands. Apr 11: 98.4% at default. Apr 18: 79.7% at default. Shows 3,413 beliefs differentiated |
+| Token cost per search | Exp 64 (23.1% at 2K budget) | Exp 64 measures coverage; this report measures raw token count. Complementary, not redundant |
+| Feedback "used" rate | No prior equivalent | New metric introduced here. Track going forward |
+| AM adoption density | No prior equivalent | New metric from JSONL log analysis. Track going forward |
+| DB inventory | MEMORY_QUALITY_AUDIT | Same format. Compare directly: beliefs 16,067 -> 19,480 (+21%), edges 33,151 -> 24,202 (schema change), sessions 0 -> 34 |
+
+### Version Comparison (DB Inventory)
+
+| Metric | Apr 11 (Audit) | Apr 18 (v2.2.0) | Delta |
+|--------|---------------|-----------------|-------|
+| Total beliefs | 16,067 | 19,480 | +3,413 (+21%) |
+| Locked beliefs | 1 | 2,037 | +2,036 |
+| Observations | 15,492 | 18,721 | +3,229 (+21%) |
+| Sessions | 0 | 34 | +34 |
+| Tests (feedback) | 0 | 31,412 | +31,412 |
+| Confidence at default | 98.4% | 79.7% | -18.7pp |
+| User-stated beliefs | 2 | 18 | +16 |
+
+### What to Run for Next Version
+
+1. Re-run the SQL queries in Section "How to Reproduce" above
+2. Re-run the Exp 6 override detection if new OVERRIDES data exists
+3. Re-run benchmark suite (docs/BENCHMARK_PROTOCOL.md)
+4. Parse latest conversation logs for adoption/correction metrics
+5. Compare all tables against this document's values
+
+## 11. Methodology Notes
 
 - Session DB: `~/.agentmemory/projects/2e7ed55e017a/memory.db`
 - Conversation logs: `~/.claude/conversation-logs/*.jsonl`
