@@ -206,6 +206,7 @@ def create_beliefs_from_classified(
     session_id: str | None = None,
     classified_by: str = "offline",
     data_source: str = "",
+    bulk: bool = False,
 ) -> IngestResult:
     """Create beliefs from pre-classified sentences.
 
@@ -218,6 +219,9 @@ def create_beliefs_from_classified(
 
     event_time: bitemporal timestamp for when the fact occurred.
     session_id: session that created these beliefs.
+    bulk: skip per-belief FTS5 relationship checks (supersession, contradiction,
+          gap closure). Use during onboard where structural edges are provided
+          by the scanner and per-belief searches are prohibitively expensive.
     """
     result: IngestResult = IngestResult()
 
@@ -252,10 +256,11 @@ def create_beliefs_from_classified(
         result.beliefs_created += 1
         result.sentences_persisted += 1
 
-        check_temporal_supersession(store, belief)
-        detect_relationships(store, belief)
-        detect_gap_closure(store, belief)
-        _check_triple_supersession(store, belief)
+        if not bulk:
+            check_temporal_supersession(store, belief)
+            detect_relationships(store, belief)
+            detect_gap_closure(store, belief)
+            _check_triple_supersession(store, belief)
 
         if cs.sentence_type == "CORRECTION":
             raw_words: list[str] = [
@@ -314,12 +319,15 @@ def ingest_turn(
     source_path: str = "",
     source_id: str = "",
     event_time: str | None = None,
+    bulk: bool = False,
 ) -> IngestResult:
     """Process a single conversation turn end-to-end (fast path).
 
     Uses offline classification for speed. Suitable for live conversation
     turns via hooks. For batch operations (onboard), use extract_turn()
     + LLM classification + create_beliefs_from_classified() instead.
+
+    bulk: skip per-belief FTS5 relationship checks during onboard.
     """
     extracted: ExtractedTurn = extract_turn(
         store, text, source, session_id, created_at, source_path,
@@ -349,6 +357,7 @@ def ingest_turn(
         created_at=created_at,
         event_time=event_time,
         session_id=session_id,
+        bulk=bulk,
     )
     result.merge(belief_result)
 

@@ -628,13 +628,17 @@ def cmd_ingest(args: argparse.Namespace) -> None:
 
 def cmd_onboard(args: argparse.Namespace) -> None:
     """Scan a project directory and ingest into memory."""
+    import time as _time
+
     project_path: Path = Path(args.path).expanduser().resolve()
     if not project_path.is_dir():
         print(f"Error: not a directory: {project_path}", file=sys.stderr)
         sys.exit(1)
 
+    t_start: float = _time.perf_counter()
     print(f"Scanning {project_path.name}...")
     scan: ScanResult = scan_project(project_path)
+    t_scan: float = _time.perf_counter()
 
     print(f"  Signals: git={scan.manifest.has_git}, "
           f"docs={scan.manifest.doc_count}, "
@@ -665,56 +669,53 @@ def cmd_onboard(args: argparse.Namespace) -> None:
 
     ingested: int = 0
     total: int = sum(1 for n in scan.nodes if n.node_type != "file")
-    for node in scan.nodes:
-        if node.node_type == "file":
-            continue
+    with store.transaction():
+        for node in scan.nodes:
+            if node.node_type == "file":
+                continue
 
-        source: str = "document"
-        if node.node_type == "commit_belief":
-            source = "git"
-        elif node.node_type == "behavioral_belief":
-            source = "directive"
-        elif node.node_type == "callable":
-            source = "code"
+            source: str = "document"
+            if node.node_type == "commit_belief":
+                source = "git"
+            elif node.node_type == "behavioral_belief":
+                source = "directive"
+            elif node.node_type == "callable":
+                source = "code"
 
-        turn_result: IngestResult = ingest_turn(
-            store=store,
-            text=node.content,
-            source=source,
-            session_id=None,
-            created_at=node.date,
-            source_path=node.file or "",
-            source_id=node.id,
-            event_time=node.date,
-        )
-        aggregate.merge(turn_result)
+            turn_result: IngestResult = ingest_turn(
+                store=store,
+                text=node.content,
+                source=source,
+                session_id=None,
+                created_at=node.date,
+                source_path=node.file or "",
+                source_id=node.id,
+                event_time=node.date,
+                bulk=True,
+            )
+            aggregate.merge(turn_result)
 
-        # Look up the belief created from this node's content
-        content_hash: str = _hashlib.sha256(node.content.encode()).hexdigest()[:12]
-        belief: Belief | None = store.get_belief_by_hash(content_hash)
-        if belief is not None:
-            node_to_belief[node.id] = belief.id
+            # Look up the belief created from this node's content
+            content_hash: str = _hashlib.sha256(node.content.encode()).hexdigest()[:12]
+            belief: Belief | None = store.get_belief_by_hash(content_hash)
+            if belief is not None:
+                node_to_belief[node.id] = belief.id
 
-        ingested += 1
-        if ingested % 500 == 0:
-            print(f"  ...{ingested}/{total}")
+            ingested += 1
+            if ingested % 500 == 0:
+                print(f"  ...{ingested}/{total}")
 
+    t_ingest: float = _time.perf_counter()
     print(f"  Mapped {len(node_to_belief)} scanner nodes to belief IDs")
 
     # Store structural edges, translating scanner IDs to belief IDs where possible
-    edge_count: int = 0
+    edge_batch: list[tuple[str, str, str, float, str]] = []
     for edge in scan.edges:
-        # Use belief IDs if we have them, otherwise keep scanner IDs
         src: str = node_to_belief.get(edge.src, edge.src)
         tgt: str = node_to_belief.get(edge.tgt, edge.tgt)
-        store.insert_graph_edge(
-            from_id=src,
-            to_id=tgt,
-            edge_type=edge.edge_type,
-            weight=edge.weight,
-            reason="scanner",
-        )
-        edge_count += 1
+        edge_batch.append((src, tgt, edge.edge_type, edge.weight, "scanner"))
+    edge_count: int = store.batch_insert_graph_edges(edge_batch)
+    t_edges: float = _time.perf_counter()
     if edge_count > 0:
         print(f"  Stored {edge_count} structural edges")
 
@@ -806,8 +807,18 @@ def cmd_onboard(args: argparse.Namespace) -> None:
         print(f"  Belief links: {link_result.belief_refs_added}")
 
     store.close()
+    t_end: float = _time.perf_counter()
 
-    timing_parts: list[str] = [f"{k}={v:.2f}s" for k, v in scan.timings.items()]
+    scan_parts: list[str] = [f"{k}={v:.2f}s" for k, v in scan.timings.items()]
+    phase_parts: list[str] = [
+        f"scan={t_scan - t_start:.2f}s",
+        f"ingest={t_ingest - t_scan:.2f}s",
+        f"edges={t_edges - t_ingest:.2f}s",
+    ]
+    if vault_sync_count > 0:
+        phase_parts.append(f"vault={t_end - t_edges:.2f}s")
+    phase_parts.append(f"total={t_end - t_start:.2f}s")
+
     print(f"\nDone.")
     print(f"  Observations: {aggregate.observations_created}")
     print(f"  Beliefs: {aggregate.beliefs_created}")
@@ -815,7 +826,8 @@ def cmd_onboard(args: argparse.Namespace) -> None:
     print(f"  Edges: {edge_count} structural + {link_edges} semantic")
     if vault_sync_count > 0:
         print(f"  Vault: {vault_sync_count} beliefs + {doc_link_count} docs")
-    print(f"  Timing: {', '.join(timing_parts)}")
+    print(f"  Timing (scan): {', '.join(scan_parts)}")
+    print(f"  Timing (pipeline): {', '.join(phase_parts)}")
 
 
 # ---------------------------------------------------------------------------
