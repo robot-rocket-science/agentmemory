@@ -46,6 +46,19 @@ from agentmemory.retrieval import RetrievalResult, retrieve
 from agentmemory.store import MemoryStore
 
 # ---------------------------------------------------------------------------
+# Input limits
+# ---------------------------------------------------------------------------
+
+MAX_TEXT_LENGTH: int = 50_000  # 50KB per input field
+MAX_BULK_ITEMS: int = 500  # max beliefs in create_beliefs / bulk_delete
+
+def _check_length(text: str, field: str = "text") -> str | None:
+    """Return error string if text exceeds limit, else None."""
+    if len(text) > MAX_TEXT_LENGTH:
+        return f"Error: {field} exceeds {MAX_TEXT_LENGTH} character limit ({len(text)} chars)."
+    return None
+
+# ---------------------------------------------------------------------------
 # Store singleton + session tracking
 # ---------------------------------------------------------------------------
 
@@ -493,6 +506,9 @@ def remember(text: str) -> str:
     The belief is NOT locked until the user explicitly confirms via lock().
     Returns belief ID and prompts for user confirmation before locking.
     """
+    err: str | None = _check_length(text)
+    if err is not None:
+        return err
     _signal_buffer.append(text)
     store: MemoryStore = _get_store()
     session_id: str = _ensure_session()
@@ -525,6 +541,9 @@ def correct(text: str, replaces: str | None = None) -> str:
     If replaces is provided (a search query), finds the best matching
     existing belief and supersedes it.
     """
+    err: str | None = _check_length(text)
+    if err is not None:
+        return err
     _signal_buffer.append(text)
     store: MemoryStore = _get_store()
     session_id: str = _ensure_session()
@@ -606,6 +625,9 @@ def observe(text: str, source: str = "user") -> str:
 
     Returns the observation ID.
     """
+    err: str | None = _check_length(text)
+    if err is not None:
+        return err
     _signal_buffer.append(text)
     store: MemoryStore = _get_store()
     session_id: str = _ensure_session()
@@ -926,8 +948,16 @@ def create_beliefs(classified_json: str) -> str:
     """
     import json as _json
 
+    err: str | None = _check_length(classified_json, "classified_json")
+    if err is not None:
+        return err
     store: MemoryStore = _get_store()
-    items: list[dict[str, str]] = _json.loads(classified_json)
+    try:
+        items: list[dict[str, str]] = _json.loads(classified_json)
+    except (ValueError, _json.JSONDecodeError) as exc:
+        return f"Error: invalid JSON in classified_json: {exc}"
+    if len(items) > MAX_BULK_ITEMS:
+        return f"Error: too many items ({len(items)}). Maximum is {MAX_BULK_ITEMS}."
 
     total_created: int = 0
     total_skipped: int = 0
@@ -1052,8 +1082,16 @@ def reclassify(mappings: str) -> str:
     """
     import json as _json
 
+    err: str | None = _check_length(mappings, "mappings")
+    if err is not None:
+        return err
     store: MemoryStore = _get_store()
-    items: list[dict[str, str]] = _json.loads(mappings)
+    try:
+        items: list[dict[str, str]] = _json.loads(mappings)
+    except (ValueError, _json.JSONDecodeError) as exc:
+        return f"Error: invalid JSON in mappings: {exc}"
+    if len(items) > MAX_BULK_ITEMS:
+        return f"Error: too many items ({len(items)}). Maximum is {MAX_BULK_ITEMS}."
 
     # Map from classification type to belief_type
     type_to_belief: dict[str, str] = {
@@ -1123,6 +1161,9 @@ def ingest(text: str, source: str = "user") -> str:
 
     Use source='user' for user messages, source='assistant' for agent messages.
     """
+    err: str | None = _check_length(text)
+    if err is not None:
+        return err
     store: MemoryStore = _get_store()
     session_id: str = _ensure_session()
     result: IngestResult = ingest_turn(store, text, source, session_id=session_id)
