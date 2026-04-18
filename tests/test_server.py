@@ -546,7 +546,7 @@ def test_deleted_belief_excluded_from_search() -> None:
 
 
 def test_deleted_locked_belief_excluded_from_get_locked() -> None:
-    """Deleted locked beliefs should not appear in get_locked()."""
+    """Locked beliefs must be unlocked before deletion."""
     out: str = remember("Locked then deleted belief")
     belief_id: str = out.split("ID: ")[1].split(")")[0]
     lock(belief_id)
@@ -554,6 +554,13 @@ def test_deleted_locked_belief_excluded_from_get_locked() -> None:
     locked_before: str = get_locked()
     assert "Locked then deleted belief" in locked_before
 
+    # Direct delete of locked belief should be refused
+    refuse_result: str = delete(belief_id)
+    assert "Refused" in refuse_result
+
+    # Unlock via store, then delete should succeed
+    store: MemoryStore = server_mod._get_store()  # pyright: ignore[reportPrivateUsage]
+    store.unlock_belief(belief_id)
     delete(belief_id)
 
     locked_after: str = get_locked()

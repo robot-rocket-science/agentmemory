@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 780 730" xmlns="http://www.w3.org/2000/svg" style="max-width:780px;width:100%;height:auto;display:block;margin:2rem auto;">
+  <defs>
+    <marker id="ag" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><path d="M0,0 L10,3.5 L0,7" fill="#33aa33"/></marker>
+    <marker id="aa" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><path d="M0,0 L10,3.5 L0,7" fill="#cc8800"/></marker>
+    <marker id="ac" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><path d="M0,0 L10,3.5 L0,7" fill="#339999"/></marker>
+    <filter id="glow-g"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="glow-a"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="glow-c"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+<rect width="780" height="730" fill="#000"/>
+  <style>
+    .t-head { font: bold 13px 'Menlo','DejaVu Sans Mono',monospace; letter-spacing: 2px; }
+    .t-mod { font: bold 11px 'Menlo','DejaVu Sans Mono',monospace; }
+    .t-desc { font: 9.5px 'Menlo','DejaVu Sans Mono',monospace; fill: #1a6a1a; }
+    .t-phase { font: bold 10px 'Menlo','DejaVu Sans Mono',monospace; letter-spacing: 3px; }
+    .t-actor { font: bold 14px 'Menlo','DejaVu Sans Mono',monospace; }
+    .arrow-g { stroke: #33aa33; stroke-width: 2; fill: none; marker-end: url(#ag); }
+    .arrow-a { stroke: #cc8800; stroke-width: 2; fill: none; marker-end: url(#aa); }
+    .arrow-c { stroke: #339999; stroke-width: 2; fill: none; marker-end: url(#ac); }
+    .arrow-fb { stroke: #cc8800; stroke-width: 2; fill: none; stroke-dasharray: 8,5; marker-end: url(#aa); }
+  </style>
+  
+  
+  <rect x="30" y="20" width="120" height="44" rx="4" fill="none" stroke="#339999" stroke-width="2" filter="url(#glow-c)"/>
+  <text x="90" y="47" text-anchor="middle" class="t-actor" fill="#339999">USER</text>
+  
+  <rect x="630" y="20" width="120" height="44" rx="4" fill="none" stroke="#cc8800" stroke-width="2" filter="url(#glow-a)"/>
+  <text x="690" y="47" text-anchor="middle" class="t-actor" fill="#cc8800">LLM</text>
+  
+  <line x1="90" y1="64" x2="90" y2="105" class="arrow-c"/>
+  <line x1="690" y1="64" x2="690" y2="105" class="arrow-a"/>
+  
+  <rect x="15" y="95" width="750" height="250" rx="3" fill="rgba(0,100,0,0.04)" stroke="#1a6a1a" stroke-width="1"/>
+  <text x="390" y="118" text-anchor="middle" class="t-phase" fill="#1a6a1a">WRITE PATH</text>
+  <text x="390" y="132" text-anchor="middle" class="t-desc">every conversation turn</text>
+  
+  <rect x="80" y="148" width="240" height="56" rx="28" fill="none" stroke="#339999" stroke-width="1.5" filter="url(#glow-c)"/>
+  <text x="200" y="172" text-anchor="middle" class="t-mod" fill="#339999">Correction Detector</text>
+  <text x="200" y="195" text-anchor="middle" class="t-desc">92% accuracy, zero LLM cost</text>
+  
+  <line x1="200" y1="204" x2="200" y2="236" class="arrow-g"/>
+  
+  <polygon points="200,236 280,270 200,304 120,270" fill="none" stroke="#cc8800" stroke-width="1.5" filter="url(#glow-a)"/>
+  <text x="200" y="267" text-anchor="middle" class="t-mod" fill="#cc8800">Write Gate</text>
+  <text x="200" y="282" text-anchor="middle" style="font:8.5px 'Menlo',monospace;fill:#1a6a1a">filter junk, classify type</text>
+  
+  <line x1="280" y1="270" x2="440" y2="270" class="arrow-g"/>
+  
+  <ellipse cx="560" cy="245" rx="100" ry="14" fill="none" stroke="#33aa33" stroke-width="1.5"/>
+  <rect x="460" y="245" width="200" height="60" fill="none" stroke="#33aa33" stroke-width="1.5"/>
+  <ellipse cx="560" cy="305" rx="100" ry="14" fill="none" stroke="#33aa33" stroke-width="1.5" filter="url(#glow-g)"/>
+  <text x="560" y="272" text-anchor="middle" class="t-mod" fill="#33aa33">Graph Store</text>
+  <text x="560" y="290" text-anchor="middle" class="t-desc">provenance, typed edges,</text>
+  <text x="560" y="302" text-anchor="middle" class="t-desc">supersession tracking</text>
+  
+  <rect x="15" y="365" width="750" height="230" rx="3" fill="rgba(0,100,0,0.04)" stroke="#1a6a1a" stroke-width="1"/>
+  <text x="390" y="388" text-anchor="middle" class="t-phase" fill="#1a6a1a">READ PATH</text>
+  <text x="390" y="402" text-anchor="middle" class="t-desc">on retrieval request</text>
+  
+  <line x1="560" y1="319" x2="560" y2="365" style="stroke:#1a6a1a;stroke-width:1;stroke-dasharray:3,3"/>
+  <line x1="560" y1="365" x2="160" y2="420" style="stroke:#33aa33;stroke-width:1.5;fill:none;marker-end:url(#ag)"/>
+  
+  <rect x="60" y="420" width="200" height="56" rx="4" fill="none" stroke="#33aa33" stroke-width="1.5"/>
+  <text x="160" y="444" text-anchor="middle" class="t-mod" fill="#33aa33">Keyword Retrieval</text>
+  <text x="160" y="466" text-anchor="middle" class="t-desc">grep-based, covers 69%</text>
+  
+  <line x1="260" y1="448" x2="310" y2="448" class="arrow-g"/>
+  
+  <rect x="310" y="420" width="200" height="56" rx="28" fill="none" stroke="#339999" stroke-width="1.5"/>
+  <text x="410" y="444" text-anchor="middle" class="t-mod" fill="#339999">Gap Recovery</text>
+  <text x="410" y="466" text-anchor="middle" class="t-desc">graph traversal, covers 31%</text>
+  
+  <line x1="510" y1="448" x2="540" y2="448" class="arrow-g"/>
+  
+  <polygon points="640,420 720,448 640,476 560,448" fill="none" stroke="#cc8800" stroke-width="1.5" filter="url(#glow-a)"/>
+  <text x="640" y="445" text-anchor="middle" class="t-mod" fill="#cc8800">Inject</text>
+  <text x="640" y="458" text-anchor="middle" style="font:8.5px 'Menlo',monospace;fill:#1a6a1a">rank + enforce</text>
+  
+  <text x="340" y="502" text-anchor="middle" class="t-desc">69% + 31% = 100% directive coverage</text>
+  
+  <line x1="720" y1="448" x2="745" y2="448" style="stroke:#cc8800;stroke-width:2;fill:none"/>
+  <path d="M745,448 L745,47 L750,47" class="arrow-a"/>
+  <text x="752" y="250" class="t-desc" fill="#cc8800" transform="rotate(90,752,250)">to LLM context</text>
+  
+  <rect x="15" y="530" width="750" height="190" rx="3" fill="rgba(150,100,0,0.04)" stroke="#1a6a1a" stroke-width="1"/>
+  <text x="390" y="553" text-anchor="middle" class="t-phase" fill="#1a6a1a">FEEDBACK PATH</text>
+  <text x="390" y="567" text-anchor="middle" class="t-desc">after LLM responds</text>
+  
+  <path d="M690,64 Q690,80 710,80 L760,80 L760,590 L660,590" class="arrow-a" style="stroke-dasharray:6,4"/>
+  
+  <rect x="440" y="580" width="220" height="56" rx="28" fill="none" stroke="#339999" stroke-width="1.5"/>
+  <text x="550" y="604" text-anchor="middle" class="t-mod" fill="#339999">Confidence Tracker</text>
+  <text x="550" y="624" text-anchor="middle" class="t-desc">did this help, hurt, or nothing?</text>
+  
+  <line x1="440" y1="608" x2="380" y2="608" class="arrow-g"/>
+  
+  <rect x="160" y="580" width="220" height="56" rx="4" fill="none" stroke="#33aa33" stroke-width="1.5" filter="url(#glow-g)"/>
+  <text x="270" y="604" text-anchor="middle" class="t-mod" fill="#33aa33">Feedback Loop</text>
+  <text x="270" y="624" text-anchor="middle" class="t-desc">update scores, decay unused</text>
+  
+  <path d="M160,608 L40,608 L40,270 L80,270" class="arrow-fb"/>
+  <text x="28" y="440" class="t-desc" fill="#cc8800" transform="rotate(-90,28,440)">feedback updates storage</text>
+  
+  </svg>

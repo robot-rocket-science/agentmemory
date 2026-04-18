@@ -1,4 +1,6 @@
-# Benchmark Results (v1.2.1)
+<sub>[← Chapter 7 - Benchmark Protocol](BENCHMARK_PROTOCOL.md) · [Contents](README.md) · Next: [Chapter 9 - Research Freeze →](RESEARCH_FREEZE_20260416.md)</sub>
+
+# Chapter 8. Benchmark Results (v1.2.1)
 
 ## Methodology
 
@@ -180,7 +182,7 @@ Two contamination incidents occurred during development and were caught:
 2. LLM self-judging with GT visible (caught, fixed, two-pass protocol)
 
 Prevention measures now in place:
-- verify_clean.py: checks 30 banned keys, mandatory before any reader
+- verify_clean.py: checks 23 banned keys, mandatory before any reader
 - Separate GT files (_gt.json), never referenced in reader prompts
 - Two-pass protocol: generation (no GT) then scoring (separate)
 - Full audit trail: git commit, adapter version, exact commands

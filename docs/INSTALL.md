@@ -1,48 +1,72 @@
-# Installing agentmemory
+<sub>[Contents](README.md) · Next: [Chapter 2 - Workflow →](WORKFLOW.md)</sub>
 
-## Quick Start
+# Chapter 1. Installation
+
+## Prerequisites
+
+**[uv](https://docs.astral.sh/uv/)** (Python package manager). uv handles Python installation automatically, you do not need Python installed separately.
 
 ```bash
-# Install
-pip install agentmemory    # or: uv tool install agentmemory
+# Install uv if you do not have it
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
 
-# Setup (writes commands, hooks, verifies CLI)
+**[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** (or any MCP-compatible agent CLI). agentmemory runs as an MCP server inside the agent.
+
+**[Obsidian](https://obsidian.md)** (optional). For browsing and visualizing the belief graph. Not required for core functionality. See [OBSIDIAN.md](OBSIDIAN.md).
+
+## Step 1: Install agentmemory
+
+```bash
+uv pip install git+https://github.com/yoshi280/agentmemory.git
+```
+
+Verify it installed:
+
+```bash
+agentmemory --help
+```
+
+If you get `command not found`, try installing as a tool instead:
+
+```bash
+uv tool install git+https://github.com/yoshi280/agentmemory.git
+```
+
+## Step 2: Run setup
+
+```bash
 agentmemory setup
+```
 
-# Restart Claude Code, then:
+This does three things:
+1. Writes `/mem:*` slash commands to `~/.claude/commands/mem/`
+2. Registers the MCP server in your project's `.mcp.json`
+3. Adds PreToolUse hooks to `~/.claude/settings.json` (commit tracking, directive gate)
+
+## Step 3: Restart Claude Code
+
+Close and reopen Claude Code. The MCP server starts automatically on launch.
+
+## Step 4: Verify it works
+
+In Claude Code, run:
+
+```
+/mem:status
+```
+
+You should see a status report with belief counts, session info, and system health. If you see an error, check Troubleshooting below.
+
+## Step 5: Onboard your project
+
+```
 /mem:onboard .
 ```
 
-## What setup does
+This scans your project directory and ingests structure from git history, code, docs, and configuration. Takes 10-30 seconds depending on project size.
 
-`agentmemory setup` performs these steps automatically:
-
-1. Creates `~/.claude/commands/mem/*.md` (14 slash commands)
-2. Removes legacy `~/.claude/skills/mem-*` files if present
-3. Installs commit tracker hook in `~/.claude/settings.json`
-4. Verifies database access
-5. Runs a smoke test
-
-After setup, restart Claude Code. Commands appear as `/mem:*`.
-
-## Commands
-
-```
-/mem:onboard <path>     Scan and ingest a project
-/mem:stats              Detailed analytics
-/mem:health             Diagnostics
-/mem:core [N]           Top N beliefs by confidence
-/mem:search <query>     Search beliefs
-/mem:locked             Show locked beliefs
-/mem:new-belief <text>  Store a new belief
-/mem:lock <text>        Create a locked belief
-/mem:wonder <topic>     Deep research from graph context
-/mem:settings           View or update settings
-/mem:demote             Demote least-relevant locked beliefs
-/mem:disable            Stop agentmemory for this session
-/mem:enable             Resume agentmemory
-/mem:help               Command reference
-```
+That is it. agentmemory will automatically capture decisions, corrections, and context from your conversations.
 
 ## Per-project isolation
 
@@ -53,19 +77,21 @@ Override with `--project /path/to/project` or `AGENTMEMORY_DB=/path/to/db.sqlite
 ## Disabling
 
 ```bash
-# In session: /mem:disable (stops tool calls for this session)
-# Permanently: agentmemory uninstall (removes commands, keeps data)
-# Nuclear: rm -rf ~/.agentmemory/ (deletes all data)
+# In session:     /mem:disable       (stops tool calls for this session)
+# Permanently:    agentmemory uninstall   (removes commands, keeps data)
+# Nuclear:        rm -rf ~/.agentmemory/  (deletes all data)
 ```
 
-## Direct CLI usage
+## Troubleshooting
 
-All commands work from the terminal without Claude Code:
+| Problem | Fix |
+|---------|-----|
+| `agentmemory: command not found` | Run `uv tool install git+https://github.com/yoshi280/agentmemory.git` or check that `~/.local/bin` is in your PATH |
+| `/mem:status` returns an error | Restart Claude Code. The MCP server needs a fresh start after setup |
+| Slash commands not showing up | Run `agentmemory setup` again, then restart Claude Code |
+| MCP tools not responding | Check `.mcp.json` exists in your project root. If not, run `agentmemory setup` from the project directory |
+| SQLite lock errors | Run `agentmemory health` to diagnose, or manually clear the WAL: `python3 -c "import sqlite3; sqlite3.connect('~/.agentmemory/projects/<hash>/memory.db').execute('PRAGMA wal_checkpoint(TRUNCATE)')"` |
 
-```bash
-agentmemory onboard /path/to/project
-agentmemory search "query terms"
-agentmemory core --top 10
-agentmemory stats
-agentmemory lock "always use strict typing"
-```
+---
+
+<sub>[Contents](README.md) · Next: [Chapter 2 - Workflow →](WORKFLOW.md)</sub>

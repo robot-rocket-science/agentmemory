@@ -415,6 +415,25 @@ def cmd_setup(args: argparse.Namespace) -> None:
     if cleaned > 0:
         print(f"  Cleaned {cleaned} legacy skill/command files")
 
+    # Step 2b: Create .mcp.json if missing
+    mcp_json_path: Path = Path.cwd() / ".mcp.json"
+    if not mcp_json_path.exists():
+        import json as _json
+        mcp_config: dict[str, object] = {
+            "mcpServers": {
+                "agentmemory": {
+                    "type": "stdio",
+                    "command": "uv",
+                    "args": ["run", "--project", ".", "python", "-m", "agentmemory.server"],
+                    "env": {},
+                }
+            }
+        }
+        mcp_json_path.write_text(_json.dumps(mcp_config, indent=2) + "\n")
+        print(f"  Created {mcp_json_path}")
+    else:
+        print(f"  .mcp.json already exists at {mcp_json_path}")
+
     # Step 3: Ensure agentmemory CLI is accessible
     agentmemory_bin: str | None = shutil.which("agentmemory")
     if agentmemory_bin is None:
@@ -1915,7 +1934,13 @@ def _install_directive_gate() -> None:
     tools, surfacing locked behavioral directives as context reminders.
     Idempotent -- skips if already present.
     """
-    gate_script: Path = Path(__file__).resolve().parents[2] / "scripts" / "agentmemory-directive-gate.sh"
+    # Try CWD first (cloned repo), then fall back to __file__ traversal (editable install)
+    gate_script: Path = Path.cwd() / "scripts" / "agentmemory-directive-gate.sh"
+    if not gate_script.exists():
+        gate_script = Path(__file__).resolve().parents[2] / "scripts" / "agentmemory-directive-gate.sh"
+    if not gate_script.exists():
+        print("  Warning: directive gate script not found, skipping hook install", file=sys.stderr)
+        return
     gate_command: str = f"bash {gate_script}"
 
     hook_entry: dict[str, object] = {

@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 820" font-family="'Menlo','DejaVu Sans Mono','Consolas',monospace">
+  <defs>
+    <filter id="glow-r">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feFlood flood-color="#ffcc00" flood-opacity="0.15" result="color"/>
+      <feComposite in="color" in2="blur" operator="in" result="glow"/>
+      <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="arr-r" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#cc8800"/>
+    </marker>
+  </defs>
+
+  <rect width="680" height="820" fill="#0a0a0e"/>
+
+  <!-- Title -->
+  <text x="340" y="35" text-anchor="middle" fill="#ffcc00" font-size="16" font-weight="bold" letter-spacing="3" filter="url(#glow-r)">RETRIEVAL PIPELINE</text>
+  <text x="340" y="56" text-anchor="middle" fill="#7a6b52" font-size="10">Each layer adds beliefs the previous layers missed</text>
+
+  <!-- QUERY INPUT -->
+  <rect x="170" y="78" width="340" height="40" rx="3" fill="none" stroke="#ffcc00" stroke-width="1.5"/>
+  <text x="340" y="104" text-anchor="middle" fill="#ffcc00" font-size="14">Query enters pipeline</text>
+
+  <line x1="340" y1="118" x2="340" y2="143" stroke="#cc8800" stroke-width="1.5" marker-end="url(#arr-r)"/>
+
+  <!-- L0: Locked -->
+  <rect x="60" y="148" width="560" height="55" rx="3" fill="rgba(255,51,0,0.06)" stroke="#ff3300" stroke-width="1.5"/>
+  <text x="85" y="175" fill="#ff3300" font-size="14" font-weight="bold">L0</text>
+  <text x="120" y="175" fill="#e8d4b0" font-size="13">Locked Beliefs</text>
+  <text x="340" y="175" fill="#ffcc00" font-size="11">ALWAYS INCLUDED</text>
+  <text x="595" y="175" text-anchor="end" fill="#7a6b52" font-size="10">~50-200 beliefs</text>
+  <text x="120" y="195" fill="#7a6b52" font-size="10">Corrections, user rules, non-negotiable constraints. MRR: 0.589 -> 0.867</text>
+
+  <line x1="340" y1="203" x2="340" y2="223" stroke="#cc8800" stroke-width="1.5" marker-end="url(#arr-r)"/>
+
+  <!-- L1: Behavioral -->
+  <rect x="70" y="228" width="540" height="55" rx="3" fill="rgba(204,136,0,0.08)" stroke="#cc8800" stroke-width="1"/>
+  <text x="95" y="255" fill="#cc8800" font-size="14" font-weight="bold">L1</text>
+  <text x="130" y="255" fill="#e8d4b0" font-size="13">Behavioral Directives</text>
+  <text x="585" y="255" text-anchor="end" fill="#7a6b52" font-size="10">~100-500 beliefs</text>
+  <text x="130" y="275" fill="#7a6b52" font-size="10">Preferences, workflow rules, project constraints. Scored but always considered.</text>
+
+  <line x1="340" y1="283" x2="340" y2="303" stroke="#cc8800" stroke-width="1.5" marker-end="url(#arr-r)"/>
+
+  <!-- L2: FTS5 -->
+  <rect x="80" y="308" width="520" height="55" rx="3" fill="rgba(204,136,0,0.06)" stroke="#7a6b52" stroke-width="1"/>
+  <text x="105" y="335" fill="#cc8800" font-size="14" font-weight="bold">L2</text>
+  <text x="140" y="335" fill="#e8d4b0" font-size="13">FTS5 Keyword Search</text>
+  <text x="575" y="335" text-anchor="end" fill="#7a6b52" font-size="10">top_k=50</text>
+  <text x="140" y="355" fill="#7a6b52" font-size="10">BM25 ranking. Covers 69% of directives. Misses 31% (zero vocab overlap).</text>
+
+  <line x1="340" y1="363" x2="340" y2="383" stroke="#cc8800" stroke-width="1.5" marker-end="url(#arr-r)"/>
+
+  <!-- L2.5: Entity-Index -->
+  <rect x="95" y="388" width="490" height="55" rx="3" fill="rgba(255,204,0,0.08)" stroke="#ffcc00" stroke-width="1.5"/>
+  <text x="120" y="415" fill="#ffcc00" font-size="14" font-weight="bold">L2.5</text>
+  <text x="165" y="415" fill="#e8d4b0" font-size="13">Entity-Index</text>
+  <text x="560" y="415" text-anchor="end" fill="#7a6b52" font-size="10">~10-30 beliefs</text>
+  <text x="165" y="435" fill="#7a6b52" font-size="10">Structured triples, 4-hop chaining. 41 regex patterns. MAB MH: 6% -> 35%</text>
+
+  <line x1="340" y1="443" x2="340" y2="463" stroke="#cc8800" stroke-width="1.5" marker-end="url(#arr-r)"/>
+
+  <!-- L3: HRR + BFS -->
+  <rect x="110" y="468" width="460" height="55" rx="3" fill="rgba(204,136,0,0.06)" stroke="#7a6b52" stroke-width="1"/>
+  <text x="135" y="495" fill="#cc8800" font-size="14" font-weight="bold">L3</text>
+  <text x="170" y="495" fill="#e8d4b0" font-size="13">HRR + BFS Graph Traversal</text>
+  <text x="545" y="495" text-anchor="end" fill="#7a6b52" font-size="10">~5-15 beliefs</text>
+  <text x="170" y="515" fill="#7a6b52" font-size="10">Vocabulary bridge: recovers 99.5% of the 31% FTS5 misses. Depth 2.</text>
+
+  <line x1="340" y1="523" x2="340" y2="548" stroke="#cc8800" stroke-width="1.5" marker-end="url(#arr-r)"/>
+
+  <!-- Merge + Score -->
+  <rect x="130" y="553" width="420" height="65" rx="3" fill="rgba(204,136,0,0.04)" stroke="#7a6b52" stroke-width="0.75"/>
+  <text x="340" y="580" text-anchor="middle" fill="#e8d4b0" font-size="13">Merge + Deduplicate + Score</text>
+  <text x="340" y="604" text-anchor="middle" fill="#7a6b52" font-size="10">confidence x type_weight x decay x lock_boost x recency x thompson</text>
+
+  <line x1="340" y1="618" x2="340" y2="643" stroke="#cc8800" stroke-width="1.5" marker-end="url(#arr-r)"/>
+
+  <!-- Compress + Output -->
+  <rect x="155" y="648" width="370" height="50" rx="3" fill="none" stroke="#ffcc00" stroke-width="1.5"/>
+  <text x="340" y="673" text-anchor="middle" fill="#ffcc00" font-size="14">Compress + Pack</text>
+  <text x="340" y="693" text-anchor="middle" fill="#cc8800" font-size="11">2000 token budget | 55% savings | 0.7s avg</text>
+
+  <!-- Summary box at bottom -->
+  <rect x="80" y="725" width="520" height="55" rx="3" fill="rgba(204,136,0,0.04)" stroke="#7a6b52" stroke-width="0.5"/>
+  <text x="340" y="750" text-anchor="middle" fill="#e8d4b0" font-size="11">Pipeline narrows from ~19,000 stored beliefs to ~50-200 in the token budget.</text>
+  <text x="340" y="770" text-anchor="middle" fill="#7a6b52" font-size="10">No embeddings. No vector DB. Keyword search as the primary layer.</text>
+
+  <!-- Footer -->
+  <text x="340" y="805" text-anchor="middle" fill="#7a6b52" font-size="9">agentmemory v1.2.1 | FTS5 + entity-index + HRR + BFS</text>
+</svg>
