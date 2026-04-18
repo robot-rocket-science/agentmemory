@@ -104,14 +104,57 @@ all vaults, the rhizome maintains its own FTS5 index of explicitly promoted
 beliefs. This is write-side governance -- deciding what should be shared, not
 just what can be found.
 
+## Promotion model: hybrid auto-candidate + user confirm
+
+Neither pure explicit nor pure automatic promotion works alone.
+
+**Against pure explicit:** A single developer won't manually curate 39K+
+beliefs. The locked beliefs system proves this -- only 2 locked beliefs exist
+across all projects despite months of use.
+
+**Against pure automatic:** The A/B test (75% noise) proves automatic sharing
+without governance creates contamination. Retrieval frequency within one
+project doesn't correlate with cross-project value.
+
+### Hybrid approach
+
+1. **Auto-candidate**: beliefs meeting ALL of:
+   - confidence >= 0.85
+   - source_type IN ('user_stated', 'user_corrected')
+   - Retrieved in 2+ distinct sessions
+   - Content is not project-specific (heuristic: no project-local paths,
+     file names, or domain-specific entities)
+
+2. **Promotion queue**: candidates surface via `agentmemory candidates` or
+   during session start. User confirms with a single keystroke.
+
+3. **Auto-promote locked beliefs**: anything the user locks is important enough
+   to be global. Already the behavior -- locked beliefs inject via SessionStart
+   hook regardless of project.
+
+4. **Decay**: promoted beliefs un-retrieved for 90 days get demoted back to
+   vault-local. Prevents rhizome from accumulating stale knowledge.
+
+### Open questions in this model
+
+- The "not project-specific" heuristic is the weakest part. Distinguishing
+  "deploy to Cloudflare" (cross-project) from "deploy solar-wallpaper endpoint"
+  (project-specific) needs semantic understanding that FTS5 can't provide.
+- Retrieval count across vaults (not just within one vault) would be a stronger
+  signal for auto-candidating, but requires cross-vault retrieval tracking that
+  doesn't exist yet.
+- Beliefs from sensitivity=restricted vaults should never auto-candidate.
+
 ## CLI extensions
 
 ```
 agentmemory onboard <path>       # auto-registers vault in rhizome.db
 agentmemory promote <belief-id>  # copy belief to rhizome promoted_beliefs
+agentmemory candidates           # show auto-candidate beliefs pending review
 agentmemory search --cross-vault # search rhizome FTS5 + current vault FTS5
 agentmemory vaults               # list registered vaults from rhizome
 agentmemory propagate            # update promoted beliefs when source changes
+agentmemory demote <belief-id>   # remove from rhizome, return to vault-local
 ```
 
 ### search --cross-vault behavior
