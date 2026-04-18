@@ -1,4 +1,6 @@
-# `/mem:` Command Reference
+<sub>[← Chapter 2 - Workflow](WORKFLOW.md) · [Contents](README.md) · Next: [Chapter 4 - Obsidian Integration →](OBSIDIAN.md)</sub>
+
+# Chapter 3. Command Reference
 
 All commands are available as Claude Code slash commands after setup.
 
@@ -32,3 +34,7 @@ agentmemory core --top 10
 agentmemory stats
 agentmemory onboard /path/to/project
 ```
+
+---
+
+<sub>[← Chapter 2 - Workflow](WORKFLOW.md) · [Contents](README.md) · Next: [Chapter 4 - Obsidian Integration →](OBSIDIAN.md)</sub>

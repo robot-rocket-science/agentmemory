@@ -1,4 +1,6 @@
-# Privacy and Security
+<sub>[← Chapter 5 - Architecture](ARCHITECTURE.md) · [Contents](README.md) · Next: [Chapter 7 - Benchmark Protocol →](BENCHMARK_PROTOCOL.md)</sub>
+
+# Chapter 6. Privacy and Security
 
 These are verifiable properties of the codebase, not marketing claims. Each can be confirmed by reading the source.
 
@@ -13,3 +15,7 @@ These are verifiable properties of the codebase, not marketing claims. Each can 
 **SQLite only.** No external database, no vector DB, no cloud storage. All data lives in `~/.agentmemory/`. WAL mode for crash safety. Fully rebuildable from source files.
 
 **When the cloud LLM is involved.** When agentmemory injects context into your Claude Code prompt, the cloud LLM provider (Anthropic) sees that context as part of the prompt. This is inherent to using any cloud LLM. agentmemory mitigates exposure by injecting only the relevant subset of beliefs (2,000 token budget) rather than a full memory dump, and per-project isolation prevents cross-project context bleed.
+
+---
+
+<sub>[← Chapter 5 - Architecture](ARCHITECTURE.md) · [Contents](README.md) · Next: [Chapter 7 - Benchmark Protocol →](BENCHMARK_PROTOCOL.md)</sub>

@@ -1,4 +1,6 @@
-# Research Freeze: Benchmark Findings and Future Levers
+<sub>[← Chapter 8 - Benchmark Results](BENCHMARK_RESULTS.md) · [Contents](README.md)</sub>
+
+# Chapter 9. Research Freeze: Benchmark Findings and Future Levers
 
 Date: 2026-04-16
 Status: Research frozen. All findings documented for future reference.

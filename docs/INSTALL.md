@@ -1,4 +1,6 @@
-# Installation
+<sub>[Contents](README.md) · Next: [Chapter 2 - Workflow →](WORKFLOW.md)</sub>
+
+# Chapter 1. Installation
 
 ## Prerequisites
 
@@ -89,3 +91,7 @@ Override with `--project /path/to/project` or `AGENTMEMORY_DB=/path/to/db.sqlite
 | Slash commands not showing up | Run `agentmemory setup` again, then restart Claude Code |
 | MCP tools not responding | Check `.mcp.json` exists in your project root. If not, run `agentmemory setup` from the project directory |
 | SQLite lock errors | Run `agentmemory health` to diagnose, or manually clear the WAL: `python3 -c "import sqlite3; sqlite3.connect('~/.agentmemory/projects/<hash>/memory.db').execute('PRAGMA wal_checkpoint(TRUNCATE)')"` |
+
+---
+
+<sub>[Contents](README.md) · Next: [Chapter 2 - Workflow →](WORKFLOW.md)</sub>

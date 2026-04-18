@@ -1,4 +1,6 @@
-# Obsidian Integration
+<sub>[← Chapter 3 - Command Reference](COMMANDS.md) · [Contents](README.md) · Next: [Chapter 5 - Architecture →](ARCHITECTURE.md)</sub>
+
+# Chapter 4. Obsidian Integration
 
 agentmemory can sync its belief graph into an [Obsidian](https://obsidian.md) vault. Each belief becomes a markdown note with YAML frontmatter and wikilinked edges, so you can browse, search, and visualize your agent's knowledge using Obsidian's graph view and Dataview plugin.
 
@@ -23,3 +25,7 @@ Or from Claude Code:
 Sync is one-way by default (agentmemory -> Obsidian). Beliefs appear as markdown files in a `beliefs/` subfolder with auto-generated index notes grouped by type, confidence, and recency. The sync is incremental. It tracks content hashes and only writes files that changed.
 
 For bidirectional sync, use `/mem:import-obsidian` to pull edits made in Obsidian back into the belief store.
+
+---
+
+<sub>[← Chapter 3 - Command Reference](COMMANDS.md) · [Contents](README.md) · Next: [Chapter 5 - Architecture →](ARCHITECTURE.md)</sub>

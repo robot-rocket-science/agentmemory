@@ -1,4 +1,6 @@
-# Workflow
+<sub>[← Chapter 1 - Installation](INSTALL.md) · [Contents](README.md) · Next: [Chapter 3 - Command Reference →](COMMANDS.md)</sub>
+
+# Chapter 2. Workflow
 
 Once installed, the commands you will use most:
 
@@ -34,3 +36,7 @@ Discuss, explore, focus, build, repeat.
 4. **Build.** Take the output from wonder/reason into a few more discussion turns to refine the plan, then implement. agentmemory captures what you build and the decisions behind it.
 
 5. **Repeat.** Next session, the agent already has the context. Wonder and reason get sharper as the belief graph grows, because there is more evidence to reason over and more connections to traverse.
+
+---
+
+<sub>[← Chapter 1 - Installation](INSTALL.md) · [Contents](README.md) · Next: [Chapter 3 - Command Reference →](COMMANDS.md)</sub>

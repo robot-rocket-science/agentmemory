@@ -1,4 +1,6 @@
-# Benchmark Results (v1.2.1)
+<sub>[← Chapter 7 - Benchmark Protocol](BENCHMARK_PROTOCOL.md) · [Contents](README.md) · Next: [Chapter 9 - Research Freeze →](RESEARCH_FREEZE_20260416.md)</sub>
+
+# Chapter 8. Benchmark Results (v1.2.1)
 
 ## Methodology
 

@@ -1,4 +1,6 @@
-# Architecture
+<sub>[← Chapter 4 - Obsidian Integration](OBSIDIAN.md) · [Contents](README.md) · Next: [Chapter 6 - Privacy and Security →](PRIVACY.md)</sub>
+
+# Chapter 5. Architecture
 
 ![agentmemory system architecture: ingestion, retrieval, and feedback pipeline](pipeline-architecture.svg)
 
@@ -14,3 +16,7 @@ Conversations become scored beliefs. Beliefs get stronger when they help, weaker
 - **Per-project isolation.** Each project gets its own SQLite database at `~/.agentmemory/projects/<hash>/`.
 
 For deeper architecture notes see [V2_ARCHITECTURE.md](V2_ARCHITECTURE.md).
+
+---
+
+<sub>[← Chapter 4 - Obsidian Integration](OBSIDIAN.md) · [Contents](README.md) · Next: [Chapter 6 - Privacy and Security →](PRIVACY.md)</sub>

@@ -1,4 +1,6 @@
-# Benchmark Protocol: Contamination-Proof Evaluation
+<sub>[← Chapter 6 - Privacy and Security](PRIVACY.md) · [Contents](README.md) · Next: [Chapter 8 - Benchmark Results →](BENCHMARK_RESULTS.md)</sub>
+
+# Chapter 7. Benchmark Protocol: Contamination-Proof Evaluation
 
 ## Purpose
 
