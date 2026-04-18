@@ -235,6 +235,18 @@ documented results, and an explicit proceed/revise/abandon decision.
 
 Experiment logs in `research/EXPERIMENTS.md`. Case studies in `research/CASE_STUDIES.md`.
 
+This project's research phase drew heavily on Leonard Lin's [agentic-memory](https://github.com/lhl/agentic-memory) collection, which surveys 35+ papers, 14+ community systems, and 6 benchmarks.
+
+```bibtex
+@misc{lin_agentic_memory_2026,
+  author       = {Leonard Lin},
+  title        = {agentic-memory: Agentic Memory Research Collection (Summaries and Analyses)},
+  year         = {2026},
+  howpublished = {GitHub repository},
+  url          = {https://github.com/lhl/agentic-memory},
+}
+```
+
 ## Development
 
 ```bash
