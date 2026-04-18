@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+import threading
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -304,6 +305,7 @@ class MemoryStore:
         """
         self._db_path: Path = Path(db_path)
         self.readonly: bool = readonly
+        self._write_lock: threading.Lock = threading.Lock()
         if readonly:
             uri: str = f"file:{self._db_path}?mode=ro"
             self._conn: sqlite3.Connection = sqlite3.connect(
@@ -312,12 +314,14 @@ class MemoryStore:
         else:
             self._conn = sqlite3.connect(
                 str(self._db_path), check_same_thread=False,
+                timeout=10.0,
             )
         self._conn.row_factory = sqlite3.Row
         if not readonly:
             self._conn.execute("PRAGMA journal_mode=WAL")
             self._conn.execute("PRAGMA synchronous=NORMAL")
             self._conn.execute("PRAGMA foreign_keys=ON")
+            self._conn.execute("PRAGMA busy_timeout=10000")
         self._last_traversed_edges: dict[str, list[tuple[int, int]]] = {}
         if not readonly:
             self._init_schema()
@@ -579,47 +583,48 @@ class MemoryStore:
         session_id links the belief to the session that created it.
         """
         ch: str = _content_hash(content)
-        existing: sqlite3.Row | None = self._conn.execute(
-            "SELECT * FROM beliefs WHERE content_hash = ?", (ch,)
-        ).fetchone()
-        if existing is not None:
-            return _row_to_belief(existing)
+        with self._write_lock:
+            existing: sqlite3.Row | None = self._conn.execute(
+                "SELECT * FROM beliefs WHERE content_hash = ?", (ch,)
+            ).fetchone()
+            if existing is not None:
+                return _row_to_belief(existing)
 
-        belief_id: str = _new_id()
-        ts: str = created_at if created_at is not None else _now()
-        confidence: float = alpha / (alpha + beta_param)
-        locked_int: int = 1 if locked else 0
+            belief_id: str = _new_id()
+            ts: str = created_at if created_at is not None else _now()
+            confidence: float = alpha / (alpha + beta_param)
+            locked_int: int = 1 if locked else 0
 
-        self._conn.execute(
-            """INSERT INTO beliefs
-               (id, content_hash, content, belief_type, alpha, beta_param,
-                source_type, locked, valid_from, valid_to, superseded_by,
-                created_at, updated_at, event_time, session_id, classified_by,
-                rigor_tier, method, sample_size, data_source,
-                independently_validated)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (belief_id, ch, content, belief_type, alpha, beta_param,
-             source_type, locked_int, ts, ts, event_time, session_id, classified_by,
-             rigor_tier, method, sample_size, data_source,
-             1 if independently_validated else 0),
-        )
-        self._conn.execute(
-            "INSERT INTO search_index(id, content, type) VALUES (?, ?, ?)",
-            (belief_id, content, "belief"),
-        )
-
-        if observation_id is not None:
-            ev_ts: str = _now()
-            # Determine source_weight from source_type
-            weight: float = 1.0 if source_type in ("user_stated", "user_corrected") else 0.5
             self._conn.execute(
-                """INSERT INTO evidence
-                   (belief_id, observation_id, source_weight, relationship, created_at)
-                   VALUES (?, ?, ?, 'supports', ?)""",
-                (belief_id, observation_id, weight, ev_ts),
+                """INSERT INTO beliefs
+                   (id, content_hash, content, belief_type, alpha, beta_param,
+                    source_type, locked, valid_from, valid_to, superseded_by,
+                    created_at, updated_at, event_time, session_id, classified_by,
+                    rigor_tier, method, sample_size, data_source,
+                    independently_validated)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (belief_id, ch, content, belief_type, alpha, beta_param,
+                 source_type, locked_int, ts, ts, event_time, session_id, classified_by,
+                 rigor_tier, method, sample_size, data_source,
+                 1 if independently_validated else 0),
+            )
+            self._conn.execute(
+                "INSERT INTO search_index(id, content, type) VALUES (?, ?, ?)",
+                (belief_id, content, "belief"),
             )
 
-        self._conn.commit()
+            if observation_id is not None:
+                ev_ts: str = _now()
+                # Determine source_weight from source_type
+                weight: float = 1.0 if source_type in ("user_stated", "user_corrected") else 0.5
+                self._conn.execute(
+                    """INSERT INTO evidence
+                       (belief_id, observation_id, source_weight, relationship, created_at)
+                       VALUES (?, ?, ?, 'supports', ?)""",
+                    (belief_id, observation_id, weight, ev_ts),
+                )
+
+            self._conn.commit()
         return Belief(
             id=belief_id,
             content_hash=ch,
@@ -719,28 +724,29 @@ class MemoryStore:
         The lock is preserved on the old belief for audit trail, but
         valid_to is set so it no longer appears in active queries.
         """
-        old_row: sqlite3.Row | None = self._conn.execute(
-            "SELECT locked FROM beliefs WHERE id = ?", (old_id,)
-        ).fetchone()
-        if old_row is None:
-            return
+        with self._write_lock:
+            old_row: sqlite3.Row | None = self._conn.execute(
+                "SELECT locked FROM beliefs WHERE id = ?", (old_id,)
+            ).fetchone()
+            if old_row is None:
+                return
 
-        ts: str = _now()
-        self._conn.execute(
-            "UPDATE beliefs SET valid_to = ?, superseded_by = ?, updated_at = ? WHERE id = ?",
-            (ts, new_id, ts, old_id),
-        )
-        self._conn.execute(
-            """INSERT INTO edges (from_id, to_id, edge_type, weight, reason, created_at)
-               VALUES (?, ?, 'SUPERSEDES', 1.0, ?, ?)""",
-            (new_id, old_id, reason, ts),
-        )
-        row: sqlite3.Row | None = self._conn.execute(
-            "SELECT alpha, beta_param FROM beliefs WHERE id = ?", (old_id,)
-        ).fetchone()
-        if row is not None:
-            self._record_confidence(old_id, row["alpha"], row["beta_param"], "superseded", new_id)
-        self._conn.commit()
+            ts: str = _now()
+            self._conn.execute(
+                "UPDATE beliefs SET valid_to = ?, superseded_by = ?, updated_at = ? WHERE id = ?",
+                (ts, new_id, ts, old_id),
+            )
+            self._conn.execute(
+                """INSERT INTO edges (from_id, to_id, edge_type, weight, reason, created_at)
+                   VALUES (?, ?, 'SUPERSEDES', 1.0, ?, ?)""",
+                (new_id, old_id, reason, ts),
+            )
+            row: sqlite3.Row | None = self._conn.execute(
+                "SELECT alpha, beta_param FROM beliefs WHERE id = ?", (old_id,)
+            ).fetchone()
+            if row is not None:
+                self._record_confidence(old_id, row["alpha"], row["beta_param"], "superseded", new_id)
+            self._conn.commit()
 
     def _record_confidence(
         self, belief_id: str, alpha: float, beta_param: float,
@@ -769,38 +775,39 @@ class MemoryStore:
         to casual noise.
         Returns True if the belief dropped below 0.5 confidence (TB-15 warning).
         """
-        row: sqlite3.Row | None = self._conn.execute(
-            "SELECT alpha, beta_param, locked FROM beliefs WHERE id = ?",
-            (belief_id,),
-        ).fetchone()
-        if row is None:
-            return False
+        with self._write_lock:
+            row: sqlite3.Row | None = self._conn.execute(
+                "SELECT alpha, beta_param, locked FROM beliefs WHERE id = ?",
+                (belief_id,),
+            ).fetchone()
+            if row is None:
+                return False
 
-        old_alpha: float = row["alpha"]
-        old_beta: float = row["beta_param"]
-        alpha: float = old_alpha
-        beta: float = old_beta
-        is_locked: bool = bool(row["locked"])
-        ts: str = _now()
+            old_alpha: float = row["alpha"]
+            old_beta: float = row["beta_param"]
+            alpha: float = old_alpha
+            beta: float = old_beta
+            is_locked: bool = bool(row["locked"])
+            ts: str = _now()
 
-        if outcome == "used":
-            alpha += weight
-        elif outcome == "harmful":
-            if is_locked:
-                # Locked beliefs require stronger evidence to downgrade
-                if weight >= self.LOCKED_EVIDENCE_THRESHOLD:
+            if outcome == "used":
+                alpha += weight
+            elif outcome == "harmful":
+                if is_locked:
+                    # Locked beliefs require stronger evidence to downgrade
+                    if weight >= self.LOCKED_EVIDENCE_THRESHOLD:
+                        beta += weight
+                    # else: evidence too weak, silently ignored
+                else:
                     beta += weight
-                # else: evidence too weak, silently ignored
-            else:
-                beta += weight
-        # ignored and contradicted do not adjust parameters
+            # ignored and contradicted do not adjust parameters
 
-        self._conn.execute(
-            "UPDATE beliefs SET alpha = ?, beta_param = ?, updated_at = ? WHERE id = ?",
-            (alpha, beta, ts, belief_id),
-        )
-        self._record_confidence(belief_id, alpha, beta, f"feedback_{outcome}")
-        self._conn.commit()
+            self._conn.execute(
+                "UPDATE beliefs SET alpha = ?, beta_param = ?, updated_at = ? WHERE id = ?",
+                (alpha, beta, ts, belief_id),
+            )
+            self._record_confidence(belief_id, alpha, beta, f"feedback_{outcome}")
+            self._conn.commit()
 
         # Propagate feedback to edges that led to this belief
         traversed: list[tuple[int, int]] | None = self._last_traversed_edges.get(belief_id)
