@@ -325,6 +325,7 @@ class MemoryStore:
             self._conn.execute("PRAGMA foreign_keys=ON")
             self._conn.execute("PRAGMA busy_timeout=10000")
         self._last_traversed_edges: dict[str, list[tuple[int, int]]] = {}
+        self._in_transaction: bool = False
         if not readonly:
             self._init_schema()
 
@@ -333,14 +334,23 @@ class MemoryStore:
         """Context manager for batching writes in a single transaction.
 
         Defers commits until the block exits. Rolls back on exception.
+        Interior _maybe_commit() calls become no-ops while active.
         """
         self._conn.execute("BEGIN IMMEDIATE")
+        self._in_transaction = True
         try:
             yield
             self._conn.commit()
         except BaseException:
             self._conn.rollback()
             raise
+        finally:
+            self._in_transaction = False
+
+    def _maybe_commit(self) -> None:
+        """Commit unless we are inside a transaction() block."""
+        if not self._in_transaction:
+            self._conn.commit()
 
     def _init_schema(self) -> None:
         """Create all tables and FTS5 index if they don't exist."""
@@ -569,7 +579,7 @@ class MemoryStore:
             "INSERT INTO search_index(id, content, type) VALUES (?, ?, ?)",
             (obs_id, content, "observation"),
         )
-        self._conn.commit()
+        self._maybe_commit()
         return Observation(
             id=obs_id,
             content_hash=ch,
@@ -657,7 +667,7 @@ class MemoryStore:
                     (belief_id, observation_id, weight, ev_ts),
                 )
 
-            self._conn.commit()
+            self._maybe_commit()
         return Belief(
             id=belief_id,
             content_hash=ch,
@@ -970,7 +980,7 @@ class MemoryStore:
                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
             (from_id, to_id, edge_type, weight, reason, ts, alpha, beta_param),
         )
-        self._conn.commit()
+        self._maybe_commit()
         row_id: int | None = cursor.lastrowid
         if row_id is None:
             raise RuntimeError("Edge insert did not return a rowid")
@@ -1439,7 +1449,7 @@ class MemoryStore:
                VALUES (?, ?, ?, ?, ?, ?)""",
             (from_id, to_id, edge_type, weight, reason, ts),
         )
-        self._conn.commit()
+        self._maybe_commit()
         row_id: int | None = cursor.lastrowid
         if row_id is None:
             raise RuntimeError("graph_edge insert did not return a rowid")

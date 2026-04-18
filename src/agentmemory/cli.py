@@ -642,39 +642,41 @@ def cmd_onboard(args: argparse.Namespace) -> None:
 
     ingested: int = 0
     total: int = sum(1 for n in scan.nodes if n.node_type != "file")
-    for node in scan.nodes:
-        if node.node_type == "file":
-            continue
+    with store.transaction():
+        for node in scan.nodes:
+            if node.node_type == "file":
+                continue
 
-        source: str = "document"
-        if node.node_type == "commit_belief":
-            source = "git"
-        elif node.node_type == "behavioral_belief":
-            source = "directive"
-        elif node.node_type == "callable":
-            source = "code"
+            source: str = "document"
+            if node.node_type == "commit_belief":
+                source = "git"
+            elif node.node_type == "behavioral_belief":
+                source = "directive"
+            elif node.node_type == "callable":
+                source = "code"
 
-        turn_result: IngestResult = ingest_turn(
-            store=store,
-            text=node.content,
-            source=source,
-            session_id=None,
-            created_at=node.date,
-            source_path=node.file or "",
-            source_id=node.id,
-            event_time=node.date,
-        )
-        aggregate.merge(turn_result)
+            turn_result: IngestResult = ingest_turn(
+                store=store,
+                text=node.content,
+                source=source,
+                session_id=None,
+                created_at=node.date,
+                source_path=node.file or "",
+                source_id=node.id,
+                event_time=node.date,
+                bulk=True,
+            )
+            aggregate.merge(turn_result)
 
-        # Look up the belief created from this node's content
-        content_hash: str = _hashlib.sha256(node.content.encode()).hexdigest()[:12]
-        belief: Belief | None = store.get_belief_by_hash(content_hash)
-        if belief is not None:
-            node_to_belief[node.id] = belief.id
+            # Look up the belief created from this node's content
+            content_hash: str = _hashlib.sha256(node.content.encode()).hexdigest()[:12]
+            belief: Belief | None = store.get_belief_by_hash(content_hash)
+            if belief is not None:
+                node_to_belief[node.id] = belief.id
 
-        ingested += 1
-        if ingested % 500 == 0:
-            print(f"  ...{ingested}/{total}")
+            ingested += 1
+            if ingested % 500 == 0:
+                print(f"  ...{ingested}/{total}")
 
     print(f"  Mapped {len(node_to_belief)} scanner nodes to belief IDs")
 

@@ -862,15 +862,12 @@ def onboard(project_path: str) -> str:
                 sentence["source_project"] = source_project_tag
             all_sentences.append(sentence)
 
-    # Store structural edges for HRR graph encoding
-    for edge in scan.edges:
-        store.insert_graph_edge(
-            from_id=edge.src,
-            to_id=edge.tgt,
-            edge_type=edge.edge_type,
-            weight=edge.weight,
-            reason="scanner",
-        )
+    # Store structural edges for HRR graph encoding (batched)
+    edge_batch: list[tuple[str, str, str, float, str]] = [
+        (edge.src, edge.tgt, edge.edge_type, edge.weight, "scanner")
+        for edge in scan.edges
+    ]
+    store.batch_insert_graph_edges(edge_batch)
 
     # Record onboarding provenance
     import subprocess
@@ -1035,6 +1032,7 @@ def create_beliefs(classified_json: str) -> str:
             created_at=created_at,
             classified_by="llm",
             data_source=provenance,
+            bulk=True,
         )
         total_created += result.beliefs_created
 
