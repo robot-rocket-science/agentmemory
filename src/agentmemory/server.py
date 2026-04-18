@@ -146,6 +146,7 @@ def _process_auto_feedback(session_id: str) -> int:
             count += 1
         if count > 0:
             store.increment_session_metrics(session_id, feedback_given=count)
+        store.clear_pending_feedback(session_id)
         return count
 
     store = _get_store()
@@ -197,6 +198,7 @@ def _process_auto_feedback(session_id: str) -> int:
 
     if count > 0:
         store.increment_session_metrics(session_id, feedback_given=count)
+    store.clear_pending_feedback(session_id)
     return count
 
 
