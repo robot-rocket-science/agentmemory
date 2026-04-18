@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 380" font-family="'Menlo','DejaVu Sans Mono','Consolas',monospace">
+  <defs>
+    <filter id="glow-v">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feFlood flood-color="#ffcc00" flood-opacity="0.15" result="color"/>
+      <feComposite in="color" in2="blur" operator="in" result="glow"/>
+      <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="arr-gold" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#cc8800"/>
+    </marker>
+    <marker id="arr-red" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#ff3300"/>
+    </marker>
+    <marker id="arr-green" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#4a9" />
+    </marker>
+  </defs>
+
+  <rect width="780" height="380" fill="#0a0a0e"/>
+
+  <!-- Title -->
+  <text x="390" y="30" text-anchor="middle" fill="#ffcc00" font-size="12" font-weight="bold" letter-spacing="3" filter="url(#glow-v)">VOCABULARY GAP BRIDGE</text>
+  <text x="390" y="46" text-anchor="middle" fill="#7a6b52" font-size="8">31% of directives share zero keywords with queries -- graph layer recovers 99.5%</text>
+
+  <!-- LEFT SIDE: The stored belief -->
+  <rect x="30" y="80" width="220" height="60" rx="3" fill="rgba(255,204,0,0.06)" stroke="#ffcc00" stroke-width="1"/>
+  <text x="40" y="97" fill="#7a6b52" font-size="7">STORED BELIEF (session 3)</text>
+  <text x="40" y="116" fill="#ffcc00" font-size="9.5">"never mock the database"</text>
+  <text x="40" y="132" fill="#7a6b52" font-size="7">type: correction | locked: true</text>
+
+  <!-- RIGHT SIDE: The current action -->
+  <rect x="530" y="80" width="220" height="60" rx="3" fill="rgba(204,136,0,0.08)" stroke="#7a6b52" stroke-width="1"/>
+  <text x="540" y="97" fill="#7a6b52" font-size="7">CURRENT CONTEXT (session 7)</text>
+  <text x="540" y="116" fill="#e8d4b0" font-size="9">unittest.mock.patch(</text>
+  <text x="540" y="132" fill="#e8d4b0" font-size="9">  'db.connect')</text>
+
+  <!-- FTS5 attempt: FAILS -->
+  <rect x="280" y="80" width="220" height="60" rx="3" fill="rgba(255,51,0,0.06)" stroke="#ff3300" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="390" y="100" text-anchor="middle" fill="#ff3300" font-size="9" font-weight="bold">FTS5 SEARCH</text>
+  <text x="390" y="116" text-anchor="middle" fill="#ff3300" font-size="8">0 keywords overlap</text>
+  <text x="390" y="132" text-anchor="middle" fill="#7a6b52" font-size="7">"mock" != "never" | "patch" != "database"</text>
+
+  <!-- X marks -->
+  <text x="268" y="115" fill="#ff3300" font-size="14" font-weight="bold">X</text>
+  <text x="510" y="115" fill="#ff3300" font-size="14" font-weight="bold">X</text>
+
+  <!-- GRAPH TRAVERSAL section -->
+  <text x="390" y="178" text-anchor="middle" fill="#cc8800" font-size="10" letter-spacing="2">GRAPH LAYER TRAVERSAL</text>
+  <line x1="200" y1="186" x2="580" y2="186" stroke="#7a6b52" stroke-width="0.5"/>
+
+  <!-- Graph nodes -->
+  <!-- Node: mock.patch -->
+  <rect x="530" y="210" width="140" height="32" rx="12" fill="rgba(204,136,0,0.1)" stroke="#cc8800" stroke-width="1"/>
+  <text x="600" y="231" text-anchor="middle" fill="#e8d4b0" font-size="8.5">mock.patch()</text>
+
+  <!-- Node: testing -->
+  <rect x="380" y="210" width="110" height="32" rx="12" fill="rgba(204,136,0,0.1)" stroke="#cc8800" stroke-width="1"/>
+  <text x="435" y="231" text-anchor="middle" fill="#e8d4b0" font-size="8.5">testing</text>
+
+  <!-- Node: database -->
+  <rect x="220" y="210" width="120" height="32" rx="12" fill="rgba(204,136,0,0.1)" stroke="#cc8800" stroke-width="1"/>
+  <text x="280" y="231" text-anchor="middle" fill="#e8d4b0" font-size="8.5">database</text>
+
+  <!-- Node: "never mock" (the target) -->
+  <rect x="50" y="210" width="130" height="32" rx="12" fill="rgba(255,204,0,0.12)" stroke="#ffcc00" stroke-width="1.5"/>
+  <text x="115" y="231" text-anchor="middle" fill="#ffcc00" font-size="8.5">"never mock"</text>
+
+  <!-- Edge: mock.patch -> testing -->
+  <line x1="530" y1="226" x2="490" y2="226" stroke="#cc8800" stroke-width="1" marker-end="url(#arr-gold)"/>
+  <text x="510" y="218" text-anchor="middle" fill="#7a6b52" font-size="6.5">CALLS</text>
+
+  <!-- Edge: testing -> database -->
+  <line x1="380" y1="226" x2="340" y2="226" stroke="#cc8800" stroke-width="1" marker-end="url(#arr-gold)"/>
+  <text x="360" y="218" text-anchor="middle" fill="#7a6b52" font-size="6.5">TESTS</text>
+
+  <!-- Edge: database -> "never mock" -->
+  <line x1="220" y1="226" x2="180" y2="226" stroke="#ffcc00" stroke-width="1.5" marker-end="url(#arr-gold)"/>
+  <text x="200" y="218" text-anchor="middle" fill="#7a6b52" font-size="6.5">PROHIBITS</text>
+
+  <!-- Hop labels underneath -->
+  <text x="510" y="254" text-anchor="middle" fill="#7a6b52" font-size="7">hop 1</text>
+  <text x="360" y="254" text-anchor="middle" fill="#7a6b52" font-size="7">hop 2</text>
+  <text x="200" y="254" text-anchor="middle" fill="#ffcc00" font-size="7">FOUND</text>
+
+  <!-- Result box -->
+  <rect x="120" y="280" width="540" height="60" rx="3" fill="rgba(74,153,136,0.08)" stroke="#4a9" stroke-width="1"/>
+  <text x="390" y="300" text-anchor="middle" fill="#4a9" font-size="10" font-weight="bold">PROHIBITION SURFACED BEFORE ACTION</text>
+  <text x="390" y="318" text-anchor="middle" fill="#e8d4b0" font-size="8">The agent sees "never mock the database" before writing the mock.patch() call.</text>
+  <text x="390" y="332" text-anchor="middle" fill="#7a6b52" font-size="7">Without the graph layer, the directive is invisible. FTS5 has no path from "mock.patch" to "never mock."</text>
+
+  <!-- Stats footer -->
+  <line x1="100" y1="355" x2="680" y2="355" stroke="#7a6b52" stroke-width="0.5"/>
+  <text x="390" y="372" text-anchor="middle" fill="#7a6b52" font-size="7">Exp 47: 3,321 directives examined across 5 codebases | 1,030 (31%) vocabulary-gapped | 1,025 (99.5%) recovered by graph traversal</text>
+</svg>

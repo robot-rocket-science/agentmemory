@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 420" font-family="'Menlo','DejaVu Sans Mono','Consolas',monospace">
+  <defs>
+    <filter id="glow-b">
+      <feGaussianBlur stdDeviation="2.5" result="blur"/>
+      <feFlood flood-color="#ffcc00" flood-opacity="0.2" result="color"/>
+      <feComposite in="color" in2="blur" operator="in" result="glow"/>
+      <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="ours" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffcc00" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#cc8800" stop-opacity="0.5"/>
+    </linearGradient>
+    <linearGradient id="theirs" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7a6b52" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#7a6b52" stop-opacity="0.25"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="780" height="420" fill="#0a0a0e"/>
+
+  <!-- Title -->
+  <text x="390" y="30" text-anchor="middle" fill="#ffcc00" font-size="12" font-weight="bold" letter-spacing="3" filter="url(#glow-b)">CROSS-BENCHMARK COMPARISON</text>
+  <text x="390" y="46" text-anchor="middle" fill="#7a6b52" font-size="8">agentmemory v1.2.1 vs published best -- no embeddings, no vector DB</text>
+
+  <!-- Chart area: y=70..340, bars grouped by benchmark -->
+  <!-- 5 benchmark groups, each with 2 bars -->
+  <!-- Group width: ~130, bar width: 45, gap between bars: 8 -->
+
+  <!-- Y axis -->
+  <line x1="60" y1="68" x2="60" y2="340" stroke="#7a6b52" stroke-width="1"/>
+  <line x1="60" y1="340" x2="740" y2="340" stroke="#7a6b52" stroke-width="1"/>
+
+  <!-- Y gridlines -->
+  <text x="52" y="343" text-anchor="end" fill="#7a6b52" font-size="7">0%</text>
+  <text x="52" y="289" text-anchor="end" fill="#7a6b52" font-size="7">20%</text>
+  <line x1="60" y1="286" x2="740" y2="286" stroke="#7a6b52" stroke-width="0.3" stroke-dasharray="2,6"/>
+  <text x="52" y="235" text-anchor="end" fill="#7a6b52" font-size="7">40%</text>
+  <line x1="60" y1="232" x2="740" y2="232" stroke="#7a6b52" stroke-width="0.3" stroke-dasharray="2,6"/>
+  <text x="52" y="181" text-anchor="end" fill="#7a6b52" font-size="7">60%</text>
+  <line x1="60" y1="178" x2="740" y2="178" stroke="#7a6b52" stroke-width="0.3" stroke-dasharray="2,6"/>
+  <text x="52" y="127" text-anchor="end" fill="#7a6b52" font-size="7">80%</text>
+  <line x1="60" y1="124" x2="740" y2="124" stroke="#7a6b52" stroke-width="0.3" stroke-dasharray="2,6"/>
+  <text x="52" y="73" text-anchor="end" fill="#7a6b52" font-size="7">100%</text>
+  <line x1="60" y1="70" x2="740" y2="70" stroke="#7a6b52" stroke-width="0.3" stroke-dasharray="2,6"/>
+
+  <!-- Scale: 270px = 100%, so 1% = 2.7px, y_base = 340 -->
+
+  <!-- GROUP 1: LoCoMo (center at x=140) -->
+  <!-- Ours: 66.1% = 178.5px, y = 161.5 -->
+  <rect x="108" y="161" width="40" height="179" fill="url(#ours)" rx="1"/>
+  <text x="128" y="155" text-anchor="middle" fill="#ffcc00" font-size="9" font-weight="bold">66.1%</text>
+  <!-- Theirs: 51.6% = 139.3px, y = 200.7 -->
+  <rect x="152" y="201" width="40" height="139" fill="url(#theirs)" rx="1"/>
+  <text x="172" y="195" text-anchor="middle" fill="#7a6b52" font-size="8">51.6%</text>
+  <!-- Label -->
+  <text x="145" y="358" text-anchor="middle" fill="#e8d4b0" font-size="8">LoCoMo</text>
+  <text x="145" y="370" text-anchor="middle" fill="#cc8800" font-size="7">+14.5pp</text>
+
+  <!-- GROUP 2: MAB SH (center at x=275) -->
+  <!-- Ours: 90% = 243px, y = 97 -->
+  <rect x="243" y="97" width="40" height="243" fill="url(#ours)" rx="1"/>
+  <text x="263" y="91" text-anchor="middle" fill="#ffcc00" font-size="9" font-weight="bold">90%</text>
+  <!-- Theirs: 45% = 121.5px, y = 218.5 -->
+  <rect x="287" y="219" width="40" height="121" fill="url(#theirs)" rx="1"/>
+  <text x="307" y="213" text-anchor="middle" fill="#7a6b52" font-size="8">45%</text>
+  <!-- Label -->
+  <text x="280" y="358" text-anchor="middle" fill="#e8d4b0" font-size="8">MAB SH</text>
+  <text x="280" y="370" text-anchor="middle" fill="#cc8800" font-size="7">+45pp</text>
+
+  <!-- GROUP 3: MAB MH (center at x=410) -->
+  <!-- Ours: 60% = 162px, y = 178 -->
+  <rect x="378" y="178" width="40" height="162" fill="url(#ours)" rx="1"/>
+  <text x="398" y="172" text-anchor="middle" fill="#ffcc00" font-size="9" font-weight="bold">60%</text>
+  <!-- Theirs: 7% = 18.9px, y = 321.1 -->
+  <rect x="422" y="321" width="40" height="19" fill="url(#theirs)" rx="1"/>
+  <text x="442" y="316" text-anchor="middle" fill="#7a6b52" font-size="8">7%</text>
+  <!-- Label -->
+  <text x="415" y="358" text-anchor="middle" fill="#e8d4b0" font-size="8">MAB MH</text>
+  <text x="415" y="370" text-anchor="middle" fill="#ff3300" font-size="7" font-weight="bold">8.6x ceiling</text>
+
+  <!-- GROUP 4: StructMemEval (center at x=545) -->
+  <!-- Ours: 100% = 270px, y = 70 -->
+  <rect x="513" y="70" width="40" height="270" fill="url(#ours)" rx="1"/>
+  <text x="533" y="64" text-anchor="middle" fill="#ffcc00" font-size="9" font-weight="bold">100%</text>
+  <!-- Theirs: ~29% (v-stores fail) = 78.3px, y = 261.7 -->
+  <rect x="557" y="262" width="40" height="78" fill="url(#theirs)" rx="1"/>
+  <text x="577" y="256" text-anchor="middle" fill="#7a6b52" font-size="8">29%</text>
+  <text x="577" y="268" text-anchor="middle" fill="#7a6b52" font-size="5.5">(v-stores)</text>
+  <!-- Label -->
+  <text x="550" y="358" text-anchor="middle" fill="#e8d4b0" font-size="7">StructMem</text>
+  <text x="550" y="370" text-anchor="middle" fill="#cc8800" font-size="7">solved</text>
+
+  <!-- GROUP 5: LongMemEval (center at x=680) -->
+  <!-- Ours: 59% = 159.3px, y = 180.7 -->
+  <rect x="648" y="181" width="40" height="159" fill="url(#ours)" rx="1"/>
+  <text x="668" y="175" text-anchor="middle" fill="#ffcc00" font-size="9" font-weight="bold">59.0%</text>
+  <!-- Theirs: 60.6% = 163.6px, y = 176.4 -->
+  <rect x="692" y="176" width="40" height="164" fill="url(#theirs)" rx="1"/>
+  <text x="712" y="170" text-anchor="middle" fill="#7a6b52" font-size="8">60.6%</text>
+  <!-- Label -->
+  <text x="685" y="358" text-anchor="middle" fill="#e8d4b0" font-size="7">LongMem</text>
+  <text x="685" y="370" text-anchor="middle" fill="#7a6b52" font-size="7">-1.6pp *</text>
+
+  <!-- Legend -->
+  <rect x="200" y="392" width="14" height="10" fill="url(#ours)" rx="1"/>
+  <text x="220" y="401" fill="#e8d4b0" font-size="8">agentmemory (FTS5 + entity-index + HRR, no embeddings)</text>
+
+  <rect x="200" y="408" width="14" height="10" fill="url(#theirs)" rx="1"/>
+  <text x="220" y="417" fill="#7a6b52" font-size="8">Published best (various LLMs + embeddings)</text>
+
+  <!-- Asterisk note -->
+  <text x="740" y="393" text-anchor="end" fill="#7a6b52" font-size="6.5">* Opus judge, not GPT-4o</text>
+</svg>

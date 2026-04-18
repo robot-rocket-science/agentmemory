@@ -1,0 +1,132 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 480" font-family="'Menlo','DejaVu Sans Mono','Consolas',monospace">
+  <defs>
+    <filter id="glow-a">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feFlood flood-color="#ffcc00" flood-opacity="0.2" result="color"/>
+      <feComposite in="color" in2="blur" operator="in" result="glow"/>
+      <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="bar-fill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffcc00" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#cc8800" stop-opacity="0.4"/>
+    </linearGradient>
+    <linearGradient id="gt-fill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#cc8800" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#cc8800" stop-opacity="0.15"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="780" height="480" fill="#0a0a0e"/>
+
+  <!-- Title -->
+  <text x="390" y="32" text-anchor="middle" fill="#ffcc00" font-size="12" font-weight="bold" letter-spacing="3" filter="url(#glow-a)">MULTI-HOP EXPERIMENT PROGRESSION</text>
+  <text x="390" y="48" text-anchor="middle" fill="#7a6b52" font-size="8">MAB FactConsolidation MH 262K -- Experiments 1-6</text>
+
+  <!-- Chart area: x=80..720, y=70..380 -->
+  <!-- Y axis -->
+  <line x1="80" y1="70" x2="80" y2="380" stroke="#7a6b52" stroke-width="1"/>
+  <!-- X axis -->
+  <line x1="80" y1="380" x2="720" y2="380" stroke="#7a6b52" stroke-width="1"/>
+
+  <!-- Y axis labels (0% to 100%) -->
+  <text x="72" y="383" text-anchor="end" fill="#7a6b52" font-size="7">0%</text>
+  <line x1="78" y1="380" x2="720" y2="380" stroke="#7a6b52" stroke-width="0.3" stroke-dasharray="2,6"/>
+
+  <text x="72" y="321" text-anchor="end" fill="#7a6b52" font-size="7">20%</text>
+  <line x1="78" y1="318" x2="720" y2="318" stroke="#7a6b52" stroke-width="0.3" stroke-dasharray="2,6"/>
+
+  <text x="72" y="259" text-anchor="end" fill="#7a6b52" font-size="7">40%</text>
+  <line x1="78" y1="256" x2="720" y2="256" stroke="#7a6b52" stroke-width="0.3" stroke-dasharray="2,6"/>
+
+  <text x="72" y="197" text-anchor="end" fill="#7a6b52" font-size="7">60%</text>
+  <line x1="78" y1="194" x2="720" y2="194" stroke="#7a6b52" stroke-width="0.3" stroke-dasharray="2,6"/>
+
+  <text x="72" y="135" text-anchor="end" fill="#7a6b52" font-size="7">80%</text>
+  <line x1="78" y1="132" x2="720" y2="132" stroke="#7a6b52" stroke-width="0.3" stroke-dasharray="2,6"/>
+
+  <text x="72" y="73" text-anchor="end" fill="#7a6b52" font-size="7">100%</text>
+  <line x1="78" y1="70" x2="720" y2="70" stroke="#7a6b52" stroke-width="0.3" stroke-dasharray="2,6"/>
+
+  <!-- Published ceiling line at 7% -->
+  <!-- 7% of 310px range = 21.7px from bottom = y=358.3 -->
+  <line x1="80" y1="358" x2="720" y2="358" stroke="#ff3300" stroke-width="1.5" stroke-dasharray="8,4"/>
+  <text x="724" y="355" fill="#ff3300" font-size="7.5">7% ceiling</text>
+  <text x="724" y="366" fill="#ff3300" font-size="6.5">(all methods)</text>
+
+  <!-- Bar positions: 6 bars evenly spaced from x=120 to x=680 -->
+  <!-- Bar width = 60, spacing ~45 between -->
+
+  <!-- Baseline: 6% -> height = 6/100 * 310 = 18.6, y = 380-18.6 = 361.4 -->
+  <rect x="107" y="361" width="60" height="19" fill="url(#bar-fill)" rx="1"/>
+  <text x="137" y="356" text-anchor="middle" fill="#ffcc00" font-size="9" font-weight="bold">6%</text>
+  <text x="137" y="398" text-anchor="middle" fill="#e8d4b0" font-size="7.5">Baseline</text>
+  <text x="137" y="410" text-anchor="middle" fill="#7a6b52" font-size="6.5">FTS5 chunks</text>
+
+  <!-- Exp 2: 7% -> height = 21.7, y = 358.3 -->
+  <rect x="207" y="358" width="60" height="22" fill="url(#bar-fill)" rx="1"/>
+  <text x="237" y="353" text-anchor="middle" fill="#ffcc00" font-size="9" font-weight="bold">7%</text>
+  <text x="237" y="398" text-anchor="middle" fill="#e8d4b0" font-size="7.5">Exp 2</text>
+  <text x="237" y="410" text-anchor="middle" fill="#7a6b52" font-size="6.5">SUPERSEDES</text>
+
+  <!-- Exp 3: 10% -> height = 31, y = 349 -->
+  <rect x="307" y="349" width="60" height="31" fill="url(#bar-fill)" rx="1"/>
+  <text x="337" y="344" text-anchor="middle" fill="#ffcc00" font-size="9" font-weight="bold">10%</text>
+  <text x="337" y="398" text-anchor="middle" fill="#e8d4b0" font-size="7.5">Exp 3</text>
+  <text x="337" y="410" text-anchor="middle" fill="#7a6b52" font-size="6.5">Triples</text>
+
+  <!-- Exp 4: 35% -> height = 108.5, y = 271.5 -->
+  <rect x="407" y="271" width="60" height="109" fill="url(#bar-fill)" rx="1"/>
+  <text x="437" y="264" text-anchor="middle" fill="#ffcc00" font-size="10" font-weight="bold" filter="url(#glow-a)">35%</text>
+  <text x="437" y="398" text-anchor="middle" fill="#e8d4b0" font-size="7.5">Exp 4</text>
+  <text x="437" y="410" text-anchor="middle" fill="#7a6b52" font-size="6.5">Entity-index</text>
+  <text x="437" y="420" text-anchor="middle" fill="#cc8800" font-size="6">BREAKTHROUGH</text>
+
+  <!-- Exp 5: 55% -> height = 170.5, y = 209.5 -->
+  <rect x="507" y="209" width="60" height="171" fill="url(#bar-fill)" rx="1"/>
+  <text x="537" y="202" text-anchor="middle" fill="#ffcc00" font-size="10" font-weight="bold">55%</text>
+  <text x="537" y="398" text-anchor="middle" fill="#e8d4b0" font-size="7.5">Exp 5</text>
+  <text x="537" y="410" text-anchor="middle" fill="#7a6b52" font-size="6.5">Extended regex</text>
+
+  <!-- Exp 6: 60% -> height = 186, y = 194 -->
+  <rect x="607" y="194" width="60" height="186" fill="url(#bar-fill)" rx="1"/>
+  <text x="637" y="187" text-anchor="middle" fill="#ffcc00" font-size="10" font-weight="bold">60%</text>
+  <text x="637" y="398" text-anchor="middle" fill="#e8d4b0" font-size="7.5">Exp 6</text>
+  <text x="637" y="410" text-anchor="middle" fill="#7a6b52" font-size="6.5">Temporal</text>
+
+  <!-- GT-reachable overlay bars (lighter, behind) -->
+  <!-- Only meaningful for Exp 4 onward. Exp 4: ~62%, Exp 5: ~62%, Exp 6: 96% -->
+  <!-- Exp 4 GT: 62% = 192.2, y = 187.8 -->
+  <rect x="413" y="188" width="48" height="83" fill="url(#gt-fill)" rx="1" opacity="0.5"/>
+  <text x="437" y="183" text-anchor="middle" fill="#cc8800" font-size="7">62% GT</text>
+
+  <!-- Exp 5 GT: 62% -->
+  <rect x="513" y="188" width="48" height="21" fill="url(#gt-fill)" rx="1" opacity="0.5"/>
+
+  <!-- Exp 6 GT: 96% = 297.6, y = 82.4 -->
+  <rect x="613" y="82" width="48" height="112" fill="url(#gt-fill)" rx="1" opacity="0.5"/>
+  <text x="637" y="77" text-anchor="middle" fill="#cc8800" font-size="8" font-weight="bold">96% GT</text>
+
+  <!-- GT-reachable connecting line -->
+  <line x1="437" y1="188" x2="537" y2="188" stroke="#cc8800" stroke-width="1" stroke-dasharray="4,3"/>
+  <line x1="537" y1="188" x2="637" y2="82" stroke="#cc8800" stroke-width="1" stroke-dasharray="4,3"/>
+
+  <!-- Legend -->
+  <rect x="100" y="438" width="12" height="12" fill="url(#bar-fill)" rx="1"/>
+  <text x="118" y="449" fill="#e8d4b0" font-size="7.5">Opus SEM score</text>
+
+  <rect x="230" y="438" width="12" height="12" fill="url(#gt-fill)" rx="1"/>
+  <text x="248" y="449" fill="#e8d4b0" font-size="7.5">GT-reachable (retrieval solved)</text>
+
+  <line x1="410" y1="444" x2="440" y2="444" stroke="#ff3300" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="448" y="449" fill="#e8d4b0" font-size="7.5">Published ceiling (all methods)</text>
+
+  <!-- Annotation: gap explanation -->
+  <rect x="540" y="100" width="170" height="56" rx="2" fill="rgba(204,136,0,0.08)" stroke="#7a6b52" stroke-width="0.5"/>
+  <text x="548" y="115" fill="#e8d4b0" font-size="7">36pp gap (60% to 96%) is</text>
+  <text x="548" y="127" fill="#e8d4b0" font-size="7">reader chain resolution,</text>
+  <text x="548" y="139" fill="#e8d4b0" font-size="7">not retrieval. The retrieval</text>
+  <text x="548" y="151" fill="#ffcc00" font-size="7">problem is fully solved.</text>
+
+  <!-- Y axis label -->
+  <text x="30" y="225" fill="#cc8800" font-size="8" transform="rotate(-90 30 225)" text-anchor="middle" letter-spacing="2">SEM SCORE</text>
+</svg>
