@@ -74,6 +74,38 @@ The full handbook is at **[docs/README.md](docs/README.md)** and is structured a
 - **Part III - Under the Hood:** [Architecture](docs/ARCHITECTURE.md) · [Privacy](docs/PRIVACY.md)
 - **Part IV - Benchmarks and Research:** [Protocol](docs/BENCHMARK_PROTOCOL.md) · [Results](docs/BENCHMARK_RESULTS.md) · [Research Freeze](docs/RESEARCH_FREEZE_20260416.md)
 
+## Wonder and Reason
+
+agentmemory includes two graph-aware research commands that go beyond simple keyword search. They use the belief graph -- edges like SUPPORTS, CONTRADICTS, SUPERSEDES, CITES -- to surface connected evidence and detect reasoning gaps.
+
+### `/mem:wonder <topic>` -- Deep Research
+
+Wonder is exploratory. You give it a topic and it fans out across the belief graph to collect everything relevant, even things you did not directly search for.
+
+1. **Retrieves** seed beliefs via FTS5 keyword search
+2. **Expands** outward along graph edges (BFS, configurable depth)
+3. **Scores uncertainty** for each belief using Beta distribution variance
+4. **Detects contradictions** between beliefs in the result set
+5. **Outputs** a structured context block with three sections: Known Facts (direct hits), Connected Evidence (reached via graph traversal), and Open Questions (high-uncertainty beliefs)
+
+Use wonder when you want to survey what the system knows about a topic before making a decision. It answers: "what do we know, what is connected, and where are we uncertain?"
+
+### `/mem:reason <question>` -- Hypothesis Testing
+
+Reason is focused. You give it a question or hypothesis and it builds branching consequence paths to evaluate whether the evidence supports it.
+
+1. **Retrieves** seed beliefs, then checks relevance (content-word overlap filter)
+2. **Builds consequence paths** -- chains of beliefs linked by edges, with compound confidence decay at each hop
+3. **Checks constraints** -- compares paths against locked beliefs for conflicts
+4. **Detects impasses** -- four types: ties (contradicting beliefs at similar confidence), gaps (dead-end paths), constraint failures (conflicts with locked beliefs), and no-change (all low-confidence evidence)
+5. **Issues a verdict**: SUFFICIENT, INSUFFICIENT, UNCERTAIN, CONTRADICTORY, or PARTIAL
+
+Use reason when you need to evaluate a specific claim or decision. It answers: "does the evidence support this, and if not, where does the reasoning break down?"
+
+### The difference
+
+Wonder is divergent -- cast a wide net, see what is out there. Reason is convergent -- evaluate a specific claim against the evidence. Together they form a research loop: wonder to survey the landscape, reason to test specific hypotheses that emerge from it.
+
 ## Benchmarks
 
 > [!NOTE]
