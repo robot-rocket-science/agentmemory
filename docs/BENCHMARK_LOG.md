@@ -96,7 +96,8 @@ Two earlier runs had answer leakage (the `answer` field was present in the agent
 | Locked | 0 |
 | Superseded | 2,439 |
 | Timing | discover=0.81s, file_tree=0.54s, git=0.06s, docs=0.08s, ast=0.94s, citations=0.02s, directives=0.00s |
-| Total onboard time | ~2.5s |
+| Scan time | ~2.5s |
+| Note | Scan-phase only; full pipeline (ingest + edges + vault) not measured at this scale |
 | Conversation sessions ingested | 15 sessions, 2,233 turns |
 
 ### Node breakdown
@@ -148,7 +149,8 @@ Two earlier runs had answer leakage (the `answer` field was present in the agent
 | Locked | 0 |
 | Superseded | 4,616 |
 | Timing | discover=1.42s, file_tree=0.93s, git=0.80s, docs=0.43s, ast=1.86s, citations=0.33s, directives=0.00s |
-| Total onboard time | ~5.8s |
+| Scan time | ~5.8s |
+| Note | Scan-phase only; full pipeline (ingest + edges + vault) not measured at this scale |
 | Temporal spread | 18 distinct days, 176 distinct hours |
 
 ### Belief distribution
@@ -169,6 +171,7 @@ Two earlier runs had answer leakage (the `answer` field was present in the agent
 
 ### Scaling observations
 - alpha-seek-memtest is ~5x larger than agentmemory (90k vs 17k nodes)
-- Onboard time scaled linearly: 5.8s vs 2.5s (2.3x for 5x data)
-- AST parsing is the bottleneck in both (38% and 32% of total time)
+- Scan time scaled linearly: 5.8s vs 2.5s (2.3x for 5x data)
+- AST parsing is the bottleneck in both (38% and 32% of scan time)
+- Full pipeline (scan + ingest + edges + vault) measured at 6.5s for 10,872-node repo after v1.2.1 perf fixes
 - Citation extraction cost is negligible even at 1,726 docs
