@@ -173,7 +173,7 @@ agentmemory demote <belief-id>   # remove from rhizome, return to vault-local
 | Project renamed (hash changes) | Orphaned vault in registry | Store path + name; registry cleanup command |
 | Contradictions across vaults | Ambiguous retrieval | Provenance tags; no conflict resolution attempted |
 | Sensitive beliefs leak | Privacy violation | Per-vault sensitivity flag; restricted vaults excluded from cross-vault search |
-| Noise from irrelevant vaults | Poor retrieval quality | Filter by confidence >= 0.8, source_type = user_stated/user_corrected |
+| Noise from irrelevant vaults | Poor retrieval quality | Filter by belief_type IN (requirement, correction, preference) -- see experiment results below |
 | Concurrent writes to rhizome.db | SQLite busy errors | WAL mode; promote operations are infrequent |
 
 ## Experiments to validate
@@ -198,15 +198,72 @@ Priority order (run C first as safety gate):
   Rhizome stores promoted (distilled) beliefs, not copies of everything.
 - **Graphiti/FalkorDB**: group_id-based isolation for multi-tenant agent memory.
 
+## Experiment results (2026-04-17)
+
+### Experiment C: Containment -- PASS
+
+80 cross-vault queries (20 terms x 4 vaults), zero mutations detected. All
+databases opened with `?mode=ro` and `PRAGMA query_only = ON`. Every metric
+(belief counts, timestamps, table row counts) identical before and after.
+
+### Experiment A: Noise filtering
+
+| Strategy | Reduction | Viable? |
+|----------|-----------|---------|
+| S0: No filter | 0% | Baseline (7,741 results) |
+| S1: confidence >= 0.85 | 75.7% | No -- vault-biased (94% from one vault) |
+| S2: user_stated/corrected | 96.4% | No -- 3/4 vaults have 0% user-sourced |
+| S3: locked only | 99.7% | No -- only 8 locked beliefs total |
+| S5: requirement/correction/preference | 93.5% | Yes -- works across all vaults |
+| S6: conf >= 0.75 + len > 50 | 20.4% | No -- too permissive |
+
+**Winner: S5 (belief_type filter).** 93.5% noise reduction, zero over-filtered
+terms, no vault bias. The auto-candidate filter should use belief_type, not
+source_type or confidence.
+
+**Key finding: confidence and source_type are not usable filters.** Confidence
+is bimodal (one vault at 0.90+, three at 0.75). Source_type is 100%
+agent_inferred in 3 of 4 vaults. Both filters silently erase vaults rather
+than filtering noise.
+
+**Revised auto-candidate rule:**
+```sql
+belief_type IN ('requirement', 'correction', 'preference')
+AND valid_to IS NULL
+AND LENGTH(content) > 30
+```
+
+## Decouple Obsidian from core write path
+
+Decision (2026-04-17): The .md file format with YAML frontmatter is the
+canonical store, but Obsidian-specific features must be an optional export
+layer, not required for core operations.
+
+Current state: obsidian.py (961 lines, 6.4% of codebase) handles both
+core write operations (write_belief_file, parse_belief_frontmatter) and
+Obsidian-specific exports (dataview dashboards, canvas, wikilinks, index
+notes). vault_store.py imports from obsidian.py for core writes.
+
+Required refactor:
+1. Extract generic .md read/write into a new markdown_store.py
+2. Use standard markdown links instead of wikilinks for edge references
+3. Move Obsidian-specific features (dataview, canvas, index notes) into
+   obsidian.py as an optional export plugin
+4. vault_store.py imports from markdown_store.py, not obsidian.py
+5. System works without Obsidian installed -- .md files are just files
+
+This applies to the rhizome too: the grove vault for cross-project beliefs
+is a directory of .md files, not an Obsidian vault. Obsidian can open it
+if the user has Obsidian, but it's not required.
+
 ## Relationship to V2_ARCHITECTURE.md
 
-V2 makes the Obsidian vault canonical and SQLite derived. The rhizome
+V2 makes the vault (.md files) canonical and SQLite derived. The rhizome
 architecture is orthogonal: it connects vaults across projects. They compose:
 
 - Each project's vault-first store is a culm
 - rhizome.db is the root network connecting them
-- promoted_beliefs in rhizome.db could sync to an Obsidian "grove" vault
-  containing only cross-project beliefs
+- promoted_beliefs sync to a grove directory of .md files (optional Obsidian)
 
 ## Migration path
 
