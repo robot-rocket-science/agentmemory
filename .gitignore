@@ -28,6 +28,9 @@ Thumbs.db
 # Generated HTML reports
 *.html
 
+# Code review artifacts
+REVIEW*.md
+
 # Experiment result data (regenerate from source scripts)
 experiments/*_results.json
 experiments/*_results/
