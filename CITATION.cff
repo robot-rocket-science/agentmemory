@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use agentmemory in your research or project, please cite it."
+title: "agentmemory: Persistent Memory for AI Coding Agents"
+type: software
+authors:
+  - name: robotrocketscience
+url: "https://github.com/yoshi280/agentmemory"
+repository-code: "https://github.com/yoshi280/agentmemory"
+license: MIT
+version: "1.2.3"
+date-released: "2026-04-18"
+keywords:
+  - agentic-memory
+  - llm
+  - mcp
+  - persistent-memory
+  - bayesian
+  - belief-graph
+abstract: >-
+  Persistent memory system for AI coding agents. Captures decisions,
+  corrections, and context as you work using Bayesian belief tracking,
+  FTS5 retrieval, and Thompson sampling. No embeddings, no vector DB.

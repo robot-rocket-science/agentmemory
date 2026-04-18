@@ -107,6 +107,20 @@ uv run pyright src/
 
 Contributions welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## Citation
+
+If you use agentmemory in your research or project, please cite:
+
+```bibtex
+@software{agentmemory2026,
+  author    = {robotrocketscience},
+  title     = {agentmemory: Persistent Memory for AI Coding Agents},
+  year      = {2026},
+  url       = {https://github.com/yoshi280/agentmemory},
+  license   = {MIT}
+}
+```
+
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) -- free for personal, commercial, and any other use. Citation appreciated.
