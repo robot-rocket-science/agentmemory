@@ -707,6 +707,36 @@ def search_for_prompt(
             all_scored.append(sb)
             seen_ids.add(r["id"])
 
+    # --- Layer 1.5: Edge-based vocabulary expansion (lightweight HRR proxy) ---
+    # HRR runs in retrieval.py but is too heavy for the hook path (numpy, ~117ms).
+    # Instead, traverse edges from FTS5 hits to find connected beliefs that FTS5
+    # missed due to vocabulary gaps. This bridges ~31% of directive vocabulary
+    # gaps (exp53) without numpy overhead. ~5-10ms for edge traversal.
+    if seen_ids:
+        fts_ids_list: list[str] = list(seen_ids)[:20]  # cap to avoid large queries
+        ph_edge: str = ",".join("?" * len(fts_ids_list))
+        try:
+            edge_rows: list[sqlite3.Row] = db.execute(
+                f"""SELECT DISTINCT b.* FROM edges e
+                    JOIN beliefs b ON b.id = e.to_id
+                    WHERE e.from_id IN ({ph_edge})
+                      AND e.edge_type IN ('RELATES_TO', 'SUPPORTS', 'IMPLEMENTS')
+                      AND b.valid_to IS NULL
+                      AND b.id NOT IN ({ph_edge})
+                    LIMIT 10""",
+                fts_ids_list + fts_ids_list,
+            ).fetchall()
+        except sqlite3.OperationalError:
+            edge_rows = []
+
+        for r in edge_rows:
+            if r["id"] not in seen_ids:
+                sb = score_belief(r, query_words, now)
+                sb.via = "edge_expansion"
+                sb.score *= 0.8  # slight discount for indirect match
+                all_scored.append(sb)
+                seen_ids.add(r["id"])
+
     # --- Layer 2: Entity-aware search (corrections/user statements) ---
     entities: list[str] = extract_entity_candidates(query_words)
     action_targets: list[str] = detect_action_targets(prompt)
