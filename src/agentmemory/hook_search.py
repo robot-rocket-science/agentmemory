@@ -503,6 +503,13 @@ def _process_pending_feedback(
     now_str: str = datetime.now(timezone.utc).isoformat()
     pending_ids: list[int] = []
 
+    # Look up session_id for test recording (may be NULL for hook-only sessions)
+    session_row: sqlite3.Row | None = db.execute(
+        "SELECT id FROM sessions WHERE completed_at IS NULL "
+        "ORDER BY started_at DESC LIMIT 1"
+    ).fetchone()
+    session_id: str = session_row["id"] if session_row else "hook"
+
     for row in pending:
         pending_ids.append(row["id"])
         belief_id: str = row["belief_id"]
@@ -525,6 +532,7 @@ def _process_pending_feedback(
                 "UPDATE beliefs SET alpha = alpha + 0.3, updated_at = ? WHERE id = ?",
                 (now_str, belief_id),
             )
+            outcome: str = "used"
             used_count += 1
         else:
             # "ignored" -- weak evidence of irrelevance (0.1 beta increment)
@@ -534,6 +542,16 @@ def _process_pending_feedback(
                 "WHERE id = ? AND locked = 0",
                 (now_str, belief_id),
             )
+            outcome = "ignored"
+
+        # Record in tests table for visibility and trend measurement
+        detail: str = f"hook: {matched}/{len(unique_terms)} terms matched"
+        db.execute(
+            "INSERT INTO tests (belief_id, session_id, outcome, outcome_detail, "
+            "detection_layer, evidence_weight, created_at) "
+            "VALUES (?, ?, ?, ?, 'implicit', 1.0, ?)",
+            (belief_id, session_id, outcome, detail, now_str),
+        )
 
     # Clear processed entries
     if pending_ids:
