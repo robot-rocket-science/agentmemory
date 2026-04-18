@@ -53,6 +53,175 @@ TOKEN_BUDGET_CHARS: int = 6000
 CORRECTION_RECENCY_HOURS: float = 72.0
 CORRECTION_BOOST: float = 5.0
 LOCK_BOOST: float = 3.0
+ACTIVATION_BOOST: float = 2.0
+
+# ---------------------------------------------------------------------------
+# Structural prompt analysis (Layer 0)
+# ---------------------------------------------------------------------------
+
+# Task-type verb taxonomy (validated in exp86: 90.5% accuracy)
+_VERB_CLASSES: dict[str, list[str]] = {
+    "planning": [
+        "plan", "design", "architect", "roadmap", "outline", "scope",
+        "milestone", "breakdown", "decompose", "strategize", "schedule",
+    ],
+    "deployment": [
+        "deploy", "push", "ship", "release", "publish", "launch",
+        "merge", "promote", "rollout", "stage",
+    ],
+    "debugging": [
+        "fix", "debug", "diagnose", "troubleshoot", "bisect", "trace",
+        "investigate", "reproduce", "isolate", "patch", "address",
+    ],
+    "implementation": [
+        "build", "implement", "create", "add", "wire", "integrate",
+        "configure", "setup", "scaffold", "bootstrap",
+    ],
+    "validation": [
+        "test", "verify", "validate", "check", "audit", "review",
+        "confirm", "assert", "benchmark", "measure", "pytest", "run",
+    ],
+    "research": [
+        "research", "explore", "investigate", "analyze", "study",
+        "compare", "evaluate", "wonder", "hypothesize", "survey",
+    ],
+}
+
+_ALL_TASK_VERBS: set[str] = {v for vs in _VERB_CLASSES.values() for v in vs}
+
+# Sequential markers suppress subagent detection
+_SEQUENTIAL_MARKERS: list[str] = [
+    "then", "after that", "next", "once that's done", "first.*then",
+    "step by step", "carefully", "one at a time", "sequentially",
+    "before we", "wait for", "depends on",
+]
+
+# Parallel markers (exp87: "also" removed -- 87.8% FP rate)
+_PARALLEL_MARKERS: list[str] = [
+    "in parallel", "at the same time", "meanwhile", "concurrently",
+    "simultaneously", "spawn subagent", "use subagent", "use agent",
+    "all at once", "at once",
+]
+
+# Planning phrases the user habitually uses
+_PLANNING_PHRASES: list[str] = [
+    "make a plan", "make a todo", "todo list", "follow the plan",
+    "verify the steps", "stay on track", "execute the plan",
+    "refer to the runbook", "check the docs", "best practices",
+]
+
+# Compound word splitting for verb detection
+_COMPOUNDS: dict[str, str] = {
+    "bugfix": "bug fix", "hotfix": "hot fix", "quickfix": "quick fix",
+}
+
+
+@dataclass
+class StructuralAnalysis:
+    """Result of structural prompt analysis."""
+
+    task_types: list[str] = field(default_factory=lambda: list[str]())
+    subagent_suitable: bool = False
+    subagent_signals: list[str] = field(default_factory=lambda: list[str]())
+    enumerated_items: int = 0
+    unique_entities: int = 0
+    word_count: int = 0
+    has_sequential_markers: bool = False
+    has_parallel_markers: bool = False
+    planning_phrases_found: list[str] = field(default_factory=lambda: list[str]())
+
+
+def _split_compounds(text: str) -> str:
+    """Split compound words like 'bugfix' into 'bug fix'."""
+    result: str = text
+    for compound, split in _COMPOUNDS.items():
+        result = re.sub(rf"\b{compound}\b", split, result, flags=re.IGNORECASE)
+    result = re.sub(r"([a-z])([A-Z])", r"\1 \2", result)
+    return result.replace("_", " ")
+
+
+def analyze_prompt_structure(text: str) -> StructuralAnalysis:
+    """Analyze prompt structure for task-type and subagent suitability.
+
+    Zero-LLM structural analysis validated at 90.5% task-type accuracy
+    and 92% subagent detection accuracy (exp86). Runs in <2ms.
+    """
+    result = StructuralAnalysis()
+    words: list[str] = text.split()
+    result.word_count = len(words)
+
+    # Entity extraction (CamelCase, paths, dotted names, snake_case)
+    entities: set[str] = set()
+    entities.update(re.findall(r"\b[A-Z][a-z]+(?:[A-Z][a-z]+)+\b", text))
+    entities.update(re.findall(r"[\w./]+\.(?:py|js|ts|md|json|yaml|yml|sh|sql)\b", text))
+    entities.update(re.findall(r"\b\w+\.\w+(?:\.\w+)*\b", text))
+    entities.update(
+        w for w in re.findall(r"\b[a-z]+_[a-z_]+\b", text) if len(w) > 4
+    )
+    result.unique_entities = len(entities)
+
+    # Enumerated items
+    result.enumerated_items = (
+        len(re.findall(r"^\s*\d+[\.\)]\s+", text, re.MULTILINE))
+        + len(re.findall(r"^\s*[-*]\s+", text, re.MULTILINE))
+        + len(re.findall(r"\b(?:first|second|third|fourth|fifth)\b", text, re.IGNORECASE))
+    )
+
+    # Verb class scoring
+    expanded: str = _split_compounds(text).lower()
+    expanded_words: list[str] = re.findall(r"\b\w+\b", expanded)
+    verb_scores: dict[str, float] = {}
+    for task_type, verbs in _VERB_CLASSES.items():
+        hits: int = sum(1 for w in expanded_words if w in verbs)
+        if hits > 0:
+            verb_scores[task_type] = hits / max(len(expanded_words), 1) * 100
+
+    # Sequential vs parallel markers
+    text_lower: str = text.lower()
+    for marker in _SEQUENTIAL_MARKERS:
+        if re.search(marker, text_lower):
+            result.has_sequential_markers = True
+            break
+    for marker in _PARALLEL_MARKERS:
+        if marker in text_lower:
+            result.has_parallel_markers = True
+            break
+
+    # Planning phrases
+    for phrase in _PLANNING_PHRASES:
+        if phrase in text_lower:
+            result.planning_phrases_found.append(phrase)
+
+    # Task type detection
+    for task_type, score in sorted(verb_scores.items(), key=lambda x: x[1], reverse=True):
+        if score > 0.5:
+            result.task_types.append(task_type)
+    if result.planning_phrases_found and "planning" not in result.task_types:
+        result.task_types.insert(0, "planning")
+
+    # Subagent suitability detection (100% precision, 62.5% recall in exp86)
+    signals: list[str] = []
+    if result.enumerated_items >= 3:
+        signals.append(f"enumerated_items={result.enumerated_items}")
+    if result.unique_entities >= 3 and not result.has_sequential_markers:
+        signals.append(f"multi_entity={result.unique_entities}")
+    if result.has_parallel_markers:
+        signals.append("parallel_language")
+    if result.word_count > 100 and result.unique_entities >= 2:
+        signals.append("broad_scope")
+    if "research" in result.task_types and result.word_count > 50:
+        signals.append("research_breadth")
+    # Multi-verb-phrase detection
+    verb_phrases: list[str] = re.findall(
+        r"\b(?:" + "|".join(_ALL_TASK_VERBS) + r")\s+\w+", text_lower,
+    )
+    if len(verb_phrases) >= 3 and not result.has_sequential_markers:
+        signals.append(f"multi_verb_phrase={len(verb_phrases)}")
+
+    result.subagent_signals = signals
+    result.subagent_suitable = len(signals) >= 1 and not result.has_sequential_markers
+
+    return result
 
 
 @dataclass
@@ -368,6 +537,111 @@ def _process_pending_feedback(
     return used_count
 
 
+def _evaluate_activation_conditions(
+    db: sqlite3.Connection,
+    analysis: StructuralAnalysis,
+    prompt_words: set[str],
+) -> list[sqlite3.Row]:
+    """Find beliefs whose activation_condition matches current prompt.
+
+    Condition format (lines ORed, '+' ANDed within line):
+        task_type:planning
+        task_type:deployment+keyword_any:production,staging
+        structural:enumerated_items>=3
+        keyword_any:deploy,ship,push
+        subagent:true
+    """
+    try:
+        rows: list[sqlite3.Row] = db.execute(
+            "SELECT * FROM beliefs WHERE activation_condition IS NOT NULL "
+            "AND valid_to IS NULL AND activation_condition != ''"
+        ).fetchall()
+    except sqlite3.OperationalError:
+        return []
+
+    matched: list[sqlite3.Row] = []
+    for row in rows:
+        condition: str = row["activation_condition"] or ""
+        if _condition_matches(condition, analysis, prompt_words):
+            matched.append(row)
+    return matched
+
+
+def _condition_matches(
+    condition: str,
+    analysis: StructuralAnalysis,
+    prompt_words: set[str],
+) -> bool:
+    """Evaluate an activation condition string. Lines ORed, '+' ANDed."""
+    for line in condition.strip().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        predicates: list[str] = line.split("+")
+        if all(_eval_predicate(p.strip(), analysis, prompt_words) for p in predicates):
+            return True
+    return False
+
+
+def _eval_predicate(
+    pred: str,
+    analysis: StructuralAnalysis,
+    prompt_words: set[str],
+) -> bool:
+    """Evaluate a single predicate like 'task_type:planning'."""
+    if ":" not in pred:
+        return False
+    ptype: str
+    pvalue: str
+    ptype, pvalue = pred.split(":", 1)
+
+    if ptype == "task_type":
+        return pvalue in analysis.task_types
+    elif ptype == "keyword_any":
+        keywords: set[str] = {k.strip().lower() for k in pvalue.split(",")}
+        return bool(keywords & prompt_words)
+    elif ptype == "keyword_all":
+        keywords = {k.strip().lower() for k in pvalue.split(",")}
+        return keywords.issubset(prompt_words)
+    elif ptype == "structural":
+        return _eval_structural_predicate(pvalue, analysis)
+    elif ptype == "subagent":
+        return analysis.subagent_suitable
+    return False
+
+
+def _eval_structural_predicate(expr: str, analysis: StructuralAnalysis) -> bool:
+    """Evaluate structural:enumerated_items>=3 style predicates."""
+    m: re.Match[str] | None = re.match(r"(\w+)\s*(>=|<=|>|<|==)\s*(\d+)", expr)
+    if not m:
+        return False
+    signal: str = m.group(1)
+    op: str = m.group(2)
+    threshold: int = int(m.group(3))
+
+    value: int = 0
+    if signal == "enumerated_items":
+        value = analysis.enumerated_items
+    elif signal == "unique_entities":
+        value = analysis.unique_entities
+    elif signal == "word_count":
+        value = analysis.word_count
+    else:
+        return False
+
+    if op == ">=":
+        return value >= threshold
+    elif op == "<=":
+        return value <= threshold
+    elif op == ">":
+        return value > threshold
+    elif op == "<":
+        return value < threshold
+    elif op == "==":
+        return value == threshold
+    return False
+
+
 def search_for_prompt(
     db: sqlite3.Connection,
     prompt: str,
@@ -375,6 +649,7 @@ def search_for_prompt(
 ) -> SearchResult:
     """Run the full search pipeline for a user prompt.
 
+    0. Structural prompt analysis + activation_condition matching
     1. Process pending feedback from previous search (closes feedback loop)
     2. FTS5 keyword search
     3. Entity-aware secondary search (user corrections mentioning prompt entities)
@@ -393,6 +668,20 @@ def search_for_prompt(
     now: datetime = datetime.now(timezone.utc)
     seen_ids: set[str] = set()
     all_scored: list[ScoredBelief] = []
+
+    # --- Layer 0: Structural analysis + activation_condition matching ---
+    analysis: StructuralAnalysis = analyze_prompt_structure(prompt)
+    prompt_words_set: set[str] = {w.lower() for w in re.findall(r"\b\w+\b", prompt.lower())}
+    activated_rows: list[sqlite3.Row] = _evaluate_activation_conditions(
+        db, analysis, prompt_words_set,
+    )
+    for r in activated_rows:
+        if r["id"] not in seen_ids:
+            sb: ScoredBelief = score_belief(r, query_words, now)
+            sb.via = "activation"
+            sb.score *= ACTIVATION_BOOST
+            all_scored.append(sb)
+            seen_ids.add(r["id"])
 
     # --- Layer 1: FTS5 keyword search (existing behavior) ---
     fts_query: str = " OR ".join(f'"{w}"' for w in query_words)
