@@ -170,7 +170,7 @@ Node types:
 - project-i: code module, memory node, wiki page, decision record, conversation
 - project-j: perk node, entity type, system, biome
 - project-d: physical device, service, network segment, config file
-- Code-monkey: module, contract, execution, delivery, aerospace component
+- project-e: module, contract, execution, delivery, aerospace component
 - project-h: requirement, phase, component, technology
 
 Edge types:
@@ -178,7 +178,7 @@ Edge types:
 - project-i: CITES, DECIDED_IN, RELATES_TO, SOURCED_FROM, SUPERSEDES, CONCEPT_LINK, EVIDENCED_BY
 - project-j: PREREQUISITE, MODIFIES_STAT, BELONGS_TO_BRANCH, UNLOCKS
 - project-d: HOSTS, CONNECTS_TO, DEPENDS_ON, MONITORS, MANAGES
-- Code-monkey: IMPORTS, CALLS, DELIVERS_TO, SCOPES, SIMILAR_TO
+- project-e: IMPORTS, CALLS, DELIVERS_TO, SCOPES, SIMILAR_TO
 - project-h: REQUIRES, DEPENDS_ON, MAPS_TO, IMPLEMENTS
 
 **Research questions:**
