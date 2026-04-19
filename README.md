@@ -144,6 +144,20 @@ LoCoMo comparison note: EverMemOS (92.3%), Letta (74.0%), and Mem0 (68.5%) use d
 
 Methodology, per-benchmark details, and audit trails: [Chapter 8 - Benchmark Results](docs/BENCHMARK_RESULTS.md).
 
+### Session metrics
+
+Beyond benchmarks, agentmemory tracks real-world usage metrics from conversation logs. Run `agentmemory metrics` for the full report.
+
+| Metric | Value | Note |
+|---|---|---|
+| Correction rate | 0.72% | FP-adjusted, ~90% precision |
+| Retrieval tokens/search | ~1,800 | Stable (2K budget cap) |
+| Retrieval budget fill | 73% -> 100% | Improving as belief store grows |
+| Correction trend | 1.7% -> 0.5% | Suggestive, not yet significant |
+| Fix commit rate | 12% | 50/404 commits in dev period |
+
+Evaluation protocol: [docs/EVALUATION_PROTOCOL.md](docs/EVALUATION_PROTOCOL.md) -- three-part framework covering benchmarks, acceptance tests (872+), and session metrics.
+
 ## Development
 
 ```bash
