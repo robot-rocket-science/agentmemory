@@ -7,6 +7,7 @@ Verifies that:
 - reclassify soft-deletes EPHEMERAL beliefs
 - reclassify skips locked beliefs
 """
+
 from __future__ import annotations
 
 import json
@@ -85,9 +86,11 @@ class TestReclassify:
             "We decided to use PostgreSQL for the backend."
         )
 
-        mappings: str = json.dumps([
-            {"id": belief_id, "type": "DECISION", "persist": "PERSIST"},
-        ])
+        mappings: str = json.dumps(
+            [
+                {"id": belief_id, "type": "DECISION", "persist": "PERSIST"},
+            ]
+        )
         result: str = reclassify(mappings)
         assert "Updated: 1" in result
 
@@ -96,7 +99,8 @@ class TestReclassify:
         belief = store.get_belief(belief_id)
         assert belief is not None
         assert belief.belief_type == "factual"  # DECISION maps to factual
-        assert belief.alpha == pytest.approx(5.0)  # pyright: ignore[reportUnknownMemberType]
+        # DECISION prior (5.0, 1.0) deflated by 0.2 for non-user source = 1.0
+        assert belief.alpha == pytest.approx(1.0)  # pyright: ignore[reportUnknownMemberType]
 
     def test_reclassify_soft_deletes_ephemeral(self) -> None:
         """Reclassify with persist=EPHEMERAL should set valid_to."""
@@ -104,9 +108,11 @@ class TestReclassify:
             "ok sounds good let me check that"
         )
 
-        mappings: str = json.dumps([
-            {"id": belief_id, "type": "COORDINATION", "persist": "EPHEMERAL"},
-        ])
+        mappings: str = json.dumps(
+            [
+                {"id": belief_id, "type": "COORDINATION", "persist": "EPHEMERAL"},
+            ]
+        )
         result: str = reclassify(mappings)
         assert "Soft-deleted (EPHEMERAL): 1" in result
 
@@ -128,16 +134,20 @@ class TestReclassify:
             pytest.skip("No locked beliefs created from correction")
 
         locked_id: str = locked[0].id
-        mappings: str = json.dumps([
-            {"id": locked_id, "type": "FACT", "persist": "PERSIST"},
-        ])
+        mappings: str = json.dumps(
+            [
+                {"id": locked_id, "type": "FACT", "persist": "PERSIST"},
+            ]
+        )
         result: str = reclassify(mappings)
         assert "Skipped (locked/missing): 1" in result
 
     def test_reclassify_skips_missing(self) -> None:
         """Reclassify should skip non-existent belief IDs."""
-        mappings: str = json.dumps([
-            {"id": "nonexistent123", "type": "FACT", "persist": "PERSIST"},
-        ])
+        mappings: str = json.dumps(
+            [
+                {"id": "nonexistent123", "type": "FACT", "persist": "PERSIST"},
+            ]
+        )
         result: str = reclassify(mappings)
         assert "Skipped (locked/missing): 1" in result
