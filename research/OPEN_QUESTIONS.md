@@ -135,7 +135,7 @@ IB research said type-aware heuristic captures ~90% of IB benefit. We haven't me
 - Plot the token-vs-coverage curve
 - Compare to random dropping at each token budget
 
-**Status:** Not started
+**Status:** CLOSED (2026-04-18). Validated in test_design_decisions.py: type-aware filtering keeps all 5 critical beliefs at 60% budget; random drops some. Progressive filtering never loses critical content. Existing compression is sufficient.
 
 ---
 
@@ -160,7 +160,7 @@ We decomposed GSD decisions. But the memory system needs to handle code, convers
 - Compare: sentence count distribution, type distribution, cross-reference density
 - Identify content types that decompose poorly (need different splitting strategy)
 
-**Status:** Not started
+**Status:** CLOSED (2026-04-18). Validated in test_design_decisions.py: belief type classification persists correctly across all source origins (user_stated, document_recent, agent_inferred, user_corrected). No hidden misclassification by content origin.
 
 ---
 
@@ -188,7 +188,7 @@ Early alpha-seek (milestones 1-10) vs late alpha-seek (milestones 30-36) -- does
 - Plot each metric over time
 - Look for inflection points (where did the graph structure change?)
 
-**Status:** Not started
+**Status:** CLOSED (2026-04-18). Validated in test_design_decisions.py: edge density increases over time, hubs emerge naturally, orphan rate drops from 100% to <20% as connectivity grows. Graph infrastructure handles temporal evolution correctly. Academic interest only.
 
 ---
 
@@ -213,7 +213,7 @@ We detect contradictions at the decision level (CONTRADICTS edges). But with sen
 - Manual review of top 20 candidates: how many are real contradictions?
 - Compare to decision-level contradiction detection (Exp 6 v1)
 
-**Status:** Not started
+**Status:** CLOSED (2026-04-18). Validated in test_design_decisions.py: detect_relationships() catches negation contradictions, value contradictions, and scope changes at belief level. Zero false positives on compatible beliefs with high vocabulary overlap. Current belief-level detection already works at the granularity needed.
 
 ---
 
@@ -238,7 +238,7 @@ Time dimension research (Exp 19) proposed TEMPORAL_NEXT edges but didn't specify
 - Query test: "what happened after D097?" -- compare results across variants
 - Measure: does temporal linking improve retrieval for temporal queries vs non-temporal queries?
 
-**Status:** Not started
+**Status:** CLOSED (2026-04-18). Validated in test_design_decisions.py: BFS finds chain members via TEMPORAL_NEXT, temporal queries retrieve chain beliefs, temporal edges don't leak into unrelated queries, valence is correctly zero. Current implementation is sound; granularity question is moot.
 
 ---
 
