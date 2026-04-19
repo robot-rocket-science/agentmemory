@@ -44,7 +44,7 @@ from agentmemory.commit_tracker import (
     save_config as save_commit_config,
 )
 from agentmemory.ingest import IngestResult, ingest_jsonl, ingest_turn
-from agentmemory.models import Belief, Edge
+from agentmemory.models import Belief, Edge, Session
 from agentmemory.retrieval import RetrievalResult, retrieve
 from agentmemory.scoring import score_belief, uncertainty_score
 from agentmemory.scanner import ScanResult, scan_project
@@ -630,6 +630,113 @@ def _setup_telemetry() -> None:
     print(
         f"  Telemetry {status}. Change anytime with /mem:enable-telemetry or /mem:disable-telemetry"
     )
+
+
+# ---------------------------------------------------------------------------
+# session-complete
+# ---------------------------------------------------------------------------
+
+
+def cmd_session_complete(args: argparse.Namespace) -> None:
+    """Complete the active session, compute velocity and quality score.
+
+    Intended for use by session-end hooks. Finds the most recent
+    incomplete session, optionally ingests conversation turns from
+    the log file, computes velocity and quality score, and marks
+    the session as complete.
+
+    Exit code is always 0 so hooks never block.
+    """
+    store: MemoryStore = _get_store()
+
+    # Find incomplete session
+    incomplete: list[Session] = store.find_incomplete_sessions()
+    if not incomplete:
+        return
+
+    session: Session = incomplete[0]
+    session_id: str = session.id
+
+    # Optionally ingest conversation turns
+    log_path: Path = (
+        Path(args.log)
+        if args.log
+        else (Path.home() / ".claude" / "conversation-logs" / "turns.jsonl")
+    )
+    ingested: int = 0
+    if log_path.exists() and not args.skip_ingest:
+        try:
+            with log_path.open("r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        entry: dict[str, str] = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+
+                    entry_session: str = entry.get("session_id", "")
+                    if entry_session and entry_session != session_id:
+                        continue
+
+                    event_type: str = entry.get("event", "")
+                    text: str = entry.get("text", "")
+                    if not text or len(text.strip()) < 10:
+                        continue
+                    if event_type not in ("user", "assistant"):
+                        continue
+
+                    ts: str = entry.get("timestamp", "")
+                    if ts and session.started_at and ts < session.started_at:
+                        continue
+
+                    source: str = "user" if event_type == "user" else "assistant"
+                    try:
+                        ingest_turn(store, text, source, session_id=session_id)
+                        ingested += 1
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+    # Complete session (computes velocity)
+    store.complete_session(session_id)
+
+    # Auto-compute quality score
+    try:
+        rows: list[sqlite3.Row] = store.query(
+            "SELECT searches_performed, feedback_given, corrections_detected, "
+            "beliefs_created FROM sessions WHERE id = ?",
+            (session_id,),
+        )
+
+        if rows:
+            row = rows[0]
+            searches: int = int(row[0] or 0)
+            feedback: int = int(row[1] or 0)
+            corrections: int = int(row[2] or 0)
+            beliefs: int = int(row[3] or 0)
+
+            quality: float = 0.0
+            if searches > 0:
+                feedback_rate: float = min(feedback / searches, 1.0)
+                quality += feedback_rate * 0.5
+            if beliefs > 0:
+                correction_density: float = corrections / beliefs
+                quality -= min(correction_density, 1.0) * 0.3
+                quality += 0.2
+            quality = max(-1.0, min(1.0, quality))
+
+            store.query(
+                "UPDATE sessions SET quality_score = ? WHERE id = ?",
+                (round(quality, 4), session_id),
+            )
+    except Exception:
+        pass
+
+    if not args.quiet:
+        print(f"Session {session_id[:12]} completed: {ingested} turns ingested")
 
 
 # ---------------------------------------------------------------------------
@@ -3066,6 +3173,24 @@ def main() -> None:
         help="Uncommitted changes before nudge (default: 10)",
     )
     p_commit_config.set_defaults(func=cmd_commit_config)
+
+    # session-complete
+    p_session_complete: argparse.ArgumentParser = subparsers.add_parser(
+        "session-complete",
+        help="Complete active session (for session-end hooks)",
+    )
+    p_session_complete.add_argument(
+        "--log", default=None, help="Path to turns.jsonl (default: auto-detect)"
+    )
+    p_session_complete.add_argument(
+        "--skip-ingest",
+        action="store_true",
+        help="Skip conversation turn ingestion",
+    )
+    p_session_complete.add_argument(
+        "--quiet", "-q", action="store_true", help="Suppress output"
+    )
+    p_session_complete.set_defaults(func=cmd_session_complete)
 
     # feedback-flush
     p_feedback_flush: argparse.ArgumentParser = subparsers.add_parser(
