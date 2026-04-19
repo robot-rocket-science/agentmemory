@@ -8,6 +8,7 @@ the result.
 All queries run against a raw sqlite3 connection (no MemoryStore) for
 speed in the hook path (~50-100ms budget).
 """
+
 from __future__ import annotations
 
 import random
@@ -22,20 +23,31 @@ from datetime import datetime, timezone
 # ---------------------------------------------------------------------------
 
 HALF_LIVES: dict[str, float] = {
-    "factual": 336.0, "procedural": 504.0,
-    "causal": 720.0, "relational": 336.0,
-    "preference": 2016.0, "correction": 1344.0,
+    "factual": 336.0,
+    "procedural": 504.0,
+    "causal": 720.0,
+    "relational": 336.0,
+    "preference": 2016.0,
+    "correction": 1344.0,
     "requirement": 4032.0,
 }
 
 TYPE_WEIGHTS: dict[str, float] = {
-    "requirement": 2.5, "correction": 2.0, "preference": 1.8,
-    "factual": 1.0, "procedural": 1.2, "causal": 1.3, "relational": 1.0,
+    "requirement": 2.5,
+    "correction": 2.0,
+    "preference": 1.8,
+    "factual": 1.0,
+    "procedural": 1.2,
+    "causal": 1.3,
+    "relational": 1.0,
 }
 
 SOURCE_WEIGHTS: dict[str, float] = {
-    "user_corrected": 1.5, "user_stated": 1.3,
-    "document_recent": 1.0, "document_old": 0.8, "agent_inferred": 1.0,
+    "user_corrected": 1.5,
+    "user_stated": 1.3,
+    "document_recent": 1.0,
+    "document_old": 0.8,
+    "agent_inferred": 1.0,
 }
 
 # Action verbs that imply the user is about to operate on a target entity.
@@ -62,28 +74,80 @@ ACTIVATION_BOOST: float = 2.0
 # Task-type verb taxonomy (validated in exp86: 90.5% accuracy)
 _VERB_CLASSES: dict[str, list[str]] = {
     "planning": [
-        "plan", "design", "architect", "roadmap", "outline", "scope",
-        "milestone", "breakdown", "decompose", "strategize", "schedule",
+        "plan",
+        "design",
+        "architect",
+        "roadmap",
+        "outline",
+        "scope",
+        "milestone",
+        "breakdown",
+        "decompose",
+        "strategize",
+        "schedule",
     ],
     "deployment": [
-        "deploy", "push", "ship", "release", "publish", "launch",
-        "merge", "promote", "rollout", "stage",
+        "deploy",
+        "push",
+        "ship",
+        "release",
+        "publish",
+        "launch",
+        "merge",
+        "promote",
+        "rollout",
+        "stage",
     ],
     "debugging": [
-        "fix", "debug", "diagnose", "troubleshoot", "bisect", "trace",
-        "investigate", "reproduce", "isolate", "patch", "address",
+        "fix",
+        "debug",
+        "diagnose",
+        "troubleshoot",
+        "bisect",
+        "trace",
+        "investigate",
+        "reproduce",
+        "isolate",
+        "patch",
+        "address",
     ],
     "implementation": [
-        "build", "implement", "create", "add", "wire", "integrate",
-        "configure", "setup", "scaffold", "bootstrap",
+        "build",
+        "implement",
+        "create",
+        "add",
+        "wire",
+        "integrate",
+        "configure",
+        "setup",
+        "scaffold",
+        "bootstrap",
     ],
     "validation": [
-        "test", "verify", "validate", "check", "audit", "review",
-        "confirm", "assert", "benchmark", "measure", "pytest", "run",
+        "test",
+        "verify",
+        "validate",
+        "check",
+        "audit",
+        "review",
+        "confirm",
+        "assert",
+        "benchmark",
+        "measure",
+        "pytest",
+        "run",
     ],
     "research": [
-        "research", "explore", "investigate", "analyze", "study",
-        "compare", "evaluate", "wonder", "hypothesize", "survey",
+        "research",
+        "explore",
+        "investigate",
+        "analyze",
+        "study",
+        "compare",
+        "evaluate",
+        "wonder",
+        "hypothesize",
+        "survey",
     ],
 }
 
@@ -91,28 +155,53 @@ _ALL_TASK_VERBS: set[str] = {v for vs in _VERB_CLASSES.values() for v in vs}
 
 # Sequential markers suppress subagent detection
 _SEQUENTIAL_MARKERS: list[str] = [
-    "then", "after that", "next", "once that's done", "first.*then",
-    "step by step", "carefully", "one at a time", "sequentially",
-    "before we", "wait for", "depends on",
+    "then",
+    "after that",
+    "next",
+    "once that's done",
+    "first.*then",
+    "step by step",
+    "carefully",
+    "one at a time",
+    "sequentially",
+    "before we",
+    "wait for",
+    "depends on",
 ]
 
 # Parallel markers (exp87: "also" removed -- 87.8% FP rate)
 _PARALLEL_MARKERS: list[str] = [
-    "in parallel", "at the same time", "meanwhile", "concurrently",
-    "simultaneously", "spawn subagent", "use subagent", "use agent",
-    "all at once", "at once",
+    "in parallel",
+    "at the same time",
+    "meanwhile",
+    "concurrently",
+    "simultaneously",
+    "spawn subagent",
+    "use subagent",
+    "use agent",
+    "all at once",
+    "at once",
 ]
 
 # Planning phrases the user habitually uses
 _PLANNING_PHRASES: list[str] = [
-    "make a plan", "make a todo", "todo list", "follow the plan",
-    "verify the steps", "stay on track", "execute the plan",
-    "refer to the runbook", "check the docs", "best practices",
+    "make a plan",
+    "make a todo",
+    "todo list",
+    "follow the plan",
+    "verify the steps",
+    "stay on track",
+    "execute the plan",
+    "refer to the runbook",
+    "check the docs",
+    "best practices",
 ]
 
 # Compound word splitting for verb detection
 _COMPOUNDS: dict[str, str] = {
-    "bugfix": "bug fix", "hotfix": "hot fix", "quickfix": "quick fix",
+    "bugfix": "bug fix",
+    "hotfix": "hot fix",
+    "quickfix": "quick fix",
 }
 
 
@@ -153,18 +242,20 @@ def analyze_prompt_structure(text: str) -> StructuralAnalysis:
     # Entity extraction (CamelCase, paths, dotted names, snake_case)
     entities: set[str] = set()
     entities.update(re.findall(r"\b[A-Z][a-z]+(?:[A-Z][a-z]+)+\b", text))
-    entities.update(re.findall(r"[\w./]+\.(?:py|js|ts|md|json|yaml|yml|sh|sql)\b", text))
-    entities.update(re.findall(r"\b\w+\.\w+(?:\.\w+)*\b", text))
     entities.update(
-        w for w in re.findall(r"\b[a-z]+_[a-z_]+\b", text) if len(w) > 4
+        re.findall(r"[\w./]+\.(?:py|js|ts|md|json|yaml|yml|sh|sql)\b", text)
     )
+    entities.update(re.findall(r"\b\w+\.\w+(?:\.\w+)*\b", text))
+    entities.update(w for w in re.findall(r"\b[a-z]+_[a-z_]+\b", text) if len(w) > 4)
     result.unique_entities = len(entities)
 
     # Enumerated items
     result.enumerated_items = (
         len(re.findall(r"^\s*\d+[\.\)]\s+", text, re.MULTILINE))
         + len(re.findall(r"^\s*[-*]\s+", text, re.MULTILINE))
-        + len(re.findall(r"\b(?:first|second|third|fourth|fifth)\b", text, re.IGNORECASE))
+        + len(
+            re.findall(r"\b(?:first|second|third|fourth|fifth)\b", text, re.IGNORECASE)
+        )
     )
 
     # Verb class scoring
@@ -193,7 +284,9 @@ def analyze_prompt_structure(text: str) -> StructuralAnalysis:
             result.planning_phrases_found.append(phrase)
 
     # Task type detection
-    for task_type, score in sorted(verb_scores.items(), key=lambda x: x[1], reverse=True):
+    for task_type, score in sorted(
+        verb_scores.items(), key=lambda x: x[1], reverse=True
+    ):
         if score > 0.5:
             result.task_types.append(task_type)
     if result.planning_phrases_found and "planning" not in result.task_types:
@@ -213,7 +306,8 @@ def analyze_prompt_structure(text: str) -> StructuralAnalysis:
         signals.append("research_breadth")
     # Multi-verb-phrase detection
     verb_phrases: list[str] = re.findall(
-        r"\b(?:" + "|".join(_ALL_TASK_VERBS) + r")\s+\w+", text_lower,
+        r"\b(?:" + "|".join(_ALL_TASK_VERBS) + r")\s+\w+",
+        text_lower,
     )
     if len(verb_phrases) >= 3 and not result.has_sequential_markers:
         signals.append(f"multi_verb_phrase={len(verb_phrases)}")
@@ -227,6 +321,7 @@ def analyze_prompt_structure(text: str) -> StructuralAnalysis:
 @dataclass
 class ScoredBelief:
     """A belief with computed relevance score."""
+
     id: str
     content: str
     belief_type: str
@@ -241,6 +336,7 @@ class ScoredBelief:
 @dataclass
 class SearchResult:
     """Result of a hook search."""
+
     beliefs: list[ScoredBelief] = field(default_factory=lambda: [])
     source_docs: list[str] = field(default_factory=lambda: [])
 
@@ -289,7 +385,7 @@ def format_ba_injection(result: SearchResult) -> str:
             age_tag: str = ""
             if b.age_days is not None:
                 if b.age_days < 1:
-                    age_tag = f" (changed <1d ago)"
+                    age_tag = " (changed <1d ago)"
                 else:
                     age_tag = f" (changed {b.age_days:.0f}d ago)"
             lines.append(f"[!] {b.content}{age_tag}")
@@ -317,7 +413,9 @@ def format_ba_injection(result: SearchResult) -> str:
     if not sections:
         return ""
 
-    header: str = f"AGENTMEMORY: {len(result.beliefs)} belief(s) relevant to your prompt:"
+    header: str = (
+        f"AGENTMEMORY: {len(result.beliefs)} belief(s) relevant to your prompt:"
+    )
     body: str = "\n\n".join(sections)
     footer: str = ""
     if result.source_docs:
@@ -330,6 +428,7 @@ def format_ba_injection(result: SearchResult) -> str:
 # ---------------------------------------------------------------------------
 # Query construction
 # ---------------------------------------------------------------------------
+
 
 def extract_query_words(prompt: str) -> list[str]:
     """Extract searchable words from a user prompt."""
@@ -362,6 +461,7 @@ def detect_action_targets(prompt: str) -> list[str]:
 # ---------------------------------------------------------------------------
 # Scoring
 # ---------------------------------------------------------------------------
+
 
 def score_belief(
     row: sqlite3.Row,
@@ -449,6 +549,7 @@ def score_belief(
 # Supersession following
 # ---------------------------------------------------------------------------
 
+
 def follow_supersession(
     db: sqlite3.Connection,
     belief_ids: list[str],
@@ -473,6 +574,7 @@ def follow_supersession(
 # ---------------------------------------------------------------------------
 # Main search
 # ---------------------------------------------------------------------------
+
 
 def _process_pending_feedback(
     db: sqlite3.Connection,
@@ -517,8 +619,7 @@ def _process_pending_feedback(
 
         # Extract key terms from belief content
         terms: list[str] = [
-            w for w in re.findall(r"[a-zA-Z0-9_]+", content.lower())
-            if len(w) >= 3
+            w for w in re.findall(r"[a-zA-Z0-9_]+", content.lower()) if len(w) >= 3
         ]
         if not terms:
             continue
@@ -562,7 +663,7 @@ def _process_pending_feedback(
     return used_count
 
 
-def _evaluate_activation_conditions(
+def evaluate_activation_conditions(
     db: sqlite3.Connection,
     analysis: StructuralAnalysis,
     prompt_words: set[str],
@@ -696,9 +797,13 @@ def search_for_prompt(
 
     # --- Layer 0: Structural analysis + activation_condition matching ---
     analysis: StructuralAnalysis = analyze_prompt_structure(prompt)
-    prompt_words_set: set[str] = {w.lower() for w in re.findall(r"\b\w+\b", prompt.lower())}
-    activated_rows: list[sqlite3.Row] = _evaluate_activation_conditions(
-        db, analysis, prompt_words_set,
+    prompt_words_set: set[str] = {
+        w.lower() for w in re.findall(r"\b\w+\b", prompt.lower())
+    }
+    activated_rows: list[sqlite3.Row] = evaluate_activation_conditions(
+        db,
+        analysis,
+        prompt_words_set,
     )
     for r in activated_rows:
         if r["id"] not in seen_ids:
@@ -865,22 +970,30 @@ def search_for_prompt(
                             ct_obs: datetime = datetime.fromisoformat(created_obs)
                             if ct_obs.tzinfo is None:
                                 ct_obs = ct_obs.replace(tzinfo=timezone.utc)
-                            age_h_obs = max(0.0, (now - ct_obs).total_seconds() / 3600.0)
+                            age_h_obs = max(
+                                0.0, (now - ct_obs).total_seconds() / 3600.0
+                            )
                         except (ValueError, TypeError):
                             pass
-                    recency_obs: float = 1.0 + 0.5 ** (age_h_obs / 6.0)  # 6h half-life for observations
-                    obs_score: float = 1.5 * recency_obs  # base score with strong recency
-                    all_scored.append(ScoredBelief(
-                        id=obs_id,
-                        content=obs_content[:300],  # truncate long observations
-                        belief_type="observation",
-                        source_type=r["source_type"] or "unknown",
-                        locked=False,
-                        confidence=0.5,  # unscored
-                        score=obs_score,
-                        age_days=age_h_obs / 24.0,
-                        via="recent_observation",
-                    ))
+                    recency_obs: float = 1.0 + 0.5 ** (
+                        age_h_obs / 6.0
+                    )  # 6h half-life for observations
+                    obs_score: float = (
+                        1.5 * recency_obs
+                    )  # base score with strong recency
+                    all_scored.append(
+                        ScoredBelief(
+                            id=obs_id,
+                            content=obs_content[:300],  # truncate long observations
+                            belief_type="observation",
+                            source_type=r["source_type"] or "unknown",
+                            locked=False,
+                            confidence=0.5,  # unscored
+                            score=obs_score,
+                            age_days=age_h_obs / 24.0,
+                            via="recent_observation",
+                        )
+                    )
                     seen_ids.add(obs_id)
         except sqlite3.OperationalError:
             pass

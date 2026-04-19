@@ -3,10 +3,12 @@
 Provides search, remember, correct, observe, status, and get_locked tools.
 Uses a single lazily-initialized MemoryStore backed by ~/.agentmemory/memory.db.
 """
+
 from __future__ import annotations
 
 import atexit
 import re
+import signal
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -16,6 +18,11 @@ from agentmemory.classification import (
     BATCH_SIZE,
     ClassifiedSentence,
     TYPE_PRIORS,
+)
+from agentmemory.hook_search import (
+    analyze_prompt_structure,
+    evaluate_activation_conditions,
+    StructuralAnalysis,
 )
 from agentmemory.ingest import (
     ExtractedTurn,
@@ -47,7 +54,7 @@ from agentmemory.models import (
 )
 from agentmemory.relationship_detector import detect_relationships
 from agentmemory.retrieval import RetrievalResult, retrieve
-from agentmemory.store import MemoryStore
+from agentmemory.store import MemoryStore, row_to_belief
 
 # ---------------------------------------------------------------------------
 # Input limits
@@ -56,11 +63,13 @@ from agentmemory.store import MemoryStore
 MAX_TEXT_LENGTH: int = 50_000  # 50KB per input field
 MAX_BULK_ITEMS: int = 500  # max beliefs in create_beliefs / bulk_delete
 
+
 def _check_length(text: str, field: str = "text") -> str | None:
     """Return error string if text exceeds limit, else None."""
     if len(text) > MAX_TEXT_LENGTH:
         return f"Error: {field} exceeds {MAX_TEXT_LENGTH} character limit ({len(text)} chars)."
     return None
+
 
 # ---------------------------------------------------------------------------
 # Store singleton + session tracking
@@ -115,15 +124,72 @@ def _prune_buffers() -> None:
 # Auto-feedback: key-term extraction and matching
 # ---------------------------------------------------------------------------
 
-_STOPWORDS: frozenset[str] = frozenset({
-    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-    "have", "has", "had", "do", "does", "did", "will", "would", "shall",
-    "should", "may", "might", "must", "can", "could", "of", "in", "to",
-    "for", "with", "on", "at", "by", "from", "as", "into", "through",
-    "that", "this", "these", "those", "it", "its", "not", "no", "all",
-    "and", "or", "but", "if", "then", "than", "when", "where", "how",
-    "what", "which", "who", "whom", "use", "using", "used",
-})
+_STOPWORDS: frozenset[str] = frozenset(
+    {
+        "the",
+        "a",
+        "an",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "shall",
+        "should",
+        "may",
+        "might",
+        "must",
+        "can",
+        "could",
+        "of",
+        "in",
+        "to",
+        "for",
+        "with",
+        "on",
+        "at",
+        "by",
+        "from",
+        "as",
+        "into",
+        "through",
+        "that",
+        "this",
+        "these",
+        "those",
+        "it",
+        "its",
+        "not",
+        "no",
+        "all",
+        "and",
+        "or",
+        "but",
+        "if",
+        "then",
+        "than",
+        "when",
+        "where",
+        "how",
+        "what",
+        "which",
+        "who",
+        "whom",
+        "use",
+        "using",
+        "used",
+    }
+)
 
 # Minimum unique term matches to infer "used". From validation experiments:
 # min_unique=2 gives 100% precision, 75% recall on realistic scenarios.
@@ -198,7 +264,11 @@ def _process_auto_feedback(session_id: str) -> int:
         valence_score: float = min(1.0, overlap_ratio)
 
         # Legacy outcome for backward compat in tests table
-        outcome: str = OUTCOME_USED if unique_matches >= _AUTO_FEEDBACK_MIN_MATCHES else OUTCOME_IGNORED
+        outcome: str = (
+            OUTCOME_USED
+            if unique_matches >= _AUTO_FEEDBACK_MIN_MATCHES
+            else OUTCOME_IGNORED
+        )
         detail: str = (
             f"auto: {unique_matches}/{len(unique_terms)} key terms matched "
             f"(valence: {valence_score:+.2f})"
@@ -215,7 +285,9 @@ def _process_auto_feedback(session_id: str) -> int:
 
         # Propagate feedback to edges that led to this belief.
         traversed: list[tuple[int, int]] | None = getattr(
-            store, "_last_traversed_edges", {},
+            store,
+            "_last_traversed_edges",
+            {},
         ).get(belief_id)
         if traversed:
             store.propagate_feedback_to_edges(belief_id, outcome, traversed)
@@ -252,7 +324,6 @@ def _sigterm_handler(signum: int, frame: object) -> None:
     raise SystemExit(0)
 
 
-import signal
 signal.signal(signal.SIGTERM, _sigterm_handler)
 
 
@@ -260,6 +331,7 @@ def _resolve_server_db() -> Path:
     """Resolve DB path for the MCP server: AGENTMEMORY_DB env > cwd-based isolation."""
     import hashlib
     import os
+
     env_db: str | None = os.environ.get("AGENTMEMORY_DB")
     if env_db:
         p: Path = Path(env_db)
@@ -289,11 +361,13 @@ def _get_store() -> MemoryStore:
     if _store is None:
         db_path: Path = _resolve_server_db()
         from agentmemory.config import get_str_setting
+
         vault_str: str = get_str_setting("obsidian", "vault_path")
         if vault_str:
             vault_path: Path = Path(vault_str)
             if vault_path.exists():
                 from agentmemory.vault_store import VaultStore
+
                 vs: VaultStore = VaultStore(vault_path, db_path)
                 _store = vs  # type: ignore[assignment]
                 return vs  # type: ignore[return-value]
@@ -308,6 +382,7 @@ def _resolve_project_db(project_path: str) -> Path | None:
     or None if no database exists for that project.
     """
     import hashlib
+
     abs_path: str = str(Path(project_path).expanduser().resolve())
     path_hash: str = hashlib.sha256(abs_path.encode()).hexdigest()[:12]
     db_path: Path = Path.home() / ".agentmemory" / "projects" / path_hash / "memory.db"
@@ -342,9 +417,11 @@ def _emit_telemetry(store: MemoryStore, session_id: str) -> None:
     """Write a telemetry snapshot for a completed session (if enabled)."""
     try:
         from agentmemory.config import get_bool_setting
+
         if not get_bool_setting("telemetry", "enabled"):
             return
         from agentmemory.telemetry import collect_snapshot, write_snapshot
+
         snapshot = collect_snapshot(store, session_id)
         write_snapshot(snapshot)
     except Exception:
@@ -452,7 +529,10 @@ def search(
         cross_store: MemoryStore = MemoryStore(target_db, readonly=True)
         try:
             result: RetrievalResult = retrieve(
-                cross_store, query, budget=budget, temporal_sort=temporal_sort,
+                cross_store,
+                query,
+                budget=budget,
+                temporal_sort=temporal_sort,
             )
         finally:
             cross_store.close()
@@ -490,8 +570,29 @@ def search(
     _prune_buffers()
 
     result: RetrievalResult = retrieve(
-        store, query, budget=budget, temporal_sort=temporal_sort,
+        store,
+        query,
+        budget=budget,
+        temporal_sort=temporal_sort,
     )
+
+    # Layer 0: check for beliefs with matching activation_condition.
+    # These are prospective beliefs that fire on specific prompt patterns.
+    retrieved_ids: set[str] = {b.id for b in result.beliefs}
+    analysis: StructuralAnalysis = analyze_prompt_structure(query)
+    prompt_words_set: set[str] = {
+        w.lower() for w in re.findall(r"\b\w+\b", query.lower())
+    }
+    activated_rows = evaluate_activation_conditions(
+        store.connection,
+        analysis,
+        prompt_words_set,
+    )
+    for row in activated_rows:
+        if row["id"] not in retrieved_ids:
+            activated_belief: Belief = row_to_belief(row)
+            result.beliefs.insert(0, activated_belief)
+            retrieved_ids.add(row["id"])
 
     store.increment_session_metrics(
         session_id,
@@ -618,7 +719,9 @@ def correct(text: str, replaces: str | None = None) -> str:
 
     store.checkpoint(session_id, "correct", belief.content, [belief.id])
     store.increment_session_metrics(
-        session_id, beliefs_created=1, corrections_detected=1,
+        session_id,
+        beliefs_created=1,
+        corrections_detected=1,
     )
     return (
         f"Correction recorded (ID: {belief.id}): {belief.content} "
@@ -724,7 +827,9 @@ def status() -> str:
     total_active: int = int(ret["total_active"])  # type: ignore[arg-type]
     retrieved: int = int(ret["retrieved_once"])  # type: ignore[arg-type]
     ret_pct: float = retrieved / total_active * 100 if total_active > 0 else 0.0
-    lines.append(f"  {ret_pct:.0f}% retrieved at least once ({retrieved}/{total_active})")
+    lines.append(
+        f"  {ret_pct:.0f}% retrieved at least once ({retrieved}/{total_active})"
+    )
     features: list[str] = ret["scoring_features"]  # type: ignore[assignment]
     lines.append(f"  Scoring: {' + '.join(features)}")
     pending: int = int(ret["pending_feedback"])  # type: ignore[arg-type]
@@ -770,7 +875,9 @@ def status() -> str:
         validated_count: int = rigor_dist.get("validated", 0)
         empirical_count: int = rigor_dist.get("empirically_tested", 0)
         strong_count: int = validated_count + empirical_count
-        strong_pct: float = strong_count / active_total_r * 100 if active_total_r > 0 else 0.0
+        strong_pct: float = (
+            strong_count / active_total_r * 100 if active_total_r > 0 else 0.0
+        )
         if strong_pct < 20.0:
             lines.append(
                 f"  Caveat: {strong_pct:.0f}% of beliefs are empirically tested or validated. "
@@ -792,7 +899,9 @@ def status() -> str:
         if orphan > 0:
             lines.append(f"  Orphans (no edges): {orphan} ({maint['orphan_pct']}%)")
         if credal > 0:
-            lines.append(f"  Never updated (at type prior): {credal} ({maint['credal_gap_pct']}%)")
+            lines.append(
+                f"  Never updated (at type prior): {credal} ({maint['credal_gap_pct']}%)"
+            )
 
     return "\n".join(lines)
 
@@ -902,12 +1011,18 @@ def onboard(project_path: str) -> str:
 
     # Record onboarding provenance
     import subprocess
+
     commit_hash: str | None = None
     try:
-        commit_hash = subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], cwd=str(path),
-            stderr=subprocess.DEVNULL,
-        ).decode().strip()
+        commit_hash = (
+            subprocess.check_output(
+                ["git", "rev-parse", "HEAD"],
+                cwd=str(path),
+                stderr=subprocess.DEVNULL,
+            )
+            .decode()
+            .strip()
+        )
     except Exception:
         pass
     store.record_onboarding_run(
@@ -944,9 +1059,7 @@ def onboard(project_path: str) -> str:
     lines.append(f"  Observations created: {observations_created}")
     lines.append(f"  Sentences for classification: {len(all_sentences)}")
 
-    timing_parts: list[str] = [
-        f"{k}={v:.2f}s" for k, v in scan.timings.items()
-    ]
+    timing_parts: list[str] = [f"{k}={v:.2f}s" for k, v in scan.timings.items()]
     lines.append(f"  Timing: {', '.join(timing_parts)}")
     if commit_hash:
         lines.append(f"  Git HEAD at onboard: {commit_hash[:12]}")
@@ -957,7 +1070,9 @@ def onboard(project_path: str) -> str:
         return summary + "\n\nNo sentences to classify."
 
     lines.append(f"\n  Batch size: {BATCH_SIZE} sentences per subagent")
-    lines.append(f"  Estimated batches: {(len(all_sentences) + BATCH_SIZE - 1) // BATCH_SIZE}")
+    lines.append(
+        f"  Estimated batches: {(len(all_sentences) + BATCH_SIZE - 1) // BATCH_SIZE}"
+    )
     lines.append("")
     lines.append("SENTENCES_JSON_START")
     lines.append(_json.dumps(all_sentences))
@@ -1039,15 +1154,17 @@ def create_beliefs(classified_json: str) -> str:
             if author == "AGENT" and should_persist:
                 alpha = max(alpha * 0.5, 1.0)
 
-            classified.append(ClassifiedSentence(
-                text=item.get("text", ""),
-                source=item.get("source", "document"),
-                persist=should_persist,
-                sentence_type=sentence_type,
-                alpha=alpha,
-                beta_param=beta_val,
-                author=author,
-            ))
+            classified.append(
+                ClassifiedSentence(
+                    text=item.get("text", ""),
+                    source=item.get("source", "document"),
+                    persist=should_persist,
+                    sentence_type=sentence_type,
+                    alpha=alpha,
+                    beta_param=beta_val,
+                    author=author,
+                )
+            )
 
         # Thread cross-project provenance if present
         source_project: str = obs_items[0].get("source_project", "")
@@ -1177,7 +1294,10 @@ def reclassify(mappings: str) -> str:
             assert prior is not None  # guarded by should_persist check
             alpha, beta_val = prior
             store.update_belief_classification(
-                belief_id, new_type, alpha, beta_val,
+                belief_id,
+                new_type,
+                alpha,
+                beta_val,
             )
             updated += 1
 
@@ -1219,7 +1339,9 @@ def ingest(text: str, source: str = "user") -> str:
         corrections_detected=result.corrections_detected,
     )
 
-    fb_msg: str = f"\n  Auto-feedback: {auto_fb} belief(s) scored" if auto_fb > 0 else ""
+    fb_msg: str = (
+        f"\n  Auto-feedback: {auto_fb} belief(s) scored" if auto_fb > 0 else ""
+    )
     reclass_msg: str = ""
     if result.beliefs_created > 0:
         reclass_msg = (
@@ -1258,8 +1380,11 @@ def timeline(
     resolved_start: str | None = _resolve_relative_time(start) if start else None
     resolved_end: str | None = _resolve_relative_time(end) if end else None
     beliefs: list[Belief] = store.timeline(
-        topic=topic, start=resolved_start, end=resolved_end,
-        session_id=session_id, limit=limit,
+        topic=topic,
+        start=resolved_start,
+        end=resolved_end,
+        session_id=session_id,
+        limit=limit,
     )
     if not beliefs:
         return "No beliefs found for the given time/topic filter."
@@ -1328,7 +1453,8 @@ def diff(
     resolved_since: str = _resolve_relative_time(since)
     resolved_until: str | None = _resolve_relative_time(until) if until else None
     changes: dict[str, list[Belief]] = store.diff(
-        since=resolved_since, until=resolved_until,
+        since=resolved_since,
+        until=resolved_until,
     )
     added: list[Belief] = changes["added"]
     removed: list[Belief] = changes["removed"]
@@ -1360,6 +1486,7 @@ def _resolve_relative_time(time_str: str) -> str:
     """Resolve relative time strings like '-7d', '-24h', '-30m' to ISO 8601."""
     import re as _re
     from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+
     match: _re.Match[str] | None = _re.match(r"^-(\d+)([dhm])$", time_str)
     if match:
         value: int = int(match.group(1))
@@ -1441,10 +1568,15 @@ def bulk_delete(belief_ids: list[str]) -> str:
     return result
 
 
-_VALID_OUTCOMES: frozenset[str] = frozenset({
-    OUTCOME_USED, OUTCOME_IGNORED, OUTCOME_HARMFUL,
-    OUTCOME_CONFIRMED, OUTCOME_WEAK,
-})
+_VALID_OUTCOMES: frozenset[str] = frozenset(
+    {
+        OUTCOME_USED,
+        OUTCOME_IGNORED,
+        OUTCOME_HARMFUL,
+        OUTCOME_CONFIRMED,
+        OUTCOME_WEAK,
+    }
+)
 
 
 @mcp.tool
@@ -1474,7 +1606,11 @@ def snapshot(
 
     beliefs: list[Belief]
     if topic is not None:
-        effective_time: str = resolved_time if resolved_time is not None else datetime.now(timezone.utc).isoformat()
+        effective_time: str = (
+            resolved_time
+            if resolved_time is not None
+            else datetime.now(timezone.utc).isoformat()
+        )
         beliefs = store.search_at_time(topic, effective_time, top_k=limit)
         if belief_type is not None:
             beliefs = [b for b in beliefs if b.belief_type == belief_type]
@@ -1501,12 +1637,16 @@ def snapshot(
         f"Belief snapshot ({total} beliefs, {locked_count} locked, avg_conf={avg_conf:.3f}):",
     ]
     if resolved_time is not None:
-        lines[0] = f"Belief snapshot at {resolved_time} ({total} beliefs, {locked_count} locked, avg_conf={avg_conf:.3f}):"
+        lines[0] = (
+            f"Belief snapshot at {resolved_time} ({total} beliefs, {locked_count} locked, avg_conf={avg_conf:.3f}):"
+        )
 
     for bt, bt_beliefs in sorted(by_type.items(), key=lambda x: -len(x[1])):
         bt_locked: int = sum(1 for b in bt_beliefs if b.locked)
         bt_avg: float = sum(b.confidence for b in bt_beliefs) / len(bt_beliefs)
-        lines.append(f"\n  {bt} ({len(bt_beliefs)}, {bt_locked} locked, avg={bt_avg:.3f}):")
+        lines.append(
+            f"\n  {bt} ({len(bt_beliefs)}, {bt_locked} locked, avg={bt_avg:.3f}):"
+        )
         for b in bt_beliefs[:10]:
             lock_tag: str = " [LOCKED]" if b.locked else ""
             snippet: str = b.content[:80].replace("\n", " ")
@@ -1561,7 +1701,9 @@ def feedback(belief_id: str, outcome: str, detail: str = "") -> str:
 
     # Propagate to edges (explicit feedback is strongest signal)
     traversed: list[tuple[int, int]] | None = getattr(
-        store, "_last_traversed_edges", {},
+        store,
+        "_last_traversed_edges",
+        {},
     ).get(belief_id)
     store.propagate_feedback_to_edges(belief_id, outcome, traversed)
 
@@ -1575,15 +1717,22 @@ def feedback(belief_id: str, outcome: str, detail: str = "") -> str:
     if updated is None:
         return f"Feedback recorded (test #{test.id}) but belief disappeared."
 
-    lock_note: str = " (locked, beta unchanged)" if updated.locked and outcome == OUTCOME_HARMFUL else ""
+    lock_note: str = (
+        " (locked, beta unchanged)"
+        if updated.locked and outcome == OUTCOME_HARMFUL
+        else ""
+    )
     drop_warn: str = ""
     if belief.confidence >= 0.5 and updated.confidence < 0.5:
         snippet: str = updated.content[:80].replace("\n", " ")
         drop_warn = (
-            f"\n  WARNING: Belief dropped below 50% confidence. "
-            f'Review: "{snippet}"'
+            f'\n  WARNING: Belief dropped below 50% confidence. Review: "{snippet}"'
         )
-    prop_note: str = f"\n  Valence {valence_score:+.1f} propagated to {propagated} connected beliefs" if propagated > 0 else ""
+    prop_note: str = (
+        f"\n  Valence {valence_score:+.1f} propagated to {propagated} connected beliefs"
+        if propagated > 0
+        else ""
+    )
     return (
         f"Feedback recorded for {belief_id}: {outcome}{lock_note}\n"
         f"  confidence: {belief.confidence:.3f} -> {updated.confidence:.3f}\n"
@@ -1637,7 +1786,11 @@ def confirm(belief_id: str, detail: str = "") -> str:
     if updated is None:
         return f"Confirmed (test #{test.id}) but belief disappeared."
 
-    prop_note: str = f"\n  Valence +1.0 propagated to {propagated} connected beliefs" if propagated > 0 else ""
+    prop_note: str = (
+        f"\n  Valence +1.0 propagated to {propagated} connected beliefs"
+        if propagated > 0
+        else ""
+    )
     return (
         f"Confirmed {belief_id}:{prop_note}\n"
         f"  confidence: {belief.confidence:.3f} -> {updated.confidence:.3f}\n"
@@ -1742,6 +1895,7 @@ def sync_obsidian(
         load_obsidian_config,
         sync_vault,
     )
+
     store: MemoryStore = _get_store()
     config: ObsidianConfig | None = load_obsidian_config(vault_path)
     if config is None:
@@ -1785,6 +1939,7 @@ def import_obsidian(
         import_vault_changes,
         load_obsidian_config,
     )
+
     store: MemoryStore = _get_store()
     config: ObsidianConfig | None = load_obsidian_config(vault_path)
     if config is None:
@@ -1831,6 +1986,7 @@ def graph_metrics(top_n: int = 20) -> str:
         top_n: Number of top beliefs to return (default 20).
     """
     from agentmemory.graph_metrics import compute_structural_importance
+
     store: MemoryStore = _get_store()
     importance: dict[str, float] = compute_structural_importance(store)
 
@@ -1871,6 +2027,7 @@ def link_docs(
     """
     from agentmemory.doc_linker import LinkResult, link_documents
     from agentmemory.obsidian import ObsidianConfig, load_obsidian_config
+
     store: MemoryStore = _get_store()
     config: ObsidianConfig | None = load_obsidian_config(vault_path)
     if config is None:

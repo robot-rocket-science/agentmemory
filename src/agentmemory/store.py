@@ -3,6 +3,7 @@
 WAL mode, FTS5 full-text search, Bayesian belief confidence, session recovery.
 All writes are synchronous and durable before return.
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -230,7 +231,7 @@ def _row_to_observation(row: sqlite3.Row) -> Observation:
     )
 
 
-def _row_to_belief(row: sqlite3.Row) -> Belief:
+def row_to_belief(row: sqlite3.Row) -> Belief:
     keys: list[str] = list(row.keys())
     return Belief(
         id=row["id"],
@@ -253,13 +254,25 @@ def _row_to_belief(row: sqlite3.Row) -> Belief:
         rigor_tier=row["rigor_tier"] if "rigor_tier" in keys else "hypothesis",
         method=row["method"] if "method" in keys else None,
         sample_size=row["sample_size"] if "sample_size" in keys else None,
-        last_retrieved_at=row["last_retrieved_at"] if "last_retrieved_at" in keys else None,
+        last_retrieved_at=row["last_retrieved_at"]
+        if "last_retrieved_at" in keys
+        else None,
         data_source=row["data_source"] if "data_source" in keys else "",
-        independently_validated=bool(row["independently_validated"]) if "independently_validated" in keys else False,
-        temporal_direction=row["temporal_direction"] if "temporal_direction" in keys else "backward",
-        uncertainty_vector=row["uncertainty_vector"] if "uncertainty_vector" in keys else None,
-        hibernation_score=float(row["hibernation_score"]) if "hibernation_score" in keys and row["hibernation_score"] is not None else None,
-        activation_condition=row["activation_condition"] if "activation_condition" in keys else None,
+        independently_validated=bool(row["independently_validated"])
+        if "independently_validated" in keys
+        else False,
+        temporal_direction=row["temporal_direction"]
+        if "temporal_direction" in keys
+        else "backward",
+        uncertainty_vector=row["uncertainty_vector"]
+        if "uncertainty_vector" in keys
+        else None,
+        hibernation_score=float(row["hibernation_score"])
+        if "hibernation_score" in keys and row["hibernation_score"] is not None
+        else None,
+        activation_condition=row["activation_condition"]
+        if "activation_condition" in keys
+        else None,
     )
 
 
@@ -272,13 +285,24 @@ def _row_to_session(row: sqlite3.Row) -> Session:
         model=row["model"],
         project_context=row["project_context"],
         summary=row["summary"],
-        retrieval_tokens=int(row["retrieval_tokens"]) if "retrieval_tokens" in keys else 0,
-        classification_tokens=int(row["classification_tokens"]) if "classification_tokens" in keys else 0,
+        retrieval_tokens=int(row["retrieval_tokens"])
+        if "retrieval_tokens" in keys
+        else 0,
+        classification_tokens=int(row["classification_tokens"])
+        if "classification_tokens" in keys
+        else 0,
         beliefs_created=int(row["beliefs_created"]) if "beliefs_created" in keys else 0,
-        corrections_detected=int(row["corrections_detected"]) if "corrections_detected" in keys else 0,
-        searches_performed=int(row["searches_performed"]) if "searches_performed" in keys else 0,
+        corrections_detected=int(row["corrections_detected"])
+        if "corrections_detected" in keys
+        else 0,
+        searches_performed=int(row["searches_performed"])
+        if "searches_performed" in keys
+        else 0,
         feedback_given=int(row["feedback_given"]) if "feedback_given" in keys else 0,
-        velocity_items_per_hour=float(row["velocity_items_per_hour"]) if "velocity_items_per_hour" in keys and row["velocity_items_per_hour"] is not None else None,
+        velocity_items_per_hour=float(row["velocity_items_per_hour"])
+        if "velocity_items_per_hour" in keys
+        and row["velocity_items_per_hour"] is not None
+        else None,
         velocity_tier=row["velocity_tier"] if "velocity_tier" in keys else None,
         topics_json=row["topics_json"] if "topics_json" in keys else None,
     )
@@ -311,11 +335,14 @@ class MemoryStore:
         if readonly:
             uri: str = f"file:{self._db_path}?mode=ro"
             self._conn: sqlite3.Connection = sqlite3.connect(
-                uri, uri=True, check_same_thread=False,
+                uri,
+                uri=True,
+                check_same_thread=False,
             )
         else:
             self._conn = sqlite3.connect(
-                str(self._db_path), check_same_thread=False,
+                str(self._db_path),
+                check_same_thread=False,
                 timeout=10.0,
             )
         self._conn.row_factory = sqlite3.Row
@@ -331,6 +358,11 @@ class MemoryStore:
         self._in_transaction: bool = False
         if not readonly:
             self._init_schema()
+
+    @property
+    def connection(self) -> sqlite3.Connection:
+        """Public read-only access to the underlying SQLite connection."""
+        return self._conn
 
     @contextlib.contextmanager
     def transaction(self) -> Iterator[None]:
@@ -380,14 +412,10 @@ class MemoryStore:
         col_names: set[str] = {row["name"] for row in cols}
         # Wave 1B: bitemporal event_time (when fact occurred vs when ingested)
         if "event_time" not in col_names:
-            self._conn.execute(
-                "ALTER TABLE beliefs ADD COLUMN event_time TEXT"
-            )
+            self._conn.execute("ALTER TABLE beliefs ADD COLUMN event_time TEXT")
         # Wave 1B: session_id for session replay queries
         if "session_id" not in col_names:
-            self._conn.execute(
-                "ALTER TABLE beliefs ADD COLUMN session_id TEXT"
-            )
+            self._conn.execute("ALTER TABLE beliefs ADD COLUMN session_id TEXT")
         # Track which classifier produced this belief ("offline" or "llm").
         if "classified_by" not in col_names:
             self._conn.execute(
@@ -400,13 +428,9 @@ class MemoryStore:
             )
         # REQ-023: provenance metadata
         if "method" not in col_names:
-            self._conn.execute(
-                "ALTER TABLE beliefs ADD COLUMN method TEXT"
-            )
+            self._conn.execute("ALTER TABLE beliefs ADD COLUMN method TEXT")
         if "sample_size" not in col_names:
-            self._conn.execute(
-                "ALTER TABLE beliefs ADD COLUMN sample_size INTEGER"
-            )
+            self._conn.execute("ALTER TABLE beliefs ADD COLUMN sample_size INTEGER")
         # Cross-project scope: "project" (default) or "global"
         if "scope" not in col_names:
             self._conn.execute(
@@ -414,9 +438,7 @@ class MemoryStore:
             )
         # Track when a belief was last retrieved
         if "last_retrieved_at" not in col_names:
-            self._conn.execute(
-                "ALTER TABLE beliefs ADD COLUMN last_retrieved_at TEXT"
-            )
+            self._conn.execute("ALTER TABLE beliefs ADD COLUMN last_retrieved_at TEXT")
         # REQ-023: remaining provenance fields
         if "data_source" not in col_names:
             self._conn.execute(
@@ -433,14 +455,10 @@ class MemoryStore:
             )
         # Multi-dimensional uncertainty vector (JSON array of [alpha, beta] pairs)
         if "uncertainty_vector" not in col_names:
-            self._conn.execute(
-                "ALTER TABLE beliefs ADD COLUMN uncertainty_vector TEXT"
-            )
+            self._conn.execute("ALTER TABLE beliefs ADD COLUMN uncertainty_vector TEXT")
         # Hibernation score for soft-closing speculative branches
         if "hibernation_score" not in col_names:
-            self._conn.execute(
-                "ALTER TABLE beliefs ADD COLUMN hibernation_score REAL"
-            )
+            self._conn.execute("ALTER TABLE beliefs ADD COLUMN hibernation_score REAL")
         # Event-based activation condition for prospective beliefs
         if "activation_condition" not in col_names:
             self._conn.execute(
@@ -482,8 +500,11 @@ class MemoryStore:
         ).fetchall()
         col_names: set[str] = {row["name"] for row in cols}
         new_cols: list[str] = [
-            "retrieval_tokens", "classification_tokens",
-            "beliefs_created", "corrections_detected", "searches_performed",
+            "retrieval_tokens",
+            "classification_tokens",
+            "beliefs_created",
+            "corrections_detected",
+            "searches_performed",
             "feedback_given",
         ]
         for col in new_cols:
@@ -497,17 +518,11 @@ class MemoryStore:
                 "ALTER TABLE sessions ADD COLUMN velocity_items_per_hour REAL"
             )
         if "velocity_tier" not in col_names:
-            self._conn.execute(
-                "ALTER TABLE sessions ADD COLUMN velocity_tier TEXT"
-            )
+            self._conn.execute("ALTER TABLE sessions ADD COLUMN velocity_tier TEXT")
         if "topics_json" not in col_names:
-            self._conn.execute(
-                "ALTER TABLE sessions ADD COLUMN topics_json TEXT"
-            )
+            self._conn.execute("ALTER TABLE sessions ADD COLUMN topics_json TEXT")
         if "quality_score" not in col_names:
-            self._conn.execute(
-                "ALTER TABLE sessions ADD COLUMN quality_score REAL"
-            )
+            self._conn.execute("ALTER TABLE sessions ADD COLUMN quality_score REAL")
         self._conn.commit()
 
     def _migrate_edges(self) -> None:
@@ -529,13 +544,9 @@ class MemoryStore:
                 "ALTER TABLE edges ADD COLUMN traversal_count INTEGER NOT NULL DEFAULT 0"
             )
         if "last_traversed_at" not in col_names:
-            self._conn.execute(
-                "ALTER TABLE edges ADD COLUMN last_traversed_at TEXT"
-            )
+            self._conn.execute("ALTER TABLE edges ADD COLUMN last_traversed_at TEXT")
         if "pruned_at" not in col_names:
-            self._conn.execute(
-                "ALTER TABLE edges ADD COLUMN pruned_at TEXT"
-            )
+            self._conn.execute("ALTER TABLE edges ADD COLUMN pruned_at TEXT")
         self._conn.commit()
 
     def _migrate_tests(self) -> None:
@@ -545,9 +556,7 @@ class MemoryStore:
         ).fetchall()
         col_names: set[str] = {row["name"] for row in cols}
         if "valence" not in col_names:
-            self._conn.execute(
-                "ALTER TABLE tests ADD COLUMN valence REAL"
-            )
+            self._conn.execute("ALTER TABLE tests ADD COLUMN valence REAL")
         self._conn.commit()
 
     # --- Observations (immutable) ---
@@ -581,7 +590,17 @@ class MemoryStore:
             """INSERT INTO observations
                (id, content_hash, content, observation_type, source_type, source_id, source_path, session_id, created_at)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (obs_id, ch, content, observation_type, source_type, source_id, source_path, session_id, ts),
+            (
+                obs_id,
+                ch,
+                content,
+                observation_type,
+                source_type,
+                source_id,
+                source_path,
+                session_id,
+                ts,
+            ),
         )
         self._conn.execute(
             "INSERT INTO search_index(id, content, type) VALUES (?, ?, ?)",
@@ -639,7 +658,7 @@ class MemoryStore:
                 "SELECT * FROM beliefs WHERE content_hash = ?", (ch,)
             ).fetchone()
             if existing is not None:
-                return _row_to_belief(existing)
+                return row_to_belief(existing)
 
             belief_id: str = _new_id()
             ts: str = created_at if created_at is not None else _now()
@@ -654,10 +673,26 @@ class MemoryStore:
                     rigor_tier, method, sample_size, data_source,
                     independently_validated)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (belief_id, ch, content, belief_type, alpha, beta_param,
-                 source_type, locked_int, ts, ts, event_time, session_id, classified_by,
-                 rigor_tier, method, sample_size, data_source,
-                 1 if independently_validated else 0),
+                (
+                    belief_id,
+                    ch,
+                    content,
+                    belief_type,
+                    alpha,
+                    beta_param,
+                    source_type,
+                    locked_int,
+                    ts,
+                    ts,
+                    event_time,
+                    session_id,
+                    classified_by,
+                    rigor_tier,
+                    method,
+                    sample_size,
+                    data_source,
+                    1 if independently_validated else 0,
+                ),
             )
             self._conn.execute(
                 "INSERT INTO search_index(id, content, type) VALUES (?, ?, ?)",
@@ -667,7 +702,9 @@ class MemoryStore:
             if observation_id is not None:
                 ev_ts: str = _now()
                 # Determine source_weight from source_type
-                weight: float = 1.0 if source_type in ("user_stated", "user_corrected") else 0.5
+                weight: float = (
+                    1.0 if source_type in ("user_stated", "user_corrected") else 0.5
+                )
                 self._conn.execute(
                     """INSERT INTO evidence
                        (belief_id, observation_id, source_weight, relationship, created_at)
@@ -717,7 +754,9 @@ class MemoryStore:
             "SELECT alpha, beta_param FROM beliefs WHERE id = ?", (belief_id,)
         ).fetchone()
         if row is not None:
-            self._record_confidence(belief_id, row["alpha"], row["beta_param"], "locked")
+            self._record_confidence(
+                belief_id, row["alpha"], row["beta_param"], "locked"
+            )
         self._conn.commit()
 
     def unlock_belief(self, belief_id: str) -> bool:
@@ -735,7 +774,9 @@ class MemoryStore:
                 "SELECT alpha, beta_param FROM beliefs WHERE id = ?", (belief_id,)
             ).fetchone()
             if row is not None:
-                self._record_confidence(belief_id, row["alpha"], row["beta_param"], "unlocked")
+                self._record_confidence(
+                    belief_id, row["alpha"], row["beta_param"], "unlocked"
+                )
         self._conn.commit()
         return cursor.rowcount > 0
 
@@ -796,12 +837,18 @@ class MemoryStore:
                 "SELECT alpha, beta_param FROM beliefs WHERE id = ?", (old_id,)
             ).fetchone()
             if row is not None:
-                self._record_confidence(old_id, row["alpha"], row["beta_param"], "superseded", new_id)
+                self._record_confidence(
+                    old_id, row["alpha"], row["beta_param"], "superseded", new_id
+                )
             self._conn.commit()
 
     def _record_confidence(
-        self, belief_id: str, alpha: float, beta_param: float,
-        event_type: str, event_detail: str = "",
+        self,
+        belief_id: str,
+        alpha: float,
+        beta_param: float,
+        event_type: str,
+        event_detail: str = "",
     ) -> None:
         """Append a snapshot to confidence_history for trajectory analysis."""
         ts: str = _now()
@@ -817,7 +864,10 @@ class MemoryStore:
     LOCKED_EVIDENCE_THRESHOLD: float = 3.0
 
     def update_confidence(
-        self, belief_id: str, outcome: str, weight: float = 1.0,
+        self,
+        belief_id: str,
+        outcome: str,
+        weight: float = 1.0,
         valence: float | None = None,
     ) -> bool:
         """Bayesian update via outcome string or continuous valence.
@@ -886,12 +936,16 @@ class MemoryStore:
             self._conn.commit()
 
         # Propagate feedback to edges that led to this belief
-        traversed: list[tuple[int, int]] | None = self._last_traversed_edges.get(belief_id)
+        traversed: list[tuple[int, int]] | None = self._last_traversed_edges.get(
+            belief_id
+        )
         if traversed:
             self.propagate_feedback_to_edges(belief_id, outcome, traversed)
 
         # TB-15: detect significant confidence drop
-        old_conf: float = old_alpha / (old_alpha + old_beta) if (old_alpha + old_beta) > 0 else 0.5
+        old_conf: float = (
+            old_alpha / (old_alpha + old_beta) if (old_alpha + old_beta) > 0 else 0.5
+        )
         new_conf: float = alpha / (alpha + beta) if (alpha + beta) > 0 else 0.5
         return old_conf >= 0.5 and new_conf < 0.5
 
@@ -910,12 +964,14 @@ class MemoryStore:
             (limit,),
         )
         for row in cursor:
-            rows.append({
-                "id": row["id"],
-                "content": row["content"],
-                "type": row["belief_type"],
-                "source": row["source_type"],
-            })
+            rows.append(
+                {
+                    "id": row["id"],
+                    "content": row["content"],
+                    "type": row["belief_type"],
+                    "source": row["source_type"],
+                }
+            )
         return rows
 
     def update_belief_classification(
@@ -961,9 +1017,7 @@ class MemoryStore:
             (new_content, new_content_hash, ts, belief_id),
         )
         # Update FTS5 index
-        self._conn.execute(
-            "DELETE FROM search_index WHERE id = ?", (belief_id,)
-        )
+        self._conn.execute("DELETE FROM search_index WHERE id = ?", (belief_id,))
         belief: Belief | None = self.get_belief(belief_id)
         if belief is not None:
             self._conn.execute(
@@ -1052,7 +1106,7 @@ class MemoryStore:
 
             rows: list[sqlite3.Row] = self._conn.execute(sql, tuple(params)).fetchall()
             for row in rows:
-                belief: Belief = _row_to_belief(row)
+                belief: Belief = row_to_belief(row)
                 edge: Edge = Edge(
                     id=row["eid"],
                     from_id=row["from_id"],
@@ -1061,9 +1115,15 @@ class MemoryStore:
                     weight=row["weight"],
                     reason=row["reason"],
                     created_at=row["ecreated"],
-                    alpha=float(str(row["ealpha"])) if row["ealpha"] is not None else 1.0,
-                    beta_param=float(str(row["ebeta"])) if row["ebeta"] is not None else 1.0,
-                    traversal_count=int(str(row["etrav"])) if row["etrav"] is not None else 0,
+                    alpha=float(str(row["ealpha"]))
+                    if row["ealpha"] is not None
+                    else 1.0,
+                    beta_param=float(str(row["ebeta"]))
+                    if row["ebeta"] is not None
+                    else 1.0,
+                    traversal_count=int(str(row["etrav"]))
+                    if row["etrav"] is not None
+                    else 0,
                     last_traversed_at=str(row["elast"]) if row["elast"] else None,
                     pruned_at=str(row["epruned"]) if row["epruned"] else None,
                 )
@@ -1195,10 +1255,17 @@ class MemoryStore:
 
     # Edge types that represent consequence/support relationships.
     # CONTRADICTS creates forks (branching paths).
-    _CONSEQUENCE_EDGE_TYPES: frozenset[str] = frozenset({
-        "SUPPORTS", "IMPLEMENTS", "TESTS", "CITES",
-        "CONTRADICTS", "RELATES_TO", "CALLS",
-    })
+    _CONSEQUENCE_EDGE_TYPES: frozenset[str] = frozenset(
+        {
+            "SUPPORTS",
+            "IMPLEMENTS",
+            "TESTS",
+            "CITES",
+            "CONTRADICTS",
+            "RELATES_TO",
+            "CALLS",
+        }
+    )
 
     def find_consequence_paths(
         self,
@@ -1234,14 +1301,16 @@ class MemoryStore:
                 (rid,),
             ).fetchall()
             if rows:
-                root_beliefs[rid] = _row_to_belief(rows[0])
+                root_beliefs[rid] = row_to_belief(rows[0])
 
         if not root_beliefs:
             return paths
 
         # DFS with path tracking
         # Stack entries: (current_belief, edge_type_to_here, compound_conf, path_so_far, visited)
-        stack: list[tuple[Belief, str, float, list[tuple[Belief, str, float]], set[str]]] = []
+        stack: list[
+            tuple[Belief, str, float, list[tuple[Belief, str, float]], set[str]]
+        ] = []
 
         for rid, rb in root_beliefs.items():
             root_conf: float = rb.confidence
@@ -1265,7 +1334,8 @@ class MemoryStore:
 
             # Filter to unvisited, non-superseded neighbors
             valid_neighbors: list[tuple[Belief, Edge]] = [
-                (nb, e) for nb, e in neighbors
+                (nb, e)
+                for nb, e in neighbors
                 if nb.id not in visited and nb.valid_to is None
             ]
 
@@ -1304,12 +1374,20 @@ class MemoryStore:
                 if edge.edge_type == "CONTRADICTS":
                     # Fork: start a new branch from the root up to current,
                     # then diverge to the contradicting belief
-                    fork_path: list[tuple[Belief, str, float]] = list(path_so_far) + [new_step]
-                    stack.append((nb, edge.edge_type, child_conf, fork_path, new_visited))
+                    fork_path: list[tuple[Belief, str, float]] = list(path_so_far) + [
+                        new_step
+                    ]
+                    stack.append(
+                        (nb, edge.edge_type, child_conf, fork_path, new_visited)
+                    )
                 else:
                     # Continue the current path
-                    continued_path: list[tuple[Belief, str, float]] = list(path_so_far) + [new_step]
-                    stack.append((nb, edge.edge_type, child_conf, continued_path, new_visited))
+                    continued_path: list[tuple[Belief, str, float]] = list(
+                        path_so_far
+                    ) + [new_step]
+                    stack.append(
+                        (nb, edge.edge_type, child_conf, continued_path, new_visited)
+                    )
 
                 expanded_any = True
 
@@ -1325,10 +1403,11 @@ class MemoryStore:
     @dataclass
     class Impasse:
         """A reasoning impasse detected in the belief graph."""
-        impasse_type: str   # "tie", "gap", "constraint_failure", "no_change"
+
+        impasse_type: str  # "tie", "gap", "constraint_failure", "no_change"
         description: str
         beliefs: list[str]  # Belief IDs involved
-        severity: float     # 0.0 to 1.0
+        severity: float  # 0.0 to 1.0
 
     def detect_impasses(
         self,
@@ -1359,7 +1438,9 @@ class MemoryStore:
         checked_pairs: set[tuple[str, str]] = set()
         for bid in beliefs:
             neighbors: list[tuple[Belief, Edge]] = self.get_neighbors(
-                bid, edge_types=["CONTRADICTS"], direction="both",
+                bid,
+                edge_types=["CONTRADICTS"],
+                direction="both",
             )
             for nb, _edge in neighbors:
                 if nb.id not in beliefs:
@@ -1375,70 +1456,84 @@ class MemoryStore:
                 if conf_diff < 0.2:
                     # Similar confidence -- genuine tie
                     severity: float = 1.0 - conf_diff  # closer = more severe
-                    impasses.append(MemoryStore.Impasse(
-                        impasse_type="tie",
-                        description=(
-                            f"Contradicting beliefs with similar confidence "
-                            f"({b1.confidence:.0%} vs {b2.confidence:.0%}): "
-                            f'"{b1.content[:60]}..." vs "{b2.content[:60]}..."'
-                        ),
-                        beliefs=[bid, nb.id],
-                        severity=severity,
-                    ))
+                    impasses.append(
+                        MemoryStore.Impasse(
+                            impasse_type="tie",
+                            description=(
+                                f"Contradicting beliefs with similar confidence "
+                                f"({b1.confidence:.0%} vs {b2.confidence:.0%}): "
+                                f'"{b1.content[:60]}..." vs "{b2.content[:60]}..."'
+                            ),
+                            beliefs=[bid, nb.id],
+                            severity=severity,
+                        )
+                    )
 
         # 2. Gap impasses: paths that terminate with high uncertainty at the leaf
         for path in paths:
             if not path:
                 continue
             leaf_belief, _etype, compound_conf = path[-1]
-            leaf_unc: float = uncertainty_score(leaf_belief.alpha, leaf_belief.beta_param)
+            leaf_unc: float = uncertainty_score(
+                leaf_belief.alpha, leaf_belief.beta_param
+            )
             if leaf_unc > 0.7 and len(path) >= 2:
-                impasses.append(MemoryStore.Impasse(
-                    impasse_type="gap",
-                    description=(
-                        f"Path ends at high-uncertainty belief "
-                        f"(uncertainty={leaf_unc:.2f}, compound_conf={compound_conf:.2f}): "
-                        f'"{leaf_belief.content[:80]}..."'
-                    ),
-                    beliefs=[leaf_belief.id],
-                    severity=leaf_unc,
-                ))
+                impasses.append(
+                    MemoryStore.Impasse(
+                        impasse_type="gap",
+                        description=(
+                            f"Path ends at high-uncertainty belief "
+                            f"(uncertainty={leaf_unc:.2f}, compound_conf={compound_conf:.2f}): "
+                            f'"{leaf_belief.content[:80]}..."'
+                        ),
+                        beliefs=[leaf_belief.id],
+                        severity=leaf_unc,
+                    )
+                )
 
         # 3. Constraint failures: evidence contradicts a locked belief
         if locked_beliefs:
             locked_ids: set[str] = {lb.id for lb in locked_beliefs}
             for bid in beliefs:
                 neighbors = self.get_neighbors(
-                    bid, edge_types=["CONTRADICTS"], direction="both",
+                    bid,
+                    edge_types=["CONTRADICTS"],
+                    direction="both",
                 )
                 for nb, _edge in neighbors:
                     if nb.id in locked_ids:
-                        impasses.append(MemoryStore.Impasse(
-                            impasse_type="constraint_failure",
-                            description=(
-                                f"Evidence contradicts LOCKED belief: "
-                                f'"{beliefs[bid].content[:60]}..." '
-                                f'CONTRADICTS locked "{nb.content[:60]}..."'
-                            ),
-                            beliefs=[bid, nb.id],
-                            severity=1.0,  # Always high -- locked beliefs are constraints
-                        ))
+                        impasses.append(
+                            MemoryStore.Impasse(
+                                impasse_type="constraint_failure",
+                                description=(
+                                    f"Evidence contradicts LOCKED belief: "
+                                    f'"{beliefs[bid].content[:60]}..." '
+                                    f'CONTRADICTS locked "{nb.content[:60]}..."'
+                                ),
+                                beliefs=[bid, nb.id],
+                                severity=1.0,  # Always high -- locked beliefs are constraints
+                            )
+                        )
 
         # 4. No-change impasses: all beliefs have low confidence
         if beliefs:
             avg_conf: float = sum(b.confidence for b in beliefs.values()) / len(beliefs)
-            high_conf_count: int = sum(1 for b in beliefs.values() if b.confidence > 0.7)
+            high_conf_count: int = sum(
+                1 for b in beliefs.values() if b.confidence > 0.7
+            )
             if avg_conf < 0.5 and high_conf_count == 0:
-                impasses.append(MemoryStore.Impasse(
-                    impasse_type="no_change",
-                    description=(
-                        f"No high-confidence evidence found. "
-                        f"Average confidence: {avg_conf:.0%}, "
-                        f"beliefs with >70% confidence: 0/{len(beliefs)}"
-                    ),
-                    beliefs=list(beliefs.keys())[:5],
-                    severity=0.8,
-                ))
+                impasses.append(
+                    MemoryStore.Impasse(
+                        impasse_type="no_change",
+                        description=(
+                            f"No high-confidence evidence found. "
+                            f"Average confidence: {avg_conf:.0%}, "
+                            f"beliefs with >70% confidence: 0/{len(beliefs)}"
+                        ),
+                        beliefs=list(beliefs.keys())[:5],
+                        severity=0.8,
+                    )
+                )
 
         # Sort by severity descending
         impasses.sort(key=lambda imp: -imp.severity)
@@ -1495,12 +1590,16 @@ class MemoryStore:
         rows: list[sqlite3.Row] = self._conn.execute(
             "SELECT from_id, to_id, edge_type FROM edges"
         ).fetchall()
-        triples.extend((str(r["from_id"]), str(r["to_id"]), str(r["edge_type"])) for r in rows)
+        triples.extend(
+            (str(r["from_id"]), str(r["to_id"]), str(r["edge_type"])) for r in rows
+        )
         # Graph edges (CITES, CALLS, CONTAINS, etc.)
         g_rows: list[sqlite3.Row] = self._conn.execute(
             "SELECT from_id, to_id, edge_type FROM graph_edges"
         ).fetchall()
-        triples.extend((str(r["from_id"]), str(r["to_id"]), str(r["edge_type"])) for r in g_rows)
+        triples.extend(
+            (str(r["from_id"]), str(r["to_id"]), str(r["edge_type"])) for r in g_rows
+        )
         return triples
 
     # --- Search ---
@@ -1513,6 +1612,7 @@ class MemoryStore:
         Split into words, quote each term, join with OR for broad matching.
         """
         import re
+
         # Strip FTS5 operators and punctuation, keep alphanumeric and spaces
         words: list[str] = re.findall(r"[a-zA-Z0-9]+", query)
         if not words:
@@ -1550,7 +1650,7 @@ class MemoryStore:
         for r in rows:
             row: sqlite3.Row | None = by_id.get(r["id"])
             if row is not None:
-                beliefs.append(_row_to_belief(row))
+                beliefs.append(row_to_belief(row))
 
         # Update last_retrieved_at for all returned beliefs (skip in readonly mode).
         if beliefs and not self.readonly:
@@ -1601,7 +1701,7 @@ class MemoryStore:
         rows: list[sqlite3.Row] = self._conn.execute(
             "SELECT * FROM beliefs WHERE locked = 1 AND valid_to IS NULL"
         ).fetchall()
-        return [_row_to_belief(r) for r in rows]
+        return [row_to_belief(r) for r in rows]
 
     def get_behavioral_beliefs(self, limit: int = 10) -> list[Belief]:
         """Return high-confidence unlocked behavioral beliefs (L1 layer).
@@ -1634,7 +1734,7 @@ class MemoryStore:
                LIMIT ?""",
             (limit,),
         ).fetchall()
-        return [_row_to_belief(r) for r in rows]
+        return [row_to_belief(r) for r in rows]
 
     def get_belief(self, belief_id: str) -> Belief | None:
         """Get a single belief by ID."""
@@ -1643,7 +1743,7 @@ class MemoryStore:
         ).fetchone()
         if row is None:
             return None
-        return _row_to_belief(row)
+        return row_to_belief(row)
 
     def get_belief_by_hash(self, content_hash: str) -> Belief | None:
         """Get a belief by content hash. Used to bridge scanner node IDs to belief IDs."""
@@ -1652,7 +1752,7 @@ class MemoryStore:
         ).fetchone()
         if row is None:
             return None
-        return _row_to_belief(row)
+        return row_to_belief(row)
 
     # --- Sessions ---
 
@@ -1722,6 +1822,7 @@ class MemoryStore:
             items: int = int(row["beliefs_created"]) + int(row["corrections_detected"])
             try:
                 from datetime import datetime as _dt
+
                 t0: _dt = _dt.fromisoformat(started)
                 t1: _dt = _dt.fromisoformat(ts)
                 hours: float = max(0.5, (t1 - t0).total_seconds() / 3600.0)
@@ -1765,9 +1866,13 @@ class MemoryStore:
                 feedback_given = feedback_given + ?
                WHERE id = ?""",
             (
-                retrieval_tokens, classification_tokens,
-                beliefs_created, corrections_detected,
-                searches_performed, feedback_given, session_id,
+                retrieval_tokens,
+                classification_tokens,
+                beliefs_created,
+                corrections_detected,
+                searches_performed,
+                feedback_given,
+                session_id,
             ),
         )
         self._conn.commit()
@@ -1857,7 +1962,7 @@ class MemoryStore:
             params.append(limit)
 
         rows: list[sqlite3.Row] = self._conn.execute(sql, params).fetchall()
-        return [_row_to_belief(r) for r in rows]
+        return [row_to_belief(r) for r in rows]
 
     def evolution(
         self,
@@ -1884,7 +1989,7 @@ class MemoryStore:
                 ).fetchone()
                 if row is None:
                     break
-                backward.append(_row_to_belief(row))
+                backward.append(row_to_belief(row))
                 # Find what this belief superseded (old belief with superseded_by = current)
                 prev: sqlite3.Row | None = self._conn.execute(
                     "SELECT * FROM beliefs WHERE superseded_by = ?", (current_id,)
@@ -1902,7 +2007,7 @@ class MemoryStore:
                 ).fetchone()
                 if row is None:
                     break
-                b: Belief = _row_to_belief(row)
+                b: Belief = row_to_belief(row)
                 chain.append(b)
                 current_id = b.superseded_by
 
@@ -1917,7 +2022,7 @@ class MemoryStore:
                    ORDER BY b.created_at ASC LIMIT ?""",
                 (safe_topic, limit),
             ).fetchall()
-            return [_row_to_belief(r) for r in rows]
+            return [row_to_belief(r) for r in rows]
 
         return []
 
@@ -1951,9 +2056,9 @@ class MemoryStore:
         ).fetchall()
 
         return {
-            "added": [_row_to_belief(r) for r in added_rows],
-            "removed": [_row_to_belief(r) for r in removed_rows],
-            "evolved": [_row_to_belief(r) for r in evolved_rows],
+            "added": [row_to_belief(r) for r in added_rows],
+            "removed": [row_to_belief(r) for r in removed_rows],
+            "evolved": [row_to_belief(r) for r in evolved_rows],
         }
 
     def search_at_time(
@@ -1977,12 +2082,13 @@ class MemoryStore:
                LIMIT ?""",
             (safe_query, at_time, at_time, top_k),
         ).fetchall()
-        return [_row_to_belief(r) for r in rows]
+        return [row_to_belief(r) for r in rows]
 
     # --- Stats ---
 
     def status(self) -> dict[str, int]:
         """Return counts: observations, beliefs, locked, superseded, edges, sessions."""
+
         def count(sql: str) -> int:
             row: sqlite3.Row = self._conn.execute(sql).fetchone()
             val: object = row[0]
@@ -1994,7 +2100,9 @@ class MemoryStore:
             "observations": count("SELECT COUNT(*) FROM observations"),
             "beliefs": count("SELECT COUNT(*) FROM beliefs"),
             "locked": count("SELECT COUNT(*) FROM beliefs WHERE locked = 1"),
-            "superseded": count("SELECT COUNT(*) FROM beliefs WHERE valid_to IS NOT NULL"),
+            "superseded": count(
+                "SELECT COUNT(*) FROM beliefs WHERE valid_to IS NOT NULL"
+            ),
             "edges": count("SELECT COUNT(*) FROM edges"),
             "sessions": count("SELECT COUNT(*) FROM sessions"),
         }
@@ -2008,14 +2116,13 @@ class MemoryStore:
           activity  -- sessions, observations, age distribution
           maintenance -- stale, orphans, credal gap (actionable items)
         """
+
         def count(sql: str, params: tuple[object, ...] = ()) -> int:
             row: sqlite3.Row = self._conn.execute(sql, params).fetchone()
             val: object = row[0]
             return val if isinstance(val, int) else 0
 
-        active: int = count(
-            "SELECT COUNT(*) FROM beliefs WHERE valid_to IS NULL"
-        )
+        active: int = count("SELECT COUNT(*) FROM beliefs WHERE valid_to IS NULL")
         superseded: int = count(
             "SELECT COUNT(*) FROM beliefs WHERE valid_to IS NOT NULL"
         )
@@ -2142,8 +2249,10 @@ class MemoryStore:
             prior = type_priors.get(bt)
             if prior is None:
                 continue
-            if (abs(float(str(row["alpha"])) - prior[0]) < epsilon
-                    and abs(float(str(row["beta_param"])) - prior[1]) < epsilon):
+            if (
+                abs(float(str(row["alpha"])) - prior[0]) < epsilon
+                and abs(float(str(row["beta_param"])) - prior[1]) < epsilon
+            ):
                 at_prior += 1
 
         credal_pct: float = round(at_prior / active * 100, 1) if active > 0 else 0.0
@@ -2169,6 +2278,7 @@ class MemoryStore:
         Includes credal gap (beliefs at type prior), orphan count,
         edge type breakdown, feedback coverage, and stale sessions.
         """
+
         def count(sql: str) -> int:
             row: sqlite3.Row = self._conn.execute(sql).fetchone()
             val: object = row[0]
@@ -2183,9 +2293,7 @@ class MemoryStore:
                 return 0.0
             return float(str(val))
 
-        active: int = count(
-            "SELECT COUNT(*) FROM beliefs WHERE valid_to IS NULL"
-        )
+        active: int = count("SELECT COUNT(*) FROM beliefs WHERE valid_to IS NULL")
 
         # Credal gap: beliefs whose (alpha, beta_param) match the most
         # common prior for their type (within epsilon). These have never
@@ -2218,8 +2326,10 @@ class MemoryStore:
             prior = type_priors.get(bt)
             if prior is None:
                 continue
-            if (abs(float(str(row["alpha"])) - prior[0]) < epsilon
-                    and abs(float(str(row["beta_param"])) - prior[1]) < epsilon):
+            if (
+                abs(float(str(row["alpha"])) - prior[0]) < epsilon
+                and abs(float(str(row["beta_param"])) - prior[1]) < epsilon
+            ):
                 at_prior += 1
 
         # Orphans: beliefs with no edges at all
@@ -2234,17 +2344,13 @@ class MemoryStore:
         contradicts: int = count(
             "SELECT COUNT(*) FROM edges WHERE edge_type = 'CONTRADICTS'"
         )
-        supports: int = count(
-            "SELECT COUNT(*) FROM edges WHERE edge_type = 'SUPPORTS'"
-        )
+        supports: int = count("SELECT COUNT(*) FROM edges WHERE edge_type = 'SUPPORTS'")
         supersedes: int = count(
             "SELECT COUNT(*) FROM edges WHERE edge_type = 'SUPERSEDES'"
         )
 
         # Feedback coverage: beliefs with at least one test result
-        with_feedback: int = count(
-            """SELECT COUNT(DISTINCT belief_id) FROM tests"""
-        )
+        with_feedback: int = count("""SELECT COUNT(DISTINCT belief_id) FROM tests""")
 
         # Average confidence
         avg_conf: float = count_float(
@@ -2252,9 +2358,7 @@ class MemoryStore:
         )
 
         # Stale sessions
-        stale: int = count(
-            "SELECT COUNT(*) FROM sessions WHERE completed_at IS NULL"
-        )
+        stale: int = count("SELECT COUNT(*) FROM sessions WHERE completed_at IS NULL")
 
         credal_gap_pct: float = (at_prior / active * 100) if active > 0 else 0.0
         orphan_pct: float = (orphan / active * 100) if active > 0 else 0.0
@@ -2321,9 +2425,15 @@ class MemoryStore:
                 reason=str(row["reason"]),
                 created_at=str(row["created_at"]),
                 alpha=float(row["alpha"]) if row["alpha"] is not None else 1.0,
-                beta_param=float(row["beta_param"]) if row["beta_param"] is not None else 1.0,
-                traversal_count=int(row["traversal_count"]) if row["traversal_count"] is not None else 0,
-                last_traversed_at=str(row["last_traversed_at"]) if row["last_traversed_at"] else None,
+                beta_param=float(row["beta_param"])
+                if row["beta_param"] is not None
+                else 1.0,
+                traversal_count=int(row["traversal_count"])
+                if row["traversal_count"] is not None
+                else 0,
+                last_traversed_at=str(row["last_traversed_at"])
+                if row["last_traversed_at"]
+                else None,
                 pruned_at=str(row["pruned_at"]) if row["pruned_at"] else None,
             )
             fid: str = edge.from_id
@@ -2400,7 +2510,10 @@ class MemoryStore:
         # No commit here -- caller batches multiple traversals.
 
     def update_edge_confidence(
-        self, edge_id: int, outcome: str, weight: float = 1.0,
+        self,
+        edge_id: int,
+        outcome: str,
+        weight: float = 1.0,
     ) -> None:
         """Bayesian update on an edge after traversal feedback.
 
@@ -2409,7 +2522,8 @@ class MemoryStore:
         'harmful': beta += weight * 2.0 (strong penalty).
         """
         row: sqlite3.Row | None = self._conn.execute(
-            "SELECT alpha, beta_param FROM edges WHERE id = ?", (edge_id,),
+            "SELECT alpha, beta_param FROM edges WHERE id = ?",
+            (edge_id,),
         ).fetchone()
         if row is None:
             return
@@ -2505,7 +2619,8 @@ class MemoryStore:
 
                 for row in rows:
                     neighbor_id: str = (
-                        str(row["to_id"]) if str(row["from_id"]) == current_id
+                        str(row["to_id"])
+                        if str(row["from_id"]) == current_id
                         else str(row["from_id"])
                     )
                     if neighbor_id in visited:
@@ -2529,14 +2644,20 @@ class MemoryStore:
                     if propagated > 0:
                         self._apply_valence_update(neighbor_id, alpha_delta=propagated)
                     else:
-                        self._apply_valence_update(neighbor_id, beta_delta=abs(propagated))
+                        self._apply_valence_update(
+                            neighbor_id, beta_delta=abs(propagated)
+                        )
 
                     # Also update the edge's own confidence
                     edge_id: int = int(str(row["id"]))
                     if propagated > 0:
-                        self.update_edge_confidence(edge_id, "used", weight=abs(propagated))
+                        self.update_edge_confidence(
+                            edge_id, "used", weight=abs(propagated)
+                        )
                     else:
-                        self.update_edge_confidence(edge_id, "harmful", weight=abs(propagated))
+                        self.update_edge_confidence(
+                            edge_id, "harmful", weight=abs(propagated)
+                        )
 
                     updated += 1
                     next_frontier.append((neighbor_id, propagated))
@@ -2581,7 +2702,8 @@ class MemoryStore:
         self._record_confidence(belief_id, alpha, beta, "valence_propagation")
 
     def get_session_retrieval_subgraph(
-        self, session_id: str,
+        self,
+        session_id: str,
     ) -> tuple[list[str], list[tuple[str, str, str, int]], dict[str, int]]:
         """Build the induced subgraph of beliefs retrieved during a session.
 
@@ -2632,6 +2754,7 @@ class MemoryStore:
 
     def get_edge_health(self) -> dict[str, object]:
         """Edge-specific health metrics."""
+
         def count(sql: str) -> int:
             row: sqlite3.Row = self._conn.execute(sql).fetchone()
             val: object = row[0]
@@ -2670,7 +2793,9 @@ class MemoryStore:
             "avg_edge_confidence": round(avg_conf, 3),
             "avg_traversal_count": round(avg_traversals, 1),
             "edge_credal_gap": at_prior,
-            "edge_credal_gap_pct": round(at_prior / active * 100, 1) if active > 0 else 0.0,
+            "edge_credal_gap_pct": round(at_prior / active * 100, 1)
+            if active > 0
+            else 0.0,
         }
 
     # --- Onboarding provenance ---
@@ -2691,14 +2816,23 @@ class MemoryStore:
                (project_path, commit_hash, nodes_extracted, edges_extracted,
                 beliefs_created, observations_created, created_at)
                VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (project_path, commit_hash, nodes_extracted, edges_extracted,
-             beliefs_created, observations_created, ts),
+            (
+                project_path,
+                commit_hash,
+                nodes_extracted,
+                edges_extracted,
+                beliefs_created,
+                observations_created,
+                ts,
+            ),
         )
         self._conn.commit()
         row_id: int | None = cursor.lastrowid
         return row_id if row_id is not None else 0
 
-    def get_last_onboarding(self, project_path: str | None = None) -> dict[str, str] | None:
+    def get_last_onboarding(
+        self, project_path: str | None = None
+    ) -> dict[str, str] | None:
         """Return the most recent onboarding run, optionally filtered by project."""
         if project_path:
             row: sqlite3.Row | None = self._conn.execute(
@@ -2762,7 +2896,7 @@ class MemoryStore:
         params.append(limit)
 
         rows: list[sqlite3.Row] = self._conn.execute(sql, tuple(params)).fetchall()
-        return [_row_to_belief(r) for r in rows]
+        return [row_to_belief(r) for r in rows]
 
     def close(self) -> None:
         """Close the database connection."""
@@ -2850,7 +2984,9 @@ class MemoryStore:
             "harmful": int(str(row["harmful"])),
         }
 
-    def get_retrieval_stats_batch(self, belief_ids: list[str]) -> dict[str, dict[str, int]]:
+    def get_retrieval_stats_batch(
+        self, belief_ids: list[str]
+    ) -> dict[str, dict[str, int]]:
         """Batch retrieval stats for multiple beliefs.
 
         Returns {belief_id: {retrieval_count, used, ignored, harmful}}.
@@ -2883,7 +3019,9 @@ class MemoryStore:
 
     # --- Stale belief detection ---
 
-    def get_stale_beliefs(self, days_threshold: int = 30, limit: int = 50) -> list[Belief]:
+    def get_stale_beliefs(
+        self, days_threshold: int = 30, limit: int = 50
+    ) -> list[Belief]:
         """Return beliefs not retrieved in the last N days.
 
         Excludes locked beliefs (always relevant) and beliefs created
@@ -2901,7 +3039,7 @@ class MemoryStore:
                LIMIT ?""",
             (f"-{days_threshold}", f"-{days_threshold}", limit),
         ).fetchall()
-        return [_row_to_belief(r) for r in rows]
+        return [row_to_belief(r) for r in rows]
 
     def count_stale_beliefs(self, days_threshold: int = 30) -> int:
         """Count beliefs not retrieved in the last N days (excludes locked and new)."""
@@ -2935,7 +3073,7 @@ class MemoryStore:
             "SELECT * FROM beliefs WHERE valid_to IS NULL LIMIT ?",
             (limit,),
         ).fetchall()
-        return [_row_to_belief(r) for r in rows]
+        return [row_to_belief(r) for r in rows]
 
     # --- Speculative beliefs ---
 
@@ -2947,7 +3085,7 @@ class MemoryStore:
                ORDER BY created_at DESC LIMIT ?""",
             (limit,),
         ).fetchall()
-        return [_row_to_belief(r) for r in rows]
+        return [row_to_belief(r) for r in rows]
 
     def get_highest_entropy_beliefs(self, limit: int = 10) -> list[Belief]:
         """Get speculative beliefs with the most uncertainty (highest joint entropy).
@@ -2964,9 +3102,11 @@ class MemoryStore:
                ORDER BY created_at DESC LIMIT ?""",
             (limit,),
         ).fetchall()
-        return [_row_to_belief(r) for r in rows]
+        return [row_to_belief(r) for r in rows]
 
-    def get_hibernated_beliefs(self, threshold: float = 0.2, limit: int = 20) -> list[Belief]:
+    def get_hibernated_beliefs(
+        self, threshold: float = 0.2, limit: int = 20
+    ) -> list[Belief]:
         """Get speculative beliefs below the hibernation threshold."""
         rows: list[sqlite3.Row] = self._conn.execute(
             """SELECT * FROM beliefs
@@ -2977,7 +3117,7 @@ class MemoryStore:
                ORDER BY hibernation_score ASC LIMIT ?""",
             (threshold, limit),
         ).fetchall()
-        return [_row_to_belief(r) for r in rows]
+        return [row_to_belief(r) for r in rows]
 
     def insert_speculative_belief(
         self,
@@ -3011,7 +3151,11 @@ class MemoryStore:
         # Create SPECULATES edge from source belief
         if source_belief_id is not None:
             self.insert_edge(
-                source_belief_id, belief.id, "SPECULATES", 1.0, "wonder",
+                source_belief_id,
+                belief.id,
+                "SPECULATES",
+                1.0,
+                "wonder",
             )
 
         # Re-read to get updated fields
@@ -3053,8 +3197,17 @@ class MemoryStore:
                (belief_id, session_id, retrieval_context, outcome, outcome_detail,
                 detection_layer, evidence_weight, valence, created_at)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (belief_id, session_id, retrieval_context, outcome, outcome_detail,
-             detection_layer, evidence_weight, valence, ts),
+            (
+                belief_id,
+                session_id,
+                retrieval_context,
+                outcome,
+                outcome_detail,
+                detection_layer,
+                evidence_weight,
+                valence,
+                ts,
+            ),
         )
         self._conn.commit()
         row_id: int | None = cursor.lastrowid
