@@ -432,6 +432,12 @@ def cmd_setup(args: argparse.Namespace) -> None:
     if not mcp_json_path.exists():
         import json as _json
 
+        # Resolve the agentmemory project path so the MCP server works
+        # from ANY project directory, not just the agentmemory project.
+        import agentmemory as _am
+
+        am_project_dir: str = str(Path(_am.__file__).parent.parent.parent.resolve())
+
         mcp_config: dict[str, object] = {
             "mcpServers": {
                 "agentmemory": {
@@ -440,7 +446,7 @@ def cmd_setup(args: argparse.Namespace) -> None:
                     "args": [
                         "run",
                         "--project",
-                        ".",
+                        am_project_dir,
                         "python",
                         "-m",
                         "agentmemory.server",
@@ -451,6 +457,7 @@ def cmd_setup(args: argparse.Namespace) -> None:
         }
         mcp_json_path.write_text(_json.dumps(mcp_config, indent=2) + "\n")
         print(f"  Created {mcp_json_path}")
+        print(f"  MCP server path: {am_project_dir}")
     else:
         print(f"  .mcp.json already exists at {mcp_json_path}")
 
