@@ -4,8 +4,8 @@ compatibility_date = "2026-04-17"
 
 [[d1_databases]]
 binding = "TELEMETRY_DB"
-database_name = "agentmemory-telemetry"
-database_id = "4704e38d-1366-4d13-ac03-c1563096d9f3"
+database_name = "agentmemory-telemetry-v2"
+database_id = "3ea14047-e013-455b-80c7-b9d0628d469c"
 
 [[send_email]]
 name = "EMAIL"
