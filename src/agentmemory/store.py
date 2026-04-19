@@ -3145,47 +3145,51 @@ class MemoryStore:
         return [row_to_belief(r) for r in rows]
 
     def recalibrate_scores(self, deflation_factor: float = 0.2) -> int:
-        """Deflate inflated alpha values for agent-inferred beliefs.
+        """Reset agent-inferred beliefs to correct type-specific priors.
 
-        Agent-inferred beliefs that were inserted with inflated priors
-        (alpha > 1.0) get deflated: new_alpha = alpha * deflation_factor.
-        Beta is reset to 0.5 (Jeffreys).
-
-        User-sourced beliefs (user_corrected, user_stated) and locked
-        beliefs are NOT touched.
+        Uses the same priors as classification.get_source_adjusted_prior()
+        to ensure beliefs match what new insertions would produce.
+        User-sourced beliefs and locked beliefs are NOT touched.
 
         Returns the number of beliefs recalibrated.
         """
-        # Find agent-inferred beliefs with inflated alpha (> 1.0)
-        count_row: list[sqlite3.Row] = self._conn.execute(
-            """SELECT COUNT(*) FROM beliefs
-               WHERE valid_to IS NULL
-                 AND locked = 0
-                 AND source_type = 'agent_inferred'
-                 AND alpha > 1.0""",
-        ).fetchall()
-        count: int = int(count_row[0][0])
+        # Type-specific deflated priors for agent-inferred content.
+        # Must match classification.py get_source_adjusted_prior().
+        type_priors: dict[str, tuple[float, float]] = {
+            "factual": (0.6, 1.0),  # 37.5%
+            "requirement": (1.8, 0.5),  # 78.3%
+            "correction": (1.8, 0.5),  # 78.3%
+            "preference": (1.4, 1.0),  # 58.3%
+            "assumption": (0.5, 1.0),  # 33.3%
+            "decision": (1.0, 1.0),  # 50.0%
+            "analysis": (0.5, 1.0),  # 33.3%
+            "speculative": (0.5, 1.0),  # 33.3%
+        }
 
-        if count == 0:
-            return 0
+        ts: str = datetime.now(timezone.utc).isoformat()
+        total: int = 0
 
-        # Apply proportional deflation
-        self._conn.execute(
-            """UPDATE beliefs
-               SET alpha = MAX(0.5, alpha * ?),
-                   beta_param = CASE
-                     WHEN beta_param < 0.5 THEN 0.5
-                     ELSE beta_param
-                   END,
-                   updated_at = ?
-               WHERE valid_to IS NULL
-                 AND locked = 0
-                 AND source_type = 'agent_inferred'
-                 AND alpha > 1.0""",
-            (deflation_factor, datetime.now(timezone.utc).isoformat()),
-        )
+        for belief_type, (target_alpha, target_beta) in type_priors.items():
+            # Only recalibrate agent-inferred beliefs with alpha above the
+            # target (i.e., still inflated from a previous calibration).
+            # Preserve any feedback-driven adjustments by keeping beliefs
+            # that have already been deflated below the target.
+            cursor: sqlite3.Cursor = self._conn.execute(
+                """UPDATE beliefs
+                   SET alpha = ?,
+                       beta_param = ?,
+                       updated_at = ?
+                   WHERE superseded_by IS NULL
+                     AND locked = 0
+                     AND source_type = 'agent_inferred'
+                     AND belief_type = ?
+                     AND alpha > ?""",
+                (target_alpha, target_beta, ts, belief_type, target_alpha),
+            )
+            total += cursor.rowcount
+
         self._conn.commit()
-        return count
+        return total
 
     # --- Speculative beliefs ---
 
