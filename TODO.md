@@ -9,7 +9,7 @@
 
 Phases 1-5 complete. 84 experiments, all research questions closed, all 35 case studies tested. Only remaining gap is REQ-011 (cross-model MCP testing with ChatGPT/Gemini), blocked on external access.
 
-### Active Experiments (Exp 66-83)
+### Active Experiments (Exp 66-83, 85-89)
 
 | Exp | Question | Status |
 |-----|----------|--------|
@@ -22,6 +22,11 @@ Phases 1-5 complete. 84 experiments, all research questions closed, all 35 case 
 | 75 | Session velocity measurement and calibration | Complete |
 | 78 | Confidence trajectory analysis | Complete |
 | 79-83 | Statement vs belief ontological distinction | Complete |
+| 85 | LoCoMo multi-run reader variance (7 runs, frozen retrieval) | Planned |
+| 86 | Retrieval-reader isolation harness (oracle context baseline) | Planned |
+| 87 | Multi-query expansion for LongMemEval cross-session | Planned |
+| 88 | Correction burden measurement (log parsing) | Planned |
+| 89 | FTS5 query reformulation for LoCoMo temporal/adversarial | Planned (after 85) |
 
 ### Code Fixes Applied (2026-04-11)
 
@@ -140,7 +145,7 @@ Phases 1-5 complete. 84 experiments, all research questions closed, all 35 case 
 ## Backlog
 
 - Sentence splitting for non-English / mixed-content documents
-- Re-run the five published benchmarks (LoCoMo, MAB SH 262K, MAB MH 262K, StructMemEval, LongMemEval) against the v2.x retrieval pipeline and commit protocol-correct result JSONs to `benchmarks/`. Current README numbers reflect the v1.2.1 freeze (RESEARCH_FREEZE_20260416.md).
+- ~~Re-run the five published benchmarks~~ **DONE** (v2.2.2, 2026-04-19). Results in `benchmarks/results_v2.2.2/`, pytest suite in `benchmarks/test_benchmark_suite.py` (65 tests). LoCoMo regression (66.1% -> 50.8%) identified as reader prompt variance, not retrieval.
 
 ## Pruned (no longer relevant)
 
