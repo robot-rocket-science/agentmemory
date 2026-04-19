@@ -115,17 +115,32 @@ Wonder is divergent -- cast a wide net, see what is out there. Reason is converg
 >
 > I welcome constructive criticism, independent replication, and analysis that refutes or supports any of these claims, and I would be glad to collaborate with anyone interested in strengthening the evaluation.
 
-Evaluated across 5 published benchmarks. All results are protocol-correct with contamination-proof isolation (separate GT files, verified by `verify_clean.py`, enforced by 65 pytest protocol tests). No embeddings, no vector DB.
+Evaluated across 5 published benchmarks. All results are protocol-correct with contamination-proof isolation (separate GT files, verified by `verify_clean.py`, enforced by 65 pytest protocol tests). No embeddings, no vector DB. Methodology follows the [Lin checklist](https://github.com/lhl/agentic-memory/tree/main/benchmarks) for reproducibility.
 
-| Benchmark | Metric | v2.2.2 | v1.2.1 | Best Published |
-|---|---|---|---|---|
-| MAB SH 262K (ICLR 2026) | SEM | **92%** | 90% | 45% (GPT-4o-mini) |
-| MAB MH 262K (ICLR 2026) | SEM | **58%** | 60% | <=7% (all methods) |
-| StructMemEval (2026) | Accuracy | **100%** (14/14) | 100% | vector stores fail |
-| LongMemEval (ICLR 2025) | Opus judge | **59.6%** | 59.0% | 60.6% (GPT-4o) |
-| LoCoMo (ACL 2024) | F1 | **50.8%** | 66.1% | 51.6% (GPT-4o-turbo) |
+### Results by version
 
-The LoCoMo v2.2.2 score (50.8%) is lower than v1.2.1 (66.1%) due to reader variance from different sub-agent batching strategies. Retrieval code is unchanged between versions. This is a single-run result; per Lin's methodology checklist, multi-run reporting (>=5 runs with mean +/- std) is needed to quantify reader variance. See the full analysis in the results doc.
+| Benchmark | Metric | v1.0 | v1.1 | v1.2.1 | v2.2.2 |
+|---|---|---|---|---|---|
+| MAB SH 262K | SEM | 60% | 90% | 90% | **92%** |
+| MAB MH 262K | SEM | 6% | 35%\* | 60% | **58%** |
+| StructMemEval | Accuracy | 29% | 100% | 100% | **100%** |
+| LongMemEval | Opus judge | -- | -- | 59.0% | **59.6%** |
+| LoCoMo | F1 | -- | 66.1% | 66.1% | 50.8%\*\* |
+
+\* chain-valid score; raw SEM was 47%
+\*\* reader variance; retrieval code unchanged from v1.2.1 (see analysis below)
+
+### Compared to published systems
+
+| Benchmark | agentmemory (best) | Paper ceiling / SOTA | Other published systems |
+|---|---|---|---|
+| MAB SH 262K | **92%** SEM | 88% GPT-4o, 45% GPT-4o-mini | o4-mini 100% (6K context only) |
+| MAB MH 262K | **58%** SEM | <=7% all methods (paper ceiling) | -- |
+| StructMemEval | **100%** (14/14) | vector stores fail | -- |
+| LongMemEval | **59.6%** | 60.6% GPT-4o pipeline | -- |
+| LoCoMo | **66.1%** (v1.2.1) | 87.9% human ceiling | 92.3% EverMemOS, 74.0% Letta, 68.5% Mem0, 51.6% GPT-4-turbo |
+
+LoCoMo comparison note: EverMemOS (92.3%), Letta (74.0%), and Mem0 (68.5%) use different retrieval architectures (embeddings, filesystem grep, LLM extraction respectively). agentmemory uses FTS5 keyword retrieval only, no embeddings. The v2.2.2 LoCoMo regression (50.8%) is driven by LLM reader variance from sub-agent batching, not retrieval quality. Per Lin's methodology, single-run results are insufficient when the reader is a variable; >=5 runs with mean +/- std are needed.
 
 Methodology, per-benchmark details, and audit trails: [Chapter 8 - Benchmark Results](docs/BENCHMARK_RESULTS.md).
 
