@@ -46,20 +46,6 @@ from benchmarks.conftest import (
 
 
 # ---------------------------------------------------------------------------
-# Custom pytest options
-# ---------------------------------------------------------------------------
-
-
-def pytest_addoption(parser: pytest.Parser) -> None:
-    parser.addoption(
-        "--run-retrieval",
-        action="store_true",
-        default=False,
-        help="Run the slow retrieval adapters (default: skip, validate existing files)",
-    )
-
-
-# ---------------------------------------------------------------------------
 # Adapter commands per benchmark
 # ---------------------------------------------------------------------------
 
@@ -522,7 +508,8 @@ class TestScoring:
                 "uv",
                 "run",
                 "python",
-                "benchmarks/locomo_score_protocol.py",
+                "-m",
+                "benchmarks.locomo_score_protocol",
                 str(paths.preds),
                 str(paths.gt),
                 "--output",

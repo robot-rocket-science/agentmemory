@@ -6,6 +6,7 @@ Handles category 5 forced-choice scoring per the original protocol.
 Usage:
     uv run python benchmarks/locomo_score_protocol.py <predictions.json> <ground_truth.json>
 """
+
 from __future__ import annotations
 
 import argparse
@@ -98,22 +99,24 @@ def score_predictions(
         category_scores[category].append(f1)
         category_counts[category] += 1
 
-        scored_items.append({
-            "id": item_id,
-            "question": str(gt.get("question", "")),
-            "answer": answer,
-            "category": category,
-            "prediction": prediction[:500],
-            "f1": round(f1, 4),
-        })
+        scored_items.append(
+            {
+                "id": item_id,
+                "question": str(gt.get("question", "")),
+                "answer": answer,
+                "category": category,
+                "prediction": prediction[:500],
+                "f1": round(f1, 4),
+            }
+        )
 
     overall_f1: float = total_f1 / total_qa if total_qa > 0 else 0.0
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("LoCoMo Benchmark Results (protocol-correct)")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"Total QA pairs:    {total_qa}")
-    print(f"Overall F1:        {overall_f1:.4f} ({overall_f1*100:.1f}%)")
+    print(f"Overall F1:        {overall_f1:.4f} ({overall_f1 * 100:.1f}%)")
     print()
     print("Per-category F1:")
     for cat in sorted(category_scores.keys()):
@@ -121,16 +124,19 @@ def score_predictions(
         count: int = category_counts.get(cat, 0)
         scores: list[float] = category_scores[cat]
         cat_f1: float = sum(scores) / len(scores) if scores else 0.0
-        print(f"  {cat}. {name:12s}  {cat_f1:.4f} ({cat_f1*100:.1f}%)  n={count}")
+        print(f"  {cat}. {name:12s}  {cat_f1:.4f} ({cat_f1 * 100:.1f}%)  n={count}")
     print()
     print("Reference baselines (from LoCoMo paper):")
     print("  Human:                    87.9%")
     print("  GPT-4-turbo (128K):       51.6%")
     print("  RAG (DRAGON+gpt-3.5):     43.3%")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     if output_path:
         out_data: dict[str, object] = {
+            "benchmark": "locomo",
+            "metric": "F1",
+            "score_pct": round(overall_f1 * 100, 1),
             "mode": "protocol-correct, agentmemory retrieval + Opus reader",
             "overall_f1": round(overall_f1, 4),
             "total_qa": total_qa,

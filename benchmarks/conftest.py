@@ -182,6 +182,21 @@ class AuditRecord:
 
 
 # ---------------------------------------------------------------------------
+# Pytest options
+# ---------------------------------------------------------------------------
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    """Register custom CLI options for benchmark suite."""
+    parser.addoption(
+        "--run-retrieval",
+        action="store_true",
+        default=False,
+        help="Run the slow retrieval adapters (default: skip, validate existing files)",
+    )
+
+
+# ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
