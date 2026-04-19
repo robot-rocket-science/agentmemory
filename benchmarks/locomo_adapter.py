@@ -7,9 +7,11 @@ published leaderboard.
 Usage:
     uv run python benchmarks/locomo_adapter.py [--data PATH] [--conversations N] [--subset N]
 """
+
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import string
@@ -181,37 +183,45 @@ def load_locomo(data_path: str) -> list[LoCoMoConversation]:
             raw_turns_val: list[dict[str, str]] = conv_data.get(session_key, [])  # type: ignore[assignment]
             turns: list[Turn] = []
             for t in raw_turns_val:
-                turns.append(Turn(
-                    speaker=t.get("speaker", ""),
-                    dia_id=t.get("dia_id", ""),
-                    text=t.get("text", ""),
-                ))
-            sessions.append(LoCoMoSession(
-                session_num=session_num,
-                date_time=date_time,
-                turns=turns,
-            ))
+                turns.append(
+                    Turn(
+                        speaker=t.get("speaker", ""),
+                        dia_id=t.get("dia_id", ""),
+                        text=t.get("text", ""),
+                    )
+                )
+            sessions.append(
+                LoCoMoSession(
+                    session_num=session_num,
+                    date_time=date_time,
+                    turns=turns,
+                )
+            )
             session_num += 1
 
         # Extract QA pairs
         raw_qa: list[dict[str, object]] = record.get("qa", [])  # type: ignore[assignment]
         qa_pairs: list[QAPair] = []
         for q in raw_qa:
-            qa_pairs.append(QAPair(
-                question=str(q.get("question", "")),
-                answer=str(q.get("answer", "")),
-                adversarial_answer=str(q.get("adversarial_answer", "")),
-                evidence=[str(e) for e in q.get("evidence", [])],  # type: ignore[union-attr]
-                category=int(q.get("category", 0)),  # type: ignore[arg-type]
-            ))
+            qa_pairs.append(
+                QAPair(
+                    question=str(q.get("question", "")),
+                    answer=str(q.get("answer", "")),
+                    adversarial_answer=str(q.get("adversarial_answer", "")),
+                    evidence=[str(e) for e in q.get("evidence", [])],  # type: ignore[union-attr]
+                    category=int(q.get("category", 0)),  # type: ignore[arg-type]
+                )
+            )
 
-        conversations.append(LoCoMoConversation(
-            sample_id=str(record.get("sample_id", "")),
-            speaker_a=speaker_a,
-            speaker_b=speaker_b,
-            sessions=sessions,
-            qa_pairs=qa_pairs,
-        ))
+        conversations.append(
+            LoCoMoConversation(
+                sample_id=str(record.get("sample_id", "")),
+                speaker_a=speaker_a,
+                speaker_b=speaker_b,
+                sessions=sessions,
+                qa_pairs=qa_pairs,
+            )
+        )
 
     return conversations
 
@@ -335,12 +345,16 @@ class BenchmarkResult:
     conversation_id: str = ""
     total_qa: int = 0
     total_f1: float = 0.0
-    category_scores: dict[int, list[float]] = field(default_factory=lambda: dict[int, list[float]]())
+    category_scores: dict[int, list[float]] = field(
+        default_factory=lambda: dict[int, list[float]]()
+    )
     category_counts: dict[int, int] = field(default_factory=lambda: dict[int, int]())
     ingest_turns: int = 0
     ingest_time_s: float = 0.0
     query_time_s: float = 0.0
-    per_question: list[dict[str, object]] = field(default_factory=lambda: list[dict[str, object]]())
+    per_question: list[dict[str, object]] = field(
+        default_factory=lambda: list[dict[str, object]]()
+    )
 
     @property
     def overall_f1(self) -> float:
@@ -370,7 +384,9 @@ def merge_results(results: list[BenchmarkResult]) -> BenchmarkResult:
                 merged.category_scores[cat] = []
                 merged.category_counts[cat] = 0
             merged.category_scores[cat].extend(scores)
-            merged.category_counts[cat] = merged.category_counts.get(cat, 0) + r.category_counts.get(cat, 0)
+            merged.category_counts[cat] = merged.category_counts.get(
+                cat, 0
+            ) + r.category_counts.get(cat, 0)
     return merged
 
 
@@ -426,7 +442,7 @@ def run_conversation(
         result.category_scores[qa.category].append(f1)
         result.category_counts[qa.category] += 1
 
-        result.per_question.append({
+        pq_item: dict[str, object] = {
             "question": qa.question,
             "answer": qa.answer,
             "category": qa.category,
@@ -434,7 +450,10 @@ def run_conversation(
             "context": prediction,  # full retrieved context for subagent
             "prediction": prediction[:500],  # truncated for display
             "f1": round(f1, 4),
-        })
+        }
+        if qa.category == 5:
+            pq_item["adversarial_answer"] = qa.adversarial_answer
+        result.per_question.append(pq_item)
 
     result.query_time_s = time.monotonic() - t1
 
@@ -443,30 +462,34 @@ def run_conversation(
 
 def print_results(result: BenchmarkResult) -> None:
     """Print formatted benchmark results."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"LoCoMo Benchmark Results: {result.conversation_id}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"Total QA pairs:    {result.total_qa}")
-    print(f"Overall F1:        {result.overall_f1:.4f} ({result.overall_f1*100:.1f}%)")
+    print(
+        f"Overall F1:        {result.overall_f1:.4f} ({result.overall_f1 * 100:.1f}%)"
+    )
     print(f"Ingest turns:      {result.ingest_turns}")
     print(f"Ingest time:       {result.ingest_time_s:.2f}s")
     print(f"Query time:        {result.query_time_s:.2f}s")
     if result.total_qa > 0:
-        print(f"Avg query latency: {result.query_time_s / result.total_qa * 1000:.1f}ms")
+        print(
+            f"Avg query latency: {result.query_time_s / result.total_qa * 1000:.1f}ms"
+        )
     print()
     print("Per-category F1:")
     for cat in sorted(result.category_scores.keys()):
         name: str = CATEGORY_NAMES.get(cat, "unknown")
         count: int = result.category_counts.get(cat, 0)
         f1: float = result.category_f1(cat)
-        print(f"  {cat}. {name:12s}  {f1:.4f} ({f1*100:.1f}%)  n={count}")
+        print(f"  {cat}. {name:12s}  {f1:.4f} ({f1 * 100:.1f}%)  n={count}")
     print()
 
     # Reference baselines
     print("Reference baselines:")
     print("  Filesystem+grep (Letta):  74.0%")
     print("  EverMemOS (SOTA):         92.3%")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
 
 def main() -> None:
@@ -474,27 +497,37 @@ def main() -> None:
         description="Run LoCoMo benchmark on agentmemory",
     )
     parser.add_argument(
-        "--data", default=DEFAULT_DATA_PATH,
+        "--data",
+        default=DEFAULT_DATA_PATH,
         help="Path to locomo10.json",
     )
     parser.add_argument(
-        "--conversations", type=int, default=None,
+        "--conversations",
+        type=int,
+        default=None,
         help="Limit to first N conversations (default: all 10)",
     )
     parser.add_argument(
-        "--subset", type=int, default=None,
+        "--subset",
+        type=int,
+        default=None,
         help="Limit to first N QA pairs per conversation (for debugging)",
     )
     parser.add_argument(
-        "--budget", type=int, default=2000,
+        "--budget",
+        type=int,
+        default=2000,
         help="Token budget for retrieval (default: 2000)",
     )
     parser.add_argument(
-        "--output", default=None,
+        "--output",
+        default=None,
         help="Write detailed results JSON to this path",
     )
     parser.add_argument(
-        "--retrieve-only", default=None, metavar="PATH",
+        "--retrieve-only",
+        default=None,
+        metavar="PATH",
         help="Run retrieval only, write question+context pairs to PATH for LLM subagent scoring",
     )
     args: argparse.Namespace = parser.parse_args()
@@ -504,7 +537,7 @@ def main() -> None:
     print(f"Loaded {len(conversations)} conversations")
 
     if args.conversations is not None:
-        conversations = conversations[:args.conversations]
+        conversations = conversations[: args.conversations]
         print(f"Using first {len(conversations)} conversations")
 
     results: list[BenchmarkResult] = []
@@ -515,27 +548,82 @@ def main() -> None:
             total_qa: int = len(conv.qa_pairs)
             if args.subset is not None:
                 total_qa = min(total_qa, args.subset)
-            print(f"\n--- {conv.sample_id}: {len(conv.sessions)} sessions, "
-                  f"{total_turns} turns, {total_qa} QA pairs ---")
+            print(
+                f"\n--- {conv.sample_id}: {len(conv.sessions)} sessions, "
+                f"{total_turns} turns, {total_qa} QA pairs ---"
+            )
 
             conv_result: BenchmarkResult = run_conversation(
-                conv, tmpdir, subset=args.subset, budget=args.budget,
+                conv,
+                tmpdir,
+                subset=args.subset,
+                budget=args.budget,
             )
             results.append(conv_result)
             if not args.retrieve_only:
                 print_results(conv_result)
 
-    # If retrieve-only, write question+context pairs for subagent scoring
+    # If retrieve-only, write retrieval (NO answers) + separate GT file
     if args.retrieve_only:
         all_items: list[dict[str, object]] = []
+        all_gt: list[dict[str, object]] = []
+        global_id: int = 0
         for r in results:
-            all_items.extend(r.per_question)
+            for pq in r.per_question:
+                category: int = int(pq["category"])  # type: ignore[arg-type]
+                # Retrieval file: NO answer, NO f1, NO score
+                item: dict[str, object] = {
+                    "id": global_id,
+                    "question": pq["question"],
+                    "category": category,
+                    "category_name": pq["category_name"],
+                    "context": pq["context"],
+                }
+                # For cat5, include forced-choice options (NOT which is correct)
+                # adversarial_answer is a wrong answer, "Not mentioned" is correct
+                # Randomize order using item index as seed for reproducibility
+                if category == 5:
+                    seed_val: int = int(
+                        hashlib.md5(str(global_id).encode()).hexdigest()[:8], 16
+                    )
+                    adv: str = str(pq.get("adversarial_answer", ""))
+                    if seed_val % 2 == 0:
+                        item["option_a"] = "Not mentioned"
+                        item["option_b"] = adv
+                    else:
+                        item["option_a"] = adv
+                        item["option_b"] = "Not mentioned"
+                all_items.append(item)
+                # Ground truth file: answers for scoring AFTER generation
+                gt_item: dict[str, object] = {
+                    "id": global_id,
+                    "question": pq["question"],
+                    "category": category,
+                }
+                if category == 5:
+                    gt_item["cat5_a"] = item.get("option_a", "")
+                    gt_item["cat5_b"] = item.get("option_b", "")
+                    gt_item["cat5_correct"] = (
+                        "a" if item.get("option_a") == "Not mentioned" else "b"
+                    )
+                    gt_item["answer"] = ""
+                else:
+                    gt_item["answer"] = pq["answer"]
+                all_gt.append(gt_item)
+                global_id += 1
         retrieve_path: Path = Path(args.retrieve_only)
+        gt_path: Path = retrieve_path.with_name(
+            retrieve_path.stem + "_gt" + retrieve_path.suffix,
+        )
         with retrieve_path.open("w", encoding="utf-8") as f:
             json.dump(all_items, f, indent=2)
+        with gt_path.open("w", encoding="utf-8") as f:
+            json.dump(all_gt, f, indent=2)
         total_q: int = sum(r.total_qa for r in results)
         print(f"Wrote {total_q} retrieval results to {args.retrieve_only}")
-        print("Next step: run locomo_generate.py via subagent to produce answers")
+        print(f"Wrote {total_q} ground truth items to {gt_path}")
+        print("ISOLATION: retrieval file contains NO ground truth answers")
+        print("Next step: run LLM reader on retrieval file, then score against GT")
         return
 
     # Aggregate
@@ -545,7 +633,9 @@ def main() -> None:
 
     # Write detailed output
     if args.output:
-        merged_for_output: BenchmarkResult = merge_results(results) if len(results) > 1 else results[0]
+        merged_for_output: BenchmarkResult = (
+            merge_results(results) if len(results) > 1 else results[0]
+        )
         output_data: dict[str, object] = {
             "overall_f1": round(merged_for_output.overall_f1, 4),
             "total_qa": merged_for_output.total_qa,

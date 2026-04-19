@@ -7,6 +7,7 @@ Usage:
     uv run python benchmarks/verify_clean.py <retrieval_file.json>
     uv run python benchmarks/verify_clean.py --all /tmp/benchmark_*.json
 """
+
 from __future__ import annotations
 
 import json
@@ -14,34 +15,36 @@ import sys
 from pathlib import Path
 from typing import Final
 
-BANNED_KEYS: Final[frozenset[str]] = frozenset({
-    # Direct answer fields
-    "answer",
-    "answers",
-    "answer_raw",
-    "reference_answer",
-    "ground_truth",
-    "gt",
-    "gold",
-    "target",
-    "expected",
-    "solution",
-    "correct",
-    "correct_answer",
-    "label",
-    # Score fields (should not be in retrieval output)
-    "score",
-    "f1",
-    "exact_match",
-    "substring_exact_match",
-    "accuracy",
-    "rouge",
-    "bleu",
-    # Judgment fields
-    "is_correct",
-    "judgment",
-    "eval_score",
-})
+BANNED_KEYS: Final[frozenset[str]] = frozenset(
+    {
+        # Direct answer fields
+        "answer",
+        "answers",
+        "answer_raw",
+        "reference_answer",
+        "ground_truth",
+        "gt",
+        "gold",
+        "target",
+        "expected",
+        "solution",
+        "correct",
+        "correct_answer",
+        "label",
+        # Score fields (should not be in retrieval output)
+        "score",
+        "f1",
+        "exact_match",
+        "substring_exact_match",
+        "accuracy",
+        "rouge",
+        "bleu",
+        # Judgment fields
+        "is_correct",
+        "judgment",
+        "eval_score",
+    }
+)
 
 
 def verify_file(path: str) -> bool:
@@ -85,12 +88,34 @@ def verify_file(path: str) -> bool:
     # that might be answer strings smuggled in via differently-named keys
     suspicious_keys: list[str] = []
     for key in all_keys:
-        if key in ("id", "question", "context", "retrieved_context",
-                    "question_id", "question_type", "question_date",
-                    "source", "row_idx", "q_idx", "case_id", "task",
-                    "domain", "task_type", "episode_id", "qa_type",
-                    "qa_type_name", "question_uuid",
-                    "num_beliefs", "retrieval_latency_ms"):
+        if key in (
+            "id",
+            "question",
+            "context",
+            "retrieved_context",
+            "question_id",
+            "question_type",
+            "question_date",
+            "source",
+            "row_idx",
+            "q_idx",
+            "case_id",
+            "task",
+            "domain",
+            "task_type",
+            "episode_id",
+            "qa_type",
+            "qa_type_name",
+            "question_uuid",
+            "num_beliefs",
+            "retrieval_latency_ms",
+            "category",
+            "category_name",
+            "option_a",
+            "option_b",  # forced-choice (no correct indicator)
+            "llm_prediction",
+            "verdict",  # prediction output fields
+        ):
             continue  # Known safe keys
         # Flag any unknown key for manual review
         suspicious_keys.append(key)
@@ -98,8 +123,8 @@ def verify_file(path: str) -> bool:
     if suspicious_keys:
         print(f"WARNING: {path}")
         print(f"  Unknown keys found: {sorted(suspicious_keys)}")
-        print(f"  These are not in the banned list but should be reviewed.")
-        print(f"  Verify they do not contain answer information.")
+        print("  These are not in the banned list but should be reviewed.")
+        print("  Verify they do not contain answer information.")
         print()
 
     print(f"CLEAN: {path}")
