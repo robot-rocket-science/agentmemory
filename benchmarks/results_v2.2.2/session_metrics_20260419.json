@@ -1,0 +1,18 @@
+{
+  "date_range": "2026-04-10T22:05:53Z to 2026-04-19T20:21:07Z",
+  "total_turns": 4337,
+  "total_sessions": 365,
+  "total_user_turns": 2083,
+  "total_corrections": 15,
+  "overall_correction_rate": 0.0072,
+  "memory_on_sessions": 11,
+  "memory_off_sessions": 66,
+  "avg_user_msg_chars": 4962,
+  "avg_asst_msg_chars": 820,
+  "total_volume_kb": 13018,
+  "memory_on_correction_rate": 0.0153,
+  "memory_off_correction_rate": 0.0071,
+  "git_total_commits": 404,
+  "git_fix_commits": 50,
+  "git_fix_pct": 12.4
+}
