@@ -1904,7 +1904,7 @@ def sync_obsidian(
             "obsidian.vault_path in ~/.agentmemory/config.json"
         )
     if not config.vault_path.exists():
-        return f"Error: vault path does not exist: {config.vault_path}"
+        return "Error: configured vault path does not exist. Check obsidian.vault_path in settings."
 
     result: SyncResult = sync_vault(store, config, full=full)
     return (
@@ -1948,7 +1948,7 @@ def import_obsidian(
             "obsidian.vault_path in ~/.agentmemory/config.json"
         )
     if not config.vault_path.exists():
-        return f"Error: vault path does not exist: {config.vault_path}"
+        return "Error: configured vault path does not exist. Check obsidian.vault_path in settings."
 
     changes: list[VaultChange] = detect_vault_changes(config)
     if not changes:
@@ -2037,7 +2037,7 @@ def link_docs(
         )
     proj: Path = Path(project_path) if project_path else Path.cwd()
     if not proj.exists():
-        return f"Error: project path does not exist: {proj}"
+        return "Error: specified project path does not exist."
 
     result: LinkResult = link_documents(store, proj, config.vault_path)
     return (
