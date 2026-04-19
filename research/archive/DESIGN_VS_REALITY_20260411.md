@@ -1,4 +1,10 @@
-# Design vs Reality: Architectural Gap Assessment
+# Design vs Reality: Architectural Gap Assessment [ARCHIVED]
+
+> **ARCHIVED 2026-04-19.** This snapshot from 2026-04-11 is outdated.
+> All 7 items listed as "NOT BUILT" were implemented in Phases 4-5:
+> feedback loop, triggered beliefs, output gating, provenance metadata,
+> session velocity, calibrated reporting, contradiction detection.
+> See TODO.md for current status.
 
 **Date:** 2026-04-11
 **Assessor:** Automated analysis of design documents vs deployed code
