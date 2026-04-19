@@ -67,7 +67,7 @@ TEMPORAL_NEXT + COMMIT_TOUCHES create paths between code and decisions that no o
 Decision-neighborhood partitioning (Exp 45) keeps partitions at 50-65 edges. With additional edge types, partitions may grow. Predicted: with multi-layer edges, 90%+ of partitions remain below DIM=2048 capacity (~204 edges).
 
 **H5: Extraction scales linearly with project size.**
-The onboarding extractors (Exp 45) ran on project-a in <5 seconds. Predicted: project-b (3x larger) completes in <15 seconds. gsd-2 (5x larger) completes in <25 seconds.
+The onboarding extractors (Exp 45) ran on project-a in <5 seconds. Predicted: project-b (3x larger) completes in <15 seconds. project-i (5x larger) completes in <25 seconds.
 
 **H6: Grep precision degrades at scale while FTS5 precision holds.**
 At 586 nodes, grep precision was 21% (higher than FTS5's 12%). At 2K+ nodes, grep returns more noise per query. Predicted: grep precision drops below 15% while FTS5 precision stays at 12%+.

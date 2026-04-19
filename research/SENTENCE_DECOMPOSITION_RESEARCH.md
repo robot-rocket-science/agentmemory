@@ -140,7 +140,7 @@ Python is the most common language in the corpus (present in 20+ repos).
 
 1. Use ast.parse to extract functions (reuse Exp 37 approach)
 2. Extract docstrings as separate belief nodes
-3. Run on project-a, smoltcp (has Python tests), gsd-2 (has Python scripts)
+3. Run on project-a, smoltcp (has Python tests), project-i (has Python scripts)
 4. Measure: partition count reduction? Vocabulary overlap change?
 
 ### Phase 3: Compare file-level vs sentence-level HRR
@@ -162,9 +162,9 @@ The definitive test:
 |------|-------|---------------|-------|---------|---------------|
 | project-d | 171 | 4,276 | 4,244 | md:105, py:56, regex:26 | CLAIM 3174, CONSTRAINT 324, FUNCTION 262 |
 | smoltcp | 110 | 2,855 | 2,753 | regex:121, md:2, py:1 | FUNCTION 2350, CLAIM 444 |
-| gsd-2 | 1,871 | 28,107 | 26,645 | regex:2288, md:581, py:4 | CLAIM 16391, FUNCTION 6994, CONSTRAINT 1566 |
+| project-i | 1,871 | 28,107 | 26,645 | regex:2288, md:581, py:4 | CLAIM 16391, FUNCTION 6994, CONSTRAINT 1566 |
 
-project-d goes from 415 file nodes to 4,276 sentence nodes (10.3x). gsd-2 from 3,331 to 28,107 (8.4x).
+project-d goes from 415 file nodes to 4,276 sentence nodes (10.3x). project-i from 3,331 to 28,107 (8.4x).
 
 ### Vocabulary Overlap: File-Level vs Sentence-Level
 
@@ -172,15 +172,15 @@ project-d goes from 415 file nodes to 4,276 sentence nodes (10.3x). gsd-2 from 3
 |------|-------|-------------|------------------------|-------------------------|
 | project-d | file | 0.155 | 38.5% | 8.7% |
 | project-d | **sentence** | **0.048** | **82.0%** | **1.8%** |
-| gsd-2 | file | 0.170 | 20.0% | 8.2% |
-| gsd-2 | **sentence** | **0.075** | **85.8%** | **5.4%** |
+| project-i | file | 0.170 | 20.0% | 8.2% |
+| project-i | **sentence** | **0.075** | **85.8%** | **5.4%** |
 | smoltcp | file | 0.160 | 21.7% | 8.6% |
 | smoltcp | **sentence** | **0.188** | **41.0%** | **27.4%** |
 
 **Key finding:** Sentence-level decomposition dramatically increases the proportion of low-overlap edges for document-heavy repos:
 
 - **project-d:** 38.5% -> 82.0% of edges below 0.1 overlap. Mean drops from 0.155 to 0.048 (3.2x reduction). This means HRR goes from "adds moderate value" to "essential for 82% of edges."
-- **gsd-2:** 20.0% -> 85.8% below 0.1. Mean drops from 0.170 to 0.075 (2.3x reduction).
+- **project-i:** 20.0% -> 85.8% below 0.1. Mean drops from 0.170 to 0.075 (2.3x reduction).
 - **smoltcp:** Mixed result. The <0.1 fraction increases (21.7% -> 41.0%) but so does >0.3 (8.6% -> 27.4%). Adjacent functions in the same Rust module share vocabulary heavily (same types, same patterns). HRR value increases for cross-module edges but decreases for within-module edges.
 
 **Interpretation:** At sentence level, individual paragraphs/claims about different topics have genuinely different vocabulary. A paragraph about "dispatch gates" and a paragraph about "flow control" are separate nodes with low overlap, whereas at file level they're merged into one node with blended vocabulary. This is exactly why Exp 29 showed sentence-level retrieval outperforming decision-level (100% vs 92%).

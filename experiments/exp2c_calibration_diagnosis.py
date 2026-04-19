@@ -185,7 +185,7 @@ def diagnosis_h3_binning(rng: np.random.Generator) -> dict[str, Any]:
 
 
 def diagnosis_h4_convergence_over_time(rng: np.random.Generator) -> dict[str, dict[str, Any]]:
-    """H4: How does ECE evolve over sessions? Is 50 enough?"""
+    """H4: How does ECE project-j over sessions? Is 50 enough?"""
     print("  H4: ECE over time (up to 200 sessions)...", file=sys.stderr)
 
     config: ExperimentConfig = ExperimentConfig()

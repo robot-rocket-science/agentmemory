@@ -608,7 +608,7 @@ Ran the exact classification prompts through Haiku subagents on 100 ground-truth
 
 **Method:** Surveyed 21 local projects for signal diversity. Designed a manifest-based discovery system that auto-detects available signals (git, languages, docs, citations, directives, tests). 9 extractors in a registry, each firing conditionally based on manifest. Source-type priors (Exp 38) for classification. FTS5+HRR dual encoding (Exp 40) for retrieval. Optional human interview bursts for high-uncertainty items (4-5 questions max, topical, system proposes/human confirms).
 
-**Dry-run validation:** Walked through on project-a (rich: all 9 extractors fire, ~6,000 nodes), project-c (doc-only: 4 extractors, ~600 nodes), mud_rust (sparse: 5 extractors, ~70 nodes). All produce usable graphs. No configuration required.
+**Dry-run validation:** Walked through on project-a (rich: all 9 extractors fire, ~6,000 nodes), project-c (doc-only: 4 extractors, ~600 nodes), project-k (sparse: 5 extractors, ~70 nodes). All produce usable graphs. No configuration required.
 
 **Key design decisions:**
 1. Automatic first, human optional

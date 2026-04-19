@@ -11,8 +11,8 @@
 |---|---|---|---|---|---|---|---|
 | project-d | 538 | 2,883 | 2,379 | 17% | 417 | 69 | **83%** |
 | project-f | 101 | 7,259 | 6,905 | 5% | 1,138 | 241 | **79%** |
-| bigtime | 14 | 1,374 | 311 | **77%** | 180 | 24 | **87%** |
-| mud_rust | 5 | 220 | 64 | **71%** | 49 | 2 | **96%** |
+| project-h | 14 | 1,374 | 311 | **77%** | 180 | 24 | **87%** |
+| project-k | 5 | 220 | 64 | **71%** | 49 | 2 | **96%** |
 
 ---
 
@@ -23,8 +23,8 @@
 The biggest improvement is in **locked belief reduction**. The offline classifier's correction detector over-triggers on keyword patterns ("must", "never", "fix"), creating hundreds of false locked beliefs per project. LLM classification reduced locked beliefs by 79-96% across all repos.
 
 For small projects, LLM also dramatically reduces total belief count:
-- bigtime: 1,374 -> 311 (77% reduction)
-- mud_rust: 220 -> 64 (71% reduction)
+- project-h: 1,374 -> 311 (77% reduction)
+- project-k: 220 -> 64 (71% reduction)
 
 The offline classifier marks almost everything as PERSIST. The LLM classifier correctly identifies headings (META), structural text, and ephemeral content.
 
@@ -34,7 +34,7 @@ The offline classifier marks almost everything as PERSIST. The LLM classifier co
 
 All commit-sourced beliefs have historical ISO 8601 dates from git log, not "now()":
 - project-d: date range 2026-02-15 to 2026-04-11
-- mud_rust: date range 2025-06-23 to 2026-04-11 (10 months of history)
+- project-k: date range 2025-06-23 to 2026-04-11 (10 months of history)
 
 **Tested:** Verified by querying beliefs table ORDER BY created_at.
 
@@ -44,10 +44,10 @@ All commit-sourced beliefs have historical ISO 8601 dates from git log, not "now
 |---|---|---|---|
 | project-d | 0.0668 | 1.0000 | 2026-02-15 |
 | project-f | 0.0664 | 1.0000 | 2026-02-15 |
-| bigtime | 0.0469 | 1.0000 | 2026-02-08 |
-| mud_rust | 0.0000 | 1.0000 | 2025-06-23 |
+| project-h | 0.0469 | 1.0000 | 2026-02-08 |
+| project-k | 0.0000 | 1.0000 | 2025-06-23 |
 
-Factual beliefs decay over time (14-day half-life). Locked beliefs are immune (always 1.0). A 10-month-old factual belief in mud_rust decays to 0.0000 -- correctly near-zero. The decay function works as designed per Exp 57-60.
+Factual beliefs decay over time (14-day half-life). Locked beliefs are immune (always 1.0). A 10-month-old factual belief in project-k decays to 0.0000 -- correctly near-zero. The decay function works as designed per Exp 57-60.
 
 **Tested:** Computed decay_factor() on actual beliefs from the validation DBs.
 
@@ -57,10 +57,10 @@ Factual beliefs decay over time (14-day half-life). Locked beliefs are immune (a
 |---|---|---|---|
 | project-d | 538 | 2,379 | 4.4 |
 | project-f | 101 | 6,905 | 68.4 (doc-heavy) |
-| bigtime | 14 | 311 | 22.2 |
-| mud_rust | 5 | 64 | 12.8 |
+| project-h | 14 | 311 | 22.2 |
+| project-k | 5 | 64 | 12.8 |
 
-With offline: bigtime produced 1,374 beliefs from 14 commits (98 per commit -- clearly inflated). With LLM: 311 (22 per commit -- reasonable for a doc-heavy project with 15 files).
+With offline: project-h produced 1,374 beliefs from 14 commits (98 per commit -- clearly inflated). With LLM: 311 (22 per commit -- reasonable for a doc-heavy project with 15 files).
 
 project-f is high (68/commit) because it has 109 files and extensive docs. This is proportional to content, not inflated by noise.
 
@@ -92,8 +92,8 @@ The single biggest quality improvement from LLM classification is **lock accurac
 |---|---|---|---|
 | project-d | 417 | 69 | ~83% false locks with offline |
 | project-f | 1,138 | 241 | ~79% false locks with offline |
-| bigtime | 180 | 24 | ~87% false locks with offline |
-| mud_rust | 49 | 2 | ~96% false locks with offline |
+| project-h | 180 | 24 | ~87% false locks with offline |
+| project-k | 49 | 2 | ~96% false locks with offline |
 
 A locked belief cannot be downgraded by the feedback loop. Every false lock is a permanent pollutant in the memory system. The offline classifier creates 5-25x more locked beliefs than appropriate because its correction detector fires on negation patterns in document text.
 

@@ -78,7 +78,7 @@ Do TEMPORAL_NEXT edges enable useful queries that timestamp filtering alone cann
 2. Design 10 temporal queries in 4 categories:
    - **Range queries** (3): "What decisions were made in milestone M005?", "What changed in the last 3 days?", "Decisions from sessions 1-5?"
    - **Sequence queries** (3): "What was decided immediately after D097?", "What's the next decision after the capital change?", "What preceded D157?"
-   - **Evolution queries** (2): "Show me all decisions about capital/sizing over time", "How did the dispatch gate protocol evolve?"
+   - **Evolution queries** (2): "Show me all decisions about capital/sizing over time", "How did the dispatch gate protocol project-j?"
    - **Causal chain queries** (2): "What superseded approach A?", "Trace the correction chain for calls/puts"
 
 3. For each query, attempt to answer using:

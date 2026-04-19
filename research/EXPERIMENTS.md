@@ -256,7 +256,7 @@ The citation graph and BFS traversal are the most complex components of our arch
 **Queries:** 20 task contexts, designed to cover:
 - 5 keyword-rich queries (expected FTS5 advantage: "exit rules for position sizing")
 - 5 structural queries (expected BFS advantage: "what decisions led to the D097 protocol")
-- 5 temporal queries (expected hybrid advantage: "how did the sizing approach evolve")
+- 5 temporal queries (expected hybrid advantage: "how did the sizing approach project-j")
 - 5 broad queries (stress test: "what do we know about risk management")
 
 Query selection: written by the user (not the experimenter or the system), to avoid unconscious bias toward queries the system handles well.

@@ -1096,7 +1096,7 @@ def main() -> None:
             "What decisions were made in the same session as D073?",
             QueryCategory.SEQUENCE,
         ),
-        ("Q7", "How did the dispatch gate protocol evolve?", QueryCategory.EVOLUTION),
+        ("Q7", "How did the dispatch gate protocol project-j?", QueryCategory.EVOLUTION),
         (
             "Q8",
             "What is the current version of the capital decision?",

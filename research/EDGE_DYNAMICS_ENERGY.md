@@ -338,7 +338,7 @@ The system maintains its ordered edge structure ONLY because energy (new informa
 
 ### 3.2 Edge of Criticality and Self-Organized Criticality
 
-Self-organized criticality (SOC) describes systems that naturally evolve toward a critical state -- the boundary between order and chaos -- without external tuning. Classic examples: sandpiles (Bak, Tang, Wiesenfeld 1987), earthquakes, neural avalanches.
+Self-organized criticality (SOC) describes systems that naturally project-j toward a critical state -- the boundary between order and chaos -- without external tuning. Classic examples: sandpiles (Bak, Tang, Wiesenfeld 1987), earthquakes, neural avalanches.
 
 At criticality, the system exhibits:
 - **Power-law distributions** in event sizes (many small events, rare large events)
@@ -396,7 +396,7 @@ Subject to: S * v = 0       (mass balance at each node)
 
 ```
 Maximize: sum(retrieval_quality_i * v_i)   (maximize useful retrievals)
-Subject to: 
+Subject to:
   For each belief b: sum(inflow edges) >= sum(outflow edges)  (reachability)
   v_i >= 0                                                     (directed flow)
   v_i <= capacity_i                                            (edge bandwidth)
@@ -538,7 +538,7 @@ Every session (or every N hours):
   For each edge:
     D(t) = exp(-lambda * (t_now - t_last_traversal))
     E_edge recalculated with new D(t)
-    
+
     If E_edge < E_prune_threshold:
       Mark edge for pruning review
 ```
@@ -551,7 +551,7 @@ The decay rate lambda controls how quickly unused edges lose energy. A reasonabl
 Edge marked for pruning:
   1. Check if edge is part of an "elementary retrieval mode" (essential for some query class)
   2. If essential: boost energy by E_essential_bonus, skip pruning
-  3. If not essential: 
+  3. If not essential:
      a. Record edge in pruning log (Landauer cost -- we spend computation to decide)
      b. Soft-delete edge (retain in archive for potential recovery)
      c. After archive_ttl: hard-delete
@@ -622,7 +622,7 @@ def compute_edge_energy(edge: Edge, now: datetime, params: EnergyParams) -> floa
     """Compute current energy for an edge."""
     dt = (now - edge.last_traversed_at).total_seconds()
     decay = math.exp(-params.lambda_decay * dt / params.session_duration)
-    
+
     return (
         params.w_retrieval * edge.traversal_count
         + params.w_feedback * edge.feedback_score

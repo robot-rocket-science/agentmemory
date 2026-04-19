@@ -1,7 +1,7 @@
 # Classification Gap Analysis: Offline vs LLM
 
 **Date:** 2026-04-11
-**Method:** Ran both classifiers on all 4 validation repos (project-d, project-f, bigtime, mud_rust). Sampled 100 sentences per repo, plus 50-sentence deep-dive on project-d. Hand-labeled 20 sentences as ground truth for test suite.
+**Method:** Ran both classifiers on all 4 validation repos (project-d, project-f, project-h, project-k). Sampled 100 sentences per repo, plus 50-sentence deep-dive on project-d. Hand-labeled 20 sentences as ground truth for test suite.
 
 ---
 
@@ -58,8 +58,8 @@ Merging would mean: if either classifier says persist, persist. Since offline sa
 | Repo | LLM beliefs | Offline beliefs | Merge (union) would be |
 |---|---|---|---|
 | project-d | 2,379 | 2,883 | ~2,883 (back to offline) |
-| bigtime | 311 | 1,374 | ~1,374 (back to offline) |
-| mud_rust | 64 | 220 | ~220 (back to offline) |
+| project-h | 311 | 1,374 | ~1,374 (back to offline) |
+| project-k | 64 | 220 | ~220 (back to offline) |
 
 The locked belief problem is even worse. Merging would restore 80-96% false lock rates because offline's correction detector fires on common words in non-correction text.
 

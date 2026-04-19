@@ -240,7 +240,7 @@ On further push, the agent acknowledged the problem:
 
 1. **same_dir lift is near-tautological.** Co-change edges are "files modified in the same commit." Files in the same directory are overwhelmingly likely to be modified together because developers work on related files in proximity. This is true for meaningful coupling AND for noise (bulk reformats, directory-wide linting, version bumps). A 24x lift on same_dir does not distinguish meaningful coupling from systematic noise.
 
-2. **import lift is real but sparse.** rclcpp shows 230x import lift -- genuinely strong. But gsd-2 and boa show 0.0 import lift (co-change edges have zero import correlation). The summary table hid this behind a "-" which is ambiguous between "not tested" and "zero."
+2. **import lift is real but sparse.** rclcpp shows 230x import lift -- genuinely strong. But project-i and boa show 0.0 import lift (co-change edges have zero import correlation). The summary table hid this behind a "-" which is ambiguous between "not tested" and "zero."
 
 3. **Self-consistency checks prove non-randomness, not correctness.** Heavy-tailed degree distributions and 50x clustering above random prove the graph is not random noise. But systematic noise (bulk operations, CI-driven co-changes) also produces non-random structure with clustering. "Not random" and "meaningful" are different claims.
 
@@ -259,7 +259,7 @@ On further push, the agent acknowledged the problem:
 3. **Require at least one precision-measuring validation before concluding edges are "meaningful."** Structural and statistical validations are necessary but not sufficient. A human sample, LLM-as-judge, or proxy ground truth comparison is needed for a precision claim.
 
 **What actually validates the edges:**
-- Approach 1 (gsd-2 proxy ground truth) -- compare against an existing human/agent-built graph. Not yet executed.
+- Approach 1 (project-i proxy ground truth) -- compare against an existing human/agent-built graph. Not yet executed.
 - Approach 4 (stratified human audit, 200 labels) -- direct precision measurement. Not yet executed.
 - Approach 6 (LLM-as-judge) -- cheap approximate precision. Not yet executed.
 
@@ -793,7 +793,7 @@ The agent's initial summary:
 > - 7-stage pipeline: Discover -> Extract -> Classify -> Encode -> Verify -> Index -> Maintain
 > - 9 extractors in a conditional registry
 > - Hard cases: zero-docs, doc-only, multi-language, fresh repo, major restructure
-> - Dry-run validation on project-a (~6K nodes), project-c (~600 nodes), mud_rust (~70 nodes)
+> - Dry-run validation on project-a (~6K nodes), project-c (~600 nodes), project-k (~70 nodes)
 > - 5 open questions documented for implementation phase
 >
 > The Tier 3 research queue is now complete (#42 done). The remaining Tier 2 items are independent research threads that inform refinements but don't block the core architecture. The system is ready for implementation planning.
@@ -1395,7 +1395,7 @@ In every scenario tested:
 - 3 turns: created skill wrappers without understanding slash command architecture
 - 5 turns: didn't know a project scanner was expected, didn't know Exp 48/49 code existed
 - 22 turns: tried 4 different approaches to exposing commands before `.claude/commands/` worked
-- 14 turns: confused GSD vs GSD-2, proposed mempalace pattern (user had trouble with it)
+- 14 turns: confused GSD vs project-i, proposed mempalace pattern (user had trouble with it)
 - 7 turns: auto-lock bug diagnosis
 
 **The memory failure:** The belief store was empty at session start. There was literally nothing to reason over. No prior beliefs existed about Claude Code's command architecture, skill authoring, or the GSD install pattern. All the knowledge that would have prevented the wrong turns was learned during this session.

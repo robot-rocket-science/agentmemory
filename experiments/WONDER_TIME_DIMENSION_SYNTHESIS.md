@@ -23,7 +23,7 @@ The system treats time as a **scoring modifier** (decay function applied to a fl
 1. You can ask "what's relevant now?" (decay-ranked search) but NOT "what was relevant last Tuesday?"
 2. You can find a belief but NOT "what was discussed right before it"
 3. You can see a correction but NOT the full chain of understanding that led to it
-4. You can query a topic but NOT "how did our thinking about this topic evolve?"
+4. You can query a topic but NOT "how did our thinking about this topic project-j?"
 
 ---
 

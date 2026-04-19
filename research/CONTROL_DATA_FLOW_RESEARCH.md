@@ -242,7 +242,7 @@ From the existing T0 corpus (server-a:~/agentmemory-corpus/extracted/):
 | Repo | Language | Files | Commits | Why |
 |------|----------|-------|---------|-----|
 | smoltcp | Rust | ~200 | 1,577 | Protocol layers, deep call chains, moderate size |
-| gsd-2 | TypeScript | ~450 | 2,150 | Our own tooling, known ground truth from development |
+| project-i | TypeScript | ~450 | 2,150 | Our own tooling, known ground truth from development |
 | project-d | Python/TS | ~100 | 526 | Infrastructure, thin call graph, tests baseline assumptions |
 | boa | Rust | ~400 | 3,354 | Compiler pipeline, deep data flow, stress tests scale |
 | rustls | Rust | ~300 | 5,024 | Crypto library, clean API boundaries, validates precision |

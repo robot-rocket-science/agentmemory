@@ -32,7 +32,7 @@ Ties are rare. TEMPORAL_NEXT provides structural certainty but timestamp ORDER B
 is sufficient for most cases.
 
 ### Category C: EVOLUTION (supersession chains)
-- "How did our understanding of Y evolve over time?"
+- "How did our understanding of Y project-j over time?"
 - "What's the current version of decision X?"
 - "What's the full correction chain for topic Z?"
 
@@ -392,7 +392,7 @@ Use the production agentmemory DB (~17K beliefs, as reported by status).
 |---|---|---|---|---|
 | T1 | "What happened in the last 24 hours?" | RANGE | `timeline(start="-24h")` | `search("recent changes")` |
 | T2 | "What was decided right after we chose HRR?" | SEQUENCE | `timeline(topic="HRR", limit=5)` then take next | `search("HRR decision")` |
-| T3 | "How did the retrieval strategy evolve?" | EVOLUTION | `evolution(topic="retrieval")` | `search("retrieval strategy")` |
+| T3 | "How did the retrieval strategy project-j?" | EVOLUTION | `evolution(topic="retrieval")` | `search("retrieval strategy")` |
 | T4 | "What's the current version of the commit hook decision?" | EVOLUTION | `evolution(belief_id=<commit_hook_belief>)` | `search("commit hook")` |
 | T5 | "What changed since yesterday?" | DIFF | `diff(since="-24h")` | impossible with search |
 | T6 | "Replay my last session" | SESSION | `timeline(session_id=<last>)` | impossible with search |
@@ -435,7 +435,7 @@ The experiment should:
 
 1. **Migration 1** (created_at index): trivial, zero risk, immediate benefit.
 2. **timeline() MCP tool + CLI**: highest-value tool. Covers RANGE + SESSION.
-3. **evolution() MCP tool + CLI**: second-highest. Only way to answer "how did X evolve?"
+3. **evolution() MCP tool + CLI**: second-highest. Only way to answer "how did X project-j?"
 4. **diff() MCP tool + CLI**: third. "What changed since last time?" is a common session-start question.
 5. **Migration 2** (session_id on beliefs): required for timeline(session_id=...) to work properly.
 6. **Validation experiment**: run after tools are built to confirm the hypothesis.

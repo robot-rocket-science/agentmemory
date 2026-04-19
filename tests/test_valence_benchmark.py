@@ -17,6 +17,7 @@ H2: After confirming one side of a contradiction, retrieval for the
 H3: Valence propagation increases the number of beliefs with non-default
     confidence (addressing the 0.04% feedback coverage problem).
 """
+
 from __future__ import annotations
 
 from collections.abc import Generator
@@ -55,18 +56,24 @@ def test_h1_confirm_improves_related_retrieval(store: MemoryStore) -> None:
     # Create a knowledge cluster about deployment
     deploy_main: Belief = store.insert_belief(
         "Cloudflare Pages handles static site deployment with automatic builds",
-        BELIEF_FACTUAL, BSRC_USER_STATED,
-        alpha=5.0, beta_param=1.0,
+        BELIEF_FACTUAL,
+        BSRC_USER_STATED,
+        alpha=5.0,
+        beta_param=1.0,
     )
     deploy_detail: Belief = store.insert_belief(
         "Wrangler CLI manages Cloudflare Workers and Pages configuration",
-        BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
-        alpha=2.0, beta_param=1.0,  # low confidence initially
+        BELIEF_FACTUAL,
+        BSRC_AGENT_INFERRED,
+        alpha=2.0,
+        beta_param=1.0,  # low confidence initially
     )
     deploy_step: Belief = store.insert_belief(
         "Build output directory must be configured in wrangler.toml for Pages",
-        BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
-        alpha=2.0, beta_param=1.0,  # low confidence
+        BELIEF_FACTUAL,
+        BSRC_AGENT_INFERRED,
+        alpha=2.0,
+        beta_param=1.0,  # low confidence
     )
 
     # Create SUPPORTS edges
@@ -77,18 +84,24 @@ def test_h1_confirm_improves_related_retrieval(store: MemoryStore) -> None:
     for i in range(10):
         store.insert_belief(
             f"Unrelated belief about topic {i} with various keywords and details",
-            BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
-            alpha=3.0, beta_param=1.0,
+            BELIEF_FACTUAL,
+            BSRC_AGENT_INFERRED,
+            alpha=3.0,
+            beta_param=1.0,
         )
 
     # Baseline retrieval: query for deployment details
-    _baseline: RetrievalResult = retrieve(store, "wrangler configuration for pages deploy", budget=2000)
+    _baseline: RetrievalResult = retrieve(
+        store, "wrangler configuration for pages deploy", budget=2000
+    )
 
     # Confirm the main deployment belief (simulates user saying "yes, that's right")
     store.propagate_valence(deploy_main.id, valence=1.0)
 
     # Post-confirmation retrieval
-    _post_confirm: RetrievalResult = retrieve(store, "wrangler configuration for pages deploy", budget=2000)
+    _post_confirm: RetrievalResult = retrieve(
+        store, "wrangler configuration for pages deploy", budget=2000
+    )
 
     # The SUPPORTS neighbors should now have higher confidence
     detail_after: Belief | None = store.get_belief(deploy_detail.id)
@@ -109,13 +122,17 @@ def test_h2_contradiction_resolution_retrieval(store: MemoryStore) -> None:
 
     correct: Belief = store.insert_belief(
         "agentmemory uses SQLite FTS5 for full-text search indexing",
-        BELIEF_FACTUAL, BSRC_USER_STATED,
-        alpha=5.0, beta_param=1.0,
+        BELIEF_FACTUAL,
+        BSRC_USER_STATED,
+        alpha=5.0,
+        beta_param=1.0,
     )
     wrong: Belief = store.insert_belief(
         "agentmemory uses PostgreSQL full-text search for indexing",
-        BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
-        alpha=5.0, beta_param=1.0,
+        BELIEF_FACTUAL,
+        BSRC_AGENT_INFERRED,
+        alpha=5.0,
+        beta_param=1.0,
     )
     store.insert_edge(correct.id, wrong.id, EDGE_CONTRADICTS)
 
@@ -133,7 +150,9 @@ def test_h2_contradiction_resolution_retrieval(store: MemoryStore) -> None:
     assert correct_after.confidence > wrong_after.confidence
 
     # Retrieve for the disputed topic
-    result: RetrievalResult = retrieve(store, "agentmemory search indexing technology", budget=2000)
+    result: RetrievalResult = retrieve(
+        store, "agentmemory search indexing technology", budget=2000
+    )
     if result.beliefs:
         # If both are retrieved, correct should rank higher
         retrieved_ids: list[str] = [b.id for b in result.beliefs]
@@ -155,8 +174,10 @@ def test_h3_valence_propagation_coverage(store: MemoryStore) -> None:
     for i in range(20):
         b: Belief = store.insert_belief(
             f"Connected belief number {i} about memory architecture design",
-            BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
-            alpha=2.0, beta_param=1.0,
+            BELIEF_FACTUAL,
+            BSRC_AGENT_INFERRED,
+            alpha=2.0,
+            beta_param=1.0,
         )
         beliefs.append(b)
 
@@ -170,7 +191,8 @@ def test_h3_valence_propagation_coverage(store: MemoryStore) -> None:
 
     # Count beliefs with non-default confidence before
     non_default_before: int = sum(
-        1 for b in beliefs
+        1
+        for b in beliefs
         if store.get_belief(b.id) is not None
         and abs(store.get_belief(b.id).confidence - 2.0 / 3.0) > 0.001  # type: ignore[union-attr]
     )
@@ -180,7 +202,8 @@ def test_h3_valence_propagation_coverage(store: MemoryStore) -> None:
 
     # Count beliefs with non-default confidence after
     non_default_after: int = sum(
-        1 for b in beliefs
+        1
+        for b in beliefs
         if store.get_belief(b.id) is not None
         and abs(store.get_belief(b.id).confidence - 2.0 / 3.0) > 0.001  # type: ignore[union-attr]
     )
@@ -199,24 +222,30 @@ def test_h3_valence_propagation_coverage(store: MemoryStore) -> None:
 
 
 def test_knowledge_evolution_via_feedback(store: MemoryStore) -> None:
-    """Simulate production use: beliefs evolve over multiple rounds
+    """Simulate production use: beliefs project-j over multiple rounds
     of feedback, and retrieval quality improves."""
 
     # Round 1: Initial knowledge (potentially noisy)
     b1: Belief = store.insert_belief(
         "The project uses React for the frontend framework",
-        BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
-        alpha=2.0, beta_param=1.0,
+        BELIEF_FACTUAL,
+        BSRC_AGENT_INFERRED,
+        alpha=2.0,
+        beta_param=1.0,
     )
     b2: Belief = store.insert_belief(
         "The project uses Vue for the frontend framework",
-        BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
-        alpha=2.0, beta_param=1.0,
+        BELIEF_FACTUAL,
+        BSRC_AGENT_INFERRED,
+        alpha=2.0,
+        beta_param=1.0,
     )
     b3: Belief = store.insert_belief(
         "The frontend uses Tailwind CSS for styling with custom components",
-        BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
-        alpha=2.0, beta_param=1.0,
+        BELIEF_FACTUAL,
+        BSRC_AGENT_INFERRED,
+        alpha=2.0,
+        beta_param=1.0,
     )
     store.insert_edge(b1.id, b2.id, EDGE_CONTRADICTS)
     store.insert_edge(b1.id, b3.id, EDGE_SUPPORTS)  # React + Tailwind go together

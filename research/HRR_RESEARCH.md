@@ -448,12 +448,12 @@ We built document reference graphs from 4 projects' markdown files (parsing D###
 |---|---|---|---|---|---|---|
 | project-a | 101 | 603 | 10.0% | 83.1% | 99.7% | 3 |
 | project-d | 85 | 196 | 6.7% | 46.4% | 77.4% | 5 |
-| gsd-2 | 214 | 562 | 2.7% | 26.1% | 66.7% | 5 |
+| project-i | 214 | 562 | 2.7% | 26.1% | 66.7% | 5 |
 | project-b | 929 | 6558 | 1.4% | 26.7% | 81.3% | 4 |
 
 ### Key Implications for HRR Multi-Hop
 
-1. The earlier conclusion that "multi-hop doesn't matter, just use fuzzy-start" was calibrated on project-a, which has an unusually shallow graph (83% within 2 hops). For sparser projects like gsd-2 and project-d, 2 hops only covers 26-46%. Multi-hop traversal IS needed for these project types.
+1. The earlier conclusion that "multi-hop doesn't matter, just use fuzzy-start" was calibrated on project-a, which has an unusually shallow graph (83% within 2 hops). For sparser projects like project-i and project-d, 2 hops only covers 26-46%. Multi-hop traversal IS needed for these project types.
 
 2. S^2 (2-hop HRR) covers 83% of connections in project-a but only 26-46% in deeper projects. The question "can S^2 work mathematically" is less important than "do we need more than 2 hops" -- and the answer is project-dependent.
 

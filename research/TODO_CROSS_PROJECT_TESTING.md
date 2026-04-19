@@ -19,18 +19,18 @@ The open question from HRR_FINDINGS.md: does HRR's value increase for graphs wit
 
 | Project | Graph Shape | Why It's Interesting |
 |---------|------------|---------------------|
-| **gsd-2** | Citation graph with 7 edge types (CITES, DECIDED_IN, RELATES_TO, SOURCED_FROM, SUPERSEDES, CONCEPT_LINK, EVIDENCED_BY) | Already has SQLite graph tables (graph_nodes, graph_edges, mem_nodes, mem_edges). BFS retrieval implemented. Most heterogeneous edge types of any project. Direct comparison: their BFS vs our HRR on same graph. |
+| **project-i** | Citation graph with 7 edge types (CITES, DECIDED_IN, RELATES_TO, SOURCED_FROM, SUPERSEDES, CONCEPT_LINK, EVIDENCED_BY) | Already has SQLite graph tables (graph_nodes, graph_edges, mem_nodes, mem_edges). BFS retrieval implemented. Most heterogeneous edge types of any project. Direct comparison: their BFS vs our HRR on same graph. |
 | **project-a** | Decision citation graph, 202 decisions, 300+ references | Already tested (Exp 30-35). Baseline. Citation-heavy, regex-constructible. |
 | **project-b** | Fork of project-a at larger scale, 40+ milestones, mempalace integration | Same graph shape as project-a but more data. Tests: does HRR scale with more decisions? Vocabulary drift over 40 milestones? |
 | **project-d** | Physical network topology (router, switch, AP, client nodes) + infrastructure decision graph | Two distinct graph layers: physical (Cytoscape) and logical (GSD decisions/knowledge). Edge types: ethernet, wifi, backhaul, tailscale. Tests HRR on non-document graphs. |
 | **project-e** | Module catalog with FTS5 + 384-dim vector embeddings + PostgreSQL contract pipeline | Already has FTS5 and embeddings. Direct A/B: their embedding search vs HRR on module relationships. Multi-layer: contract -> execution -> delivery chain for BFS testing. |
-| **evolve** | Skill tree DAG (100+ nodes, prerequisite edges, stat modifications) | Hierarchical graph, not lateral citations. Tests: can HRR traverse prerequisite chains? Nodes have stat-based relationships (armor, thrust, energy) that are semantic but not lexical. |
+| **project-j** | Skill tree DAG (100+ nodes, prerequisite edges, stat modifications) | Hierarchical graph, not lateral citations. Tests: can HRR traverse prerequisite chains? Nodes have stat-based relationships (armor, thrust, energy) that are semantic but not lexical. |
 
 ### Tier 2: Moderate structure, tests specific aspects
 
 | Project | Graph Shape | What It Tests |
 |---------|------------|--------------|
-| **bigtime** | Requirement-to-phase mapping (50 reqs -> 8 phases), phase dependency DAG | No code, only planning docs. Tests: can we construct a useful graph from planning documents alone? Pure structural relationships. |
+| **project-h** | Requirement-to-phase mapping (50 reqs -> 8 phases), phase dependency DAG | No code, only planning docs. Tests: can we construct a useful graph from planning documents alone? Pure structural relationships. |
 | **project-f** | Classification taxonomy (priority x category x flags) + subscription tracking | Flat relational, not graph-heavy. Tests: does HRR add value when relationships are categorical (email -> classification) rather than citation-based? |
 | **project-g-arbitrage** | API pipeline (sportsbook -> normalize -> cache -> analyze), TimescaleDB | Temporal data flow. Tests: can we build and traverse time-ordered event chains via HRR? |
 | **project-a-test** | Same as project-a + mempalace rooms | Tests mempalace-to-graph bridge: can mempalace room structure inform HRR subgraph partitioning? |
@@ -40,8 +40,8 @@ The open question from HRR_FINDINGS.md: does HRR's value increase for graphs wit
 
 | Project | Notes |
 |---------|-------|
-| **ascii-evolve** | Small Rust game, ECS components. Might test: component dependency graph. |
-| **mud_rust** | Early stage, minimal structure. |
+| **ascii-project-j** | Small Rust game, ECS components. Might test: component dependency graph. |
+| **project-k** | Early stage, minimal structure. |
 | **orbitgame** | Physics sim, no persistent relationships. |
 | **robotrocketscience / umouse** | Paused. Phase-based planning, could test planning-doc graph construction. |
 | **stash** | Media metadata + GraphQL. Could test: plugin hook dependency graph. |
@@ -167,19 +167,19 @@ This is a prerequisite for everything else -- if graph construction requires man
 
 Node types:
 - project-a: decision, milestone, sentence, concept
-- GSD-2: code module, memory node, wiki page, decision record, conversation
-- Evolve: perk node, entity type, system, biome
+- project-i: code module, memory node, wiki page, decision record, conversation
+- project-j: perk node, entity type, system, biome
 - project-d: physical device, service, network segment, config file
 - Code-monkey: module, contract, execution, delivery, aerospace component
-- Bigtime: requirement, phase, component, technology
+- project-h: requirement, phase, component, technology
 
 Edge types:
 - project-a: CITES, DECIDED_IN, RELATES_TO, SOURCED_FROM, SUPERSEDES
-- GSD-2: CITES, DECIDED_IN, RELATES_TO, SOURCED_FROM, SUPERSEDES, CONCEPT_LINK, EVIDENCED_BY
-- Evolve: PREREQUISITE, MODIFIES_STAT, BELONGS_TO_BRANCH, UNLOCKS
+- project-i: CITES, DECIDED_IN, RELATES_TO, SOURCED_FROM, SUPERSEDES, CONCEPT_LINK, EVIDENCED_BY
+- project-j: PREREQUISITE, MODIFIES_STAT, BELONGS_TO_BRANCH, UNLOCKS
 - project-d: HOSTS, CONNECTS_TO, DEPENDS_ON, MONITORS, MANAGES
 - Code-monkey: IMPORTS, CALLS, DELIVERS_TO, SCOPES, SIMILAR_TO
-- Bigtime: REQUIRES, DEPENDS_ON, MAPS_TO, IMPLEMENTS
+- project-h: REQUIRES, DEPENDS_ON, MAPS_TO, IMPLEMENTS
 
 **Research questions:**
 - [ ] Can node types be inferred from file structure, content patterns, or naming conventions?
@@ -208,11 +208,11 @@ Can we build sentence-level belief graphs from projects that DON'T have explicit
 
 | Method | Works For | Doesn't Work For |
 |--------|----------|-----------------|
-| Regex citation extraction | project-a, project-b, gsd-2 (D###, M### syntax) | Everything else |
+| Regex citation extraction | project-a, project-b, project-i (D###, M### syntax) | Everything else |
 | Co-occurrence (same file/section) | All projects with docs | Low precision without filtering |
 | Keyword/entity co-reference | Projects with consistent terminology | Vocabulary-drift projects |
-| Planning doc structure (requirement -> phase mapping) | bigtime, project-d, project-e (have .planning/) | Projects without structured planning |
-| Import/dependency parsing | project-e (Python imports), gsd-2 (TypeScript), evolve (Rust use statements) | Non-code projects |
+| Planning doc structure (requirement -> phase mapping) | project-h, project-d, project-e (have .planning/) | Projects without structured planning |
+| Import/dependency parsing | project-e (Python imports), project-i (TypeScript), project-j (Rust use statements) | Non-code projects |
 | Config/YAML relationship extraction | project-d (docker-compose, ansible), stash (plugin hooks) | Code-only projects |
 | **Git history: co-change analysis** | All projects with commits | New/empty repos |
 | **Git history: commit message decomposition** | All projects (commit msgs are universal) | Repos with empty/unhelpful commit msgs |
@@ -239,11 +239,11 @@ The 184x separation result (Exp 34 Test A) used manually-classified AGENT_CONSTR
 
 | Graph Shape | Test Case | Expected Difficulty |
 |-------------|----------|-------------------|
-| Heterogeneous edges | gsd-2: CONCEPT_LINK edges connecting decisions with different vocabulary | Medium -- edges exist, 7 types give rich selectivity |
-| Skill tree | evolve: can HRR connect "armor plating" (defense perk) to "energy shield" (different perk, same defensive category) via prerequisite paths? | Hard -- prerequisite edges are structural, not semantic |
+| Heterogeneous edges | project-i: CONCEPT_LINK edges connecting decisions with different vocabulary | Medium -- edges exist, 7 types give rich selectivity |
+| Skill tree | project-j: can HRR connect "armor plating" (defense perk) to "energy shield" (different perk, same defensive category) via prerequisite paths? | Hard -- prerequisite edges are structural, not semantic |
 | Infrastructure topology | project-d: can HRR connect "server-b GPU" to "jellyfin transcoding" when they share no words but are linked by service dependency? | Hard -- physical/logical gap |
 | Module catalog | project-e: can HRR connect aerospace modules in different subdomains that share no keywords but have similar usage patterns? | Medium -- embeddings exist for comparison |
-| Planning-only | bigtime: can HRR connect Phase 4 (Work Scheduling) to Phase 7 (Preemption) via shared dependency on Phase 3 (Resource Monitoring)? | Easy -- clean DAG, small graph |
+| Planning-only | project-h: can HRR connect Phase 4 (Work Scheduling) to Phase 7 (Preemption) via shared dependency on Phase 3 (Resource Monitoring)? | Easy -- clean DAG, small graph |
 
 ### T3: Where FTS5 Fails and HRR Succeeds (and Vice Versa)
 
@@ -260,8 +260,8 @@ This directly measures the complementarity claim from HRR_FINDINGS.md.
 | Project | Expected Max Useful Depth | Why |
 |---------|--------------------------|-----|
 | project-a | 2-3 hops (D -> cites -> cites -> D) | Citation chains |
-| gsd-2 | 3-4 hops (decision -> milestone -> concept_link -> decision) | Richer edge types allow deeper meaningful traversal |
-| evolve | 5-10 hops (root -> perk -> perk -> ... -> leaf) | Deep tree structure |
+| project-i | 3-4 hops (decision -> milestone -> concept_link -> decision) | Richer edge types allow deeper meaningful traversal |
+| project-j | 5-10 hops (root -> perk -> perk -> ... -> leaf) | Deep tree structure |
 | project-d | 3-4 hops (service -> host -> network -> host -> service) | Infrastructure path traversal |
 | project-e | 4-5 hops (contract -> scope -> module -> similar_module -> prior_contract) | Pipeline depth |
 
@@ -271,10 +271,10 @@ HRR requires subgraph partitioning to stay within capacity (k < n/9). Different 
 
 | Strategy | Natural Fit |
 |----------|------------|
-| By topic/cluster | project-a (by milestone), gsd-2 (by extension) |
-| By edge type | gsd-2 (7 types), project-d (physical vs logical) |
+| By topic/cluster | project-a (by milestone), project-i (by extension) |
+| By edge type | project-i (7 types), project-d (physical vs logical) |
 | By mempalace room | project-b, project-a-test (already have room assignments) |
-| By module/directory | project-e (by layer), evolve (by system) |
+| By module/directory | project-e (by layer), project-j (by system) |
 | By time window | project-g-arbitrage (temporal), project-b (by milestone era) |
 
 ---
@@ -282,13 +282,13 @@ HRR requires subgraph partitioning to stay within capacity (k < n/9). Different 
 ## Execution Order
 
 ### Phase 1: Extract and normalize graphs (no HRR yet)
-- [ ] gsd-2: Export existing SQLite graph (graph_nodes, graph_edges, mem_nodes, mem_edges) to a common format
+- [ ] project-i: Export existing SQLite graph (graph_nodes, graph_edges, mem_nodes, mem_edges) to a common format
 - [ ] project-a: Already have sentence graph from Exp 31 (1,195 nodes, 1,485 edges). Export to same format.
 - [ ] project-b: Build sentence graph using same methods as project-a (regex D### + co-occurrence)
-- [ ] evolve: Extract skill tree from GENOME_GRAPH in genome.py. Convert to node/edge format.
+- [ ] project-j: Extract skill tree from GENOME_GRAPH in genome.py. Convert to node/edge format.
 - [ ] project-d: Extract topology graph from netmap models.py + GSD decisions
 - [ ] project-e: Extract module catalog relationships + contract pipeline edges
-- [ ] bigtime: Extract requirement-to-phase mapping + phase dependency DAG from planning docs
+- [ ] project-h: Extract requirement-to-phase mapping + phase dependency DAG from planning docs
 
 ### Phase 2: Characterize graph shapes
 - [ ] For each graph: node count, edge count, edge type distribution, average degree, diameter, clustering coefficient
@@ -339,11 +339,11 @@ HRR requires subgraph partitioning to stay within capacity (k < n/9). Different 
   personal/          # mirror of ~/projects/ Tier 1-2 (full git history)
     project-a/
     project-b/
-    gsd-2/
+    project-i/
     project-d/
     project-e/
-    evolve/
-    bigtime/
+    project-j/
+    project-h/
     project-f/
     project-g-arbitrage/
     project-a-test/

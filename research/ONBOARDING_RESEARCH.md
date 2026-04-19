@@ -21,11 +21,11 @@ The memory system needs to ingest projects it has never seen before and produce 
 | Project | Type | Files | Commits | Code | Docs | Signals |
 |---------|------|------:|--------:|------|------|---------|
 | project-a | Trading system | 289 py | 552 | Dense | Rich (D### decisions) | Git, AST, citations, CLAUDE.md |
-| gsd-2 | Dev tooling | 240 ts | 2,649 | Dense | Very rich (609 md) | Git, AST, citations, graph tables |
+| project-i | Dev tooling | 240 ts | 2,649 | Dense | Very rich (609 md) | Git, AST, citations, graph tables |
 | project-c | Legal case | 0 code | 61 | None | 42 md + PDF | Git, docs only, narrative structure |
 | project-d | Infrastructure | 7 py | 538 | Thin | 24 md | Git, sparse AST, network topology |
-| mud_rust | Toy game | 7 rs | 5 | Minimal | 5 md | Almost nothing |
-| bigtime | Planning only | 0 code | 14 | None | 11 md | Git, docs only |
+| project-k | Toy game | 7 rs | 5 | Minimal | 5 md | Almost nothing |
+| project-h | Planning only | 0 code | 14 | None | 11 md | Git, docs only |
 
 The onboarding system cannot assume any specific convention (D### references, GSD phases, CLAUDE.md). It must detect what signals exist and extract what it can.
 
@@ -85,10 +85,10 @@ Everything else is conditional on project type.
 
 | Archetype | Example | Dominant Signals | Weak/Missing Signals |
 |-----------|---------|-----------------|---------------------|
-| **Rich code + rich docs** | project-a, gsd-2 | Everything | -- |
-| **Code-heavy, doc-light** | ascii-evolve, project-g | AST, git, imports | Citations, structured decisions |
-| **Doc-only, no code** | project-c, bigtime | Git, document structure, narrative | AST, imports, CALLS |
-| **Sparse/early stage** | mud_rust, orbitgame | File tree, README | Almost everything |
+| **Rich code + rich docs** | project-a, project-i | Everything | -- |
+| **Code-heavy, doc-light** | ascii-project-j, project-g | AST, git, imports | Citations, structured decisions |
+| **Doc-only, no code** | project-c, project-h | Git, document structure, narrative | AST, imports, CALLS |
+| **Sparse/early stage** | project-k, orbitgame | File tree, README | Almost everything |
 | **Infrastructure** | project-d | Git, config files, network topology | Deep AST (few functions) |
 
 ---
@@ -272,7 +272,7 @@ On each subsequent session:
 
 ### 5.1 Zero Documentation Projects
 
-**Example:** mud_rust (5 commits, 7 Rust files, 3 .md files)
+**Example:** project-k (5 commits, 7 Rust files, 3 .md files)
 
 **What fires:** git_history (5 COMMIT_BELIEF nodes), file_tree, imports (Cargo.toml deps), ast_calls (if any functions exist), readme_extract.
 
@@ -376,7 +376,7 @@ Walk through the pipeline on three projects to validate the design.
 
 **Expected coverage:** Document-level retrieval works. No code structure. FTS5 handles most queries. HRR adds value only if document-to-document edges are meaningful.
 
-### 7.3 mud_rust (Sparse/Early)
+### 7.3 project-k (Sparse/Early)
 
 | Stage | What Happens | Output |
 |-------|-------------|--------|
@@ -589,7 +589,7 @@ The two cases where HRR helped:
 
 ### 8.12 H5 Status: Not Directly Tested
 
-H5 (minimum viable graph threshold) was not tested in this round. The smallest project tested (project-c, 5,383 nodes) is well above the hypothesized ~50 node threshold. A project like mud_rust (5 commits, 7 files) would need to be added to test H5. Deferred.
+H5 (minimum viable graph threshold) was not tested in this round. The smallest project tested (project-c, 5,383 nodes) is well above the hypothesized ~50 node threshold. A project like project-k (5 commits, 7 files) would need to be added to test H5. Deferred.
 
 ---
 
@@ -653,7 +653,7 @@ HRR's vocabulary-bridge mechanism depends on edge type richness, not project arc
 | H2: Graph FTS5 >= 80% precision | **PASS** (87-93%) | But raw FTS5 beats it (100%) |
 | H3: HRR value beyond project-a | **PARTIAL PASS** | 20% of queries improved on both project-c and project-d (Exp 45c). Modest but non-zero. |
 | H4: Manifest detection accuracy | **PASS** | Correct on all 3 projects (1 possible FN on project-d tests) |
-| H5: Minimum viable graph | **NOT TESTED** | Need to add mud_rust (5 commits) |
+| H5: Minimum viable graph | **NOT TESTED** | Need to add project-k (5 commits) |
 
 ### Key Design Decisions (Evidence-Based)
 
@@ -668,7 +668,7 @@ HRR's vocabulary-bridge mechanism depends on edge type richness, not project arc
 
 1. ~~**Entity detection for CROSS_DOC_ENTITY edges.**~~ DONE (Exp 45c). 2,734 edges on project-c, 16,547 on project-d. Person name detector has false positives on infrastructure terms -- needs concept-name filtering.
 2. **Dual-mode FTS5 implementation.** Two FTS5 virtual tables: one sentence-level, one file-level. Required by H2 finding.
-3. **H5 test on mud_rust.** Determine minimum viable graph threshold. Not yet tested.
+3. **H5 test on project-k.** Determine minimum viable graph threshold. Not yet tested.
 4. ~~**H3 retest after entity detection.**~~ DONE. Partial pass: 20% of queries improved. HRR adds modest value on non-project-a projects.
 5. ~~**Entity detector quality improvement.**~~ DONE (Exp 45d). Added non-person word filter (40+ indicator words: home, assistant, environment, server, etc.) + table fragment filter in sentence extractor. Person FP rate: 0% on all 3 projects (was 5-12%). Overall FP rate: 1.2-1.3% (was 3.9-6.5%). Expected wrong encounters per session: 0.58-0.65 (was 2.5-17.5). All projects pass ACCEPTABLE threshold.
 
@@ -724,7 +724,7 @@ Graphs below ~50 nodes provide no retrieval benefit over raw file search (grep/F
 
 **Why it matters:** Defines when the onboarding pipeline is worth running. If a 5-commit project produces a 20-node graph that's no better than grep, the system should skip graph construction and fall back to raw file search.
 
-**How to test:** Compare retrieval quality (precision@5) on projects of increasing size: mud_rust (~70 nodes estimated), bigtime (~50 nodes estimated), project-d (~200 nodes estimated). Find the crossover point where graph retrieval outperforms raw file search.
+**How to test:** Compare retrieval quality (precision@5) on projects of increasing size: project-k (~70 nodes estimated), project-h (~50 nodes estimated), project-d (~200 nodes estimated). Find the crossover point where graph retrieval outperforms raw file search.
 
 **Null:** Even at 50 nodes, graph structure provides measurable retrieval benefit (no minimum threshold exists).
 

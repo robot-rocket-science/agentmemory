@@ -113,7 +113,7 @@ DOMAIN_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     (
         "project_name",
         re.compile(
-            r"\b(project-a|project-d|project-b|project-e|evolve)\b",
+            r"\b(project-a|project-d|project-b|project-e|project-j)\b",
             re.IGNORECASE,
         ),
     ),

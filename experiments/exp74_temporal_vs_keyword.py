@@ -142,14 +142,14 @@ def main() -> None:
         },
         {
             "id": "T3", "category": "EVOLUTION",
-            "description": "How did retrieval strategy evolve?",
+            "description": "How did retrieval strategy project-j?",
             "temporal_fn": lambda: run_evolution(conn, "retrieval strategy"),
             "search_fn": lambda: run_fts5_search(conn, "retrieval strategy"),
             "search_possible": True,
         },
         {
             "id": "T4", "category": "EVOLUTION",
-            "description": "How did decay architecture evolve?",
+            "description": "How did decay architecture project-j?",
             "temporal_fn": lambda: run_evolution(conn, "decay architecture"),
             "search_fn": lambda: run_fts5_search(conn, "decay architecture"),
             "search_possible": True,

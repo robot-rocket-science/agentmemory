@@ -25,26 +25,59 @@ BLOCKED_PATTERNS=(
     'jonsobol@gmail\.com'
     '/Users/thelorax/'
     '/home/jso/'
+    '\bthelorax\b'
     # Internal hostnames
     '\barchon\b'
     '\bmintaka\b'
+    '\bwillow\b'
     'mintaka:2222'
     'gitea:jso/'
     # Private project names
     '\balpha-seek\b'
+    '\balpha_seek\b'
     '\boptimus-prime\b'
+    '\boptimus_prime\b'
     '\bdebserver\b'
     '\bjose-bully\b'
+    '\bjose_bully\b'
     '\bcode-monkey\b'
     '\bemail-secretary\b'
     '\bsports-betting'
     '\bbigtime\b'
+    '\bgsd-2\b'
+    'alpha-seek-memtest'
+    # Infrastructure IDs
+    'secretary-487605'
+    'dry-term-30e8'
+    '3ea14047-e013-455b-80c7-b9d0628d469c'
+    '4704e38d-1366-4d13-ac03-c1563096d9f3'
 )
 
 # Build combined regex
 REGEX=$(IFS='|'; echo "${BLOCKED_PATTERNS[*]}")
 
-# Check all files that differ from the remote
+# FULL TREE SCAN: check ALL tracked files, not just the diff.
+echo "[pre-push] Scanning full tree for sensitive patterns..."
+TREE_MATCHES=$(git ls-files -- '*.py' '*.md' '*.txt' '*.sh' '*.toml' '*.json' '*.yaml' '*.yml' \
+    ':!:scripts/pre-push-public-guard.sh' ':!:scripts/sanitize-for-public.sh' \
+    | xargs grep -ilE "$REGEX" 2>/dev/null || true)
+
+if [ -n "$TREE_MATCHES" ]; then
+    echo ""
+    echo "BLOCKED: Sensitive patterns found in tracked files!"
+    echo ""
+    echo "$TREE_MATCHES" | head -20
+    FILE_COUNT=$(echo "$TREE_MATCHES" | wc -l | tr -d ' ')
+    if [ "$FILE_COUNT" -gt 20 ]; then
+        echo "  ... and $((FILE_COUNT - 20)) more files"
+    fi
+    echo ""
+    echo "Run: bash scripts/sanitize-for-public.sh --apply"
+    echo "Override: git push --no-verify (use with caution)"
+    exit 1
+fi
+
+# Also check diff for patterns (belt and suspenders)
 while read -r local_ref local_oid remote_ref remote_oid; do
     if [ "$local_oid" = "0000000000000000000000000000000000000000" ]; then
         continue  # branch deletion

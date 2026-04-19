@@ -207,7 +207,7 @@ Add migration in `_migrate_sessions()` to add the three new columns. Backfill ex
 
 ### Objective
 
-Detect when the same topic appears across multiple sessions. Create CROSS_SESSION edges linking related beliefs across session boundaries. Test whether these edges improve retrieval for temporal-evolution queries ("how did X evolve?").
+Detect when the same topic appears across multiple sessions. Create CROSS_SESSION edges linking related beliefs across session boundaries. Test whether these edges improve retrieval for temporal-evolution queries ("how did X project-j?").
 
 ### Phase 1: Topic Extraction per Session
 
@@ -253,7 +253,7 @@ Use the `graph_edges` table (not `edges`) because these link across sessions and
 
 ### Phase 4: Temporal Evolution Queries
 
-Test whether CROSS_SESSION edges improve retrieval for "how did X evolve?" queries.
+Test whether CROSS_SESSION edges improve retrieval for "how did X project-j?" queries.
 
 **Test set:** Manually identify 5-10 topics that span multiple sessions (e.g., "decay architecture", "correction detection", "retrieval pipeline"). For each topic, write a temporal evolution query.
 
@@ -393,7 +393,7 @@ Total: 11-16 hours of implementation work, assuming Exp 75 and 76 validate the h
 
 2. **Velocity denominator.** Should velocity use `beliefs_created` only, or `beliefs_created + observations_created`? Observations are cheaper (no classification), so a session that mostly observes is not really "sprinting" in the same way.
 
-3. **Cross-session edge direction.** Should CROSS_SESSION edges point forward (old -> new) or backward (new -> old)? Forward makes "how did X evolve?" traversal natural. Backward makes "what was the origin of X?" traversal natural. Recommendation: forward (old -> new), since temporal evolution queries are the primary use case.
+3. **Cross-session edge direction.** Should CROSS_SESSION edges point forward (old -> new) or backward (new -> old)? Forward makes "how did X project-j?" traversal natural. Backward makes "what was the origin of X?" traversal natural. Recommendation: forward (old -> new), since temporal evolution queries are the primary use case.
 
 4. **FTS5 vs HRR for cross-session matching.** Phase 2 of Exp 76 proposes FTS5 term overlap. Should HRR vector similarity also be tested as an alternative or complement? HRR might catch semantic similarity that term overlap misses (e.g., "decay function" and "temporal scoring" are the same topic but share no terms).
 

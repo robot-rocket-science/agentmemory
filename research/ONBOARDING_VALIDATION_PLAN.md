@@ -11,8 +11,8 @@
 |---|---|---|---|---|
 | project-d | 538 | 189 | Python, YAML, MD | Large personal project with T0 data |
 | project-f | 101 | 109 | Python, MD | Medium project with directives |
-| bigtime | 14 | 15 | MD, JSON | Tiny doc-heavy project |
-| mud_rust | 5 | 16 | Rust, MD | Minimal cross-language project |
+| project-h | 14 | 15 | MD, JSON | Tiny doc-heavy project |
+| project-k | 5 | 16 | Rust, MD | Minimal cross-language project |
 
 ## What We're Testing
 
@@ -32,9 +32,9 @@
 - **Success:** Monotonic decay for non-locked types, constant 1.0 for locked/correction/requirement
 
 ### H4: Small projects don't over-generate
-- **Method:** Compare belief count for bigtime (14 commits) vs project-d (538 commits)
-- **Measure:** bigtime should produce proportionally fewer beliefs, not a similar volume of noise
-- **Success:** bigtime < 200 beliefs, project-d < 5000 beliefs (proportional to content, not inflated by noise)
+- **Method:** Compare belief count for project-h (14 commits) vs project-d (538 commits)
+- **Measure:** project-h should produce proportionally fewer beliefs, not a similar volume of noise
+- **Success:** project-h < 200 beliefs, project-d < 5000 beliefs (proportional to content, not inflated by noise)
 
 ## Execution Steps
 

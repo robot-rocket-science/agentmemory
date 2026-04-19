@@ -321,7 +321,7 @@ HRR + FTS5 are co-primary retrieval axes. BFS is exact-depth backup. FFT cost at
 
 ## Cross-Project Validation (2026-04-10)
 
-The findings above were based on a single project (project-a). Cross-project testing on 7 diverse repos (smoltcp, adr, boa, project-d, gsd-2, rclcpp, rustls) confirmed and extended them. Full results in T0_RESULTS.md. Key additions:
+The findings above were based on a single project (project-a). Cross-project testing on 7 diverse repos (smoltcp, adr, boa, project-d, project-i, rclcpp, rustls) confirmed and extended them. Full results in T0_RESULTS.md. Key additions:
 
 ### HRR scales with adaptive thresholds + partition routing
 
@@ -333,7 +333,7 @@ Initial cross-project testing showed HRR failing on larger repos (boa R@10=0.074
 | rustls | 5,024 | -- | 0.711 |
 | smoltcp | 1,577 | 0.378 | 0.641 |
 | boa | 3,354 | 0.074 | 0.466 |
-| gsd-2 | 2,150 | 0.166 | 0.441 |
+| project-i | 2,150 | 0.166 | 0.441 |
 
 ### Selective amplifier confirmed
 
