@@ -31,6 +31,9 @@ Thumbs.db
 # Code review artifacts
 REVIEW*.md
 
+# Result data files
+results/
+
 # Experiment result data (regenerate from source scripts)
 experiments/*_results.json
 experiments/*_results/
