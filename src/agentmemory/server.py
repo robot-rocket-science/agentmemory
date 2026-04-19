@@ -72,18 +72,44 @@ _session_id: str | None = None
 # Retrieval tracking: maps session_id -> list of (belief_id, timestamp) tuples.
 # Populated by search(), consumed by feedback() and auto-feedback.
 _retrieval_buffer: dict[str, list[tuple[str, str]]] = {}
+_MAX_RETRIEVAL_SESSIONS: int = 10  # prune oldest sessions beyond this
 
 # Signal buffer: text from agent actions since the last auto-feedback processing.
 # Populated by search() queries, remember/correct/observe text, and ingest().
 # Consumed by _process_auto_feedback() for key-term matching.
 _signal_buffer: list[str] = []
+_MAX_SIGNAL_BUFFER: int = 1000  # drop oldest entries beyond this
 
 # Belief IDs that already received explicit feedback this session.
 # Auto-feedback skips these (explicit always wins).
 _explicit_feedback_ids: set[str] = set()
+_MAX_EXPLICIT_IDS: int = 5000  # cap to prevent unbounded growth
 
 # TB-13: Count locked belief accesses for audit trail.
 _locked_access_count: int = 0
+
+
+def _prune_buffers() -> None:
+    """Prevent unbounded growth of module-level buffers."""
+    global _signal_buffer
+    # Retrieval buffer: keep only the most recent sessions
+    if len(_retrieval_buffer) > _MAX_RETRIEVAL_SESSIONS:
+        # Sort by most recent entry timestamp, drop oldest
+        sorted_sids: list[str] = sorted(
+            _retrieval_buffer,
+            key=lambda s: _retrieval_buffer[s][-1][1] if _retrieval_buffer[s] else "",
+        )
+        for sid in sorted_sids[: len(sorted_sids) - _MAX_RETRIEVAL_SESSIONS]:
+            del _retrieval_buffer[sid]
+
+    # Signal buffer: trim to max size
+    if len(_signal_buffer) > _MAX_SIGNAL_BUFFER:
+        _signal_buffer = _signal_buffer[-_MAX_SIGNAL_BUFFER:]
+
+    # Explicit feedback IDs: if over limit, clear (session-scoped anyway)
+    if len(_explicit_feedback_ids) > _MAX_EXPLICIT_IDS:
+        _explicit_feedback_ids.clear()
+
 
 # ---------------------------------------------------------------------------
 # Auto-feedback: key-term extraction and matching
@@ -461,6 +487,7 @@ def search(
 
     # Process auto-feedback for the previous retrieval batch
     _process_auto_feedback(session_id)
+    _prune_buffers()
 
     result: RetrievalResult = retrieve(
         store, query, budget=budget, temporal_sort=temporal_sort,

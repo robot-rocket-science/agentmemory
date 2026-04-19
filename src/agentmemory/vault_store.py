@@ -228,125 +228,128 @@ class VaultStore:
         """Reconstruct the SQLite index from vault .md files.
 
         Drops all beliefs, edges, and search_index rows, then re-parses
-        every .md file in the beliefs/ directory.
+        every .md file in the beliefs/ directory.  The entire operation
+        runs in a single transaction so a crash mid-rebuild rolls back
+        instead of leaving a half-deleted index.
         """
         start: float = time.monotonic()
         errors: list[str] = []
 
-        # Clear existing index data (order matters for FK constraints)
-        self.index.query("DELETE FROM evidence")
-        self.index.query("DELETE FROM tests")
-        self.index.query("DELETE FROM confidence_history")
-        self.index.query("DELETE FROM edges")
-        self.index.query("DELETE FROM graph_edges")
-        self.index.query("DELETE FROM search_index")
-        self.index.query("DELETE FROM beliefs")
+        with self.index.transaction():
+            # Clear existing index data (order matters for FK constraints)
+            self.index.query("DELETE FROM evidence")
+            self.index.query("DELETE FROM tests")
+            self.index.query("DELETE FROM confidence_history")
+            self.index.query("DELETE FROM edges")
+            self.index.query("DELETE FROM graph_edges")
+            self.index.query("DELETE FROM search_index")
+            self.index.query("DELETE FROM beliefs")
 
-        beliefs_indexed: int = 0
-        edges_created: int = 0
+            beliefs_indexed: int = 0
+            edges_created: int = 0
 
-        # Collect pending edges for second pass (FK targets must exist first)
-        _OUTGOING_TYPES: set[str] = {
-            "SUPERSEDES", "SUPPORTS", "CONTRADICTS",
-            "RELATES_TO", "CITES", "TESTS", "IMPLEMENTS",
-        }
-        pending_edges: list[tuple[str, str, str]] = []
+            # Collect pending edges for second pass (FK targets must exist first)
+            _OUTGOING_TYPES: set[str] = {
+                "SUPERSEDES", "SUPPORTS", "CONTRADICTS",
+                "RELATES_TO", "CITES", "TESTS", "IMPLEMENTS",
+            }
+            pending_edges: list[tuple[str, str, str]] = []
 
-        # Pass 1: Insert all beliefs
-        for md_file in sorted(self.beliefs_dir.glob("*.md")):
-            try:
-                content: str = md_file.read_text(encoding="utf-8")
-                fm: dict[str, str] = parse_belief_frontmatter(content)
-
-                if "id" not in fm:
-                    errors.append(f"No id in frontmatter: {md_file.name}")
-                    continue
-
-                belief_id: str = fm["id"]
-
-                # Extract body text (between frontmatter and ## Relationships)
-                fm_match: re.Match[str] | None = FRONTMATTER_RE.match(content)
-                body: str = content[fm_match.end():] if fm_match else content
-                body_lines: list[str] = body.strip().split("\n")
-                text_lines: list[str] = []
-                in_relationships: bool = False
-                for line in body_lines:
-                    if line.startswith("# ") and len(line.strip()) <= 14:
-                        continue
-                    if line.startswith("## Relationships"):
-                        in_relationships = True
-                        continue
-                    if in_relationships:
-                        if line.startswith("## "):
-                            in_relationships = False
-                        else:
-                            continue
-                    text_lines.append(line)
-                belief_text: str = "\n".join(text_lines).strip()
-
-                if not belief_text:
-                    errors.append(f"Empty body: {md_file.name}")
-                    continue
-
-                alpha: float = float(fm.get("alpha", "0.5"))
-                beta: float = float(fm.get("beta", "0.5"))
-                locked_str: str = fm.get("locked", "false")
-                locked_val: bool = locked_str.lower() == "true"
-
-                # Direct SQL insert to preserve the original belief ID
-                content_hash: str = hashlib.sha256(
-                    belief_text.encode("utf-8")
-                ).hexdigest()[:12]
-                ts: str = fm.get("created", fm.get("updated", ""))
-                updated: str = fm.get("updated", ts)
-                locked_int: int = 1 if locked_val else 0
-                self.index.query(
-                    """INSERT OR IGNORE INTO beliefs
-                       (id, content_hash, content, belief_type, alpha, beta_param,
-                        source_type, locked, created_at, updated_at,
-                        classified_by, rigor_tier, data_source)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (belief_id, content_hash, belief_text,
-                     fm.get("type", "factual"), alpha, beta,
-                     fm.get("source", "agent_inferred"), locked_int,
-                     ts, updated,
-                     fm.get("classified_by", "offline"),
-                     fm.get("rigor", "hypothesis"),
-                     fm.get("data_source", "")),
-                )
-                # Add to FTS5 index
-                self.index.query(
-                    "INSERT INTO search_index(id, content, type) VALUES (?, ?, ?)",
-                    (belief_id, belief_text, fm.get("type", "factual")),
-                )
-                beliefs_indexed += 1
-
-                # Collect edges for second pass
-                for line in body_lines:
-                    wl_match: re.Match[str] | None = re.search(
-                        r"\*\*(\w+)\*\*\s+\[\[([0-9a-f]{12})\]\]", line
-                    )
-                    if wl_match:
-                        edge_type: str = wl_match.group(1)
-                        target_id: str = wl_match.group(2)
-                        if edge_type in _OUTGOING_TYPES:
-                            pending_edges.append((belief_id, target_id, edge_type))
-
-            except Exception as e:
-                errors.append(f"Error parsing {md_file.name}: {e}")
-
-        # Pass 2: Insert edges (all beliefs now exist)
-        indexed_ids: set[str] = set(self.index.get_active_belief_ids())
-        for from_id, to_id, edge_type in pending_edges:
-            if from_id in indexed_ids and to_id in indexed_ids:
+            # Pass 1: Insert all beliefs
+            for md_file in sorted(self.beliefs_dir.glob("*.md")):
                 try:
-                    self.index.insert_edge(
-                        from_id, to_id, edge_type,
-                        reason="rebuilt from vault",
+                    content: str = md_file.read_text(encoding="utf-8")
+                    fm: dict[str, str] = parse_belief_frontmatter(content)
+
+                    if "id" not in fm:
+                        errors.append(f"No id in frontmatter: {md_file.name}")
+                        continue
+
+                    belief_id: str = fm["id"]
+
+                    # Extract body text (between frontmatter and ## Relationships)
+                    fm_match: re.Match[str] | None = FRONTMATTER_RE.match(content)
+                    body: str = content[fm_match.end():] if fm_match else content
+                    body_lines: list[str] = body.strip().split("\n")
+                    text_lines: list[str] = []
+                    in_relationships: bool = False
+                    for line in body_lines:
+                        if line.startswith("# ") and len(line.strip()) <= 14:
+                            continue
+                        if line.startswith("## Relationships"):
+                            in_relationships = True
+                            continue
+                        if in_relationships:
+                            if line.startswith("## "):
+                                in_relationships = False
+                            else:
+                                continue
+                        text_lines.append(line)
+                    belief_text: str = "\n".join(text_lines).strip()
+
+                    if not belief_text:
+                        errors.append(f"Empty body: {md_file.name}")
+                        continue
+
+                    alpha: float = float(fm.get("alpha", "0.5"))
+                    beta: float = float(fm.get("beta", "0.5"))
+                    locked_str: str = fm.get("locked", "false")
+                    locked_val: bool = locked_str.lower() == "true"
+
+                    # Direct SQL insert to preserve the original belief ID
+                    content_hash: str = hashlib.sha256(
+                        belief_text.encode("utf-8")
+                    ).hexdigest()[:12]
+                    ts: str = fm.get("created", fm.get("updated", ""))
+                    updated: str = fm.get("updated", ts)
+                    locked_int: int = 1 if locked_val else 0
+                    self.index.query(
+                        """INSERT OR IGNORE INTO beliefs
+                           (id, content_hash, content, belief_type, alpha, beta_param,
+                            source_type, locked, created_at, updated_at,
+                            classified_by, rigor_tier, data_source)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (belief_id, content_hash, belief_text,
+                         fm.get("type", "factual"), alpha, beta,
+                         fm.get("source", "agent_inferred"), locked_int,
+                         ts, updated,
+                         fm.get("classified_by", "offline"),
+                         fm.get("rigor", "hypothesis"),
+                         fm.get("data_source", "")),
                     )
-                    edges_created += 1
+                    # Add to FTS5 index
+                    self.index.query(
+                        "INSERT INTO search_index(id, content, type) VALUES (?, ?, ?)",
+                        (belief_id, belief_text, fm.get("type", "factual")),
+                    )
+                    beliefs_indexed += 1
+
+                    # Collect edges for second pass
+                    for line in body_lines:
+                        wl_match: re.Match[str] | None = re.search(
+                            r"\*\*(\w+)\*\*\s+\[\[([0-9a-f]{12})\]\]", line
+                        )
+                        if wl_match:
+                            edge_type: str = wl_match.group(1)
+                            target_id: str = wl_match.group(2)
+                            if edge_type in _OUTGOING_TYPES:
+                                pending_edges.append((belief_id, target_id, edge_type))
+
                 except Exception as e:
-                    errors.append(f"Edge {from_id}->{to_id}: {e}")
+                    errors.append(f"Error parsing {md_file.name}: {e}")
+
+            # Pass 2: Insert edges (all beliefs now exist)
+            indexed_ids: set[str] = set(self.index.get_active_belief_ids())
+            for from_id, to_id, edge_type in pending_edges:
+                if from_id in indexed_ids and to_id in indexed_ids:
+                    try:
+                        self.index.insert_edge(
+                            from_id, to_id, edge_type,
+                            reason="rebuilt from vault",
+                        )
+                        edges_created += 1
+                    except Exception as e:
+                        errors.append(f"Edge {from_id}->{to_id}: {e}")
 
         elapsed: float = time.monotonic() - start
         return RebuildResult(

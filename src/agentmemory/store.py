@@ -320,6 +320,9 @@ class MemoryStore:
             )
         self._conn.row_factory = sqlite3.Row
         if not readonly:
+            # Restrict database file to owner-only access (0600)
+            if self._db_path.exists():
+                self._db_path.chmod(0o600)
             self._conn.execute("PRAGMA journal_mode=WAL")
             self._conn.execute("PRAGMA synchronous=NORMAL")
             self._conn.execute("PRAGMA foreign_keys=ON")
@@ -336,6 +339,11 @@ class MemoryStore:
         Defers commits until the block exits. Rolls back on exception.
         Interior _maybe_commit() calls become no-ops while active.
         """
+        # Flush any pending implicit transaction before starting explicit one
+        try:
+            self._conn.commit()
+        except Exception:
+            pass
         self._conn.execute("BEGIN IMMEDIATE")
         self._in_transaction = True
         try:
@@ -3121,7 +3129,7 @@ class MemoryStore:
             )
         else:
             cursor = self._conn.execute("DELETE FROM pending_feedback")
-        self._conn.commit()
+        self._maybe_commit()
         return cursor.rowcount
 
     def get_session_observation_texts(
