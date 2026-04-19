@@ -706,6 +706,40 @@ def cmd_metrics(args: argparse.Namespace) -> None:
         _re.compile(r"\bnot\s+what\s+I\s+(asked|meant|said|wanted)", _re.I),
     ]
 
+    # False positive filters (patterns that trigger corrections
+    # but are actually quoting, code, or benchmark data)
+    fp_indicators: list[str] = [
+        "<task-notification>",  # agent task notifications
+        "when the user says",  # quoting correction examples
+        "### corrections",  # section headers about corrections
+        "```",  # code blocks
+        "the user would",  # describing behavior patterns
+        "camping in the mountains",  # benchmark conversation data
+        "I just took my fam",  # benchmark conversation data
+    ]
+
+    def _is_correction(text: str) -> bool:
+        """Check if text contains a real correction (not a false positive)."""
+        text_lower: str = text.lower()
+        # Skip if text starts with task notification or contains FP indicators
+        for fp in fp_indicators:
+            if fp.lower() in text_lower[:200]:
+                return False
+        # Skip very long messages (>2000 chars) -- likely pasted content
+        if len(text) > 2000:
+            return False
+        for pat in correction_pats:
+            m: _re.Match[str] | None = pat.search(text)
+            if m:
+                # Context check: is the match inside a quote or example?
+                before: str = text[: m.start()].lower()
+                if "example" in before[-50:]:
+                    return False
+                if '"' in text[max(0, m.start() - 5) : m.start()]:
+                    return False
+                return True
+        return False
+
     # Per-session analysis
     total_user: int = 0
     total_corrections: int = 0
@@ -723,14 +757,12 @@ def cmd_metrics(args: argparse.Namespace) -> None:
         if len(user_turns) < 2:
             continue  # skip trivial sessions
 
-        # Count corrections
+        # Count corrections (FP-filtered)
         corrections: int = 0
         for t in user_turns:
             text: str = t.get("text", "")
-            for pat in correction_pats:
-                if pat.search(text):
-                    corrections += 1
-                    break
+            if _is_correction(text):
+                corrections += 1
 
         # Check for agentmemory usage
         has_memory: bool = any(
@@ -823,6 +855,75 @@ def cmd_metrics(args: argparse.Namespace) -> None:
         print(f"  Incomplete:       {len(sessions_in_db)}")
     print()
 
+    # Message length / token proxy
+    avg_user: int = 0
+    avg_asst: int = 0
+    total_user_chars: int = 0
+    total_asst_chars: int = 0
+    total_commits: int = 0
+    fix_commits: int = 0
+    fix_pct: float = 0.0
+    print("## Message Length (token proxy)")
+    daily_chars: dict[str, dict[str, int]] = defaultdict(
+        lambda: {"user_chars": 0, "user_n": 0, "asst_chars": 0, "asst_n": 0}
+    )
+    for turn in all_turns:
+        ts_val: str = turn.get("timestamp", "")
+        if not ts_val:
+            continue
+        day: str = ts_val[:10]
+        text_val: str = turn.get("text", "")
+        evt: str = turn.get("event", "")
+        if evt == "user":
+            daily_chars[day]["user_chars"] += len(text_val)
+            daily_chars[day]["user_n"] += 1
+        elif evt == "assistant":
+            daily_chars[day]["asst_chars"] += len(text_val)
+            daily_chars[day]["asst_n"] += 1
+
+    if daily_chars:
+        total_user_chars: int = sum(d["user_chars"] for d in daily_chars.values())
+        total_user_n: int = sum(d["user_n"] for d in daily_chars.values())
+        total_asst_chars: int = sum(d["asst_chars"] for d in daily_chars.values())
+        total_asst_n: int = sum(d["asst_n"] for d in daily_chars.values())
+        avg_user: int = total_user_chars // total_user_n if total_user_n else 0
+        avg_asst: int = total_asst_chars // total_asst_n if total_asst_n else 0
+        print(f"  Avg user message:     {avg_user:,} chars (~{avg_user // 4:,} tokens)")
+        print(
+            f"  Avg assistant message: {avg_asst:,} chars (~{avg_asst // 4:,} tokens)"
+        )
+        print(
+            f"  Total volume:         {(total_user_chars + total_asst_chars) // 1024:,} KB"
+        )
+    print()
+
+    # Git metrics (if in a git repo)
+    import subprocess as _sp
+
+    git_result: _sp.CompletedProcess[str] = _sp.run(
+        ["git", "log", "--since=30 days ago", "--format=%ai|%s"],
+        capture_output=True,
+        text=True,
+    )
+    if git_result.returncode == 0 and git_result.stdout.strip():
+        lines: list[str] = git_result.stdout.strip().split("\n")
+        total_commits: int = len(lines)
+        fix_commits: int = sum(1 for ln in lines if "|fix" in ln.lower())
+        feat_commits: int = sum(1 for ln in lines if "|feat" in ln.lower())
+        test_commits: int = sum(1 for ln in lines if "|test" in ln.lower())
+        doc_commits: int = sum(
+            1 for ln in lines if "|docs" in ln.lower() or "|doc:" in ln.lower()
+        )
+        fix_pct: float = fix_commits / total_commits * 100 if total_commits else 0
+
+        print("## Git Metrics (last 30 days)")
+        print(f"  Total commits:   {total_commits}")
+        print(f"  Features (feat): {feat_commits}")
+        print(f"  Bug fixes (fix): {fix_commits} ({fix_pct:.0f}%)")
+        print(f"  Tests:           {test_commits}")
+        print(f"  Docs:            {doc_commits}")
+        print()
+
     # Output JSON if requested
     if args.output:
         report: dict[str, object] = {
@@ -834,10 +935,19 @@ def cmd_metrics(args: argparse.Namespace) -> None:
             "overall_correction_rate": round(overall_rate, 4),
             "memory_on_sessions": len(memory_on_sessions),
             "memory_off_sessions": len(memory_off_sessions),
+            "avg_user_msg_chars": avg_user if daily_chars else 0,
+            "avg_asst_msg_chars": avg_asst if daily_chars else 0,
+            "total_volume_kb": (total_user_chars + total_asst_chars) // 1024
+            if daily_chars
+            else 0,
         }
         if memory_on_sessions and memory_off_sessions:
             report["memory_on_correction_rate"] = round(on_rate, 4)
             report["memory_off_correction_rate"] = round(off_rate, 4)
+        if git_result.returncode == 0 and git_result.stdout.strip():
+            report["git_total_commits"] = total_commits
+            report["git_fix_commits"] = fix_commits
+            report["git_fix_pct"] = round(fix_pct, 1)
         out_path: Path = Path(args.output)
         with out_path.open("w", encoding="utf-8") as f:
             json.dump(report, f, indent=2)
