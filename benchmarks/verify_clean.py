@@ -111,6 +111,7 @@ def verify_file(path: str) -> bool:
             "retrieval_latency_ms",
             "category",
             "category_name",
+            "prompt",  # LoCoMo per-category prompt (no answer info)
             "option_a",
             "option_b",  # forced-choice (no correct indicator)
             "llm_prediction",

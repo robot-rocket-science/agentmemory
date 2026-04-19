@@ -571,28 +571,56 @@ def main() -> None:
         for r in results:
             for pq in r.per_question:
                 category: int = int(pq["category"])  # type: ignore[arg-type]
-                # Retrieval file: NO answer, NO f1, NO score
-                item: dict[str, object] = {
-                    "id": global_id,
-                    "question": pq["question"],
-                    "category": category,
-                    "category_name": pq["category_name"],
-                    "context": pq["context"],
-                }
-                # For cat5, include forced-choice options (NOT which is correct)
-                # adversarial_answer is a wrong answer, "Not mentioned" is correct
-                # Randomize order using item index as seed for reproducibility
+                # Retrieval file: NO answer, NO f1, NO score, NO category metadata
+                # Category-specific instructions baked into the prompt field
+                # per LoCoMo protocol (Maharana et al., ACL 2024)
+                question_text: str = str(pq["question"])
+                context_text: str = str(pq["context"])
+
+                # Build category-specific prompt per LoCoMo protocol
+                opt_a: str = ""
+                opt_b: str = ""
                 if category == 5:
+                    # Forced-choice: bake options into prompt text
                     seed_val: int = int(
                         hashlib.md5(str(global_id).encode()).hexdigest()[:8], 16
                     )
                     adv: str = str(pq.get("adversarial_answer", ""))
                     if seed_val % 2 == 0:
-                        item["option_a"] = "Not mentioned"
-                        item["option_b"] = adv
+                        opt_a: str = "Not mentioned"
+                        opt_b: str = adv
                     else:
-                        item["option_a"] = adv
-                        item["option_b"] = "Not mentioned"
+                        opt_a = adv
+                        opt_b = "Not mentioned"
+                    prompt: str = (
+                        f"Based on the above context, pick the correct answer "
+                        f"for the following question. Answer ONLY with (a) or (b).\n"
+                        f"Question: {question_text}\n"
+                        f"(a) {opt_a}\n"
+                        f"(b) {opt_b}"
+                    )
+                elif category == 2:
+                    # Temporal: include date hint per protocol
+                    prompt = (
+                        f"Based on the above context, write an answer in the "
+                        f"form of a short phrase for the following question. "
+                        f"Use DATE of CONVERSATION to answer with an "
+                        f"approximate date.\n"
+                        f"Question: {question_text}"
+                    )
+                else:
+                    # Cat 1/3/4: short phrase
+                    prompt = (
+                        f"Based on the above context, write an answer in the "
+                        f"form of a short phrase for the following question.\n"
+                        f"Question: {question_text}"
+                    )
+
+                item: dict[str, object] = {
+                    "id": global_id,
+                    "context": context_text,
+                    "prompt": prompt,
+                }
                 all_items.append(item)
                 # Ground truth file: answers for scoring AFTER generation
                 gt_item: dict[str, object] = {
@@ -601,11 +629,9 @@ def main() -> None:
                     "category": category,
                 }
                 if category == 5:
-                    gt_item["cat5_a"] = item.get("option_a", "")
-                    gt_item["cat5_b"] = item.get("option_b", "")
-                    gt_item["cat5_correct"] = (
-                        "a" if item.get("option_a") == "Not mentioned" else "b"
-                    )
+                    gt_item["cat5_a"] = opt_a
+                    gt_item["cat5_b"] = opt_b
+                    gt_item["cat5_correct"] = "a" if opt_a == "Not mentioned" else "b"
                     gt_item["answer"] = ""
                 else:
                     gt_item["answer"] = pq["answer"]

@@ -91,6 +91,7 @@ SAFE_KEYS: Final[frozenset[str]] = frozenset(
         "question_uuid",
         "category",
         "category_name",
+        "prompt",  # LoCoMo per-category prompt (no answer info)
         "num_beliefs",
         "retrieval_latency_ms",
         "option_a",
