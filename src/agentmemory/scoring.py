@@ -2,6 +2,7 @@
 
 Validated in Exp 57-60. Content-type decay half-lives from Exp 58c.
 """
+
 from __future__ import annotations
 
 import math
@@ -13,13 +14,13 @@ from agentmemory.models import Belief
 # Content type to decay half-life in hours (from Exp 58c).
 # None means the belief never decays (stays at 1.0 regardless of age).
 DECAY_HALF_LIVES: dict[str, float | None] = {
-    "factual": 336.0,        # 14 days
-    "preference": 2016.0,    # 12 weeks -- slow decay, not immortal
-    "correction": 1344.0,    # 8 weeks -- outlives factual, still decays
-    "requirement": 4032.0,   # 24 weeks -- longest lived, still mortal
-    "procedural": 504.0,     # 21 days
-    "causal": 720.0,         # 30 days
-    "relational": 336.0,     # 14 days
+    "factual": 336.0,  # 14 days
+    "preference": 2016.0,  # 12 weeks -- slow decay, not immortal
+    "correction": 1344.0,  # 8 weeks -- outlives factual, still decays
+    "requirement": 4032.0,  # 24 weeks -- longest lived, still mortal
+    "procedural": 504.0,  # 21 days
+    "causal": 720.0,  # 30 days
+    "relational": 336.0,  # 14 days
 }
 
 
@@ -74,7 +75,11 @@ def decay_factor(
     if half_life is None:
         return 1.0
 
-    current: datetime = current_time_iso if isinstance(current_time_iso, datetime) else _parse_iso(current_time_iso)
+    current: datetime = (
+        current_time_iso
+        if isinstance(current_time_iso, datetime)
+        else _parse_iso(current_time_iso)
+    )
     created: datetime = _parse_iso(belief.created_at)
     age_hours: float = (current - created).total_seconds() / 3600.0
 
@@ -90,7 +95,9 @@ def decay_factor(
     return math.pow(0.5, age_hours / effective_hl)
 
 
-def lock_boost_typed(belief: Belief, query_terms: list[str], boost: float = 2.0) -> float:
+def lock_boost_typed(
+    belief: Belief, query_terms: list[str], boost: float = 2.0
+) -> float:
     """Boost locked beliefs that are topically relevant to the query.
 
     Relevance is determined by checking whether any query term appears in the
@@ -107,7 +114,9 @@ def lock_boost_typed(belief: Belief, query_terms: list[str], boost: float = 2.0)
         return 1.0
 
     content_lower: str = belief.content.lower()
-    is_relevant: bool = any(term.lower() in content_lower for term in query_terms if term)
+    is_relevant: bool = any(
+        term.lower() in content_lower for term in query_terms if term
+    )
 
     if is_relevant:
         return boost + 1.0  # boost applied on top of base 1.0
@@ -177,7 +186,7 @@ _SOURCE_WEIGHTS: dict[str, float] = {
 }
 
 
-def _length_multiplier(content: str) -> float:
+def length_multiplier(content: str) -> float:
     """Content length multiplier: penalize fragments, boost dense beliefs."""
     n: int = len(content)
     if n < 30:
@@ -201,7 +210,7 @@ def core_score(belief: Belief, current_time_iso: str | None = None) -> float:
 
     type_w: float = _TYPE_WEIGHTS.get(belief.belief_type, 1.0)
     source_w: float = _SOURCE_WEIGHTS.get(belief.source_type, 1.0)
-    length_w: float = _length_multiplier(belief.content)
+    length_w: float = length_multiplier(belief.content)
     lock_w: float = 2.0 if belief.locked else 1.0
 
     # Tier 2: temporal decay (when timestamps have variance)
@@ -238,7 +247,9 @@ def retrieval_frequency_boost(retrieval_count: int, used_count: int) -> float:
     return 1.0
 
 
-def recency_boost(belief: Belief, current_time_iso: str | datetime, half_life_hours: float = 24.0) -> float:
+def recency_boost(
+    belief: Belief, current_time_iso: str | datetime, half_life_hours: float = 24.0
+) -> float:
     """Boost recently created beliefs so new information can surface.
 
     Exp 63 showed new beliefs cannot penetrate existing top-k at uniform
@@ -249,7 +260,11 @@ def recency_boost(belief: Belief, current_time_iso: str | datetime, half_life_ho
 
     current_time_iso accepts a pre-parsed datetime to avoid redundant parsing.
     """
-    current: datetime = current_time_iso if isinstance(current_time_iso, datetime) else _parse_iso(current_time_iso)
+    current: datetime = (
+        current_time_iso
+        if isinstance(current_time_iso, datetime)
+        else _parse_iso(current_time_iso)
+    )
     created: datetime = _parse_iso(belief.created_at)
     age_hours: float = max(0.0, (current - created).total_seconds() / 3600.0)
     return 1.0 + math.pow(0.5, age_hours / half_life_hours)
