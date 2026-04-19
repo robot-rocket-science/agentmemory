@@ -273,6 +273,9 @@ def row_to_belief(row: sqlite3.Row) -> Belief:
         activation_condition=row["activation_condition"]
         if "activation_condition" in keys
         else None,
+        lock_level=str(row["lock_level"])
+        if "lock_level" in keys and row["lock_level"] is not None
+        else ("user" if row["locked"] else "none"),
     )
 
 
@@ -464,6 +467,15 @@ class MemoryStore:
             self._conn.execute(
                 "ALTER TABLE beliefs ADD COLUMN activation_condition TEXT"
             )
+        # 3-tier lock level: none / promoted / user
+        if "lock_level" not in col_names:
+            self._conn.execute(
+                "ALTER TABLE beliefs ADD COLUMN lock_level TEXT DEFAULT 'none'"
+            )
+            # Backfill: existing locked=1 -> 'user', locked=0 -> 'none'
+            self._conn.execute(
+                "UPDATE beliefs SET lock_level = 'user' WHERE locked = 1"
+            )
         self._conn.commit()
         # Create index on session_id (safe to run even if already exists)
         self._conn.execute(
@@ -639,6 +651,7 @@ class MemoryStore:
         sample_size: int | None = None,
         data_source: str = "",
         independently_validated: bool = False,
+        lock_level: str = "none",
     ) -> Belief:
         """Insert a belief with optional evidence link. Content-hash dedup.
 
@@ -664,6 +677,10 @@ class MemoryStore:
             ts: str = created_at if created_at is not None else _now()
             confidence: float = alpha / (alpha + beta_param)
             locked_int: int = 1 if locked else 0
+            # Derive lock_level from locked flag if caller used legacy API
+            effective_lock_level: str = lock_level
+            if locked and lock_level == "none":
+                effective_lock_level = "user"
 
             self._conn.execute(
                 """INSERT INTO beliefs
@@ -671,8 +688,8 @@ class MemoryStore:
                     source_type, locked, valid_from, valid_to, superseded_by,
                     created_at, updated_at, event_time, session_id, classified_by,
                     rigor_tier, method, sample_size, data_source,
-                    independently_validated)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    independently_validated, lock_level)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     belief_id,
                     ch,
@@ -692,6 +709,7 @@ class MemoryStore:
                     sample_size,
                     data_source,
                     1 if independently_validated else 0,
+                    effective_lock_level,
                 ),
             )
             self._conn.execute(
@@ -739,15 +757,14 @@ class MemoryStore:
         )
 
     def lock_belief(self, belief_id: str) -> None:
-        """Mark a belief as locked.
+        """Mark a belief as user-locked (highest tier).
 
-        Locked beliefs have a higher evidence threshold for confidence
-        reduction (require weight >= 3.0 for harmful feedback), but they
-        are NOT immune to evidence. They can also be superseded and unlocked.
+        User-locked beliefs are non-negotiable: only explicit user action
+        can unlock them. They resist all automated confidence changes.
         """
         ts: str = _now()
         self._conn.execute(
-            "UPDATE beliefs SET locked = 1, updated_at = ? WHERE id = ?",
+            "UPDATE beliefs SET locked = 1, lock_level = 'user', updated_at = ? WHERE id = ?",
             (ts, belief_id),
         )
         row: sqlite3.Row | None = self._conn.execute(
@@ -766,7 +783,8 @@ class MemoryStore:
         """
         ts: str = _now()
         cursor: sqlite3.Cursor = self._conn.execute(
-            "UPDATE beliefs SET locked = 0, updated_at = ? WHERE id = ? AND locked = 1",
+            "UPDATE beliefs SET locked = 0, lock_level = 'none', updated_at = ? "
+            "WHERE id = ? AND locked = 1",
             (ts, belief_id),
         )
         if cursor.rowcount > 0:
@@ -777,6 +795,38 @@ class MemoryStore:
                 self._record_confidence(
                     belief_id, row["alpha"], row["beta_param"], "unlocked"
                 )
+        self._conn.commit()
+        return cursor.rowcount > 0
+
+    def promote_belief(self, belief_id: str) -> bool:
+        """Promote a belief to 'promoted' lock level.
+
+        Promoted beliefs resist noise (single ignores) but can be demoted
+        by 2+ independent counter-signals. They are NOT user-locked.
+
+        Returns True if promoted, False if not found or already user-locked.
+        """
+        ts: str = _now()
+        cursor: sqlite3.Cursor = self._conn.execute(
+            "UPDATE beliefs SET locked = 1, lock_level = 'promoted', updated_at = ? "
+            "WHERE id = ? AND lock_level = 'none'",
+            (ts, belief_id),
+        )
+        self._conn.commit()
+        return cursor.rowcount > 0
+
+    def demote_belief(self, belief_id: str) -> bool:
+        """Demote a 'promoted' belief back to 'none'.
+
+        Only demotes promoted beliefs, not user-locked ones.
+        Returns True if demoted, False if not found or user-locked.
+        """
+        ts: str = _now()
+        cursor: sqlite3.Cursor = self._conn.execute(
+            "UPDATE beliefs SET locked = 0, lock_level = 'none', updated_at = ? "
+            "WHERE id = ? AND lock_level = 'promoted'",
+            (ts, belief_id),
+        )
         self._conn.commit()
         return cursor.rowcount > 0
 
@@ -900,6 +950,13 @@ class MemoryStore:
             alpha: float = old_alpha
             beta: float = old_beta
             is_locked: bool = bool(row["locked"])
+            # Read lock_level with fallback for pre-migration DBs
+            lock_level: str = "none"
+            if "lock_level" in row.keys():
+                lock_level = str(row["lock_level"] or "none")
+            elif is_locked:
+                lock_level = "user"
+            is_user_locked: bool = lock_level == "user"
             ts: str = _now()
 
             if valence is not None:
@@ -907,7 +964,7 @@ class MemoryStore:
                 if valence > 0:
                     alpha += abs(valence) * weight
                 elif valence < 0:
-                    if is_locked:
+                    if is_user_locked:
                         if abs(valence) * weight >= self.LOCKED_EVIDENCE_THRESHOLD:
                             beta += abs(valence) * weight
                     else:
@@ -917,15 +974,17 @@ class MemoryStore:
                 if outcome in ("used", "confirmed"):
                     alpha += weight
                 elif outcome == "harmful":
-                    if is_locked:
+                    if is_user_locked:
                         if weight >= self.LOCKED_EVIDENCE_THRESHOLD:
                             beta += weight
                     else:
                         beta += weight
-                elif outcome == "ignored" and not is_locked:
+                elif outcome == "ignored" and not is_user_locked:
                     # Weak evidence of irrelevance: retrieved but not acted on.
                     # 0.1 weight means ~10 ignores = 1 "used" signal.
-                    # Locked beliefs are exempt -- they represent user constraints.
+                    # User-locked beliefs are exempt. Promoted beliefs DO receive
+                    # this update -- they resist noise through their higher alpha,
+                    # not through immunity.
                     beta += 0.1 * weight
 
             self._conn.execute(
@@ -933,6 +992,16 @@ class MemoryStore:
                 (alpha, beta, ts, belief_id),
             )
             self._record_confidence(belief_id, alpha, beta, f"feedback_{outcome}")
+
+            # Auto-demotion: promoted beliefs with 2+ counter-signals get demoted
+            if lock_level == "promoted" and beta >= old_beta + 2.0:
+                self._conn.execute(
+                    "UPDATE beliefs SET locked = 0, lock_level = 'none', updated_at = ? "
+                    "WHERE id = ? AND lock_level = 'promoted'",
+                    (ts, belief_id),
+                )
+                self._record_confidence(belief_id, alpha, beta, "auto_demoted")
+
             self._conn.commit()
 
         # Propagate feedback to edges that led to this belief
