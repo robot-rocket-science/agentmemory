@@ -3075,6 +3075,49 @@ class MemoryStore:
         ).fetchall()
         return [row_to_belief(r) for r in rows]
 
+    def recalibrate_scores(self, deflation_factor: float = 0.2) -> int:
+        """Deflate inflated alpha values for agent-inferred beliefs.
+
+        Agent-inferred beliefs that were inserted with inflated priors
+        (alpha > 1.0) get deflated: new_alpha = alpha * deflation_factor.
+        Beta is reset to 0.5 (Jeffreys).
+
+        User-sourced beliefs (user_corrected, user_stated) and locked
+        beliefs are NOT touched.
+
+        Returns the number of beliefs recalibrated.
+        """
+        # Find agent-inferred beliefs with inflated alpha (> 1.0)
+        count_row: list[sqlite3.Row] = self._conn.execute(
+            """SELECT COUNT(*) FROM beliefs
+               WHERE valid_to IS NULL
+                 AND locked = 0
+                 AND source_type = 'agent_inferred'
+                 AND alpha > 1.0""",
+        ).fetchall()
+        count: int = int(count_row[0][0])
+
+        if count == 0:
+            return 0
+
+        # Apply proportional deflation
+        self._conn.execute(
+            """UPDATE beliefs
+               SET alpha = MAX(0.5, alpha * ?),
+                   beta_param = CASE
+                     WHEN beta_param < 0.5 THEN 0.5
+                     ELSE beta_param
+                   END,
+                   updated_at = ?
+               WHERE valid_to IS NULL
+                 AND locked = 0
+                 AND source_type = 'agent_inferred'
+                 AND alpha > 1.0""",
+            (deflation_factor, datetime.now(timezone.utc).isoformat()),
+        )
+        self._conn.commit()
+        return count
+
     # --- Speculative beliefs ---
 
     def get_speculative_beliefs(self, limit: int = 50) -> list[Belief]:
