@@ -4,8 +4,8 @@ title: "agentmemory: Persistent Memory for AI Coding Agents"
 type: software
 authors:
   - name: robotrocketscience
-url: "https://github.com/yoshi280/agentmemory"
-repository-code: "https://github.com/yoshi280/agentmemory"
+url: "https://github.com/robot-rocket-science/agentmemory"
+repository-code: "https://github.com/robot-rocket-science/agentmemory"
 license: MIT
 version: "2.3.2"
 date-released: "2026-04-19"

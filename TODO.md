@@ -5,9 +5,9 @@
 
 ---
 
-## Current Priority: Harden and Validate Cross-Session
+## Current Priority: Cross-Model Testing (REQ-011)
 
-Research phase is complete (83 experiments). Phase 2 MVP is built and self-hosting. Feedback loop validated (Exp 66: +22% MRR). Current focus is cross-session validation and closing remaining Phase 3 gaps.
+Phases 1-5 complete. 84 experiments, all research questions closed, all 35 case studies tested. Only remaining gap is REQ-011 (cross-model MCP testing with ChatGPT/Gemini), blocked on external access.
 
 ### Active Experiments (Exp 66-83)
 
@@ -93,7 +93,7 @@ Research phase is complete (83 experiments). Phase 2 MVP is built and self-hosti
 - [x] BFS multi-hop traversal (depth-2, expand_graph in retrieve, 129ms overhead)
 - [x] L1 behavioral layer (get_behavioral_beliefs between L0 and L2)
 
-### Phase 5: Epistemic Integrity, Validation, and Gap Closure (IN PROGRESS)
+### Phase 5: Epistemic Integrity, Validation, and Gap Closure (COMPLETE)
 - [x] Provenance metadata: all 5 fields (rigor_tier, method, sample_size, data_source, independently_validated) (REQ-023)
 - [x] Session velocity tracking (velocity_items_per_hour + velocity_tier in sessions) (REQ-024)
 - [x] Rigor tier field with 4-tier classification (REQ-025)
