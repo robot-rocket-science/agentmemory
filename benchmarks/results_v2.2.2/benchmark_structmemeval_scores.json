@@ -1,0 +1,7 @@
+{
+  "benchmark": "structmemeval",
+  "metric": "Accuracy",
+  "score_pct": 100.0,
+  "correct": 14,
+  "total": 14
+}

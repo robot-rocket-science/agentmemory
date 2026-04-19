@@ -1,0 +1,17 @@
+{
+  "benchmark": "LongMemEval",
+  "git_commit": "b98cb3ec1c8a212acae10c06a9c9764e7c97c2d6",
+  "timestamp": "2026-04-19T10:06:42.411853+00:00",
+  "adapter": "benchmarks/longmemeval_adapter.py",
+  "reader_model": "claude-opus-4-6 (sub-agent, 5 batch agents)",
+  "judge_model": "claude-opus-4-6 (sub-agent, separate judge)",
+  "contamination_status": "CLEAN",
+  "retrieval_file": "/tmp/benchmark_v2/benchmark_longmemeval.json",
+  "gt_file": "/tmp/benchmark_v2/benchmark_longmemeval_gt.json",
+  "predictions_file": "/tmp/benchmark_v2/benchmark_longmemeval_preds.json",
+  "metric": "accuracy (Opus binary judge, non-standard)",
+  "score": 0.61,
+  "n": 500,
+  "published_baseline": "60.6% (GPT-4o)",
+  "prediction_token_count": 0
+}

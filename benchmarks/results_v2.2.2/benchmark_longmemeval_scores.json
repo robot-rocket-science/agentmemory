@@ -1,0 +1,39 @@
+{
+  "benchmark": "longmemeval",
+  "metric": "Accuracy (Opus binary judge)",
+  "score_pct": 59.6,
+  "correct": 298,
+  "total": 500,
+  "per_category": {
+    "knowledge-update": {
+      "correct": 34,
+      "total": 78,
+      "accuracy_pct": 43.6
+    },
+    "multi-session": {
+      "correct": 69,
+      "total": 133,
+      "accuracy_pct": 51.9
+    },
+    "single-session-assistant": {
+      "correct": 27,
+      "total": 56,
+      "accuracy_pct": 48.2
+    },
+    "single-session-preference": {
+      "correct": 24,
+      "total": 30,
+      "accuracy_pct": 80.0
+    },
+    "single-session-user": {
+      "correct": 56,
+      "total": 70,
+      "accuracy_pct": 80.0
+    },
+    "temporal-reasoning": {
+      "correct": 88,
+      "total": 133,
+      "accuracy_pct": 66.2
+    }
+  }
+}

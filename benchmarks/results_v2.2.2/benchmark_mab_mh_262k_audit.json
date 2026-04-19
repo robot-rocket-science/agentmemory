@@ -1,0 +1,16 @@
+{
+  "benchmark": "MAB_FactConsolidation_MH_262K",
+  "git_commit": "b98cb3ec1c8a212acae10c06a9c9764e7c97c2d6",
+  "timestamp": "2026-04-19T10:06:42.411853+00:00",
+  "adapter": "benchmarks/mab_entity_index_adapter.py",
+  "reader_model": "claude-opus-4-6 (sub-agent)",
+  "contamination_status": "CLEAN",
+  "retrieval_file": "/tmp/benchmark_v2/benchmark_mab_mh_262k.json",
+  "gt_file": "/tmp/benchmark_v2/benchmark_mab_mh_262k_gt.json",
+  "predictions_file": "/tmp/benchmark_v2/benchmark_mab_mh_262k_preds.json",
+  "metric": "substring_exact_match",
+  "score": 0.58,
+  "n": 100,
+  "published_baseline": "<=7% (all methods)",
+  "prediction_token_count": 43383
+}

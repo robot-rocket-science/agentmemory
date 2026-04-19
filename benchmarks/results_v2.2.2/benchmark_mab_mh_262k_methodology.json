@@ -1,0 +1,15 @@
+{
+  "reader_model": "claude-opus-4-6 (sub-agent)",
+  "retrieval_method": "agentmemory FTS5 + entity-index + HRR + BFS",
+  "token_budget": 2000,
+  "run_count": 1,
+  "variance_justification": "Retrieval is deterministic (FTS5 + BFS on SQLite). Reader variance unquantified in single run; noted as limitation.",
+  "git_commit": "b98cb3ec1c8a212acae10c06a9c9764e7c97c2d6",
+  "timestamp": "2026-04-19T09:42:12.580710+00:00",
+  "code_link": "https://github.com/robot-rocket-science/agentmemory/tree/v2.2.2/benchmarks",
+  "benchmark_name": "MemoryAgentBench FactConsolidation Multi-Hop 262K",
+  "benchmark_version": "ai-hyz/MemoryAgentBench Conflict_Resolution split, factconsolidation_mh_262k",
+  "metric_type": "substring_exact_match (SEM)",
+  "judge_model": "none (automatic string matching)",
+  "prompt_template_hash": "c82c43c9a7dfdf94"
+}

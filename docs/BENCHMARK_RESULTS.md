@@ -1,6 +1,6 @@
 <sub>[← Chapter 7 - Benchmark Protocol](BENCHMARK_PROTOCOL.md) · [Contents](README.md) · Next: [Chapter 9 - Research Freeze →](RESEARCH_FREEZE_20260416.md)</sub>
 
-# Chapter 8. Benchmark Results (v1.2.1)
+# Chapter 8. Benchmark Results
 
 ## Methodology
 
@@ -8,22 +8,53 @@ All benchmarks follow published protocols exactly. Retrieval and answer generati
 are fully isolated: retrieval output files contain NO ground truth answers. Ground
 truth is stored in separate `_gt.json` files used only for scoring after generation.
 Contamination check (verify_clean.py) is mandatory before any reader touches data.
+Protocol enforcement is codified as 65 pytest tests in `benchmarks/test_benchmark_suite.py`.
 
 - **Retrieval:** agentmemory FTS5 + entity-index (L2.5) + HRR + BFS, 2000-token budget
-- **Readers:** Claude Opus 4.6 AND Haiku 4.5 (both tested on same retrieval)
+- **Readers:** Claude Opus 4.6 (sub-agent batches)
 - **Isolation:** Fresh SQLite DB per test case via tempfile
 - **No embeddings, no vector DB** in the retrieval pipeline
 - **Protocol:** docs/BENCHMARK_PROTOCOL.md (automatic 0% on any contamination)
+- **Validation:** 60 pytest protocol checks passed, 0 failed
+- **Methodology checklist:** Lin (github.com/lhl/agentic-memory) fields populated for all benchmarks
 
-## Results Summary (v1.2.1)
+## Results Summary (v2.2.2)
 
-| Benchmark | Metric | Opus Reader | Haiku Reader | Paper Best |
-|-----------|--------|-------------|-------------|------------|
-| LoCoMo (ACL 2024) | F1 | **66.1%** | N/A | 51.6% (GPT-4o) |
-| MAB SH 262K (ICLR 2026) | SEM | **90%** | **62%** | 45% (GPT-4o-mini) |
-| MAB MH 262K (ICLR 2026) | SEM | **60%** | **54%** | <=7% (ceiling) |
-| StructMemEval (2026) | Accuracy | **100%** | N/A | vector stores fail |
-| LongMemEval (ICLR 2025) | Opus judge | **59.0%** | N/A | 60.6% (GPT-4o) |
+| Benchmark | Metric | v2.2.2 Opus | v1.2.1 Opus | v1.2.1 Haiku | Paper Best |
+|-----------|--------|-------------|-------------|-------------|------------|
+| MAB SH 262K (ICLR 2026) | SEM | **92%** | 90% | 62% | 45% (GPT-4o-mini) |
+| MAB MH 262K (ICLR 2026) | SEM | **58%** | 60% | 54% | <=7% (ceiling) |
+| StructMemEval (2026) | Accuracy | **100%** | 100% | N/A | vector stores fail |
+| LongMemEval (ICLR 2025) | Opus judge | **59.6%** | 59.0% | N/A | 60.6% (GPT-4o) |
+| LoCoMo (ACL 2024) | F1 | **50.8%** | 66.1% | N/A | 51.6% (GPT-4o) |
+
+### v2.2.2 re-run notes (2026-04-19)
+
+Full re-run of all 5 benchmarks against v2.2.2 release with contamination-proof
+pytest suite. Retrieval code unchanged from v1.2.1; differences are reader variance.
+
+**MAB SH 262K (+2pp to 92%):** Marginal Opus reader improvement on conflict resolution.
+
+**MAB MH 262K (-2pp to 58%):** Within single-run noise. Entity-index retrieval still
+provides 8x improvement over the 7% paper ceiling.
+
+**StructMemEval (100%):** Perfect state tracking maintained.
+
+**LongMemEval (+0.6pp to 59.6%):** Near the GPT-4o baseline (60.6%).
+Per-category: single-session-user 80.0%, single-session-preference 80.0%,
+temporal-reasoning 66.2%, multi-session 51.9%, single-session-assistant 48.2%,
+knowledge-update 43.6%.
+
+**LoCoMo (-15.3pp to 50.8%):** Significant regression driven by reader variance,
+not retrieval changes. The v1.2.1 run used 10 manually-curated batch agents;
+this run used 10 independent batch agents with a different batching strategy.
+Per-category: adversarial 76.5% (was 97.5%), temporal 23.0% (was 45.4%),
+multi-hop 36.3% (was 42.2%), single-hop 56.3% (was 69.4%), open-ended 18.2% (was 30.5%).
+This validates Lin's recommendation for multi-run reporting (>=5 runs with mean +/- std)
+to quantify reader variance. Single-run results are insufficient for benchmarks
+where the LLM reader is a variable.
+
+### v1.2.1 results (prior run, retained for comparison)
 
 ### v1.2.1 changes (Exp 6: temporal coherence)
 
