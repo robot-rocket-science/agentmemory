@@ -106,7 +106,7 @@ Research phase is complete (83 experiments). Phase 2 MVP is built and self-hosti
 - [x] REQ-008: longitudinal FP rate tracking (2 tests: 20-session feedback loop validates FP decrease)
 - [x] Acceptance tests Phase 3: all 35 case studies have acceptance tests (27 new tests added 2026-04-18)
 - [ ] Cross-model benchmarking (needs ChatGPT/Gemini access) (REQ-011)
-- [ ] REQ-015/016: claims audit + limitations documentation (ship-time)
+- [x] REQ-015/016: claims audit (20 claims, zero unverified) + LIMITATIONS.md (14 limitations documented)
 
 ---
 
