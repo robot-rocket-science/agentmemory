@@ -140,6 +140,7 @@ Research phase is complete (83 experiments). Phase 2 MVP is built and self-hosti
 ## Backlog
 
 - Sentence splitting for non-English / mixed-content documents
+- Re-run the five published benchmarks (LoCoMo, MAB SH 262K, MAB MH 262K, StructMemEval, LongMemEval) against the v2.x retrieval pipeline and commit protocol-correct result JSONs to `benchmarks/`. Current README numbers reflect the v1.2.1 freeze (RESEARCH_FREEZE_20260416.md).
 
 ## Pruned (no longer relevant)
 
