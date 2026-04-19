@@ -117,6 +117,9 @@ Wonder is divergent -- cast a wide net, see what is out there. Reason is converg
 
 Evaluated across 5 published benchmarks (v1.0 through v1.2.1). All results are protocol-correct with contamination-proof isolation (separate GT files, verified by `verify_clean.py`). No embeddings, no vector DB.
 
+> [!IMPORTANT]
+> The numbers in the table below are from the **v1.2.1** benchmark freeze and have not been re-run on the current v2.x retrieval pipeline. See [RESEARCH_FREEZE_20260416.md](docs/RESEARCH_FREEZE_20260416.md) for the frozen protocol. A v2.x re-run is tracked in `TODO.md`.
+
 | Benchmark | Metric | agentmemory | Best Published | Delta |
 |---|---|---|---|---|
 | LoCoMo (ACL 2024) | F1 | **66.1%** | 51.6% (GPT-4o-turbo) | +14.5pp |

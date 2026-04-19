@@ -2,6 +2,35 @@
 
 ## [Unreleased]
 
+## [2.3.2] - 2026-04-19
+
+### Added
+- onboard: `use_llm` parameter to opt into LLM classification during bulk ingest (default False keeps zero-LLM path)
+
+### Maintenance
+- Documentation: refresh stale counts (tests, MCP tools, modules) and URLs across CLAUDE.md, TODO.md, INSTALL.md
+
+## [2.3.1] - 2026-04-19
+
+### Fixed
+- onboard end-to-end: scan, classify, and create beliefs in a single pipeline (previously stopped after scan)
+- workers: PII leaked through diff-based guard path; guard now operates on full tracked content
+- PII sanitization: complete case-insensitive pass across tracked files; pre-push guard enhanced to block remaining variants
+
+## [2.3.0] - 2026-04-19
+
+### Added
+- 3-tier `lock_level` schema (none / promoted / user) replacing the binary locked flag
+- `recalibrate` wired into CLI and MCP server to deflate agent-inferred priors after the fact
+- Obsidian sync filters: `--tier` and `--max-beliefs` for selective export
+
+### Fixed
+- Bayesian score inflation: insertion priors deflated for agent-inferred content so user-sourced beliefs retain higher confidence
+- `recalibrate_scores()` with 13 diagnostic tests to detect and correct inflated distributions
+
+### Security
+- Full PII sanitization sweep across tracked files ahead of public release
+
 ## [2.2.2] - 2026-04-19
 
 ### Fixed

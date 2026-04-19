@@ -7,8 +7,8 @@ authors:
 url: "https://github.com/yoshi280/agentmemory"
 repository-code: "https://github.com/yoshi280/agentmemory"
 license: MIT
-version: "2.0.0"
-date-released: "2026-04-18"
+version: "2.3.2"
+date-released: "2026-04-19"
 keywords:
   - agentic-memory
   - llm
