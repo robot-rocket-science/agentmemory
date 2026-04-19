@@ -2066,5 +2066,33 @@ def link_docs(
     )
 
 
+@mcp.tool
+def recalibrate(
+    deflation_factor: float = 0.2,
+) -> str:
+    """Recalibrate inflated Bayesian scores on agent-inferred beliefs.
+
+    Agent-inferred beliefs inserted with inflated alpha priors get
+    deflated: new_alpha = alpha * deflation_factor. User-sourced
+    beliefs (user_corrected, user_stated) and locked beliefs are
+    NOT touched.
+
+    Run this after bulk onboarding or when the confidence distribution
+    is compressed (most beliefs at 90%+, Thompson sampling unable to
+    discriminate).
+
+    Args:
+        deflation_factor: Multiplier for alpha deflation (default 0.2).
+            Lower = more aggressive deflation.
+    """
+    store: MemoryStore = _get_store()
+    count: int = store.recalibrate_scores(deflation_factor)
+    return (
+        f"Recalibrated {count} agent-inferred beliefs "
+        f"(deflation_factor={deflation_factor}).\n"
+        f"User-sourced and locked beliefs were not touched."
+    )
+
+
 if __name__ == "__main__":
     mcp.run()

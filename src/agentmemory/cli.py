@@ -2517,6 +2517,16 @@ def cmd_batch_feedback(args: argparse.Namespace) -> None:
     print(f"Updated {updated} beliefs.")
 
 
+def cmd_recalibrate(args: argparse.Namespace) -> None:
+    """Deflate inflated Bayesian scores on agent-inferred beliefs."""
+    store: MemoryStore = _get_store()
+    factor: float = getattr(args, "factor", 0.2)
+    count: int = store.recalibrate_scores(factor)
+    store.close()
+    print(f"Recalibrated {count} agent-inferred beliefs (factor={factor}).")
+    print("User-sourced and locked beliefs were not touched.")
+
+
 def cmd_sync_obsidian(args: argparse.Namespace) -> None:
     """Export beliefs to an Obsidian vault as markdown files."""
     from agentmemory.obsidian import (
@@ -3191,6 +3201,18 @@ def main() -> None:
         "send-telemetry", help="Send unsent telemetry snapshots (with confirmation)"
     )
     p_send_telem.set_defaults(func=cmd_send_telemetry)
+
+    # recalibrate
+    p_recal: argparse.ArgumentParser = subparsers.add_parser(
+        "recalibrate", help="Deflate inflated Bayesian scores on agent-inferred beliefs"
+    )
+    p_recal.add_argument(
+        "--factor",
+        type=float,
+        default=0.2,
+        help="Deflation factor for alpha (default: 0.2)",
+    )
+    p_recal.set_defaults(func=cmd_recalibrate)
 
     args: argparse.Namespace = parser.parse_args()
 
