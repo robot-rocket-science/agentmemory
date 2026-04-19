@@ -7,6 +7,7 @@ comparison against a sync state file.
 Phase A: one-way export (agentmemory -> Obsidian).
 Phase B (future): bidirectional sync with import support.
 """
+
 from __future__ import annotations
 
 import json
@@ -47,6 +48,7 @@ _INCOMING_LABELS: Final[dict[str, str]] = {
 @dataclass
 class ObsidianConfig:
     """Configuration for Obsidian vault sync."""
+
     vault_path: Path
     beliefs_subfolder: str = _DEFAULT_BELIEFS_SUBFOLDER
     archive_subfolder: str = _DEFAULT_ARCHIVE_SUBFOLDER
@@ -61,7 +63,9 @@ def load_obsidian_config(vault_override: str | None = None) -> ObsidianConfig | 
     vault_str: str = vault_override or get_str_setting("obsidian", "vault_path")
     if not vault_str:
         return None
-    beliefs_sub: str = get_str_setting("obsidian", "beliefs_subfolder") or _DEFAULT_BELIEFS_SUBFOLDER
+    beliefs_sub: str = (
+        get_str_setting("obsidian", "beliefs_subfolder") or _DEFAULT_BELIEFS_SUBFOLDER
+    )
     return ObsidianConfig(
         vault_path=Path(vault_str),
         beliefs_subfolder=beliefs_sub,
@@ -72,6 +76,7 @@ def load_obsidian_config(vault_override: str | None = None) -> ObsidianConfig | 
 # ---------------------------------------------------------------------------
 # Serialization: Belief -> Markdown
 # ---------------------------------------------------------------------------
+
 
 def belief_to_markdown(
     belief: Belief,
@@ -138,9 +143,7 @@ def belief_to_markdown(
 # Frontmatter parsing (for sync state comparison)
 # ---------------------------------------------------------------------------
 
-FRONTMATTER_RE: Final[re.Pattern[str]] = re.compile(
-    r"^---\n(.*?)\n---\n", re.DOTALL
-)
+FRONTMATTER_RE: Final[re.Pattern[str]] = re.compile(r"^---\n(.*?)\n---\n", re.DOTALL)
 
 
 def parse_belief_frontmatter(md_content: str) -> dict[str, str]:
@@ -164,6 +167,7 @@ def parse_belief_frontmatter(md_content: str) -> dict[str, str]:
 # ---------------------------------------------------------------------------
 # Edge collection
 # ---------------------------------------------------------------------------
+
 
 def collect_edges_for_belief(
     belief_id: str,
@@ -199,6 +203,7 @@ def collect_edges_for_belief(
 # ---------------------------------------------------------------------------
 # Sync state persistence
 # ---------------------------------------------------------------------------
+
 
 def _read_sync_state(vault_path: Path) -> dict[str, str]:
     """Read content_hash map from sync state file.
@@ -237,9 +242,7 @@ def _write_sync_state(
     # Atomic write via temp file + rename
     fd: int
     tmp_name: str
-    fd, tmp_name = tempfile.mkstemp(
-        dir=str(vault_path), suffix=".tmp", prefix=".sync_"
-    )
+    fd, tmp_name = tempfile.mkstemp(dir=str(vault_path), suffix=".tmp", prefix=".sync_")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(data, f, separators=(",", ":"))
@@ -253,6 +256,7 @@ def _write_sync_state(
 # ---------------------------------------------------------------------------
 # File writing
 # ---------------------------------------------------------------------------
+
 
 def write_belief_file(
     belief: Belief,
@@ -304,6 +308,7 @@ def _archive_stale_files(
 # Index generation
 # ---------------------------------------------------------------------------
 
+
 def _generate_by_type_index(beliefs: list[Belief], index_dir: Path) -> None:
     """Write _index/by-type.md grouping beliefs by type."""
     by_type: dict[str, list[Belief]] = {}
@@ -323,7 +328,9 @@ def _generate_by_type_index(beliefs: list[Belief], index_dir: Path) -> None:
         lines.append(f"## {btype} ({len(group)})")
         lines.append("")
         # Show top 50 by confidence for each type
-        sorted_group: list[Belief] = sorted(group, key=lambda b: b.confidence, reverse=True)
+        sorted_group: list[Belief] = sorted(
+            group, key=lambda b: b.confidence, reverse=True
+        )
         for b in sorted_group[:50]:
             preview: str = b.content[:80].replace("\n", " ")
             lines.append(f"- [[{b.id}]] ({b.confidence:.0%}) {preview}")
@@ -489,6 +496,7 @@ def generate_index_notes(
 # Dataview dashboard generation
 # ---------------------------------------------------------------------------
 
+
 def _generate_dataview_dashboards(beliefs: list[Belief], dash_dir: Path) -> int:
     """Generate Dataview-powered dashboard notes. Returns count written."""
     # Counts for the overview
@@ -545,7 +553,7 @@ def _generate_dataview_dashboards(beliefs: list[Belief], dash_dir: Path) -> int:
         "```dataview\n"
         "TABLE type, confidence, source, updated\n"
         'FROM "beliefs"\n'
-        'WHERE date(now) - date(updated) > dur(30 days)\n'
+        "WHERE date(now) - date(updated) > dur(30 days)\n"
         "SORT updated ASC\n"
         "LIMIT 100\n"
         "```\n",
@@ -600,9 +608,11 @@ def _generate_dataview_dashboards(beliefs: list[Belief], dash_dir: Path) -> int:
 # Main sync engine
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class SyncResult:
     """Result of a vault sync operation."""
+
     beliefs_written: int
     beliefs_archived: int
     beliefs_unchanged: int
@@ -610,10 +620,64 @@ class SyncResult:
     elapsed_seconds: float
 
 
+def _filter_beliefs_by_tier(
+    beliefs: list[Belief],
+    edges: dict[str, list[Edge]],
+    tier: str,
+    max_beliefs: int | None,
+) -> list[Belief]:
+    """Filter beliefs for Obsidian export based on tier or max_beliefs.
+
+    Tier definitions:
+      core     -- locked + user-stated/corrected + beliefs with 2+ edges (~500-1000)
+      connected -- all beliefs with at least 1 edge (non-orphans)
+      full     -- everything (no filter)
+
+    If max_beliefs is set, it overrides tier and returns the top N by
+    priority: locked first, then user-sourced, then by edge count desc.
+    """
+    if tier == "full" and max_beliefs is None:
+        return beliefs
+
+    if max_beliefs is not None:
+        # Score each belief: locked=1000, user_corrected=100, user_stated=100,
+        # then edge count as tiebreaker
+        def _priority(b: Belief) -> tuple[int, int, float]:
+            lock_score: int = 1000 if b.locked else 0
+            source_score: int = (
+                100 if b.source_type in ("user_corrected", "user_stated") else 0
+            )
+            edge_count: int = len(edges.get(b.id, []))
+            return (lock_score + source_score, edge_count, b.confidence)
+
+        sorted_beliefs: list[Belief] = sorted(beliefs, key=_priority, reverse=True)
+        return sorted_beliefs[:max_beliefs]
+
+    if tier == "core":
+        core: list[Belief] = []
+        remaining: list[Belief] = []
+        for b in beliefs:
+            if b.locked or b.source_type in ("user_corrected", "user_stated"):
+                core.append(b)
+            elif len(edges.get(b.id, [])) >= 2:
+                remaining.append(b)
+        # Sort remaining by edge count descending, cap total at 2000
+        remaining.sort(key=lambda b: len(edges.get(b.id, [])), reverse=True)
+        cap: int = max(0, 2000 - len(core))
+        return core + remaining[:cap]
+
+    if tier == "connected":
+        return [b for b in beliefs if len(edges.get(b.id, [])) >= 1]
+
+    return beliefs
+
+
 def sync_vault(
     store: MemoryStore,
     config: ObsidianConfig,
     full: bool = False,
+    tier: str = "full",
+    max_beliefs: int | None = None,
 ) -> SyncResult:
     """Export beliefs from the store to the Obsidian vault.
 
@@ -624,6 +688,8 @@ def sync_vault(
         store: The MemoryStore to read beliefs from.
         config: Obsidian vault configuration.
         full: If True, rewrite all files unconditionally.
+        tier: Filter tier: "core", "connected", or "full".
+        max_beliefs: If set, export only this many beliefs (by priority).
 
     Returns:
         SyncResult with counts and timing.
@@ -638,17 +704,24 @@ def sync_vault(
     # Load sync state (skip on full sync)
     prev_hashes: dict[str, str] = {} if full else _read_sync_state(config.vault_path)
 
-    # Fetch all active beliefs
-    all_beliefs: list[Belief] = store.get_all_active_beliefs()
-    active_ids: set[str] = {b.id for b in all_beliefs}
-    belief_ids: list[str] = list(active_ids)
+    # Fetch all active beliefs and edges (needed for filtering)
+    all_beliefs_unfiltered: list[Belief] = store.get_all_active_beliefs()
+    all_ids: list[str] = [b.id for b in all_beliefs_unfiltered]
+    all_edges: dict[str, list[Edge]] = store.get_edges_by_belief_ids(all_ids)
 
-    # Bulk-fetch all edges
-    all_edges: dict[str, list[Edge]] = store.get_edges_by_belief_ids(belief_ids)
+    # Apply tier/max_beliefs filter
+    all_beliefs: list[Belief] = _filter_beliefs_by_tier(
+        all_beliefs_unfiltered,
+        all_edges,
+        tier,
+        max_beliefs,
+    )
+    active_ids: set[str] = {b.id for b in all_beliefs}
 
     # Write changed beliefs. Sync state stores hash of the file content
     # (not the belief content_hash) so we can detect external edits.
     import hashlib as _hl
+
     written: int = 0
     unchanged: int = 0
     new_hashes: dict[str, str] = {}
@@ -700,9 +773,11 @@ def sync_vault(
 # Play B: Bidirectional sync (vault -> agentmemory)
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class VaultChange:
     """A change detected in the vault relative to sync state."""
+
     belief_id: str
     change_type: str  # "modified" | "new" | "deleted"
     md_content: str | None = None
@@ -712,6 +787,7 @@ class VaultChange:
 @dataclass
 class ImportResult:
     """Result of importing vault changes."""
+
     modified: int
     new_beliefs: int
     deleted: int
@@ -726,7 +802,7 @@ def _extract_body_text(md_content: str) -> str:
     """
     # Remove frontmatter
     fm_match: re.Match[str] | None = FRONTMATTER_RE.match(md_content)
-    body: str = md_content[fm_match.end():] if fm_match else md_content
+    body: str = md_content[fm_match.end() :] if fm_match else md_content
 
     # Remove H1 heading line (# belief_id)
     lines: list[str] = body.strip().split("\n")
@@ -769,6 +845,7 @@ def detect_vault_changes(config: ObsidianConfig) -> list[VaultChange]:
     # Obsidian (body text changed, frontmatter tweaked, anything), the
     # file hash will differ.
     import hashlib as _hl
+
     seen_ids: set[str] = set()
     for md_file in beliefs_dir.glob("*.md"):
         belief_id: str = md_file.stem
@@ -780,29 +857,35 @@ def detect_vault_changes(config: ObsidianConfig) -> list[VaultChange]:
             # New file created in Obsidian
             body_text: str = _extract_body_text(md_content)
             if body_text:
-                changes.append(VaultChange(
-                    belief_id=belief_id,
-                    change_type="new",
-                    md_content=md_content,
-                    new_text=body_text,
-                ))
+                changes.append(
+                    VaultChange(
+                        belief_id=belief_id,
+                        change_type="new",
+                        md_content=md_content,
+                        new_text=body_text,
+                    )
+                )
         elif file_hash != prev_hashes.get(belief_id, ""):
             # File was modified externally
             body_text = _extract_body_text(md_content)
-            changes.append(VaultChange(
-                belief_id=belief_id,
-                change_type="modified",
-                md_content=md_content,
-                new_text=body_text,
-            ))
+            changes.append(
+                VaultChange(
+                    belief_id=belief_id,
+                    change_type="modified",
+                    md_content=md_content,
+                    new_text=body_text,
+                )
+            )
 
     # Check for deletions
     for bid in prev_hashes:
         if bid not in seen_ids:
-            changes.append(VaultChange(
-                belief_id=bid,
-                change_type="deleted",
-            ))
+            changes.append(
+                VaultChange(
+                    belief_id=bid,
+                    change_type="deleted",
+                )
+            )
 
     return changes
 
@@ -842,12 +925,10 @@ def import_vault_changes(
                 errors.append(f"Modified: belief {change.belief_id} not found in DB")
                 continue
             # Update content and hash
-            new_hash: str = hashlib.sha256(
-                change.new_text.encode("utf-8")
-            ).hexdigest()[:12]
-            store.update_belief_content(
-                change.belief_id, change.new_text, new_hash
-            )
+            new_hash: str = hashlib.sha256(change.new_text.encode("utf-8")).hexdigest()[
+                :12
+            ]
+            store.update_belief_content(change.belief_id, change.new_text, new_hash)
             modified += 1
 
         elif change.change_type == "new":
@@ -874,6 +955,7 @@ def import_vault_changes(
 # ---------------------------------------------------------------------------
 # Canvas export: reasoning traces as JSON Canvas
 # ---------------------------------------------------------------------------
+
 
 def beliefs_to_canvas(
     beliefs: list[Belief],
@@ -944,14 +1026,16 @@ def beliefs_to_canvas(
     canvas_edges: list[dict[str, object]] = []
     for edge in edges:
         if edge.from_id in belief_id_set and edge.to_id in belief_id_set:
-            canvas_edges.append({
-                "id": f"e{edge.id}",
-                "fromNode": edge.from_id,
-                "toNode": edge.to_id,
-                "fromEnd": "none",
-                "toEnd": "arrow",
-                "label": edge.edge_type,
-            })
+            canvas_edges.append(
+                {
+                    "id": f"e{edge.id}",
+                    "fromNode": edge.from_id,
+                    "toNode": edge.to_id,
+                    "fromEnd": "none",
+                    "toEnd": "arrow",
+                    "label": edge.edge_type,
+                }
+            )
 
     canvas: dict[str, object] = {
         "nodes": canvas_nodes,

@@ -19,6 +19,7 @@ Provides direct commands that execute without LLM involvement:
   agentmemory commit-config      -- view or update commit tracker settings
   agentmemory help               -- command reference
 """
+
 from __future__ import annotations
 
 import argparse
@@ -58,6 +59,7 @@ _active_project: Path | None = None
 def _project_db_path(project_dir: Path) -> Path:
     """Compute the isolated DB path for a project directory."""
     import hashlib
+
     abs_path: str = str(project_dir.resolve())
     path_hash: str = hashlib.sha256(abs_path.encode()).hexdigest()[:12]
     db_dir: Path = _AGENTMEMORY_HOME / "projects" / path_hash
@@ -72,6 +74,7 @@ def _project_db_path(project_dir: Path) -> Path:
 def _resolve_db_path() -> Path:
     """Resolve DB path: AGENTMEMORY_DB env > --project flag > cwd."""
     import os
+
     env_db: str | None = os.environ.get("AGENTMEMORY_DB")
     if env_db:
         p: Path = Path(env_db)
@@ -86,11 +89,13 @@ def _get_store() -> MemoryStore:
     """Create store. Uses VaultStore if obsidian.vault_path is configured."""
     db_path: Path = _resolve_db_path()
     from agentmemory.config import get_str_setting
+
     vault_str: str = get_str_setting("obsidian", "vault_path")
     if vault_str:
         vault_path: Path = Path(vault_str)
         if vault_path.exists():
             from agentmemory.vault_store import VaultStore
+
             return VaultStore(vault_path, db_path)  # type: ignore[return-value]
     return MemoryStore(db_path)
 
@@ -169,14 +174,14 @@ _COMMAND_DEFS: dict[str, dict[str, str]] = {
         "argument_hint": "The belief text to store",
         "tools": "Bash",
         "objective": "Store a new belief.",
-        "process": "Run: `uv run agentmemory remember \"$ARGUMENTS\"`\nDisplay the output. Do not add commentary.",
+        "process": 'Run: `uv run agentmemory remember "$ARGUMENTS"`\nDisplay the output. Do not add commentary.',
     },
     "lock": {
         "description": "Create a locked belief (non-negotiable constraint).",
         "argument_hint": "The constraint text to lock",
         "tools": "Bash",
         "objective": "Create a locked belief.",
-        "process": "Run: `uv run agentmemory lock \"$ARGUMENTS\"`\nDisplay the output. Do not add commentary.",
+        "process": 'Run: `uv run agentmemory lock "$ARGUMENTS"`\nDisplay the output. Do not add commentary.',
     },
     "delete": {
         "description": "Soft-delete beliefs by ID. Beliefs are excluded from search and retrieval but remain in the database.",
@@ -191,7 +196,7 @@ _COMMAND_DEFS: dict[str, dict[str, str]] = {
         "tools": "Bash, Read, WebSearch, Agent",
         "objective": "Gather all beliefs and associations connected to the query, then spawn parallel subagents for deep research.",
         "process": (
-            "1. Run: `uv run agentmemory wonder \"$ARGUMENTS\"` to get belief context.\n"
+            '1. Run: `uv run agentmemory wonder "$ARGUMENTS"` to get belief context.\n'
             "2. Run: `uv run agentmemory settings` to read wonder.max_agents (default 4).\n"
             "3. Parse the belief context output into themes or angles.\n"
             "4. Spawn up to max_agents subagents in parallel using the Agent tool. "
@@ -231,7 +236,7 @@ _COMMAND_DEFS: dict[str, dict[str, str]] = {
         "tools": "Bash, Read, WebSearch, Agent",
         "objective": "Simulate branching consequence paths from memory to support decision-making, debugging, or planning.",
         "process": (
-            "1. Run: `uv run agentmemory reason \"$ARGUMENTS\"` to get structured consequence-path output.\n"
+            '1. Run: `uv run agentmemory reason "$ARGUMENTS"` to get structured consequence-path output.\n'
             "2. Run: `uv run agentmemory settings` to read reason.max_agents and reason.depth.\n"
             "3. Analyze the structured output. It contains:\n"
             "   - VERDICT: SUFFICIENT / INSUFFICIENT / CONTRADICTORY / UNCERTAIN / PARTIAL\n"
@@ -373,7 +378,7 @@ def _render_command_md(name: str, defn: dict[str, str]) -> str:
         for tool in defn["tools"].split(", "):
             lines.append(f"  - {tool}")
     lines.append("---")
-    lines.append(f"<objective>")
+    lines.append("<objective>")
     lines.append(defn["objective"])
     lines.append("</objective>")
     lines.append("")
@@ -397,8 +402,14 @@ def cmd_setup(args: argparse.Namespace) -> None:
     # Step 2: Clean up old skill-based commands (legacy)
     old_skills_dir: Path = Path.home() / ".claude" / "skills"
     old_prefixes: list[str] = [
-        "mem-correct", "mem-ingest", "mem-locked", "mem-observe",
-        "mem-onboard", "mem-remember", "mem-search", "mem-status",
+        "mem-correct",
+        "mem-ingest",
+        "mem-locked",
+        "mem-observe",
+        "mem-onboard",
+        "mem-remember",
+        "mem-search",
+        "mem-status",
     ]
     cleaned: int = 0
     for prefix in old_prefixes:
@@ -420,12 +431,20 @@ def cmd_setup(args: argparse.Namespace) -> None:
     mcp_json_path: Path = Path.cwd() / ".mcp.json"
     if not mcp_json_path.exists():
         import json as _json
+
         mcp_config: dict[str, object] = {
             "mcpServers": {
                 "agentmemory": {
                     "type": "stdio",
                     "command": "uv",
-                    "args": ["run", "--project", ".", "python", "-m", "agentmemory.server"],
+                    "args": [
+                        "run",
+                        "--project",
+                        ".",
+                        "python",
+                        "-m",
+                        "agentmemory.server",
+                    ],
                     "env": {},
                 }
             }
@@ -458,14 +477,20 @@ def cmd_setup(args: argparse.Namespace) -> None:
     # Step 6: Smoke test
     print("\n  Smoke test...")
     import subprocess
+
     smoke: subprocess.CompletedProcess[str] = subprocess.run(
         ["uv", "run", "agentmemory", "stats"],
-        capture_output=True, text=True, timeout=10,
+        capture_output=True,
+        text=True,
+        timeout=10,
     )
     if smoke.returncode == 0:
         print("  OK: CLI works")
     else:
-        print(f"  FAIL: agentmemory stats returned exit code {smoke.returncode}", file=sys.stderr)
+        print(
+            f"  FAIL: agentmemory stats returned exit code {smoke.returncode}",
+            file=sys.stderr,
+        )
         if smoke.stderr:
             print(f"  {smoke.stderr[:200]}", file=sys.stderr)
 
@@ -475,7 +500,7 @@ def cmd_setup(args: argparse.Namespace) -> None:
     # Step 8: Telemetry opt-in
     _setup_telemetry()
 
-    print(f"\nDone. Restart Claude Code, then run /mem:onboard . on your project.")
+    print("\nDone. Restart Claude Code, then run /mem:onboard . on your project.")
 
 
 def _setup_obsidian_vault() -> None:
@@ -534,8 +559,14 @@ def _setup_obsidian_vault() -> None:
 
     # Add to .gitignore if not already present
     gitignore: Path = vault_path / ".gitignore"
-    entries: list[str] = ["beliefs/", "_index/", "_dashboards/", "_docs/",
-                          "_canvas/", ".agentmemory_sync.json"]
+    entries: list[str] = [
+        "beliefs/",
+        "_index/",
+        "_dashboards/",
+        "_docs/",
+        "_canvas/",
+        ".agentmemory_sync.json",
+    ]
     if gitignore.exists():
         existing_text: str = gitignore.read_text(encoding="utf-8")
         missing: list[str] = [e for e in entries if e not in existing_text]
@@ -596,7 +627,9 @@ def _setup_telemetry() -> None:
     save_config(config)  # type: ignore[arg-type]
 
     status: str = "ENABLED" if enabled else "DISABLED"
-    print(f"  Telemetry {status}. Change anytime with /mem:enable-telemetry or /mem:disable-telemetry")
+    print(
+        f"  Telemetry {status}. Change anytime with /mem:enable-telemetry or /mem:disable-telemetry"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -640,9 +673,11 @@ def cmd_onboard(args: argparse.Namespace) -> None:
     scan: ScanResult = scan_project(project_path)
     t_scan: float = _time.perf_counter()
 
-    print(f"  Signals: git={scan.manifest.has_git}, "
-          f"docs={scan.manifest.doc_count}, "
-          f"languages={scan.manifest.languages}")
+    print(
+        f"  Signals: git={scan.manifest.has_git}, "
+        f"docs={scan.manifest.doc_count}, "
+        f"languages={scan.manifest.languages}"
+    )
 
     node_types: dict[str, int] = {}
     for n in scan.nodes:
@@ -665,6 +700,7 @@ def cmd_onboard(args: argparse.Namespace) -> None:
 
     # Map scanner node IDs to belief IDs via content hash
     import hashlib as _hashlib
+
     node_to_belief: dict[str, str] = {}
 
     ingested: int = 0
@@ -731,6 +767,7 @@ def cmd_onboard(args: argparse.Namespace) -> None:
             build_link_prompt,
             parse_link_response,
         )
+
         print("\nSemantic linking (Haiku)...")
         active_rows: list[sqlite3.Row] = store.query(
             "SELECT id, content FROM beliefs "
@@ -756,7 +793,9 @@ def cmd_onboard(args: argparse.Namespace) -> None:
                     max_tokens=2048,
                     messages=[{"role": "user", "content": prompt}],
                 )
-                raw_text: str = str(getattr(response.content[0], "text", response.content[0]))
+                raw_text: str = str(
+                    getattr(response.content[0], "text", response.content[0])
+                )
                 links: list[tuple[str, str, str]] = parse_link_response(raw_text)
                 created: int = apply_links(store, links)
                 link_edges += created
@@ -784,12 +823,14 @@ def cmd_onboard(args: argparse.Namespace) -> None:
     # --- Obsidian vault sync ---
     # If vault is configured, sync beliefs + link documents
     from agentmemory.config import get_str_setting
+
     vault_str: str = get_str_setting("obsidian", "vault_path")
     vault_sync_count: int = 0
     doc_link_count: int = 0
     if vault_str and Path(vault_str).exists():
         print("\nSyncing to Obsidian vault...")
         from agentmemory.obsidian import ObsidianConfig, SyncResult, sync_vault
+
         obs_config: ObsidianConfig = ObsidianConfig(vault_path=Path(vault_str))
         sync_result: SyncResult = sync_vault(store, obs_config, full=True)
         vault_sync_count = sync_result.beliefs_written
@@ -798,9 +839,8 @@ def cmd_onboard(args: argparse.Namespace) -> None:
 
         print("Linking project documents...")
         from agentmemory.doc_linker import LinkResult, link_documents
-        link_result: LinkResult = link_documents(
-            store, project_path, Path(vault_str)
-        )
+
+        link_result: LinkResult = link_documents(store, project_path, Path(vault_str))
         doc_link_count = link_result.docs_exported
         print(f"  Documents: {link_result.docs_exported}")
         print(f"  Cross-references: {link_result.refs_linked}")
@@ -819,7 +859,7 @@ def cmd_onboard(args: argparse.Namespace) -> None:
         phase_parts.append(f"vault={t_end - t_edges:.2f}s")
     phase_parts.append(f"total={t_end - t_start:.2f}s")
 
-    print(f"\nDone.")
+    print("\nDone.")
     print(f"  Observations: {aggregate.observations_created}")
     print(f"  Beliefs: {aggregate.beliefs_created}")
     print(f"  Corrections: {aggregate.corrections_detected}")
@@ -906,27 +946,41 @@ def cmd_health(args: argparse.Namespace) -> None:
     active: int = int(str(metrics["active_beliefs"]))
 
     print("\n  Belief diagnostics:")
-    print(f"    Credal gap: {metrics['credal_gap_count']} / {active}"
-          f" ({metrics['credal_gap_pct']}%) beliefs at type prior (untested)")
-    print(f"    Orphans: {metrics['orphan_count']}"
-          f" ({metrics['orphan_pct']}%) beliefs with no edges")
-    print(f"    Edges: {metrics['contradicts_edges']} CONTRADICTS,"
-          f" {metrics['supports_edges']} SUPPORTS,"
-          f" {metrics['supersedes_edges']} SUPERSEDES")
-    print(f"    Feedback coverage: {metrics['feedback_coverage_count']}"
-          f" ({metrics['feedback_coverage_pct']}%) beliefs with test results")
+    print(
+        f"    Credal gap: {metrics['credal_gap_count']} / {active}"
+        f" ({metrics['credal_gap_pct']}%) beliefs at type prior (untested)"
+    )
+    print(
+        f"    Orphans: {metrics['orphan_count']}"
+        f" ({metrics['orphan_pct']}%) beliefs with no edges"
+    )
+    print(
+        f"    Edges: {metrics['contradicts_edges']} CONTRADICTS,"
+        f" {metrics['supports_edges']} SUPPORTS,"
+        f" {metrics['supersedes_edges']} SUPERSEDES"
+    )
+    print(
+        f"    Feedback coverage: {metrics['feedback_coverage_count']}"
+        f" ({metrics['feedback_coverage_pct']}%) beliefs with test results"
+    )
     print(f"    Avg confidence: {metrics['avg_confidence']}")
     print(f"    Stale sessions: {metrics['stale_sessions']} incomplete")
 
     print("\n  Edge diagnostics:")
-    print(f"    Active: {edge_health['active_edges']}"
-          f" (pruned: {edge_health['pruned_edges']})")
-    print(f"    Traversed: {edge_health['traversed_edges']}"
-          f" (never: {edge_health['never_traversed_edges']})")
+    print(
+        f"    Active: {edge_health['active_edges']}"
+        f" (pruned: {edge_health['pruned_edges']})"
+    )
+    print(
+        f"    Traversed: {edge_health['traversed_edges']}"
+        f" (never: {edge_health['never_traversed_edges']})"
+    )
     print(f"    Avg edge confidence: {edge_health['avg_edge_confidence']}")
     print(f"    Avg traversal count: {edge_health['avg_traversal_count']}")
-    print(f"    Edge credal gap: {edge_health['edge_credal_gap']}"
-          f" ({edge_health['edge_credal_gap_pct']}%) at default prior")
+    print(
+        f"    Edge credal gap: {edge_health['edge_credal_gap']}"
+        f" ({edge_health['edge_credal_gap_pct']}%) at default prior"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -994,9 +1048,9 @@ def cmd_core(args: argparse.Namespace) -> None:
             elif age_days < 7:
                 age_str = f" {age_days:.0f}d"
             elif age_days < 30:
-                age_str = f" {age_days/7:.0f}w"
+                age_str = f" {age_days / 7:.0f}w"
             else:
-                age_str = f" {age_days/30:.0f}mo"
+                age_str = f" {age_days / 30:.0f}mo"
         except Exception:
             pass
         print(f"  {i}. [score {s:.2f}{age_str}]{locked_str} {b.content}")
@@ -1023,8 +1077,10 @@ def cmd_search(args: argparse.Namespace) -> None:
         print("No beliefs found.")
         return
 
-    print(f"Found {len(result.beliefs)} belief(s) "
-          f"({result.total_tokens} tokens, {result.budget_remaining} remaining):")
+    print(
+        f"Found {len(result.beliefs)} belief(s) "
+        f"({result.total_tokens} tokens, {result.budget_remaining} remaining):"
+    )
     from datetime import datetime as dt
     from datetime import timezone as tz
 
@@ -1043,13 +1099,15 @@ def cmd_search(args: argparse.Namespace) -> None:
             elif age_days < 7:
                 age_str = f" {age_days:.0f}d"
             elif age_days < 30:
-                age_str = f" {age_days/7:.0f}w"
+                age_str = f" {age_days / 7:.0f}w"
             else:
-                age_str = f" {age_days/30:.0f}mo"
+                age_str = f" {age_days / 30:.0f}mo"
         except Exception:
             pass
-        print(f"  [{belief.confidence:.0%}{age_str}]{locked_str} {belief.content} "
-              f"(ID: {belief.id}, type: {belief.belief_type}{score_str})")
+        print(
+            f"  [{belief.confidence:.0%}{age_str}]{locked_str} {belief.content} "
+            f"(ID: {belief.id}, type: {belief.belief_type}{score_str})"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -1075,7 +1133,9 @@ def cmd_locked(args: argparse.Namespace) -> None:
         print(f"  [{b.confidence:.0%}] {b.content} (ID: {b.id})")
 
     if len(beliefs) >= warn_at:
-        print(f"\n  WARNING: {len(beliefs)} locked beliefs (warn threshold: {warn_at}, cap: {max_cap})")
+        print(
+            f"\n  WARNING: {len(beliefs)} locked beliefs (warn threshold: {warn_at}, cap: {max_cap})"
+        )
         print("  Consider unlocking least-relevant locked beliefs.")
         print("  Run: agentmemory unlock [--count N] to unlock the N least-relevant.")
 
@@ -1089,7 +1149,8 @@ def cmd_stale(args: argparse.Namespace) -> None:
     """Show beliefs not retrieved recently (stale)."""
     store: MemoryStore = _get_store()
     beliefs: list[Belief] = store.get_stale_beliefs(
-        days_threshold=args.days, limit=args.limit,
+        days_threshold=args.days,
+        limit=args.limit,
     )
     store.close()
 
@@ -1176,8 +1237,10 @@ def cmd_wonder(args: argparse.Namespace) -> None:
         print("Error: empty query", file=sys.stderr)
         sys.exit(1)
 
-    depth: int = args.depth if args.depth is not None else int(
-        get_setting("wonder", "depth") or 2
+    depth: int = (
+        args.depth
+        if args.depth is not None
+        else int(get_setting("wonder", "depth") or 2)
     )
     budget: int = args.budget
 
@@ -1195,7 +1258,8 @@ def cmd_wonder(args: argparse.Namespace) -> None:
     # Step 2: Graph expansion from top 10 seeds
     seed_ids: list[str] = [b.id for b in result.beliefs[:10]]
     expanded: dict[str, list[tuple[Belief, str, int]]] = store.expand_graph(
-        seed_ids, depth=depth,
+        seed_ids,
+        depth=depth,
     )
 
     # Step 3: Merge and deduplicate
@@ -1211,7 +1275,10 @@ def cmd_wonder(args: argparse.Namespace) -> None:
         for neighbor_belief, edge_type, hop in exp_neighbors:
             if neighbor_belief.id not in all_beliefs:
                 all_beliefs[neighbor_belief.id] = neighbor_belief
-            if neighbor_belief.id not in belief_hops or hop < belief_hops[neighbor_belief.id]:
+            if (
+                neighbor_belief.id not in belief_hops
+                or hop < belief_hops[neighbor_belief.id]
+            ):
                 belief_hops[neighbor_belief.id] = hop
                 belief_edges[neighbor_belief.id] = edge_type
 
@@ -1225,20 +1292,18 @@ def cmd_wonder(args: argparse.Namespace) -> None:
     result_ids: set[str] = set(all_beliefs.keys())
     for bid in result_ids:
         neighbors: list[tuple[Belief, Edge]] = store.get_neighbors(
-            bid, edge_types=["CONTRADICTS"], direction="both",
+            bid,
+            edge_types=["CONTRADICTS"],
+            direction="both",
         )
         for neighbor_belief, _edge in neighbors:
             if neighbor_belief.id in result_ids and neighbor_belief.id > bid:
-                contradictions.append(
-                    (all_beliefs[bid], neighbor_belief)
-                )
+                contradictions.append((all_beliefs[bid], neighbor_belief))
 
     store.close()
 
     # Step 6: Categorize
-    direct: list[Belief] = [
-        b for b in result.beliefs if belief_hops.get(b.id, 0) == 0
-    ]
+    direct: list[Belief] = [b for b in result.beliefs if belief_hops.get(b.id, 0) == 0]
     connected: list[tuple[Belief, str, int]] = []
     for bid, b in all_beliefs.items():
         hop: int = belief_hops.get(bid, 0)
@@ -1256,9 +1321,11 @@ def cmd_wonder(args: argparse.Namespace) -> None:
 
     # Step 7: Output as structured context block (for LLM consumption)
     print(f"WONDER: {query}")
-    print(f"depth={depth}, direct={len(direct)}, "
-          f"graph={len(connected)}, uncertain={len(high_uncertainty)}, "
-          f"contradictions={len(contradictions)}")
+    print(
+        f"depth={depth}, direct={len(direct)}, "
+        f"graph={len(connected)}, uncertain={len(high_uncertainty)}, "
+        f"contradictions={len(contradictions)}"
+    )
 
     print("\n## Known Facts")
     for b in direct:
@@ -1281,8 +1348,8 @@ def cmd_wonder(args: argparse.Namespace) -> None:
     if contradictions:
         print("\n## Contradictions")
         for a, b in contradictions:
-            print(f"- \"{a.content[:100]}\"")
-            print(f"  CONTRADICTS \"{b.content[:100]}\"")
+            print(f'- "{a.content[:100]}"')
+            print(f'  CONTRADICTS "{b.content[:100]}"')
 
     if not connected and not high_uncertainty and not contradictions:
         print("\n(No graph connections, uncertainty flags, or contradictions found.)")
@@ -1291,6 +1358,7 @@ def cmd_wonder(args: argparse.Namespace) -> None:
     # Sources: high-uncertainty beliefs, contradictions, and the query itself
     store = _get_store()
     from agentmemory.uncertainty import UncertaintyVector
+
     speculative_created: int = 0
     spec_ids: list[str] = []
 
@@ -1313,7 +1381,7 @@ def cmd_wonder(args: argparse.Namespace) -> None:
     for a, b in contradictions[:2]:
         uv = UncertaintyVector()
         spec = store.insert_speculative_belief(
-            content=f"[fork] resolve: \"{a.content[:80]}\" vs \"{b.content[:80]}\"",
+            content=f'[fork] resolve: "{a.content[:80]}" vs "{b.content[:80]}"',
             uncertainty_vector_json=uv.to_json(),
             source_belief_id=a.id,
             session_id=None,
@@ -1362,8 +1430,10 @@ def cmd_reason(args: argparse.Namespace) -> None:
         print("Error: empty query", file=sys.stderr)
         sys.exit(1)
 
-    depth: int = args.depth if args.depth is not None else int(
-        get_setting("reason", "depth") or 2
+    depth: int = (
+        args.depth
+        if args.depth is not None
+        else int(get_setting("reason", "depth") or 2)
     )
     budget: int = args.budget
 
@@ -1382,28 +1452,87 @@ def cmd_reason(args: argparse.Namespace) -> None:
     # Use content-word overlap between query and top-5 beliefs.
     # Require min 3-char words and exclude common stopwords.
     import re as _re
-    _stop_words: frozenset[str] = frozenset({
-        "not", "don", "dont", "never", "cannot", "can",
-        "isn", "doesn", "didn", "without", "none", "nor",
-        "the", "and", "for", "are", "but", "with", "this", "that",
-        "from", "have", "has", "was", "were", "been", "being",
-        "will", "would", "could", "should", "about", "into",
-        "what", "when", "where", "which", "while", "how", "who",
-        "does", "did", "our", "your", "their", "its", "than",
-        "then", "also", "just", "only", "very", "some", "any",
-        "each", "every", "all", "both", "such", "more", "most",
-        "other", "using", "used", "use", "may", "need", "way",
-    })
+
+    _stop_words: frozenset[str] = frozenset(
+        {
+            "not",
+            "don",
+            "dont",
+            "never",
+            "cannot",
+            "can",
+            "isn",
+            "doesn",
+            "didn",
+            "without",
+            "none",
+            "nor",
+            "the",
+            "and",
+            "for",
+            "are",
+            "but",
+            "with",
+            "this",
+            "that",
+            "from",
+            "have",
+            "has",
+            "was",
+            "were",
+            "been",
+            "being",
+            "will",
+            "would",
+            "could",
+            "should",
+            "about",
+            "into",
+            "what",
+            "when",
+            "where",
+            "which",
+            "while",
+            "how",
+            "who",
+            "does",
+            "did",
+            "our",
+            "your",
+            "their",
+            "its",
+            "than",
+            "then",
+            "also",
+            "just",
+            "only",
+            "very",
+            "some",
+            "any",
+            "each",
+            "every",
+            "all",
+            "both",
+            "such",
+            "more",
+            "most",
+            "other",
+            "using",
+            "used",
+            "use",
+            "may",
+            "need",
+            "way",
+        }
+    )
     query_content: set[str] = {
-        t.lower() for t in _re.split(r'\W+', query)
-        if len(t) >= 3
+        t.lower() for t in _re.split(r"\W+", query) if len(t) >= 3
     } - _stop_words
     if query_content:
         topical_hits: int = 0
         for b in result.beliefs[:5]:
             b_terms: set[str] = {
-                t.lower() for t in _re.split(r'\W+', b.content)
-                if len(t) >= 3
+                t.lower() for t in _re.split(r"\W+", b.content) if len(t) >= 3
             } - _stop_words
             overlap: int = len(query_content & b_terms)
             # Require at least 1 shared content word
@@ -1412,10 +1541,14 @@ def cmd_reason(args: argparse.Namespace) -> None:
         if topical_hits == 0:
             print(f"REASON: {query}")
             print("VERDICT: INSUFFICIENT -- no topically relevant beliefs found.")
-            print(f"  (Returned {len(result.beliefs)} beliefs but none share "
-                  f"content words with the query.)")
-            print("  This topic may not be in memory. Consider using /mem:search "
-                  "with different keywords.")
+            print(
+                f"  (Returned {len(result.beliefs)} beliefs but none share "
+                f"content words with the query.)"
+            )
+            print(
+                "  This topic may not be in memory. Consider using /mem:search "
+                "with different keywords."
+            )
             store.close()
             return
 
@@ -1439,9 +1572,7 @@ def cmd_reason(args: argparse.Namespace) -> None:
     # Step 4: Load locked beliefs for constraint checking
     locked_rows: list[Belief] = store.get_locked_beliefs()
     # Filter to topically relevant locked beliefs (in all_beliefs or connected)
-    relevant_locked: list[Belief] = [
-        lb for lb in locked_rows if lb.id in all_beliefs
-    ]
+    relevant_locked: list[Belief] = [lb for lb in locked_rows if lb.id in all_beliefs]
 
     # Step 5: Detect impasses
     impasses: list[MemoryStore.Impasse] = store.detect_impasses(
@@ -1473,8 +1604,10 @@ def cmd_reason(args: argparse.Namespace) -> None:
 
     # Step 7: Format output
     print(f"REASON: {query}")
-    print(f"  depth={depth}, seeds={len(seed_ids)}, "
-          f"paths={len(paths)}, impasses={len(impasses)}")
+    print(
+        f"  depth={depth}, seeds={len(seed_ids)}, "
+        f"paths={len(paths)}, impasses={len(impasses)}"
+    )
     print(f"VERDICT: {verdict}")
 
     # Direct evidence (top 10 seed beliefs)
@@ -1501,33 +1634,45 @@ def cmd_reason(args: argparse.Namespace) -> None:
                     weakest_conf = cc
                     weakest_idx = j
 
-            print(f"\n  PATH {i + 1} (length={len(path)}, "
-                  f"leaf_confidence={leaf_conf:.0%}):")
+            print(
+                f"\n  PATH {i + 1} (length={len(path)}, "
+                f"leaf_confidence={leaf_conf:.0%}):"
+            )
             for j, (b, etype, cc) in enumerate(path):
                 indent: str = "    " + "  " * j
                 locked_str = " [LOCKED]" if b.locked else ""
                 arrow: str = f"--{etype}-->" if etype != "ROOT" else "[root]"
-                weak_marker: str = " *** WEAKEST LINK ***" if j == weakest_idx and len(path) > 1 else ""
-                print(f"{indent}{arrow} [{cc:.0%}]{locked_str} {b.content[:100]}{weak_marker}")
+                weak_marker: str = (
+                    " *** WEAKEST LINK ***"
+                    if j == weakest_idx and len(path) > 1
+                    else ""
+                )
+                print(
+                    f"{indent}{arrow} [{cc:.0%}]{locked_str} {b.content[:100]}{weak_marker}"
+                )
 
     # Impasses
     if impasses:
         print(f"\nIMPASSES ({len(impasses)} detected):")
         for imp in impasses:
             severity_bar: str = "#" * int(imp.severity * 10)
-            print(f"  [{imp.impasse_type.upper()}] (severity={imp.severity:.1f}) "
-                  f"[{severity_bar}]")
+            print(
+                f"  [{imp.impasse_type.upper()}] (severity={imp.severity:.1f}) "
+                f"[{severity_bar}]"
+            )
             print(f"    {imp.description}")
             if imp.impasse_type == "constraint_failure":
-                print(f"    ACTION: This path is BLOCKED by a locked constraint.")
+                print("    ACTION: This path is BLOCKED by a locked constraint.")
             elif imp.impasse_type == "tie":
-                print(f"    ACTION: Fork -- resolve which belief is correct.")
+                print("    ACTION: Fork -- resolve which belief is correct.")
             elif imp.impasse_type == "gap":
-                print(f"    ACTION: Evidence insufficient at this point in the chain.")
+                print("    ACTION: Evidence insufficient at this point in the chain.")
 
     if not paths and not impasses:
-        print("\n(No consequence paths or impasses found -- "
-              "graph may be too sparse for path-based reasoning.)")
+        print(
+            "\n(No consequence paths or impasses found -- "
+            "graph may be too sparse for path-based reasoning.)"
+        )
         print("Reason output is equivalent to a standard search at this graph density.")
 
     # Step 8: Update speculative beliefs if any are in the result set
@@ -1536,6 +1681,7 @@ def cmd_reason(args: argparse.Namespace) -> None:
         DIMENSION_FEASIBILITY,
         DIMENSION_VALUE,
     )
+
     store = _get_store()
     speculative_updated: int = 0
 
@@ -1547,17 +1693,13 @@ def cmd_reason(args: argparse.Namespace) -> None:
 
         # Evidence from consequence paths: if this belief appears in paths
         # with high compound confidence, increase feasibility
-        in_path: bool = any(
-            any(pb.id == b.id for pb, _, _ in path)
-            for path in paths
-        )
+        in_path: bool = any(any(pb.id == b.id for pb, _, _ in path) for path in paths)
         if in_path and has_high_conf:
             uv.update_dimension(DIMENSION_FEASIBILITY, True, weight=2.0)
 
         # Evidence from impasses: constraint failures reduce value
         belief_in_impasse: bool = any(
-            b.id in (imp.description or "")
-            for imp in impasses
+            b.id in (imp.description or "") for imp in impasses
         )
         if has_constraint_failure or belief_in_impasse:
             uv.update_dimension(DIMENSION_VALUE, False, weight=2.0)
@@ -1575,7 +1717,10 @@ def cmd_reason(args: argparse.Namespace) -> None:
         for seed in result.beliefs[:3]:
             if seed.id != b.id:
                 store.insert_edge(
-                    seed.id, b.id, "RESOLVES", 1.0,
+                    seed.id,
+                    b.id,
+                    "RESOLVES",
+                    1.0,
                     f"reason:{verdict.split(' -- ')[0].lower()}",
                 )
 
@@ -1592,11 +1737,17 @@ def cmd_reason(args: argparse.Namespace) -> None:
                     updated_b.uncertainty_vector
                 )
                 summary: dict[str, dict[str, float]] = uv_updated.dimension_summary()
-                h: float = updated_b.hibernation_score if updated_b.hibernation_score is not None else 0.0
+                h: float = (
+                    updated_b.hibernation_score
+                    if updated_b.hibernation_score is not None
+                    else 0.0
+                )
                 print(f"  {b.id}: hibernation={h:.3f}")
                 for dim_name, dim_data in summary.items():
-                    print(f"    {dim_name}: mean={dim_data['mean']:.3f}, "
-                          f"voi={dim_data['voi']:.4f}")
+                    print(
+                        f"    {dim_name}: mean={dim_data['mean']:.3f}, "
+                        f"voi={dim_data['voi']:.4f}"
+                    )
 
     store.close()
 
@@ -1639,7 +1790,9 @@ def cmd_unlock(args: argparse.Namespace) -> None:
             (current_time, b.id),
         )
         store._conn.commit()  # pyright: ignore[reportPrivateUsage]
-        print(f"  Unlocked: [{b.confidence:.0%}] {b.content} (ID: {b.id}, score: {s:.3f})")
+        print(
+            f"  Unlocked: [{b.confidence:.0%}] {b.content} (ID: {b.id}, score: {s:.3f})"
+        )
 
     store.close()
     print(f"\n{len(to_unlock)} beliefs unlocked.")
@@ -1665,7 +1818,9 @@ def cmd_delete(args: argparse.Namespace) -> None:
             print(f"  Already deleted: {belief_id}")
             continue
         store.delete_belief(belief_id)
-        print(f"  Deleted [{belief.confidence:.0%}] {belief.content[:80]} (ID: {belief_id})")
+        print(
+            f"  Deleted [{belief.confidence:.0%}] {belief.content[:80]} (ID: {belief_id})"
+        )
         deleted += 1
 
     store.close()
@@ -1674,6 +1829,7 @@ def cmd_delete(args: argparse.Namespace) -> None:
 
 def _now_iso() -> str:
     from datetime import datetime, timezone
+
     return datetime.now(timezone.utc).isoformat()
 
 
@@ -1681,6 +1837,7 @@ def _resolve_relative_time(time_str: str) -> str:
     """Resolve '-7d', '-24h', '-30m' to ISO 8601."""
     import re as _re
     from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+
     match: _re.Match[str] | None = _re.match(r"^-(\d+)([dhm])$", time_str)
     if match:
         value: int = int(match.group(1))
@@ -1707,8 +1864,11 @@ def cmd_timeline(args: argparse.Namespace) -> None:
     start: str | None = _resolve_relative_time(args.since) if args.since else None
     end: str | None = _resolve_relative_time(args.until) if args.until else None
     beliefs: list[Belief] = store.timeline(
-        topic=args.topic, start=start, end=end,
-        session_id=args.session, limit=args.limit,
+        topic=args.topic,
+        start=start,
+        end=end,
+        session_id=args.session,
+        limit=args.limit,
     )
     if not beliefs:
         print("No beliefs found.")
@@ -1727,7 +1887,8 @@ def cmd_evolution(args: argparse.Namespace) -> None:
     """Trace belief or topic evolution over time."""
     store: MemoryStore = _get_store()
     beliefs: list[Belief] = store.evolution(
-        belief_id=args.belief_id, topic=args.topic,
+        belief_id=args.belief_id,
+        topic=args.topic,
     )
     if not beliefs:
         print("No evolution chain found.")
@@ -1785,7 +1946,9 @@ def cmd_settings(args: argparse.Namespace) -> None:
 
     changed: bool = False
     if args.wonder_max_agents is not None:
-        wonder_section: dict[str, Any] = cast("dict[str, Any]", config.get("wonder", {}))
+        wonder_section: dict[str, Any] = cast(
+            "dict[str, Any]", config.get("wonder", {})
+        )
         wonder_section["max_agents"] = args.wonder_max_agents
         config["wonder"] = wonder_section
         changed = True
@@ -1795,22 +1958,30 @@ def cmd_settings(args: argparse.Namespace) -> None:
         config["core"] = core_section
         changed = True
     if args.locked_max_cap is not None:
-        locked_section: dict[str, Any] = cast("dict[str, Any]", config.get("locked", {}))
+        locked_section: dict[str, Any] = cast(
+            "dict[str, Any]", config.get("locked", {})
+        )
         locked_section["max_cap"] = args.locked_max_cap
         config["locked"] = locked_section
         changed = True
     if args.locked_warn_at is not None:
-        locked_section2: dict[str, Any] = cast("dict[str, Any]", config.get("locked", {}))
+        locked_section2: dict[str, Any] = cast(
+            "dict[str, Any]", config.get("locked", {})
+        )
         locked_section2["warn_at"] = args.locked_warn_at
         config["locked"] = locked_section2
         changed = True
     if args.reason_max_agents is not None:
-        reason_section: dict[str, Any] = cast("dict[str, Any]", config.get("reason", {}))
+        reason_section: dict[str, Any] = cast(
+            "dict[str, Any]", config.get("reason", {})
+        )
         reason_section["max_agents"] = args.reason_max_agents
         config["reason"] = reason_section
         changed = True
     if args.reason_depth is not None:
-        reason_section2: dict[str, Any] = cast("dict[str, Any]", config.get("reason", {}))
+        reason_section2: dict[str, Any] = cast(
+            "dict[str, Any]", config.get("reason", {})
+        )
         reason_section2["depth"] = args.reason_depth
         config["reason"] = reason_section2
         changed = True
@@ -1952,10 +2123,12 @@ def _install_commit_hook(agentmemory_bin: str | None) -> None:
                 print("  Commit tracker hook already installed")
                 return
 
-    pre_tool.append({
-        "type": "command",
-        "command": f"{cmd} commit-check",
-    })
+    pre_tool.append(
+        {
+            "type": "command",
+            "command": f"{cmd} commit-check",
+        }
+    )
     hooks["PreToolUse"] = pre_tool
     settings["hooks"] = hooks
     _SETTINGS_PATH.write_text(json.dumps(settings, indent=2) + "\n")
@@ -1972,9 +2145,16 @@ def _install_directive_gate() -> None:
     # Try CWD first (cloned repo), then fall back to __file__ traversal (editable install)
     gate_script: Path = Path.cwd() / "scripts" / "agentmemory-directive-gate.sh"
     if not gate_script.exists():
-        gate_script = Path(__file__).resolve().parents[2] / "scripts" / "agentmemory-directive-gate.sh"
+        gate_script = (
+            Path(__file__).resolve().parents[2]
+            / "scripts"
+            / "agentmemory-directive-gate.sh"
+        )
     if not gate_script.exists():
-        print("  Warning: directive gate script not found, skipping hook install", file=sys.stderr)
+        print(
+            "  Warning: directive gate script not found, skipping hook install",
+            file=sys.stderr,
+        )
         return
     gate_command: str = f"bash {gate_script}"
 
@@ -2023,11 +2203,13 @@ def _install_directive_gate() -> None:
                 print("  Directive gate hook already installed")
                 return
 
-    pre_tool.append({
-        "type": "command",
-        "matcher": "Edit|Write|Bash|NotebookEdit",
-        "command": gate_command,
-    })
+    pre_tool.append(
+        {
+            "type": "command",
+            "matcher": "Edit|Write|Bash|NotebookEdit",
+            "command": gate_command,
+        }
+    )
     hooks["PreToolUse"] = pre_tool
     settings["hooks"] = hooks
     _SETTINGS_PATH.write_text(json.dumps(settings, indent=2) + "\n")
@@ -2038,15 +2220,72 @@ def _install_directive_gate() -> None:
 # feedback-flush
 # ---------------------------------------------------------------------------
 
-_FEEDBACK_STOPWORDS: frozenset[str] = frozenset({
-    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-    "have", "has", "had", "do", "does", "did", "will", "would", "shall",
-    "should", "may", "might", "must", "can", "could", "of", "in", "to",
-    "for", "with", "on", "at", "by", "from", "as", "into", "through",
-    "that", "this", "these", "those", "it", "its", "not", "no", "all",
-    "and", "or", "but", "if", "then", "than", "when", "where", "how",
-    "what", "which", "who", "whom", "use", "using", "used",
-})
+_FEEDBACK_STOPWORDS: frozenset[str] = frozenset(
+    {
+        "the",
+        "a",
+        "an",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "shall",
+        "should",
+        "may",
+        "might",
+        "must",
+        "can",
+        "could",
+        "of",
+        "in",
+        "to",
+        "for",
+        "with",
+        "on",
+        "at",
+        "by",
+        "from",
+        "as",
+        "into",
+        "through",
+        "that",
+        "this",
+        "these",
+        "those",
+        "it",
+        "its",
+        "not",
+        "no",
+        "all",
+        "and",
+        "or",
+        "but",
+        "if",
+        "then",
+        "than",
+        "when",
+        "where",
+        "how",
+        "what",
+        "which",
+        "who",
+        "whom",
+        "use",
+        "using",
+        "used",
+    }
+)
 
 _FEEDBACK_MIN_MATCHES: int = 2
 
@@ -2054,6 +2293,7 @@ _FEEDBACK_MIN_MATCHES: int = 2
 def _extract_feedback_key_terms(text: str) -> list[str]:
     """Extract meaningful terms from text, filtering stopwords."""
     import re as _re
+
     words: list[str] = _re.findall(r"[a-zA-Z0-9_]+", text.lower())
     return [w for w in words if w not in _FEEDBACK_STOPWORDS and len(w) >= 2]
 
@@ -2077,9 +2317,7 @@ def cmd_feedback_flush(args: argparse.Namespace) -> None:
         return
 
     # Gather recently ingested text: observations from the same session(s)
-    session_ids: set[str] = {
-        e["session_id"] for e in entries if e["session_id"]
-    }
+    session_ids: set[str] = {e["session_id"] for e in entries if e["session_id"]}
     combined_text: str = ""
     for sid in session_ids:
         texts: list[str] = store.get_session_observation_texts(sid)
@@ -2100,13 +2338,9 @@ def cmd_feedback_flush(args: argparse.Namespace) -> None:
         unique_matches: int = sum(1 for t in unique_terms if t in combined_lower)
 
         outcome: str = (
-            OUTCOME_USED
-            if unique_matches >= _FEEDBACK_MIN_MATCHES
-            else OUTCOME_IGNORED
+            OUTCOME_USED if unique_matches >= _FEEDBACK_MIN_MATCHES else OUTCOME_IGNORED
         )
-        detail: str = (
-            f"flush: {unique_matches}/{len(unique_terms)} key terms matched"
-        )
+        detail: str = f"flush: {unique_matches}/{len(unique_terms)} key terms matched"
 
         store.record_test_result(
             belief_id=belief_id,
@@ -2132,6 +2366,7 @@ def cmd_feedback_flush(args: argparse.Namespace) -> None:
 def cmd_mcp(args: argparse.Namespace) -> None:
     """Start the MCP server (stdio transport)."""
     from agentmemory.server import mcp
+
     mcp.run()
 
 
@@ -2151,14 +2386,24 @@ def cmd_uninstall(args: argparse.Namespace) -> None:
 
     # Remove old skills
     old_skills_dir: Path = Path.home() / ".claude" / "skills"
-    for prefix in ["mem-correct", "mem-ingest", "mem-locked", "mem-observe",
-                    "mem-onboard", "mem-remember", "mem-search", "mem-status"]:
+    for prefix in [
+        "mem-correct",
+        "mem-ingest",
+        "mem-locked",
+        "mem-observe",
+        "mem-onboard",
+        "mem-remember",
+        "mem-search",
+        "mem-status",
+    ]:
         old_path: Path = old_skills_dir / prefix
         if old_path.is_dir():
             shutil.rmtree(old_path)
 
     print("  Removed legacy skills")
-    print("\nDone. Data is preserved at ~/.agentmemory/. To delete data: rm -rf ~/.agentmemory/")
+    print(
+        "\nDone. Data is preserved at ~/.agentmemory/. To delete data: rm -rf ~/.agentmemory/"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -2240,14 +2485,18 @@ def cmd_batch_feedback(args: argparse.Namespace) -> None:
             (args.source_type,),
         )
         target_ids: list[str] = [str(r["id"]) for r in rows]
-        print(f"Targeting {len(target_ids)} beliefs with source_type={args.source_type}")
+        print(
+            f"Targeting {len(target_ids)} beliefs with source_type={args.source_type}"
+        )
     elif args.belief_type:
         rows = store.query(
             "SELECT id FROM beliefs WHERE valid_to IS NULL AND belief_type = ?",
             (args.belief_type,),
         )
         target_ids = [str(r["id"]) for r in rows]
-        print(f"Targeting {len(target_ids)} beliefs with belief_type={args.belief_type}")
+        print(
+            f"Targeting {len(target_ids)} beliefs with belief_type={args.belief_type}"
+        )
     elif args.classified_by:
         rows = store.query(
             "SELECT id FROM beliefs WHERE valid_to IS NULL AND classified_by = ?",
@@ -2256,9 +2505,7 @@ def cmd_batch_feedback(args: argparse.Namespace) -> None:
         target_ids = [str(r["id"]) for r in rows]
         print(f"Targeting {len(target_ids)} beliefs classified_by={args.classified_by}")
     else:
-        rows = store.query(
-            "SELECT id FROM beliefs WHERE valid_to IS NULL"
-        )
+        rows = store.query("SELECT id FROM beliefs WHERE valid_to IS NULL")
         target_ids = [str(r["id"]) for r in rows]
         print(f"Targeting all {len(target_ids)} active beliefs")
 
@@ -2278,10 +2525,13 @@ def cmd_sync_obsidian(args: argparse.Namespace) -> None:
         load_obsidian_config,
         sync_vault,
     )
+
     store: MemoryStore = _get_store()
 
     vault_path: str | None = getattr(args, "vault", None)
     full: bool = getattr(args, "full", False)
+    tier: str = getattr(args, "tier", "full")
+    max_beliefs: int | None = getattr(args, "max_beliefs", None)
 
     config: ObsidianConfig | None = load_obsidian_config(vault_path)
     if config is None:
@@ -2294,8 +2544,15 @@ def cmd_sync_obsidian(args: argparse.Namespace) -> None:
         print(f"Error: vault path does not exist: {config.vault_path}")
         sys.exit(1)
 
-    print(f"Syncing to {config.vault_path} ...")
-    result: SyncResult = sync_vault(store, config, full=full)
+    label: str = f"tier={tier}" if max_beliefs is None else f"max={max_beliefs}"
+    print(f"Syncing to {config.vault_path} ({label}) ...")
+    result: SyncResult = sync_vault(
+        store,
+        config,
+        full=full,
+        tier=tier,
+        max_beliefs=max_beliefs,
+    )
     store.close()
 
     print(f"Done in {result.elapsed_seconds}s:")
@@ -2315,6 +2572,7 @@ def cmd_import_obsidian(args: argparse.Namespace) -> None:
         import_vault_changes,
         load_obsidian_config,
     )
+
     store: MemoryStore = _get_store()
 
     vault_path: str | None = getattr(args, "vault", None)
@@ -2345,7 +2603,7 @@ def cmd_import_obsidian(args: argparse.Namespace) -> None:
         print("\nRe-run with --apply to import changes.")
     else:
         result: ImportResult = import_vault_changes(store, changes)
-        print(f"Import complete:")
+        print("Import complete:")
         print(f"  Modified: {result.modified}")
         print(f"  New:      {result.new_beliefs}")
         print(f"  Deleted:  {result.deleted}")
@@ -2393,6 +2651,7 @@ def cmd_rebuild_index(args: argparse.Namespace) -> None:
     vault_path: str | None = getattr(args, "vault", None)
     if vault_path is None:
         from agentmemory.config import get_str_setting
+
         vault_path = get_str_setting("obsidian", "vault_path")
     if not vault_path:
         print("Error: no vault path. Use --vault or set obsidian.vault_path")
@@ -2433,7 +2692,9 @@ def cmd_enable_telemetry(args: argparse.Namespace) -> None:
     config["telemetry"] = telem
     save_config(config)  # type: ignore[arg-type]
     print("Telemetry ENABLED.")
-    print("Content-free performance metrics will be appended to ~/.agentmemory/telemetry.jsonl")
+    print(
+        "Content-free performance metrics will be appended to ~/.agentmemory/telemetry.jsonl"
+    )
     print("Disable anytime: agentmemory disable-telemetry (or /mem:disable-telemetry)")
 
 
@@ -2459,7 +2720,9 @@ def cmd_send_telemetry(args: argparse.Namespace) -> None:
 
     enabled: bool = bool(get_setting("telemetry", "enabled"))
     if not enabled:
-        print("Telemetry is disabled. Enable it first with: agentmemory enable-telemetry")
+        print(
+            "Telemetry is disabled. Enable it first with: agentmemory enable-telemetry"
+        )
         sys.exit(1)
 
     unsent, offset = get_unsent_lines()
@@ -2480,11 +2743,19 @@ def cmd_send_telemetry(args: argparse.Namespace) -> None:
         try:
             obj: dict[str, object] = _json.loads(line)
             ts: object = obj.get("ts", "?")
-            session: object = obj.get("session", {})
-            beliefs: object = obj.get("beliefs", {})
-            s_created: object = session.get("beliefs_created", 0) if isinstance(session, dict) else 0  # type: ignore[union-attr]
-            b_active: object = beliefs.get("total_active", 0) if isinstance(beliefs, dict) else 0  # type: ignore[union-attr]
-            print(f"  [{i + 1}] ts={ts}  beliefs_created={s_created}  total_active={b_active}")
+            session_raw: object = obj.get("session")
+            beliefs_raw: object = obj.get("beliefs")
+            s_created: object = 0
+            b_active: object = 0
+            if isinstance(session_raw, dict):
+                sd: dict[str, object] = session_raw  # type: ignore[assignment]
+                s_created = sd.get("beliefs_created", 0)
+            if isinstance(beliefs_raw, dict):
+                bd: dict[str, object] = beliefs_raw  # type: ignore[assignment]
+                b_active = bd.get("total_active", 0)
+            print(
+                f"  [{i + 1}] ts={ts}  beliefs_created={s_created}  total_active={b_active}"
+            )
         except (ValueError, AttributeError):
             print(f"  [{i + 1}] (unparseable line)")
     print("  " + "-" * 60)
@@ -2521,7 +2792,9 @@ def main() -> None:
         description="Persistent memory for AI coding agents",
     )
     parser.add_argument(
-        "--project", type=str, default=None,
+        "--project",
+        type=str,
+        default=None,
         help="Project directory (default: cwd). Determines which isolated DB to use.",
     )
     subparsers = parser.add_subparsers(dest="command")
@@ -2538,7 +2811,9 @@ def main() -> None:
     )
     p_onboard.add_argument("path", help="Project directory to onboard")
     p_onboard.add_argument(
-        "--link", action="store_true", default=False,
+        "--link",
+        action="store_true",
+        default=False,
         help="Run Haiku semantic linking after ingestion (~$0.01-0.05)",
     )
     p_onboard.set_defaults(func=cmd_onboard)
@@ -2587,10 +2862,15 @@ def main() -> None:
     p_stale: argparse.ArgumentParser = subparsers.add_parser(
         "stale", help="Show stale beliefs (not retrieved recently)"
     )
-    p_stale.add_argument("--days", type=int, default=30,
-                         help="Days threshold for staleness (default: 30)")
-    p_stale.add_argument("--limit", type=int, default=20,
-                         help="Max beliefs to show (default: 20)")
+    p_stale.add_argument(
+        "--days",
+        type=int,
+        default=30,
+        help="Days threshold for staleness (default: 30)",
+    )
+    p_stale.add_argument(
+        "--limit", type=int, default=20, help="Max beliefs to show (default: 20)"
+    )
     p_stale.set_defaults(func=cmd_stale)
 
     # remember (new-belief)
@@ -2612,10 +2892,18 @@ def main() -> None:
         "wonder", help="Deep research from graph context"
     )
     p_wonder.add_argument("query", nargs="+", help="Research topic or question")
-    p_wonder.add_argument("--depth", type=int, default=None,
-                          help="Graph expansion depth 1-3 (default: from config, usually 2)")
-    p_wonder.add_argument("--budget", type=int, default=4000,
-                          help="Token budget for retrieval (default: 4000)")
+    p_wonder.add_argument(
+        "--depth",
+        type=int,
+        default=None,
+        help="Graph expansion depth 1-3 (default: from config, usually 2)",
+    )
+    p_wonder.add_argument(
+        "--budget",
+        type=int,
+        default=4000,
+        help="Token budget for retrieval (default: 4000)",
+    )
     p_wonder.set_defaults(func=cmd_wonder)
 
     # reason
@@ -2623,18 +2911,27 @@ def main() -> None:
         "reason", help="Graph-aware reasoning with uncertainty analysis"
     )
     p_reason.add_argument("query", nargs="+", help="Statement or topic to reason about")
-    p_reason.add_argument("--depth", type=int, default=None,
-                          help="Graph expansion depth 1-3 (default: from config, usually 2)")
-    p_reason.add_argument("--budget", type=int, default=4000,
-                          help="Token budget for retrieval (default: 4000)")
+    p_reason.add_argument(
+        "--depth",
+        type=int,
+        default=None,
+        help="Graph expansion depth 1-3 (default: from config, usually 2)",
+    )
+    p_reason.add_argument(
+        "--budget",
+        type=int,
+        default=4000,
+        help="Token budget for retrieval (default: 4000)",
+    )
     p_reason.set_defaults(func=cmd_reason)
 
     # unlock
     p_unlock: argparse.ArgumentParser = subparsers.add_parser(
         "unlock", help="Unlock least-relevant locked beliefs"
     )
-    p_unlock.add_argument("--count", type=int, default=5,
-                          help="Number of beliefs to unlock (default: 5)")
+    p_unlock.add_argument(
+        "--count", type=int, default=5, help="Number of beliefs to unlock (default: 5)"
+    )
     p_unlock.set_defaults(func=cmd_unlock)
 
     # delete
@@ -2649,18 +2946,28 @@ def main() -> None:
         "timeline", help="Show beliefs ordered by time"
     )
     p_timeline.add_argument("--topic", default=None, help="FTS5 topic filter")
-    p_timeline.add_argument("--since", default=None, help="Start time (ISO 8601 or -7d/-24h)")
-    p_timeline.add_argument("--until", default=None, help="End time (ISO 8601 or -7d/-24h)")
+    p_timeline.add_argument(
+        "--since", default=None, help="Start time (ISO 8601 or -7d/-24h)"
+    )
+    p_timeline.add_argument(
+        "--until", default=None, help="End time (ISO 8601 or -7d/-24h)"
+    )
     p_timeline.add_argument("--session", default=None, help="Filter by session ID")
-    p_timeline.add_argument("--limit", type=int, default=50, help="Max beliefs (default: 50)")
+    p_timeline.add_argument(
+        "--limit", type=int, default=50, help="Max beliefs (default: 50)"
+    )
     p_timeline.set_defaults(func=cmd_timeline)
 
     # evolution
     p_evolution: argparse.ArgumentParser = subparsers.add_parser(
         "evolution", help="Trace belief or topic evolution"
     )
-    p_evolution.add_argument("--belief-id", default=None, help="Follow SUPERSEDES chain for this belief")
-    p_evolution.add_argument("--topic", default=None, help="Show all beliefs about topic chronologically")
+    p_evolution.add_argument(
+        "--belief-id", default=None, help="Follow SUPERSEDES chain for this belief"
+    )
+    p_evolution.add_argument(
+        "--topic", default=None, help="Show all beliefs about topic chronologically"
+    )
     p_evolution.set_defaults(func=cmd_evolution)
 
     # diff
@@ -2675,18 +2982,42 @@ def main() -> None:
     p_settings: argparse.ArgumentParser = subparsers.add_parser(
         "settings", help="View or update agentmemory settings"
     )
-    p_settings.add_argument("--wonder-max-agents", type=int, default=None,
-                            help="Max subagents for /mem:wonder (default: 4)")
-    p_settings.add_argument("--core-default-top", type=int, default=None,
-                            help="Default N for /mem:core (default: 10)")
-    p_settings.add_argument("--locked-max-cap", type=int, default=None,
-                            help="Max locked beliefs in retrieve (default: 100)")
-    p_settings.add_argument("--locked-warn-at", type=int, default=None,
-                            help="Warn when locked beliefs exceed this (default: 80)")
-    p_settings.add_argument("--reason-max-agents", type=int, default=None,
-                            help="Max subagents for /mem:reason (default: 3)")
-    p_settings.add_argument("--reason-depth", type=int, default=None,
-                            help="Graph expansion depth for /mem:reason (default: 2)")
+    p_settings.add_argument(
+        "--wonder-max-agents",
+        type=int,
+        default=None,
+        help="Max subagents for /mem:wonder (default: 4)",
+    )
+    p_settings.add_argument(
+        "--core-default-top",
+        type=int,
+        default=None,
+        help="Default N for /mem:core (default: 10)",
+    )
+    p_settings.add_argument(
+        "--locked-max-cap",
+        type=int,
+        default=None,
+        help="Max locked beliefs in retrieve (default: 100)",
+    )
+    p_settings.add_argument(
+        "--locked-warn-at",
+        type=int,
+        default=None,
+        help="Warn when locked beliefs exceed this (default: 80)",
+    )
+    p_settings.add_argument(
+        "--reason-max-agents",
+        type=int,
+        default=None,
+        help="Max subagents for /mem:reason (default: 3)",
+    )
+    p_settings.add_argument(
+        "--reason-depth",
+        type=int,
+        default=None,
+        help="Graph expansion depth for /mem:reason (default: 2)",
+    )
     p_settings.set_defaults(func=cmd_settings)
 
     # commit-check
@@ -2697,8 +3028,10 @@ def main() -> None:
         "--project-dir", default=".", help="Git repo to check (default: cwd)"
     )
     p_commit_check.add_argument(
-        "--nudge-only", action="store_true", default=False,
-        help="Only print output when a nudge threshold is exceeded"
+        "--nudge-only",
+        action="store_true",
+        default=False,
+        help="Only print output when a nudge threshold is exceeded",
     )
     p_commit_check.set_defaults(func=cmd_commit_check)
 
@@ -2707,13 +3040,19 @@ def main() -> None:
         "commit-config", help="View or update commit tracker settings"
     )
     p_commit_config.add_argument("--enable", action="store_true", help="Enable tracker")
-    p_commit_config.add_argument("--disable", action="store_true", help="Disable tracker")
     p_commit_config.add_argument(
-        "--max-minutes", type=int, default=None,
+        "--disable", action="store_true", help="Disable tracker"
+    )
+    p_commit_config.add_argument(
+        "--max-minutes",
+        type=int,
+        default=None,
         help="Minutes before nudge (default: 15)",
     )
     p_commit_config.add_argument(
-        "--max-changes", type=int, default=None,
+        "--max-changes",
+        type=int,
+        default=None,
         help="Uncommitted changes before nudge (default: 10)",
     )
     p_commit_config.set_defaults(func=cmd_commit_config)
@@ -2744,7 +3083,8 @@ def main() -> None:
         "rebuild-edges", help="Rebuild SUPPORTS/CONTRADICTS edges across all beliefs"
     )
     p_rebuild.add_argument(
-        "--only-orphans", action="store_true",
+        "--only-orphans",
+        action="store_true",
         help="Only process beliefs with no existing SUPPORTS/CONTRADICTS edges",
     )
     p_rebuild.set_defaults(func=cmd_rebuild_edges)
@@ -2754,16 +3094,22 @@ def main() -> None:
         "batch-feedback", help="Apply bulk feedback to beliefs matching criteria"
     )
     p_batch.add_argument(
-        "--outcome", choices=["used", "harmful"], default="used",
+        "--outcome",
+        choices=["used", "harmful"],
+        default="used",
         help="Feedback outcome (default: used)",
     )
     p_batch.add_argument(
-        "--weight", type=float, default=0.5,
+        "--weight",
+        type=float,
+        default=0.5,
         help="Update weight (default: 0.5)",
     )
     p_batch.add_argument("--source-type", default=None, help="Filter by source_type")
     p_batch.add_argument("--belief-type", default=None, help="Filter by belief_type")
-    p_batch.add_argument("--classified-by", default=None, help="Filter by classified_by")
+    p_batch.add_argument(
+        "--classified-by", default=None, help="Filter by classified_by"
+    )
     p_batch.set_defaults(func=cmd_batch_feedback)
 
     # sync-obsidian
@@ -2774,8 +3120,23 @@ def main() -> None:
         "--vault", default=None, help="Obsidian vault path (default: from config)"
     )
     p_sync_obs.add_argument(
-        "--full", action="store_true", default=False,
-        help="Rewrite all files unconditionally"
+        "--full",
+        action="store_true",
+        default=False,
+        help="Rewrite all files unconditionally",
+    )
+    p_sync_obs.add_argument(
+        "--tier",
+        default="full",
+        choices=["core", "connected", "full"],
+        help="Filter tier: core (~2000), connected (non-orphans), full (all)",
+    )
+    p_sync_obs.add_argument(
+        "--max-beliefs",
+        type=int,
+        default=None,
+        dest="max_beliefs",
+        help="Export only top N beliefs by priority (overrides --tier)",
     )
     p_sync_obs.set_defaults(func=cmd_sync_obsidian)
 
@@ -2787,14 +3148,17 @@ def main() -> None:
         "--vault", default=None, help="Obsidian vault path (default: from config)"
     )
     p_import_obs.add_argument(
-        "--apply", action="store_true", default=False,
-        help="Apply changes (default: dry run)"
+        "--apply",
+        action="store_true",
+        default=False,
+        help="Apply changes (default: dry run)",
     )
     p_import_obs.set_defaults(func=cmd_import_obsidian)
 
     # link-docs
     p_link_docs: argparse.ArgumentParser = subparsers.add_parser(
-        "link-docs", help="Export project documents to Obsidian vault with cross-references"
+        "link-docs",
+        help="Export project documents to Obsidian vault with cross-references",
     )
     p_link_docs.add_argument(
         "--vault", default=None, help="Obsidian vault path (default: from config)"

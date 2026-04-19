@@ -1876,6 +1876,8 @@ def session_quality(score: float, detail: str = "") -> str:
 def sync_obsidian(
     vault_path: str | None = None,
     full: bool = False,
+    tier: str = "full",
+    max_beliefs: int | None = None,
 ) -> str:
     """Sync beliefs to an Obsidian vault as markdown files.
 
@@ -1888,6 +1890,11 @@ def sync_obsidian(
     Args:
         vault_path: Path to Obsidian vault root. Uses config if omitted.
         full: If True, rewrite all files unconditionally.
+        tier: Filter tier: "core" (~2000 important beliefs), "connected"
+              (non-orphans only), or "full" (all beliefs, default).
+        max_beliefs: If set, export only this many beliefs by priority
+                     (locked first, then user-sourced, then by edge count).
+                     Overrides tier.
     """
     from agentmemory.obsidian import (
         ObsidianConfig,
@@ -1906,7 +1913,13 @@ def sync_obsidian(
     if not config.vault_path.exists():
         return "Error: configured vault path does not exist. Check obsidian.vault_path in settings."
 
-    result: SyncResult = sync_vault(store, config, full=full)
+    result: SyncResult = sync_vault(
+        store,
+        config,
+        full=full,
+        tier=tier,
+        max_beliefs=max_beliefs,
+    )
     return (
         f"Obsidian sync complete ({result.elapsed_seconds}s):\n"
         f"  Written: {result.beliefs_written}\n"
