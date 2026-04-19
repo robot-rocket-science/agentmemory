@@ -2,6 +2,43 @@
 
 ## [Unreleased]
 
+## [2.3.2] - 2026-04-19
+
+### Changed
+- Update stale counts and URLs across CLAUDE.md, TODO.md, INSTALL.md
+
+### Added
+- LLM classification option for onboard (`use_llm` parameter)
+
+## [2.3.1] - 2026-04-19
+
+### Fixed
+- Onboard end-to-end: scan, classify, and create beliefs in a single pipeline
+
+## [2.3.0] - 2026-04-19
+
+### Fixed
+- Bayesian score inflation: deflate insertion priors for agent-inferred content
+- Complete case-insensitive PII sanitization for public release
+- Remove diff-based guard check, fix workers PII
+- Sanitize filesystem paths in error messages
+
+### Added
+- `recalibrate_scores()` with 13 diagnostic tests for score inflation
+- 3-tier `lock_level` schema (none/promoted/user)
+- `--tier` and `--max-beliefs` filters for Obsidian sync
+- 27 acceptance tests for case studies CS-012 through CS-035
+- 25 acceptance tests for REQ-003/023/024/025/026/027
+- 181 tests for scoring, correction_detection, classification
+- 19 validation tests for open design questions
+- REQ-015/016 claims audit (20 claims, zero unverified) + LIMITATIONS.md
+
+### Changed
+- Wire `recalibrate` into CLI and MCP server
+- Close all open research questions (R2/R3/D1/D2/D3/F4/F5/C1)
+- Set `ingest.use_llm` default to False
+- Add ruff to dev dependencies for pre-commit hooks
+
 ## [2.2.2] - 2026-04-19
 
 ### Fixed

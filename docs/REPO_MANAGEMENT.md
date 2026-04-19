@@ -249,7 +249,7 @@ This project pushes to three remotes:
 | Remote | URL | Purpose |
 |---|---|---|
 | `origin` | gitea:user/agentmemory.git | Primary dev (Gitea) |
-| `github` | git@github.com:yoshi280/agentmemory.git | Public install source |
+| `github` | git@github.com:robot-rocket-science/agentmemory.git | Public install source |
 | `github-rrs` | git@github-rrs:robotrocketscience/agentmemory.git | Public-facing (when unlocked) |
 
 Push to all three on release:
@@ -272,12 +272,12 @@ uv run pytest
 
 # 3. After PR merges, tag and push
 git checkout main && git pull
-git tag v2.1.0
+git tag v2.3.2
 git push origin main --tags
 git push github main --tags
 git push github-rrs main --tags
 
 # 4. Create GitHub Release
-gh release create v2.1.0 --repo yoshi280/agentmemory \
-  --title "v2.1.0" --notes "$(sed -n '/## \[2.1.0\]/,/## \[/p' CHANGELOG.md | head -n -1)"
+gh release create v2.3.2 --repo robot-rocket-science/agentmemory \
+  --title "v2.3.2" --notes "$(sed -n '/## \[2.3.2\]/,/## \[/p' CHANGELOG.md | head -n -1)"
 ```

@@ -5,7 +5,7 @@ description = "Persistent, graph-backed memory for AI coding agents. Bayesian co
 readme = "README.md"
 requires-python = ">=3.12"
 license = {text = "MIT"}
-authors = [{name = "yoshi280"}]
+authors = [{name = "robotrocketscience"}]
 keywords = ["ai", "memory", "llm", "mcp", "agent", "retrieval", "sqlite"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -25,8 +25,8 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yoshi280/agentmemory"
-Repository = "https://github.com/yoshi280/agentmemory"
+Homepage = "https://github.com/robot-rocket-science/agentmemory"
+Repository = "https://github.com/robot-rocket-science/agentmemory"
 Changelog = "https://github.com/robot-rocket-science/agentmemory/blob/master/CHANGELOG.md"
 
 [project.scripts]

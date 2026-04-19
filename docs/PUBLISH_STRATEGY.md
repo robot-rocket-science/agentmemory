@@ -50,8 +50,9 @@ Two claims must be stated precisely:
   and benchmark code are the proof of work; the production modules are the
   implementation detail.
 
-## Git Repos (locked belief dd7fcad5e718)
+## Git Repos
 
-- **yoshi280** (private GitHub): deploys builds to Cloudflare
-- **robotrocketscience** (public GitHub): public-facing, shares source code
+- **robot-rocket-science** (public GitHub): public-facing, shares source code (renamed from yoshi280 on 2026-04-18)
 - **Gitea** (internal): configuration control, primary development repo
+
+Note: The `robotrocketscience` (no hyphens) GitHub account is locked by GitHub. The active public account is `robot-rocket-science` (with hyphens).

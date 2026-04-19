@@ -3,7 +3,7 @@
 ## Setup
 
 ```bash
-git clone https://github.com/yoshi280/agentmemory.git
+git clone https://github.com/robot-rocket-science/agentmemory.git
 cd agentmemory
 uv sync --all-groups
 ```
