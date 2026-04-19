@@ -1,7 +1,7 @@
 # TODO: Agentic Memory Project
 
-**Last updated:** 2026-04-18
-**Status:** Phases 1-4 complete. Phase 5 in progress. 28 production modules, 861 tests passing, 23 MCP tools, MCP server active. All open research questions closed. All 35 case studies have acceptance tests.
+**Last updated:** 2026-04-19
+**Status:** Phases 1-4 complete. Phase 5 complete (except REQ-011). v2.3.2, 28 modules, 872 tests, 26 MCP tools. Score inflation fixed, 3-tier lock_level, onboard end-to-end, PII sanitized, all research closed.
 
 ---
 

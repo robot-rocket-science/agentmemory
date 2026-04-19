@@ -18,7 +18,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 ## Step 1: Install agentmemory
 
 ```bash
-uv pip install git+https://github.com/yoshi280/agentmemory.git
+uv pip install git+https://github.com/robot-rocket-science/agentmemory.git
 ```
 
 Verify it installed:
@@ -30,7 +30,7 @@ agentmemory --help
 If you get `command not found`, try installing as a tool instead:
 
 ```bash
-uv tool install git+https://github.com/yoshi280/agentmemory.git
+uv tool install git+https://github.com/robot-rocket-science/agentmemory.git
 ```
 
 ## Step 2: Run setup
@@ -86,7 +86,7 @@ Override with `--project /path/to/project` or `AGENTMEMORY_DB=/path/to/db.sqlite
 
 | Problem | Fix |
 |---------|-----|
-| `agentmemory: command not found` | Run `uv tool install git+https://github.com/yoshi280/agentmemory.git` or check that `~/.local/bin` is in your PATH |
+| `agentmemory: command not found` | Run `uv tool install git+https://github.com/robot-rocket-science/agentmemory.git` or check that `~/.local/bin` is in your PATH |
 | `/mem:status` returns an error | Restart Claude Code. The MCP server needs a fresh start after setup |
 | Slash commands not showing up | Run `agentmemory setup` again, then restart Claude Code |
 | MCP tools not responding | Check `.mcp.json` exists in your project root. If not, run `agentmemory setup` from the project directory |
