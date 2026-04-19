@@ -3,6 +3,7 @@
 Stores settings in ~/.agentmemory/config.json. Provides typed access
 with sensible defaults. Settings are user-configurable via /mem:settings.
 """
+
 from __future__ import annotations
 
 import json
@@ -27,7 +28,7 @@ _DEFAULTS: dict[str, dict[str, int | bool | str]] = {
         "warn_at": 80,
     },
     "ingest": {
-        "use_llm": True,
+        "use_llm": False,  # LLM classifier not yet built; offline only (36% accuracy)
     },
     "obsidian": {
         "vault_path": "",
@@ -58,7 +59,9 @@ def load_config() -> dict[str, Any]:
     merged: dict[str, Any] = {}
     for section, defaults in _DEFAULTS.items():
         user_raw: object = config.get(section, {})
-        user_section: dict[str, Any] = cast("dict[str, Any]", user_raw) if isinstance(user_raw, dict) else {}
+        user_section: dict[str, Any] = (
+            cast("dict[str, Any]", user_raw) if isinstance(user_raw, dict) else {}
+        )
         merged_section: dict[str, int | bool | str] = {}
         for key, default_val in defaults.items():
             raw_val: object = user_section.get(key, default_val)
