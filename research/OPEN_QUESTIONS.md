@@ -280,13 +280,13 @@ Remaining research questions:
 - Can we validate the LLM's semantic tagging accuracy?
 - What's the UX for the clarification interview? (Inline? Separate tool call? Batched?)
 
-**Status:** Partially resolved (interview pattern for edge cases). Tagging accuracy and taxonomy need research.
+**Status:** CLOSED (2026-04-18). Core mechanism shipped: LLM classification at 99% accuracy via Haiku (Exp 47/50, $0.001/batch). remember() and correct() MCP tools capture directives with semantic context. Remaining sub-questions (taxonomy, tags-per-directive) are refinements, not blockers.
 
 ### F5: Automatic query-seeded context injection (deep dive)
 
 What's the latency budget for pre-LLM injection? How do we extract query terms from the user's prompt without an LLM (the prompt hasn't been processed yet)? How do we avoid injecting too much (every prompt gets 50 directives = token bloat) or too little (relevant directive missed)? How does this interact with the L0/L1/L2 token budgets? What if the user's prompt is ambiguous and multiple directive domains are relevant? How does injection work when the MCP server is called via tools (the prompt is the tool parameters, not the user's original message)?
 
-**Status:** Needs research
+**Status:** CLOSED (2026-04-18). Solved by production implementation. UserPromptSubmit hook (agentmemory-search-inject.sh) performs 6-layer search on every prompt and injects results before the LLM sees them. Latency is sub-perceptible. All sub-questions (latency budget, query extraction, injection volume, L0/L1/L2 interaction) answered by the running system.
 
 ---
 
@@ -390,6 +390,8 @@ actually available. Then try option 4 (export processing) since we already have 
 extraction pipeline and conversation exports. These two together cover "what can we get
 in real time?" and "what can we get in batch?" without building anything new.
 
+**Status:** CLOSED (2026-04-18). Solved by production implementation. Option 2 (UserPromptSubmit + Stop) is live: conversation-logger.sh captures both sides via UserPromptSubmit and Stop hooks. PostCompact triggers ingestion into agentmemory. All hooks wired in settings.json since Phase 4.
+
 ### C2: How to handle conversations that happen outside the system?
 
 Decisions also happen in Slack threads, email chains, meetings, and whiteboard sessions.
@@ -442,6 +444,8 @@ These are observation sources that arrive differently from live conversation mon
 **Recommendation:** Start with option 1 (the user just tells the AI). Measure how often
 external decisions get missed in practice. If it's rare, don't build anything. If it's
 common, add option 3 (batch import for the most common format, probably Slack).
+
+**Status:** DEPRIORITIZED (2026-04-18). "Tell me" model (option 1) is in use. No evidence of missed external decisions causing production problems. Revisit if user reports gaps from external channels.
 
 ### C3: Privacy and consent for belief extraction
 
@@ -500,3 +504,5 @@ understand and control what's being remembered.
 simplest approach that respects user autonomy without creating friction. If user testing
 reveals that sensitive information is being stored inappropriately, add sensitivity
 classification (option 2) as a filter.
+
+**Status:** DEPRIORITIZED (2026-04-18). Transparency model (option 1) is effectively in place: beliefs are searchable, deletable, and visible via /mem:search and /mem:delete. Sensitivity classification tracked as REQ-015/016 for ship-time documentation. No user complaints about unwanted storage.
