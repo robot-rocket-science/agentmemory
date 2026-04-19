@@ -270,7 +270,7 @@ Each requirement has:
 
 **Rationale:** Memory contains private project data, decisions, conversations, and intellectual property. Any exfiltration -- even to "trusted" cloud services -- is unacceptable. This is non-negotiable.
 
-**Verification method:** 
+**Verification method:**
 1. Static analysis: audit all code paths for network calls. Zero outbound connections except to the LLM API (which the user already consents to).
 2. Runtime verification: run the memory system with network disabled (airplane mode). All memory operations (observe, believe, search, test_result, revise, checkpoint, recover) must succeed.
 3. Dependency audit: no dependency may phone home, collect telemetry, or require network access for memory operations.
@@ -369,8 +369,8 @@ The correction creates a belief with source_type = user_corrected (highest Bayes
 
 **Plan trace:** Phase 5 (validation)
 **Experiment trace:** All experiments
-**Status:** Not started
-**Evidence:** --
+**Status:** PASSING
+**Evidence:** Claims audit (2026-04-18): 20 claims reviewed across README.md, docs/ARCHITECTURE.md, docs/INSTALL.md, docs/BENCHMARK_RESULTS.md. 15 verified with linked artifacts, 2 partially verified (qualified with dataset/estimate caveats), 3 unverified claims fixed (onboarding time softened, correction detection qualified with "on tested corpus", cost marked as "estimated"). Zero unverified claims remain.
 
 ### REQ-016: Documented Limitations
 
@@ -384,8 +384,8 @@ The correction creates a belief with source_type = user_corrected (highest Bayes
 
 **Plan trace:** Phase 5 (failure mode analysis)
 **Experiment trace:** All experiments
-**Status:** Not started
-**Evidence:** --
+**Status:** PASSING
+**Evidence:** docs/LIMITATIONS.md (2026-04-18): 14 limitations documented across 7 categories (retrieval, contradiction detection, confidence/scoring, classification, platform, cross-model, benchmarks). Each limitation includes impact, mitigation, and evidence source. Sourced from case studies CS-028/029/032/033/034/035 and experimental findings.
 
 ---
 

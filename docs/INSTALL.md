@@ -64,7 +64,7 @@ You should see a status report with belief counts, session info, and system heal
 /mem:onboard .
 ```
 
-This scans your project directory and ingests structure from git history, code, docs, and configuration. Takes 10-30 seconds depending on project size.
+This scans your project directory and ingests structure from git history, code, docs, and configuration. Typically completes in under a minute; larger projects with deep git history may take longer.
 
 That is it. agentmemory will automatically capture decisions, corrections, and context from your conversations.
 

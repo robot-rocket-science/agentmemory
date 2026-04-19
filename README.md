@@ -19,7 +19,7 @@ agentmemory captures decisions, corrections, and context as you work, and hands 
 ## Install
 
 ```bash
-uv pip install git+https://github.com/yoshi280/agentmemory.git
+uv pip install git+https://github.com/robot-rocket-science/agentmemory.git
 agentmemory setup
 ```
 
@@ -130,7 +130,7 @@ Methodology and per-benchmark details: [Chapter 8 - Benchmark Results](docs/BENC
 ## Development
 
 ```bash
-git clone https://github.com/yoshi280/agentmemory.git
+git clone https://github.com/robot-rocket-science/agentmemory.git
 cd agentmemory
 uv sync --all-groups
 uv run pytest tests/ -x -q
@@ -148,7 +148,7 @@ If you use agentmemory in your research or project, please cite:
   author    = {robotrocketscience},
   title     = {agentmemory: Persistent Memory for AI Coding Agents},
   year      = {2026},
-  url       = {https://github.com/yoshi280/agentmemory},
+  url       = {https://github.com/robot-rocket-science/agentmemory},
   license   = {MIT}
 }
 ```
