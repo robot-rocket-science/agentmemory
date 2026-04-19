@@ -192,30 +192,46 @@ _COMMAND_DEFS: dict[str, dict[str, str]] = {
     },
     "wonder": {
         "description": "Deep-dive research on a hypothesis, question, or topic using memory graph context.",
-        "argument_hint": "A hypothesis, question, or research topic",
-        "tools": "Bash, Read, WebSearch, Agent",
-        "objective": "Gather all beliefs and associations connected to the query, then spawn parallel subagents for deep research.",
+        "argument_hint": "A hypothesis, question, or research topic. Optionally specify agent count: 'quick 2-agent', 'deep 6-agent', etc.",
+        "tools": "Bash, Read, WebSearch, Agent, mcp__agentmemory__wonder, mcp__agentmemory__wonder_ingest",
+        "objective": (
+            "Explore a topic by analyzing belief graph gaps, spawning parallel "
+            "subagents for orthogonal research, and ingesting their findings "
+            "as speculative beliefs. Each subagent writes a research document "
+            "with no size limits -- the ingest pipeline converts them to "
+            "speculative beliefs at low confidence for future exploration."
+        ),
         "process": (
-            '1. Run: `uv run agentmemory wonder "$ARGUMENTS"` to get belief context.\n'
-            "2. Run: `uv run agentmemory settings` to read wonder.max_agents (default 4).\n"
-            "3. Parse the belief context output into themes or angles.\n"
-            "4. Spawn up to max_agents subagents in parallel using the Agent tool. "
-            "Each subagent gets:\n"
+            "1. Parse agent count from user's query if specified (e.g. 'quick 2-agent "
+            "wonder' -> 2, 'deep 6-agent wonder' -> 6). Default is 4.\n"
+            "2. Call mcp__agentmemory__wonder with the query and agent_count.\n"
+            "   This returns JSON with: known beliefs, gaps, coverage score, "
+            "research axes, and anchor speculative_ids.\n"
+            "3. Parse the research_axes from the JSON. Each axis has:\n"
+            "   - axis_id, name, description, search_hints, gap_context\n"
+            "4. Spawn one subagent per research axis, ALL IN PARALLEL using the "
+            "Agent tool. Each subagent gets:\n"
             "   - The original wonder query\n"
-            "   - The full belief context from step 1\n"
-            "   - A specific research angle or theme to investigate\n"
-            "   Suggested agent assignments:\n"
-            "   - Agent 1: Search for prior art, related work, existing solutions\n"
-            "   - Agent 2: Identify gaps, contradictions, or weak spots in current beliefs\n"
-            "   - Agent 3: Generate hypotheses and propose experiments to test them\n"
-            "   - Agent 4: Synthesize findings and map connections to the existing graph\n"
-            "   Additional agents can explore domain-specific angles as needed.\n"
-            "5. Collect results from all subagents.\n"
-            "6. Present a structured analysis:\n"
-            "   - What the memory system already knows (from beliefs)\n"
-            "   - What was discovered (from research)\n"
-            "   - Gaps and open questions\n"
-            "   - Proposed next steps or experiments\n"
+            "   - The axis name, description, and search_hints\n"
+            "   - The known beliefs summary (from step 2 JSON)\n"
+            "   - The identified gaps (from step 2 JSON)\n"
+            "   - Instructions: 'Write a thorough research document on your assigned "
+            "axis. Use web search, documentation lookups, and reasoning. Include "
+            "specific findings, citations, and concrete details. Do not limit your "
+            "output length -- write as much as the topic warrants. Return ONLY the "
+            "research document text, no preamble.'\n"
+            "5. Collect ALL subagent research documents.\n"
+            "6. Call mcp__agentmemory__wonder_ingest with:\n"
+            "   - research_documents: JSON array of {text: <doc>, axis_id: <id>}\n"
+            "   - anchor_belief_ids: comma-separated speculative_ids from step 2\n"
+            "   This runs each document through the ingest pipeline, creating "
+            "speculative beliefs at ~23% confidence.\n"
+            "7. Present a structured analysis to the user:\n"
+            "   - What the memory system already knew (coverage score, known beliefs)\n"
+            "   - What each subagent discovered (summarize key findings per axis)\n"
+            "   - How many speculative beliefs were created\n"
+            "   - Identified gaps still remaining\n"
+            "   - Suggest /mem:reason on specific speculative beliefs to test them\n"
         ),
     },
     "settings": {
