@@ -3,6 +3,7 @@
 Implements the Exp 61 classification process: batch sentences to Haiku,
 assign type-based Bayesian priors, return ClassifiedSentence objects.
 """
+
 from __future__ import annotations
 
 import json
@@ -23,19 +24,47 @@ _HAIKU_MODEL: str = "claude-haiku-4-5-20251001"
 BATCH_SIZE: int = 20
 
 # Type-to-prior mapping from Exp 61.
+# These priors are for USER-SOURCED content (user_stated, user_corrected).
+# Agent-inferred content uses deflated priors via get_source_adjusted_prior().
 # None means "don't store" (Coordination, Question, Meta).
 TYPE_PRIORS: dict[str, tuple[float, float] | None] = {
-    "REQUIREMENT":  (9.0, 0.5),   # 94.7% -- hard constraints
-    "CORRECTION":   (9.0, 0.5),   # 94.7% -- user corrections
-    "PREFERENCE":   (7.0, 1.0),   # 87.5% -- user preferences
-    "FACT":         (3.0, 1.0),   # 75.0% -- stated facts
-    "ASSUMPTION":   (2.0, 1.0),   # 66.7% -- taken as true without evidence
-    "DECISION":     (5.0, 1.0),   # 83.3% -- choices made
-    "ANALYSIS":     (2.0, 1.0),   # 66.7% -- derived conclusions
+    "REQUIREMENT": (9.0, 0.5),  # 94.7% -- hard constraints
+    "CORRECTION": (9.0, 0.5),  # 94.7% -- user corrections
+    "PREFERENCE": (7.0, 1.0),  # 87.5% -- user preferences
+    "FACT": (3.0, 1.0),  # 75.0% -- stated facts
+    "ASSUMPTION": (2.0, 1.0),  # 66.7% -- taken as true without evidence
+    "DECISION": (5.0, 1.0),  # 83.3% -- choices made
+    "ANALYSIS": (2.0, 1.0),  # 66.7% -- derived conclusions
     "COORDINATION": None,
-    "QUESTION":     None,
-    "META":         None,
+    "QUESTION": None,
+    "META": None,
 }
+
+# Deflation factor for agent-inferred content. TYPE_PRIORS were designed
+# for user-sourced content; agent-inferred beliefs (scanner, document
+# extraction) should start with lower confidence and earn it through
+# the feedback loop. Without this, 90% of beliefs cluster at 90-95%
+# and Thompson sampling loses discriminative power.
+_AGENT_INFERRED_DEFLATION: float = 0.2
+
+
+def get_source_adjusted_prior(
+    sentence_type: str,
+    source: str,
+) -> tuple[float, float] | None:
+    """Get alpha/beta prior adjusted for source reliability.
+
+    User sources (source="user") get full TYPE_PRIORS.
+    Non-user sources get deflated alpha (TYPE_PRIORS * deflation factor).
+    """
+    prior: tuple[float, float] | None = TYPE_PRIORS.get(sentence_type)
+    if prior is None:
+        return None
+    alpha, beta = prior
+    if source != "user":
+        alpha = max(0.5, alpha * _AGENT_INFERRED_DEFLATION)
+    return (alpha, beta)
+
 
 # Prompt template from Exp 61 Step 3.
 _CLASSIFICATION_PROMPT: str = """You are classifying conversation sentences for a memory system.
@@ -127,12 +156,12 @@ _QUESTION_PREFIXES: tuple[str, ...] = (
 @dataclass
 class ClassifiedSentence:
     text: str
-    source: str          # "user" or "assistant"
-    persist: bool        # should this be stored?
-    sentence_type: str   # REQUIREMENT, CORRECTION, FACT, etc.
-    alpha: float         # Beta prior alpha
-    beta_param: float    # Beta prior beta
-    author: str = ""     # USER, AGENT, UNKNOWN (onboard only)
+    source: str  # "user" or "assistant"
+    persist: bool  # should this be stored?
+    sentence_type: str  # REQUIREMENT, CORRECTION, FACT, etc.
+    alpha: float  # Beta prior alpha
+    beta_param: float  # Beta prior beta
+    author: str = ""  # USER, AGENT, UNKNOWN (onboard only)
 
 
 # ---------------------------------------------------------------------------
@@ -177,18 +206,20 @@ def _parse_llm_response(
         if remap_correction and sentence_type == "CORRECTION":
             sentence_type = "FACT"
 
-        prior: tuple[float, float] | None = TYPE_PRIORS.get(sentence_type)
+        # Determine source for prior adjustment: agent-authored content
+        # gets deflated priors, user-authored gets full priors.
+        _source_for_prior: str = "assistant" if author == "AGENT" else "user"
+        prior: tuple[float, float] | None = get_source_adjusted_prior(
+            sentence_type,
+            _source_for_prior,
+        )
         should_persist: bool = persist_label == "PERSIST" and prior is not None
         alpha: float
         beta_val: float
         if prior is not None:
             alpha, beta_val = prior
         else:
-            alpha, beta_val = 2.0, 1.0
-
-        # Agent-authored content gets lower priors (agent-inferred, not user-stated)
-        if author == "AGENT" and should_persist:
-            alpha = max(alpha * 0.5, 1.0)
+            alpha, beta_val = 0.5, 0.5
 
         results.append(
             ClassifiedSentence(
@@ -333,7 +364,7 @@ def classify_sentences_offline(
             ]
         ):
             sentence_type = "REQUIREMENT"
-            _req_prior = TYPE_PRIORS["REQUIREMENT"]
+            _req_prior = get_source_adjusted_prior("REQUIREMENT", source)
             assert _req_prior is not None
             alpha, beta_val = _req_prior
             results.append(
@@ -356,7 +387,7 @@ def classify_sentences_offline(
         if source == "user":
             is_correction, _signals, _conf = detect_correction(text)
         if is_correction:
-            _cor_prior = TYPE_PRIORS["CORRECTION"]
+            _cor_prior = get_source_adjusted_prior("CORRECTION", source)
             assert _cor_prior is not None
             results.append(
                 ClassifiedSentence(
@@ -384,7 +415,7 @@ def classify_sentences_offline(
             ]
         ):
             sentence_type = "PREFERENCE"
-            _pref_prior = TYPE_PRIORS["PREFERENCE"]
+            _pref_prior = get_source_adjusted_prior("PREFERENCE", source)
             assert _pref_prior is not None
             alpha, beta_val = _pref_prior
         elif any(
@@ -400,7 +431,7 @@ def classify_sentences_offline(
             ]
         ):
             sentence_type = "DECISION"
-            _dec_prior = TYPE_PRIORS["DECISION"]
+            _dec_prior = get_source_adjusted_prior("DECISION", source)
             assert _dec_prior is not None
             alpha, beta_val = _dec_prior
         elif any(
@@ -408,7 +439,7 @@ def classify_sentences_offline(
             for kw in ["assume", "assuming", "i think", "probably", "likely"]
         ):
             sentence_type = "ASSUMPTION"
-            _asm_prior = TYPE_PRIORS["ASSUMPTION"]
+            _asm_prior = get_source_adjusted_prior("ASSUMPTION", source)
             assert _asm_prior is not None
             alpha, beta_val = _asm_prior
         elif any(
@@ -416,13 +447,13 @@ def classify_sentences_offline(
             for kw in ["because", "therefore", "causes", "results in", "analysis"]
         ):
             sentence_type = "ANALYSIS"
-            _ana_prior = TYPE_PRIORS["ANALYSIS"]
+            _ana_prior = get_source_adjusted_prior("ANALYSIS", source)
             assert _ana_prior is not None
             alpha, beta_val = _ana_prior
         else:
             # Default: FACT
             sentence_type = "FACT"
-            _fact_prior = TYPE_PRIORS["FACT"]
+            _fact_prior = get_source_adjusted_prior("FACT", source)
             assert _fact_prior is not None
             alpha, beta_val = _fact_prior
 

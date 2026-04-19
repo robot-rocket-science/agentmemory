@@ -17,7 +17,7 @@ from fastmcp import FastMCP
 from agentmemory.classification import (
     BATCH_SIZE,
     ClassifiedSentence,
-    TYPE_PRIORS,
+    get_source_adjusted_prior,
 )
 from agentmemory.hook_search import (
     analyze_prompt_structure,
@@ -1142,17 +1142,17 @@ def create_beliefs(classified_json: str) -> str:
             if sentence_type == "CORRECTION":
                 sentence_type = "FACT"
 
-            prior: tuple[float, float] | None = TYPE_PRIORS.get(sentence_type)
+            _source_for_prior: str = "assistant" if author == "AGENT" else "user"
+            prior: tuple[float, float] | None = get_source_adjusted_prior(
+                sentence_type,
+                _source_for_prior,
+            )
             should_persist: bool = persist_label == "PERSIST" and prior is not None
 
-            alpha: float = 2.0
-            beta_val: float = 1.0
+            alpha: float = 0.5
+            beta_val: float = 0.5
             if prior is not None:
                 alpha, beta_val = prior
-
-            # Agent-authored content gets lower priors
-            if author == "AGENT" and should_persist:
-                alpha = max(alpha * 0.5, 1.0)
 
             classified.append(
                 ClassifiedSentence(
@@ -1281,7 +1281,11 @@ def reclassify(mappings: str) -> str:
             skipped += 1
             continue
 
-        prior: tuple[float, float] | None = TYPE_PRIORS.get(sentence_type)
+        # Reclassified beliefs use agent-inferred source for prior adjustment
+        prior: tuple[float, float] | None = get_source_adjusted_prior(
+            sentence_type,
+            "assistant",
+        )
         should_persist: bool = persist_label == "PERSIST" and prior is not None
 
         if not should_persist:
