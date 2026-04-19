@@ -1,7 +1,0 @@
-[doc-refs] debserver
-  files: 105
-  sentences: 2539
-  reference types: {'D': 39, 'M': 134, 'file_path': 522}
-  direct edges: 196
-  co-citation edges: 1111
-  avg refs/file: 8.18

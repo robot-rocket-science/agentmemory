@@ -62,7 +62,7 @@ Note: Exp 47 originally reported 18 behavioral nodes / 306 edges exceeding DIM=2
 
 ### Behavioral node count discrepancy
 
-Exp 47 reported 18 behavioral nodes (from sentence-level counting) producing 306 edges. This run found 11 behavioral decisions producing 110 edges. The alpha-seek DB appears to have fewer nodes than at the time of the original experiment. This is a data provenance issue, not an algorithm issue. The architectural recommendation (DIM=4096 minimum) remains correct as a safety margin.
+Exp 47 reported 18 behavioral nodes (from sentence-level counting) producing 306 edges. This run found 11 behavioral decisions producing 110 edges. The project-a DB appears to have fewer nodes than at the time of the original experiment. This is a data provenance issue, not an algorithm issue. The architectural recommendation (DIM=4096 minimum) remains correct as a safety margin.
 
 ## Hypothesis Verdict
 
@@ -73,7 +73,7 @@ Exp 47 reported 18 behavioral nodes (from sentence-level counting) producing 306
 ## Caveats
 
 1. **Small test set.** 6 topics, 13 decisions. Statistical significance is limited. The 100% vs 92% difference is 1 decision (D157).
-2. **Single dataset.** All tests are on alpha-seek beliefs. Cross-project validation (Exp 53 showed 31% gaps across 5 projects) suggests the advantage generalizes, but this needs confirmation.
+2. **Single dataset.** All tests are on project-a beliefs. Cross-project validation (Exp 53 showed 31% gaps across 5 projects) suggests the advantage generalizes, but this needs confirmation.
 3. **Known ground truth.** The system was partly designed around these test cases (especially D157). A truly blind evaluation would use a holdout set.
 4. **Token cost.** The corrected pipeline uses 2.4x more tokens than grep. This is within budget but not free.
 

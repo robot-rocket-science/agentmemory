@@ -1,26 +1,26 @@
 """Exp 58b: Decay Half-Life Calibration -- Full Scale (4-Month Lineage)
 
-Extends Exp 58 by replacing the narrow 13-day alpha-seek spike DB with 4 months
-of real project history: optimus-prime (Dec 2025 - Mar 2026) -> alpha-seek
-(Mar-Apr 2026) -> alpha-seek-memtest (Mar-Apr 2026).
+Extends Exp 58 by replacing the narrow 13-day project-a spike DB with 4 months
+of real project history: project-b (Dec 2025 - Mar 2026) -> project-a
+(Mar-Apr 2026) -> project-a-test (Mar-Apr 2026).
 
 Data sources:
-  - /Users/thelorax/projects/alpha-seek-memtest/.gsd/DECISIONS.md (183 active)
-  - /Users/thelorax/projects/alpha-seek/docs/DECISIONS-ARCHIVE.md (35 superseded)
-  - /Users/thelorax/projects/agentmemory/experiments/exp6_failures_v2.json (38 corrections)
-  - git log from optimus-prime + alpha-seek + alpha-seek-memtest repos
+  - /home/user/projects/project-a-test/.gsd/DECISIONS.md (183 active)
+  - /home/user/projects/project-a/docs/DECISIONS-ARCHIVE.md (35 superseded)
+  - /home/user/projects/agentmemory/experiments/exp6_failures_v2.json (38 corrections)
+  - git log from project-b + project-a + project-a-test repos
 
 Research questions:
   1. Are half-lives still insensitive at 4-month scale (13 days was too short)?
   2. Do superseded decisions rank below their replacements at all half-lives?
-  3. Do inherited (optimus-prime) decisions decay to near-zero by alpha-seek phase?
+  3. Do inherited (project-b) decisions decay to near-zero by project-a phase?
   4. What half-life achieves best correction prevention for each content type?
 
 Additional analyses vs Exp 58:
   - Decay factor distribution at each half-life setting
   - Locked vs unlocked separation by half-life
   - Superseded vs active ordering check
-  - Inherited (optimus-prime) vs recent (alpha-seek) score comparison
+  - Inherited (project-b) vs recent (project-a) score comparison
 """
 
 from __future__ import annotations
@@ -40,36 +40,40 @@ from typing import Any, Final
 # Paths
 # ============================================================
 
-DECISIONS_MD: Final[Path] = Path(
-    "/Users/thelorax/projects/alpha-seek-memtest/.gsd/DECISIONS.md"
-)
+DECISIONS_MD: Final[Path] = Path("/home/user/projects/project-a-test/.gsd/DECISIONS.md")
 ARCHIVE_MD: Final[Path] = Path(
-    "/Users/thelorax/projects/alpha-seek/docs/DECISIONS-ARCHIVE.md"
+    "/home/user/projects/project-a/docs/DECISIONS-ARCHIVE.md"
 )
 EXP6_FAILURES: Final[Path] = Path(
-    "/Users/thelorax/projects/agentmemory/experiments/exp6_failures_v2.json"
+    "/home/user/projects/agentmemory/experiments/exp6_failures_v2.json"
 )
 RESULTS_PATH: Final[Path] = Path(
-    "/Users/thelorax/projects/agentmemory/experiments/exp58b_results.json"
+    "/home/user/projects/agentmemory/experiments/exp58b_results.json"
 )
 
-OPTIMUS_PRIME_REPO: Final[Path] = Path("/Users/thelorax/projects/optimus-prime")
-ALPHA_SEEK_REPO: Final[Path] = Path("/Users/thelorax/projects/alpha-seek")
-ALPHA_SEEK_MEMTEST_REPO: Final[Path] = Path(
-    "/Users/thelorax/projects/alpha-seek-memtest"
-)
+OPTIMUS_PRIME_REPO: Final[Path] = Path("/home/user/projects/project-b")
+ALPHA_SEEK_REPO: Final[Path] = Path("/home/user/projects/project-a")
+ALPHA_SEEK_MEMTEST_REPO: Final[Path] = Path("/home/user/projects/project-a-test")
 
 # ============================================================
 # Config
 # ============================================================
 
-# Days since PROJECT_EPOCH (Dec 2025 optimus-prime start)
-# All timestamps normalised to this.  optimus-prime first commit: 2025-12-01
+# Days since PROJECT_EPOCH (Dec 2025 project-b start)
+# All timestamps normalised to this.  project-b first commit: 2025-12-01
 PROJECT_EPOCH: Final[str] = "2025-12-01T00:00:00+00:00"
 
 # Half-life sweep candidates in days; None = no decay
 HALF_LIFE_CANDIDATES: Final[list[float | None]] = [
-    1.0, 3.0, 7.0, 14.0, 30.0, 60.0, 90.0, 180.0, None
+    1.0,
+    3.0,
+    7.0,
+    14.0,
+    30.0,
+    60.0,
+    90.0,
+    180.0,
+    None,
 ]
 
 RANKING_THRESHOLDS: Final[list[int]] = [5, 10, 15]
@@ -87,24 +91,45 @@ class ContentType(Enum):
 
 
 # Classification rules (per spec)
-SCOPE_CONSTRAINT: Final[frozenset[str]] = frozenset({
-    "architecture", "infrastructure", "operations", "agent behavior", "code-quality",
-})
-SCOPE_EVIDENCE: Final[frozenset[str]] = frozenset({
-    "strategy", "signal-model", "backtesting", "evaluation", "validation",
-})
-SCOPE_CONTEXT: Final[frozenset[str]] = frozenset({
-    "milestone", "bugfix", "reporting", "documentation",
-})
-SCOPE_PROCEDURE: Final[frozenset[str]] = frozenset({
-    "methodology", "configuration", "tooling",
-})
+SCOPE_CONSTRAINT: Final[frozenset[str]] = frozenset(
+    {
+        "architecture",
+        "infrastructure",
+        "operations",
+        "agent behavior",
+        "code-quality",
+    }
+)
+SCOPE_EVIDENCE: Final[frozenset[str]] = frozenset(
+    {
+        "strategy",
+        "signal-model",
+        "backtesting",
+        "evaluation",
+        "validation",
+    }
+)
+SCOPE_CONTEXT: Final[frozenset[str]] = frozenset(
+    {
+        "milestone",
+        "bugfix",
+        "reporting",
+        "documentation",
+    }
+)
+SCOPE_PROCEDURE: Final[frozenset[str]] = frozenset(
+    {
+        "methodology",
+        "configuration",
+        "tooling",
+    }
+)
 
 
 @dataclass
 class Decision:
-    d_id: str              # "D002", "D073", etc.
-    when_raw: str          # raw "When" field from markdown
+    d_id: str  # "D002", "D073", etc.
+    when_raw: str  # raw "When" field from markdown
     scope: str
     decision_text: str
     choice_text: str
@@ -112,11 +137,11 @@ class Decision:
     revisable_raw: str
     made_by: str
     superseded_by: str | None  # D### that supersedes this, or None
-    is_archived: bool      # True if from DECISIONS-ARCHIVE.md
+    is_archived: bool  # True if from DECISIONS-ARCHIVE.md
     created_at_days: float  # days since PROJECT_EPOCH
     content_type: ContentType
     locked: bool
-    is_inherited: bool     # True if when_raw == "inherited"
+    is_inherited: bool  # True if when_raw == "inherited"
 
 
 @dataclass
@@ -133,7 +158,7 @@ class RankingResult:
     topic_id: str
     correction_iso: str
     correct_refs_found: list[str]
-    best_rank: int | None   # 1-indexed; None if not in decisions
+    best_rank: int | None  # 1-indexed; None if not in decisions
     total_decisions: int
 
 
@@ -161,12 +186,15 @@ class SweepResult:
     prevention_rate_top5: float
     prevention_rate_top10: float
     prevention_rate_top15: float
-    per_cluster: dict[str, dict[str, float]] = field(default_factory=lambda: dict[str, dict[str, float]]())
+    per_cluster: dict[str, dict[str, float]] = field(
+        default_factory=lambda: dict[str, dict[str, float]]()
+    )
 
 
 # ============================================================
 # Date utilities
 # ============================================================
+
 
 def _epoch_dt() -> datetime:
     return datetime.fromisoformat(PROJECT_EPOCH)
@@ -186,11 +214,16 @@ def iso_to_days(iso_str: str) -> float:
 # Git log helpers
 # ============================================================
 
+
 def load_git_log(repo: Path) -> list[tuple[str, str, str]]:
     """Run git log on a repo and return list of (sha, iso_date, subject)."""
     result = subprocess.run(
         [
-            "git", "log", "--all", "--format=%H %ad %s", "--date=iso",
+            "git",
+            "log",
+            "--all",
+            "--format=%H %ad %s",
+            "--date=iso",
         ],
         cwd=str(repo),
         capture_output=True,
@@ -207,7 +240,7 @@ def load_git_log(repo: Path) -> list[tuple[str, str, str]]:
         if len(raw_line) < 67:
             continue
         sha: str = raw_line[:40]
-        date_str: str = raw_line[41:66]   # "YYYY-MM-DD HH:MM:SS +HHMM"
+        date_str: str = raw_line[41:66]  # "YYYY-MM-DD HH:MM:SS +HHMM"
         subject: str = raw_line[67:]
         entries.append((sha, date_str.strip(), subject))
     return entries
@@ -298,14 +331,14 @@ def _parse_decisions_md_row(line: str) -> tuple[str, ...] | None:
         return None
     # Columns: #, When, Scope, Decision, Choice, Rationale, Revisable?, Made By
     return (
-        parts[0].strip(),   # D###
-        parts[1].strip(),   # When
-        parts[2].strip(),   # Scope
-        parts[3].strip(),   # Decision
-        parts[4].strip(),   # Choice
-        parts[5].strip(),   # Rationale
-        parts[6].strip(),   # Revisable?
-        parts[7].strip(),   # Made By
+        parts[0].strip(),  # D###
+        parts[1].strip(),  # When
+        parts[2].strip(),  # Scope
+        parts[3].strip(),  # Decision
+        parts[4].strip(),  # Choice
+        parts[5].strip(),  # Rationale
+        parts[6].strip(),  # Revisable?
+        parts[7].strip(),  # Made By
     )
 
 
@@ -323,7 +356,16 @@ def load_active_decisions(
         parsed = _parse_decisions_md_row(line)
         if parsed is None:
             continue
-        d_id, when_raw, scope, decision_text, choice_text, rationale_text, revisable_raw, made_by = parsed
+        (
+            d_id,
+            when_raw,
+            scope,
+            decision_text,
+            choice_text,
+            rationale_text,
+            revisable_raw,
+            made_by,
+        ) = parsed
 
         # Derive timestamp
         created_at_days: float = _derive_timestamp(
@@ -337,22 +379,24 @@ def load_active_decisions(
         content_type: ContentType = _classify(scope, locked)
         is_inherited: bool = when_raw.strip().lower() == "inherited"
 
-        decisions.append(Decision(
-            d_id=d_id,
-            when_raw=when_raw,
-            scope=scope,
-            decision_text=decision_text,
-            choice_text=choice_text,
-            rationale_text=rationale_text,
-            revisable_raw=revisable_raw,
-            made_by=made_by,
-            superseded_by=None,  # active decisions are not superseded
-            is_archived=False,
-            created_at_days=created_at_days,
-            content_type=content_type,
-            locked=locked,
-            is_inherited=is_inherited,
-        ))
+        decisions.append(
+            Decision(
+                d_id=d_id,
+                when_raw=when_raw,
+                scope=scope,
+                decision_text=decision_text,
+                choice_text=choice_text,
+                rationale_text=rationale_text,
+                revisable_raw=revisable_raw,
+                made_by=made_by,
+                superseded_by=None,  # active decisions are not superseded
+                is_archived=False,
+                created_at_days=created_at_days,
+                content_type=content_type,
+                locked=locked,
+                is_inherited=is_inherited,
+            )
+        )
 
     print(f"[parse] active decisions: {len(decisions)}", file=sys.stderr)
     return decisions
@@ -426,22 +470,24 @@ def load_archived_decisions(
         content_type: ContentType = _classify(scope, locked)
         is_inherited: bool = when_raw.strip().lower() == "inherited"
 
-        decisions.append(Decision(
-            d_id=d_id,
-            when_raw=when_raw,
-            scope=scope,
-            decision_text=d_id,    # archive format doesn't always have separate decision text
-            choice_text=choice_text,
-            rationale_text=rationale_text,
-            revisable_raw="Yes",
-            made_by="unknown",
-            superseded_by=superseded_by,
-            is_archived=True,
-            created_at_days=created_at_days,
-            content_type=content_type,
-            locked=locked,
-            is_inherited=is_inherited,
-        ))
+        decisions.append(
+            Decision(
+                d_id=d_id,
+                when_raw=when_raw,
+                scope=scope,
+                decision_text=d_id,  # archive format doesn't always have separate decision text
+                choice_text=choice_text,
+                rationale_text=rationale_text,
+                revisable_raw="Yes",
+                made_by="unknown",
+                superseded_by=superseded_by,
+                is_archived=True,
+                created_at_days=created_at_days,
+                content_type=content_type,
+                locked=locked,
+                is_inherited=is_inherited,
+            )
+        )
 
     print(f"[parse] archived decisions: {len(decisions)}", file=sys.stderr)
     return decisions
@@ -484,6 +530,7 @@ def _derive_timestamp(
 # Content type classification
 # ============================================================
 
+
 def _classify(scope: str, locked: bool) -> ContentType:
     """Classify a decision by scope and locked status per experiment spec."""
     scope_lower: str = scope.lower().strip()
@@ -519,6 +566,7 @@ def _classify(scope: str, locked: bool) -> ContentType:
 # Correction cluster loading
 # ============================================================
 
+
 def load_correction_clusters(path: Path) -> list[CorrectionCluster]:
     with path.open("r", encoding="utf-8") as fh:
         data: dict[str, Any] = json.load(fh)
@@ -530,13 +578,15 @@ def load_correction_clusters(path: Path) -> list[CorrectionCluster]:
             for ov in list[dict[str, Any]](cluster.get("overrides", []))
             if "timestamp" in ov
         ]
-        clusters.append(CorrectionCluster(
-            topic_id=str(cluster["topic_id"]),
-            description=str(cluster.get("description", "")),
-            decision_refs=list[str](cluster.get("decision_refs", [])),
-            correction_timestamps=timestamps,
-            is_memory_failure=bool(cluster.get("is_memory_failure", False)),
-        ))
+        clusters.append(
+            CorrectionCluster(
+                topic_id=str(cluster["topic_id"]),
+                description=str(cluster.get("description", "")),
+                decision_refs=list[str](cluster.get("decision_refs", [])),
+                correction_timestamps=timestamps,
+                is_memory_failure=bool(cluster.get("is_memory_failure", False)),
+            )
+        )
 
     print(
         f"[load] {len(clusters)} total clusters, "
@@ -551,6 +601,7 @@ def load_correction_clusters(path: Path) -> list[CorrectionCluster]:
 # ============================================================
 # Scoring and ranking
 # ============================================================
+
 
 def decay_score(
     decision: Decision,
@@ -616,6 +667,7 @@ def find_best_rank(
 # Evaluation
 # ============================================================
 
+
 def evaluate_config(
     decisions: list[Decision],
     clusters: list[CorrectionCluster],
@@ -643,20 +695,21 @@ def evaluate_config(
                 decisions, current_days, half_lives
             )
             best_rank: int | None = find_best_rank(ranked, target_ids)
-            results.append(RankingResult(
-                topic_id=cluster.topic_id,
-                correction_iso=ts_iso,
-                correct_refs_found=found_refs,
-                best_rank=best_rank,
-                total_decisions=len(decisions),
-            ))
+            results.append(
+                RankingResult(
+                    topic_id=cluster.topic_id,
+                    correction_iso=ts_iso,
+                    correct_refs_found=found_refs,
+                    best_rank=best_rank,
+                    total_decisions=len(decisions),
+                )
+            )
 
     total: int = len(results)
     threshold_rates: dict[int, float] = {}
     for thresh in RANKING_THRESHOLDS:
         hits: int = sum(
-            1 for r in results
-            if r.best_rank is not None and r.best_rank <= thresh
+            1 for r in results if r.best_rank is not None and r.best_rank <= thresh
         )
         threshold_rates[thresh] = hits / total if total > 0 else 0.0
 
@@ -669,7 +722,8 @@ def evaluate_config(
         ct_rates: dict[str, float] = {}
         for thresh in RANKING_THRESHOLDS:
             hits = sum(
-                1 for r in cluster_results
+                1
+                for r in cluster_results
                 if r.best_rank is not None and r.best_rank <= thresh
             )
             ct_rates[f"top{thresh}"] = hits / ct_total if ct_total > 0 else 0.0
@@ -681,6 +735,7 @@ def evaluate_config(
 # ============================================================
 # Grid search
 # ============================================================
+
 
 def _make_all_none() -> HalfLifeConfig:
     return HalfLifeConfig(constraint=None, evidence=None, context=None, procedure=None)
@@ -730,14 +785,16 @@ def grid_search(
                 file=sys.stderr,
             )
 
-            all_results.append(SweepResult(
-                content_type_swept=ct.value,
-                half_life=hl,
-                prevention_rate_top5=r5,
-                prevention_rate_top10=r10,
-                prevention_rate_top15=r15,
-                per_cluster=per_cluster,
-            ))
+            all_results.append(
+                SweepResult(
+                    content_type_swept=ct.value,
+                    half_life=hl,
+                    prevention_rate_top5=r5,
+                    prevention_rate_top10=r10,
+                    prevention_rate_top15=r15,
+                    per_cluster=per_cluster,
+                )
+            )
 
             combined_score: float = r10 + r5 * 0.001
             if combined_score > best_score:
@@ -754,6 +811,7 @@ def grid_search(
 # ============================================================
 # Additional analyses
 # ============================================================
+
 
 def decay_factor_distribution(
     decisions: list[Decision],
@@ -861,7 +919,7 @@ def inherited_vs_recent_scores(
     half_lives: HalfLifeConfig,
     eval_at_days: float,
 ) -> dict[str, float]:
-    """Compare mean scores of inherited (optimus-prime) vs recent (alpha-seek) decisions."""
+    """Compare mean scores of inherited (project-b) vs recent (project-a) decisions."""
     inherited_scores: list[float] = []
     recent_scores: list[float] = []
 
@@ -892,20 +950,25 @@ def inherited_vs_recent_scores(
 # Main
 # ============================================================
 
+
 def main() -> None:
-    print("=== Exp 58b: Decay Calibration (Full-Scale, 4-Month Lineage) ===",
-          file=sys.stderr)
+    print(
+        "=== Exp 58b: Decay Calibration (Full-Scale, 4-Month Lineage) ===",
+        file=sys.stderr,
+    )
 
     # --- Step 1: Build milestone-to-date index from git logs ---
     print("\n[git] Loading git logs from 3 repos...", file=sys.stderr)
-    milestone_dates: dict[str, float] = build_milestone_date_index([
-        OPTIMUS_PRIME_REPO,
-        ALPHA_SEEK_REPO,
-        ALPHA_SEEK_MEMTEST_REPO,
-    ])
+    milestone_dates: dict[str, float] = build_milestone_date_index(
+        [
+            OPTIMUS_PRIME_REPO,
+            ALPHA_SEEK_REPO,
+            ALPHA_SEEK_MEMTEST_REPO,
+        ]
+    )
 
     # Optimus-prime earliest commit date (used for "inherited" decisions)
-    print("[git] Fetching optimus-prime earliest commit date...", file=sys.stderr)
+    print("[git] Fetching project-b earliest commit date...", file=sys.stderr)
     op_result = subprocess.run(
         ["git", "log", "--all", "--format=%ad", "--date=iso", "--reverse"],
         cwd=str(OPTIMUS_PRIME_REPO),
@@ -924,22 +987,27 @@ def main() -> None:
             break
         except ValueError:
             continue
-    print(f"[git] optimus-prime earliest: {optimus_earliest_days:.1f}d since epoch",
-          file=sys.stderr)
+    print(
+        f"[git] project-b earliest: {optimus_earliest_days:.1f}d since epoch",
+        file=sys.stderr,
+    )
 
     # Compute median across all milestone dates for fallback
     all_dates: list[float] = sorted(milestone_dates.values())
     if all_dates:
         mid: int = len(all_dates) // 2
         median_days: float = (
-            all_dates[mid] if len(all_dates) % 2 == 1
+            all_dates[mid]
+            if len(all_dates) % 2 == 1
             else (all_dates[mid - 1] + all_dates[mid]) / 2.0
         )
     else:
         median_days = optimus_earliest_days
-    print(f"[git] milestone date range: {min(all_dates):.1f}d - {max(all_dates):.1f}d, "
-          f"median={median_days:.1f}d",
-          file=sys.stderr)
+    print(
+        f"[git] milestone date range: {min(all_dates):.1f}d - {max(all_dates):.1f}d, "
+        f"median={median_days:.1f}d",
+        file=sys.stderr,
+    )
 
     # --- Step 2: Parse decisions ---
     print("\n[parse] Loading decisions...", file=sys.stderr)
@@ -951,16 +1019,20 @@ def main() -> None:
     )
     all_decisions: list[Decision] = active + archived
 
-    print(f"[parse] total decisions: {len(all_decisions)} "
-          f"({len(active)} active + {len(archived)} archived)",
-          file=sys.stderr)
+    print(
+        f"[parse] total decisions: {len(all_decisions)} "
+        f"({len(active)} active + {len(archived)} archived)",
+        file=sys.stderr,
+    )
 
     # Date range of decisions
     created_dates: list[float] = [d.created_at_days for d in all_decisions]
-    print(f"[parse] decision date range: "
-          f"{min(created_dates):.1f}d - {max(created_dates):.1f}d "
-          f"({max(created_dates)-min(created_dates):.1f}d span)",
-          file=sys.stderr)
+    print(
+        f"[parse] decision date range: "
+        f"{min(created_dates):.1f}d - {max(created_dates):.1f}d "
+        f"({max(created_dates) - min(created_dates):.1f}d span)",
+        file=sys.stderr,
+    )
 
     # Content type distribution
     type_counts: dict[str, int] = {}
@@ -971,9 +1043,11 @@ def main() -> None:
     inherited_count: int = sum(1 for d in all_decisions if d.is_inherited)
     superseded_count: int = sum(1 for d in all_decisions if d.superseded_by is not None)
     print(f"[parse] content types: {type_counts}", file=sys.stderr)
-    print(f"[parse] locked: {locked_count}, inherited: {inherited_count}, "
-          f"superseded: {superseded_count}",
-          file=sys.stderr)
+    print(
+        f"[parse] locked: {locked_count}, inherited: {inherited_count}, "
+        f"superseded: {superseded_count}",
+        file=sys.stderr,
+    )
 
     # --- Step 3: Load corrections ---
     print("\n[load] Loading correction clusters...", file=sys.stderr)
@@ -985,16 +1059,21 @@ def main() -> None:
     # Filter to clusters with at least one known decision ref
     decision_id_set: set[str] = {d.d_id for d in all_decisions}
     active_clusters: list[CorrectionCluster] = [
-        c for c in memory_failure_clusters
+        c
+        for c in memory_failure_clusters
         if any(ref in decision_id_set for ref in c.decision_refs)
     ]
-    print(f"[load] active clusters (has known refs): {len(active_clusters)} / "
-          f"{len(memory_failure_clusters)}",
-          file=sys.stderr)
+    print(
+        f"[load] active clusters (has known refs): {len(active_clusters)} / "
+        f"{len(memory_failure_clusters)}",
+        file=sys.stderr,
+    )
     for c in active_clusters:
         known: list[str] = [r for r in c.decision_refs if r in decision_id_set]
-        print(f"  {c.topic_id}: known_refs={known} events={len(c.correction_timestamps)}",
-              file=sys.stderr)
+        print(
+            f"  {c.topic_id}: known_refs={known} events={len(c.correction_timestamps)}",
+            file=sys.stderr,
+        )
 
     # Diagnostic: target decision attributes
     print("\n[diagnostic] Target decision attributes:", file=sys.stderr)
@@ -1026,7 +1105,10 @@ def main() -> None:
     )
 
     # Diagnostic: ranks under baseline
-    print("[diagnostic] Target ranks at first correction event (baseline):", file=sys.stderr)
+    print(
+        "[diagnostic] Target ranks at first correction event (baseline):",
+        file=sys.stderr,
+    )
     for cluster in active_clusters:
         if not cluster.correction_timestamps:
             continue
@@ -1035,12 +1117,14 @@ def main() -> None:
         ranked: list[tuple[str, float]] = rank_decisions(
             all_decisions, current_days, baseline_config
         )
-        target_ids: set[str] = {r for r in cluster.decision_refs if r in decision_id_set}
+        target_ids: set[str] = {
+            r for r in cluster.decision_refs if r in decision_id_set
+        }
         for ref in sorted(target_ids):
             for i, (d_id, s) in enumerate(ranked):
                 if d_id == ref:
                     print(
-                        f"  {cluster.topic_id}/{ref}: rank={i+1} score={s:.4f} "
+                        f"  {cluster.topic_id}/{ref}: rank={i + 1} score={s:.4f} "
                         f"(locked={decision_by_id[ref].locked})",
                         file=sys.stderr,
                     )
@@ -1069,7 +1153,13 @@ def main() -> None:
 
     # Rank distribution under combined config
     rank_buckets: dict[str, int] = {
-        "1-5": 0, "6-10": 0, "11-15": 0, "16-30": 0, "31-50": 0, "51+": 0, "not_found": 0
+        "1-5": 0,
+        "6-10": 0,
+        "11-15": 0,
+        "16-30": 0,
+        "31-50": 0,
+        "51+": 0,
+        "not_found": 0,
     }
     for rr in combined_detail_results:
         if rr.best_rank is None:
@@ -1089,21 +1179,22 @@ def main() -> None:
     print(f"[diagnostic] Rank distribution (combined): {rank_buckets}", file=sys.stderr)
 
     # --- Step 7: Additional analyses ---
-    print("\n[additional] Decay factor distributions per half-life setting", file=sys.stderr)
+    print(
+        "\n[additional] Decay factor distributions per half-life setting",
+        file=sys.stderr,
+    )
     # Evaluate at the median correction timestamp
-    all_correction_days: list[float] = sorted([
-        iso_to_days(ts)
-        for c in active_clusters
-        for ts in c.correction_timestamps
-    ])
+    all_correction_days: list[float] = sorted(
+        [iso_to_days(ts) for c in active_clusters for ts in c.correction_timestamps]
+    )
     mid_corr: int = len(all_correction_days) // 2
     eval_at_days: float = (
-        all_correction_days[mid_corr]
-        if all_correction_days
-        else median_days
+        all_correction_days[mid_corr] if all_correction_days else median_days
     )
-    print(f"  Evaluating at median correction time: {eval_at_days:.1f}d since epoch",
-          file=sys.stderr)
+    print(
+        f"  Evaluating at median correction time: {eval_at_days:.1f}d since epoch",
+        file=sys.stderr,
+    )
 
     decay_distributions: dict[str, dict[str, float]] = {}
     for hl in HALF_LIFE_CANDIDATES:
@@ -1114,9 +1205,11 @@ def main() -> None:
         )
         key: str = f"{hl}d"
         decay_distributions[key] = dist
-        print(f"  hl={hl}d: n={dist['n']} mean={dist['mean']:.3f} "
-              f"min={dist['min']:.3f} max={dist['max']:.3f}",
-              file=sys.stderr)
+        print(
+            f"  hl={hl}d: n={dist['n']} mean={dist['mean']:.3f} "
+            f"min={dist['min']:.3f} max={dist['max']:.3f}",
+            file=sys.stderr,
+        )
 
     print("\n[additional] Locked vs unlocked separation per half-life", file=sys.stderr)
     locked_unlocked_by_hl: dict[str, dict[str, float]] = {}
@@ -1173,28 +1266,37 @@ def main() -> None:
 
     # --- Final summary ---
     print("\n=== SUMMARY ===", file=sys.stderr)
-    print(f"Total decisions: {len(all_decisions)} ({len(active)} active + {len(archived)} archived)",
-          file=sys.stderr)
-    print(f"  Locked: {locked_count}  Inherited: {inherited_count}  "
-          f"Superseded: {superseded_count}",
-          file=sys.stderr)
+    print(
+        f"Total decisions: {len(all_decisions)} ({len(active)} active + {len(archived)} archived)",
+        file=sys.stderr,
+    )
+    print(
+        f"  Locked: {locked_count}  Inherited: {inherited_count}  "
+        f"Superseded: {superseded_count}",
+        file=sys.stderr,
+    )
     print(f"  Content types: {type_counts}", file=sys.stderr)
     span_days: float = max(created_dates) - min(created_dates)
-    print(f"  Temporal span: {span_days:.1f} days ({span_days/30:.1f} months)",
-          file=sys.stderr)
+    print(
+        f"  Temporal span: {span_days:.1f} days ({span_days / 30:.1f} months)",
+        file=sys.stderr,
+    )
     print(f"Active correction clusters: {len(active_clusters)}", file=sys.stderr)
     total_events: int = sum(len(c.correction_timestamps) for c in active_clusters)
     print(f"Total correction events: {total_events}", file=sys.stderr)
-    print(f"\nBaseline (no decay): top5={baseline_rates[5]:.3f}  "
-          f"top10={baseline_rates[10]:.3f}  top15={baseline_rates[15]:.3f}",
-          file=sys.stderr)
-    print(f"Combined best:       top5={combined_rates[5]:.3f}  "
-          f"top10={combined_rates[10]:.3f}  top15={combined_rates[15]:.3f}",
-          file=sys.stderr)
-    print(f"\nOptimal half-lives:", file=sys.stderr)
+    print(
+        f"\nBaseline (no decay): top5={baseline_rates[5]:.3f}  "
+        f"top10={baseline_rates[10]:.3f}  top15={baseline_rates[15]:.3f}",
+        file=sys.stderr,
+    )
+    print(
+        f"Combined best:       top5={combined_rates[5]:.3f}  "
+        f"top10={combined_rates[10]:.3f}  top15={combined_rates[15]:.3f}",
+        file=sys.stderr,
+    )
+    print("\nOptimal half-lives:", file=sys.stderr)
     for ct, hl in best_per_type.items():
-        print(f"  {ct.value}: {'never' if hl is None else f'{hl}d'}",
-              file=sys.stderr)
+        print(f"  {ct.value}: {'never' if hl is None else f'{hl}d'}", file=sys.stderr)
     print(f"\nRank distribution (combined): {rank_buckets}", file=sys.stderr)
 
     # --- Build results JSON ---
@@ -1219,7 +1321,9 @@ def main() -> None:
             "inherited_count": inherited_count,
             "superseded_count": superseded_count,
             "temporal_span_days": round(max(created_dates) - min(created_dates), 1),
-            "temporal_span_months": round((max(created_dates) - min(created_dates)) / 30, 1),
+            "temporal_span_months": round(
+                (max(created_dates) - min(created_dates)) / 30, 1
+            ),
             "active_clusters": len(active_clusters),
             "total_correction_events": total_events,
             "content_type_distribution": type_counts,
@@ -1241,9 +1345,7 @@ def main() -> None:
             }
             for sr in sweep_results
         ],
-        "optimal_half_lives": {
-            ct.value: hl for ct, hl in best_per_type.items()
-        },
+        "optimal_half_lives": {ct.value: hl for ct, hl in best_per_type.items()},
         "combined_best": {
             "top5": combined_rates[5],
             "top10": combined_rates[10],
@@ -1270,12 +1372,12 @@ def main() -> None:
         "interpretation": {
             "note": (
                 f"4-month full-scale calibration. {len(all_decisions)} decisions "
-                f"spanning {round((max(created_dates)-min(created_dates))/30, 1)} months "
+                f"spanning {round((max(created_dates) - min(created_dates)) / 30, 1)} months "
                 f"(vs 173 decisions over 13 days in Exp 58). "
                 f"Superseded decisions: {superseded_count}. "
-                f"Inherited (optimus-prime) decisions: {inherited_count}. "
+                f"Inherited (project-b) decisions: {inherited_count}. "
                 f"Locked fraction: {locked_count}/{len(all_decisions)}="
-                f"{locked_count/len(all_decisions):.2f}. "
+                f"{locked_count / len(all_decisions):.2f}. "
                 "If half-lives are still insensitive, the issue is the same: "
                 "too many locked decisions all score 1.0 and dominate the top of the ranking."
             ),

@@ -113,7 +113,7 @@
 - `tests/test_retrieval.py` -- search accuracy, ranking correctness, budget compliance
 
 **Test methodology:**
-- Seed database with alpha-seek beliefs (from spike DB)
+- Seed database with project-a beliefs (from spike DB)
 - Run 6-topic ground truth queries (from Exp 56)
 - Verify coverage >= 100% at K=30
 - Verify locked beliefs rank above unlocked for same query

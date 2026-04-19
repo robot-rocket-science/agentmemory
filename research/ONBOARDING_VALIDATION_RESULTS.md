@@ -9,8 +9,8 @@
 
 | Repo | Commits | Offline beliefs | LLM beliefs | Reduction | Offline locked | LLM locked | Lock reduction |
 |---|---|---|---|---|---|---|---|
-| debserver | 538 | 2,883 | 2,379 | 17% | 417 | 69 | **83%** |
-| email-secretary | 101 | 7,259 | 6,905 | 5% | 1,138 | 241 | **79%** |
+| project-d | 538 | 2,883 | 2,379 | 17% | 417 | 69 | **83%** |
+| project-f | 101 | 7,259 | 6,905 | 5% | 1,138 | 241 | **79%** |
 | bigtime | 14 | 1,374 | 311 | **77%** | 180 | 24 | **87%** |
 | mud_rust | 5 | 220 | 64 | **71%** | 49 | 2 | **96%** |
 
@@ -33,7 +33,7 @@ The offline classifier marks almost everything as PERSIST. The LLM classifier co
 ### H2: Git commit dates flow through to belief created_at -- CONFIRMED
 
 All commit-sourced beliefs have historical ISO 8601 dates from git log, not "now()":
-- debserver: date range 2026-02-15 to 2026-04-11
+- project-d: date range 2026-02-15 to 2026-04-11
 - mud_rust: date range 2025-06-23 to 2026-04-11 (10 months of history)
 
 **Tested:** Verified by querying beliefs table ORDER BY created_at.
@@ -42,8 +42,8 @@ All commit-sourced beliefs have historical ISO 8601 dates from git log, not "now
 
 | Repo | Oldest factual decay | Locked decay | Oldest date |
 |---|---|---|---|
-| debserver | 0.0668 | 1.0000 | 2026-02-15 |
-| email-secretary | 0.0664 | 1.0000 | 2026-02-15 |
+| project-d | 0.0668 | 1.0000 | 2026-02-15 |
+| project-f | 0.0664 | 1.0000 | 2026-02-15 |
 | bigtime | 0.0469 | 1.0000 | 2026-02-08 |
 | mud_rust | 0.0000 | 1.0000 | 2025-06-23 |
 
@@ -55,14 +55,14 @@ Factual beliefs decay over time (14-day half-life). Locked beliefs are immune (a
 
 | Repo | Commits | LLM beliefs | Beliefs per commit |
 |---|---|---|---|
-| debserver | 538 | 2,379 | 4.4 |
-| email-secretary | 101 | 6,905 | 68.4 (doc-heavy) |
+| project-d | 538 | 2,379 | 4.4 |
+| project-f | 101 | 6,905 | 68.4 (doc-heavy) |
 | bigtime | 14 | 311 | 22.2 |
 | mud_rust | 5 | 64 | 12.8 |
 
 With offline: bigtime produced 1,374 beliefs from 14 commits (98 per commit -- clearly inflated). With LLM: 311 (22 per commit -- reasonable for a doc-heavy project with 15 files).
 
-email-secretary is high (68/commit) because it has 109 files and extensive docs. This is proportional to content, not inflated by noise.
+project-f is high (68/commit) because it has 109 files and extensive docs. This is proportional to content, not inflated by noise.
 
 ---
 
@@ -90,8 +90,8 @@ The single biggest quality improvement from LLM classification is **lock accurac
 
 | Repo | Offline locked | LLM locked | False lock rate (estimated) |
 |---|---|---|---|
-| debserver | 417 | 69 | ~83% false locks with offline |
-| email-secretary | 1,138 | 241 | ~79% false locks with offline |
+| project-d | 417 | 69 | ~83% false locks with offline |
+| project-f | 1,138 | 241 | ~79% false locks with offline |
 | bigtime | 180 | 24 | ~87% false locks with offline |
 | mud_rust | 49 | 2 | ~96% false locks with offline |
 

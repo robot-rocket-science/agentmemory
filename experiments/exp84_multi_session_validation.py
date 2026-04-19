@@ -13,12 +13,12 @@ Simulates 5 sessions against a temp DB copy:
 Each session creates a new MemoryStore instance (simulating server restart)
 but shares the same DB file.
 """
+
 from __future__ import annotations
 
 import hashlib
 import json
 import shutil
-import sys
 import tempfile
 from pathlib import Path
 from typing import Final
@@ -31,7 +31,7 @@ from agentmemory.store import MemoryStore
 # Config
 # ---------------------------------------------------------------------------
 
-CWD: Final[str] = "/Users/thelorax/projects/agentmemory"
+CWD: Final[str] = "/home/user/projects/agentmemory"
 DB_HASH: Final[str] = hashlib.sha256(CWD.encode()).hexdigest()[:12]
 LIVE_DB: Final[Path] = Path.home() / ".agentmemory" / "projects" / DB_HASH / "memory.db"
 
@@ -41,6 +41,7 @@ MRR_K: Final[int] = 10
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def fresh_store(db_path: Path) -> tuple[MemoryStore, Session]:
     """Create a new MemoryStore + Session (simulating a server restart)."""
@@ -66,6 +67,7 @@ def mrr_at_k(
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     # Use a fresh temp DB (not a copy of live) for controlled testing
@@ -119,7 +121,15 @@ def main() -> None:
 
     store.complete_session(sid1)
     s1_count: int = store.status()["beliefs"]
-    checks.append({"session": 1, "check": "seed_beliefs_created", "expected": 5, "actual": s1_count, "pass": s1_count >= 5})
+    checks.append(
+        {
+            "session": 1,
+            "check": "seed_beliefs_created",
+            "expected": 5,
+            "actual": s1_count,
+            "pass": s1_count >= 5,
+        }
+    )
     print(f"Session 1: {s1_count} beliefs, {len(seed_ids)} seeded")
 
     # -----------------------------------------------------------------------
@@ -135,7 +145,15 @@ def main() -> None:
         if b2 is not None and b2.valid_to is None:
             persisted += 1
 
-    checks.append({"session": 2, "check": "seed_beliefs_persisted", "expected": 5, "actual": persisted, "pass": persisted == 5})
+    checks.append(
+        {
+            "session": 2,
+            "check": "seed_beliefs_persisted",
+            "expected": 5,
+            "actual": persisted,
+            "pass": persisted == 5,
+        }
+    )
 
     # Add new beliefs
     new_belief: Belief = store.insert_belief(
@@ -148,11 +166,23 @@ def main() -> None:
 
     # Verify feedback from session 1 persisted (alpha should have been updated)
     b_check: Belief | None = store.get_belief(seed_beliefs[0].id)
-    feedback_persisted: bool = b_check is not None and b_check.alpha != seed_beliefs[0].alpha
-    checks.append({"session": 2, "check": "feedback_persisted", "expected": True, "actual": feedback_persisted, "pass": feedback_persisted})
+    feedback_persisted: bool = (
+        b_check is not None and b_check.alpha != seed_beliefs[0].alpha
+    )
+    checks.append(
+        {
+            "session": 2,
+            "check": "feedback_persisted",
+            "expected": True,
+            "actual": feedback_persisted,
+            "pass": feedback_persisted,
+        }
+    )
 
     store.complete_session(sid2)
-    print(f"Session 2: persisted={persisted}/5, feedback_persisted={feedback_persisted}")
+    print(
+        f"Session 2: persisted={persisted}/5, feedback_persisted={feedback_persisted}"
+    )
 
     # -----------------------------------------------------------------------
     # Session 3: Correct a belief (supersession)
@@ -174,15 +204,33 @@ def main() -> None:
     # Verify old belief is superseded
     old_b: Belief | None = store.get_belief(old_id)
     superseded: bool = old_b is not None and old_b.superseded_by == correction.id
-    checks.append({"session": 3, "check": "supersession_works", "expected": True, "actual": superseded, "pass": superseded})
+    checks.append(
+        {
+            "session": 3,
+            "check": "supersession_works",
+            "expected": True,
+            "actual": superseded,
+            "pass": superseded,
+        }
+    )
 
     # Verify superseded belief excluded from search
     search_results: list[Belief] = store.search("retrieval pipeline FTS5", top_k=10)
     old_in_results: bool = any(b.id == old_id for b in search_results)
-    checks.append({"session": 3, "check": "superseded_excluded_from_search", "expected": False, "actual": old_in_results, "pass": not old_in_results})
+    checks.append(
+        {
+            "session": 3,
+            "check": "superseded_excluded_from_search",
+            "expected": False,
+            "actual": old_in_results,
+            "pass": not old_in_results,
+        }
+    )
 
     store.complete_session(sid3)
-    print(f"Session 3: superseded={superseded}, excluded_from_search={not old_in_results}")
+    print(
+        f"Session 3: superseded={superseded}, excluded_from_search={not old_in_results}"
+    )
 
     # -----------------------------------------------------------------------
     # Session 4: Lock a belief, verify it ranks highly
@@ -196,12 +244,28 @@ def main() -> None:
     # Verify lock persists
     locked_b: Belief | None = store.get_belief(correction.id)
     is_locked: bool = locked_b is not None and locked_b.locked
-    checks.append({"session": 4, "check": "lock_persists", "expected": True, "actual": is_locked, "pass": is_locked})
+    checks.append(
+        {
+            "session": 4,
+            "check": "lock_persists",
+            "expected": True,
+            "actual": is_locked,
+            "pass": is_locked,
+        }
+    )
 
     # Verify locked belief appears in get_locked_beliefs
     locked_list: list[Belief] = store.get_locked_beliefs()
     in_locked_list: bool = any(b.id == correction.id for b in locked_list)
-    checks.append({"session": 4, "check": "in_locked_list", "expected": True, "actual": in_locked_list, "pass": in_locked_list})
+    checks.append(
+        {
+            "session": 4,
+            "check": "in_locked_list",
+            "expected": True,
+            "actual": in_locked_list,
+            "pass": in_locked_list,
+        }
+    )
 
     store.complete_session(sid4)
     print(f"Session 4: locked={is_locked}, in_locked_list={in_locked_list}")
@@ -215,18 +279,44 @@ def main() -> None:
     # The correction should rank above the remaining seed beliefs for this query
     active_ids: set[str] = {correction.id} | {b.id for b in seed_beliefs[1:]}
     mrr: float = mrr_at_k(store, "retrieval pipeline FTS5 HRR", active_ids)
-    checks.append({"session": 5, "check": "mrr_stable", "expected": "> 0", "actual": mrr, "pass": mrr > 0.0})
+    checks.append(
+        {
+            "session": 5,
+            "check": "mrr_stable",
+            "expected": "> 0",
+            "actual": mrr,
+            "pass": mrr > 0.0,
+        }
+    )
 
     # Verify total belief count is correct (5 seed + 1 new + 1 correction = 7)
     final_count: int = store.status()["beliefs"]
-    checks.append({"session": 5, "check": "total_beliefs", "expected": 7, "actual": final_count, "pass": final_count == 7})
+    checks.append(
+        {
+            "session": 5,
+            "check": "total_beliefs",
+            "expected": 7,
+            "actual": final_count,
+            "pass": final_count == 7,
+        }
+    )
 
     # Count sessions
     session_count: int = store.status()["sessions"]
-    checks.append({"session": 5, "check": "session_count", "expected": 5, "actual": session_count, "pass": session_count == 5})
+    checks.append(
+        {
+            "session": 5,
+            "check": "session_count",
+            "expected": 5,
+            "actual": session_count,
+            "pass": session_count == 5,
+        }
+    )
 
     store.complete_session(sid5)
-    print(f"Session 5: mrr={mrr:.3f}, total_beliefs={final_count}, sessions={session_count}")
+    print(
+        f"Session 5: mrr={mrr:.3f}, total_beliefs={final_count}, sessions={session_count}"
+    )
 
     # -----------------------------------------------------------------------
     # Summary
@@ -242,7 +332,9 @@ def main() -> None:
     print(f"\n{'PASS' if all_pass else 'FAIL'}: {passed}/{total} checks passed")
     for c in checks:
         status: str = "PASS" if c["pass"] else "FAIL"
-        print(f"  [{status}] Session {c['session']}: {c['check']} (expected={c['expected']}, actual={c['actual']})")
+        print(
+            f"  [{status}] Session {c['session']}: {c['check']} (expected={c['expected']}, actual={c['actual']})"
+        )
 
     out_path: Path = Path(__file__).parent / "exp84_results.json"
     with open(out_path, "w") as f:

@@ -57,7 +57,7 @@ The memory system writes locked beliefs directly to CLAUDE.md (or equivalent per
 
 **Pros:** Most reliable. CLAUDE.md is specifically designed to survive compaction.
 **Cons:** Modifying CLAUDE.md programmatically is invasive. May conflict with user's manual CLAUDE.md content. Model-specific (CLAUDE.md is Claude-only; ChatGPT has different config).
-**Verdict:** This is what the user was already doing manually in alpha-seek. Automating it is the most direct solution but needs careful design to avoid overwriting user content.
+**Verdict:** This is what the user was already doing manually in project-a. Automating it is the most direct solution but needs careful design to avoid overwriting user content.
 
 ### Approach 5: Hybrid (recommended)
 

@@ -23,12 +23,22 @@ import numpy as np
 from experiments.exp2_bayesian_calibration import Belief, compute_calibration
 
 
-ALPHA_SEEK_DB = Path("/Users/thelorax/projects/.gsd/workflows/spikes/"
-                     "260406-1-associative-memory-for-gsd-please-explor/"
-                     "sandbox/alpha-seek.db")
+ALPHA_SEEK_DB = Path(
+    "/home/user/projects/.gsd/workflows/spikes/"
+    "260406-1-associative-memory-for-gsd-please-explor/"
+    "sandbox/project-a.db"
+)
 
-DOMAINS = ["strategy", "methodology", "knowledge", "architecture",
-           "data-source", "backtesting", "agent behavior", "milestone"]
+DOMAINS = [
+    "strategy",
+    "methodology",
+    "knowledge",
+    "architecture",
+    "data-source",
+    "backtesting",
+    "agent behavior",
+    "milestone",
+]
 N_SESSIONS = 50
 N_TRIALS = 10
 
@@ -40,11 +50,13 @@ DegreeDict = dict[str, int]
 
 
 def load_real_graph() -> tuple[NodeDict, AdjDict, AnchorDict, SubgraphDict, DegreeDict]:
-    """Load alpha-seek nodes and build real subgraphs from anchors."""
+    """Load project-a nodes and build real subgraphs from anchors."""
     db = sqlite3.connect(str(ALPHA_SEEK_DB))
 
     nodes: NodeDict = {}
-    for row in db.execute("SELECT id, content, category, confidence FROM mem_nodes WHERE superseded_by IS NULL"):
+    for row in db.execute(
+        "SELECT id, content, category, confidence FROM mem_nodes WHERE superseded_by IS NULL"
+    ):
         nodes[str(row[0])] = {
             "content": row[1],
             "category": row[2] or "unknown",
@@ -78,14 +90,22 @@ def load_real_graph() -> tuple[NodeDict, AdjDict, AnchorDict, SubgraphDict, Degr
     return nodes, adj, anchors, subgraphs, degrees
 
 
-def create_beliefs_from_graph(nodes: NodeDict, rng: np.random.Generator) -> dict[str, Belief]:
+def create_beliefs_from_graph(
+    nodes: NodeDict, rng: np.random.Generator
+) -> dict[str, Belief]:
     """Create belief objects from real graph nodes with semi-realistic true rates."""
     beliefs: dict[str, Belief] = {}
     # Assign true rates based on category (domain proxy)
     category_rates: dict[str, float] = {
-        "strategy": 0.75, "methodology": 0.80, "knowledge": 0.60,
-        "architecture": 0.65, "data-source": 0.55, "backtesting": 0.70,
-        "agent behavior": 0.85, "milestone": 0.50, "unknown": 0.50,
+        "strategy": 0.75,
+        "methodology": 0.80,
+        "knowledge": 0.60,
+        "architecture": 0.65,
+        "data-source": 0.55,
+        "backtesting": 0.70,
+        "agent behavior": 0.85,
+        "milestone": 0.50,
+        "unknown": 0.50,
     }
 
     for nid, node in nodes.items():
@@ -106,14 +126,18 @@ def create_beliefs_from_graph(nodes: NodeDict, rng: np.random.Generator) -> dict
     return beliefs
 
 
-def run_flat(beliefs_dict: dict[str, Belief], rng: np.random.Generator) -> dict[str, Any]:
+def run_flat(
+    beliefs_dict: dict[str, Belief], rng: np.random.Generator
+) -> dict[str, Any]:
     """Flat Thompson sampling (baseline)."""
     beliefs: list[Belief] = list(beliefs_dict.values())
     n = len(beliefs)
 
     for _ in range(N_SESSIONS):
         for _ in range(10):
-            samples = np.array([rng.beta(max(b.alpha, 0.01), max(b.beta_param, 0.01)) for b in beliefs])
+            samples = np.array(
+                [rng.beta(max(b.alpha, 0.01), max(b.beta_param, 0.01)) for b in beliefs]
+            )
             top_k = np.argpartition(samples, -5)[-5:]
             for idx_val in top_k:
                 idx: int = int(idx_val)
@@ -130,7 +154,13 @@ def run_flat(beliefs_dict: dict[str, Belief], rng: np.random.Generator) -> dict[
     return {"ece": cal["ece"], "coverage": round(tested / n, 4)}
 
 
-def run_hierarchical(beliefs_dict: dict[str, Belief], subgraphs: SubgraphDict, anchors: AnchorDict, prop_weight: float, rng: np.random.Generator) -> dict[str, Any]:
+def run_hierarchical(
+    beliefs_dict: dict[str, Belief],
+    subgraphs: SubgraphDict,
+    anchors: AnchorDict,
+    prop_weight: float,
+    rng: np.random.Generator,
+) -> dict[str, Any]:
     """Hierarchical with real subgraphs and configurable propagation weight."""
     beliefs: list[Belief] = list(beliefs_dict.values())
     nid_to_idx: dict[str, int] = {b.nid: i for i, b in enumerate(beliefs)}
@@ -146,7 +176,9 @@ def run_hierarchical(beliefs_dict: dict[str, Belief], subgraphs: SubgraphDict, a
 
     for _ in range(N_SESSIONS):
         for _ in range(10):
-            samples = np.array([rng.beta(max(b.alpha, 0.01), max(b.beta_param, 0.01)) for b in beliefs])
+            samples = np.array(
+                [rng.beta(max(b.alpha, 0.01), max(b.beta_param, 0.01)) for b in beliefs]
+            )
             top_k = np.argpartition(samples, -5)[-5:]
 
             for idx_val in top_k:
@@ -166,7 +198,9 @@ def run_hierarchical(beliefs_dict: dict[str, Belief], subgraphs: SubgraphDict, a
                 if idx in anchor_members and outcome != "ignored":
                     members_list = anchor_members[idx]
                     # Scale propagation by 1/sqrt(subgraph_size) to prevent over-propagation
-                    scaled_weight: float = prop_weight / max(1, float(np.sqrt(len(members_list))))
+                    scaled_weight: float = prop_weight / max(
+                        1, float(np.sqrt(len(members_list)))
+                    )
                     for midx in members_list:
                         if outcome == "used":
                             beliefs[midx].alpha += scaled_weight
@@ -196,7 +230,7 @@ def main() -> None:
     results: dict[str, dict[str, Any]] = {}
 
     # Flat baseline
-    print(f"\n  Running flat Thompson...", file=sys.stderr)
+    print("\n  Running flat Thompson...", file=sys.stderr)
     flat_eces: list[float] = []
     flat_covs: list[float] = []
     for _ in range(N_TRIALS):
@@ -210,7 +244,10 @@ def main() -> None:
         "ece": round(float(np.mean(flat_eces)), 4),
         "coverage": round(float(np.mean(flat_covs)), 4),
     }
-    print(f"    ECE={np.mean(flat_eces):.4f}, coverage={np.mean(flat_covs):.0%}", file=sys.stderr)
+    print(
+        f"    ECE={np.mean(flat_eces):.4f}, coverage={np.mean(flat_covs):.0%}",
+        file=sys.stderr,
+    )
 
     # Hierarchical with different propagation weights
     for pw in [0.1, 0.3, 0.5, 1.0]:
@@ -220,7 +257,9 @@ def main() -> None:
         for _ in range(N_TRIALS):
             seed = int(cast(int, rng_base.integers(0, 2**32)))
             beliefs = create_beliefs_from_graph(nodes, np.random.default_rng(seed))
-            r = run_hierarchical(beliefs, subgraphs, anchors, pw, np.random.default_rng(seed))
+            r = run_hierarchical(
+                beliefs, subgraphs, anchors, pw, np.random.default_rng(seed)
+            )
             h_eces.append(float(r["ece"]))
             h_covs.append(float(r["coverage"]))
 
@@ -228,17 +267,20 @@ def main() -> None:
             "ece": round(float(np.mean(h_eces)), 4),
             "coverage": round(float(np.mean(h_covs)), 4),
         }
-        print(f"    ECE={np.mean(h_eces):.4f}, coverage={np.mean(h_covs):.0%}", file=sys.stderr)
+        print(
+            f"    ECE={np.mean(h_eces):.4f}, coverage={np.mean(h_covs):.0%}",
+            file=sys.stderr,
+        )
 
     # Summary
-    print(f"\n{'='*60}", file=sys.stderr)
+    print(f"\n{'=' * 60}", file=sys.stderr)
     print(f"{'Method':<25} {'ECE':>8} {'Coverage':>10}", file=sys.stderr)
     print("-" * 45, file=sys.stderr)
     for method, r in results.items():
         print(f"{method:<25} {r['ece']:>8.4f} {r['coverage']:>10.0%}", file=sys.stderr)
 
     Path("experiments/exp26_results.json").write_text(json.dumps(results, indent=2))
-    print(f"\nOutput: experiments/exp26_results.json", file=sys.stderr)
+    print("\nOutput: experiments/exp26_results.json", file=sys.stderr)
 
 
 if __name__ == "__main__":

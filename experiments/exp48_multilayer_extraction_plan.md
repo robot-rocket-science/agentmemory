@@ -9,7 +9,7 @@
 
 ## 1. Motivation
 
-Exp 47 showed grep beats our architecture at 586 nodes: 92% coverage vs 85% for FTS5 and 85% for FTS5+HRR. But 586 nodes is an artificially small graph -- it contains only decision-level beliefs from the alpha-seek spike DB, with no temporal edges, no code structure, no commit history, and no file-level nodes.
+Exp 47 showed grep beats our architecture at 586 nodes: 92% coverage vs 85% for FTS5 and 85% for FTS5+HRR. But 586 nodes is an artificially small graph -- it contains only decision-level beliefs from the project-a spike DB, with no temporal edges, no code structure, no commit history, and no file-level nodes.
 
 Real projects have thousands of nodes across multiple layers. The onboarding research (Exp 45) designed extractors for these layers but only validated graph connectivity (H1), not retrieval quality at scale. Exp 19 designed temporal edges (TEMPORAL_NEXT + content-aware decay) but they were never extracted from real data.
 
@@ -23,14 +23,14 @@ The fundamental question has shifted from "does our retrieval architecture work?
 
 | Layer | Source Experiment | What Was Proven | What's Untested |
 |-------|------------------|-----------------|-----------------|
-| Decision/belief nodes | Exp 6, 16 | 173 decisions, 1,195 sentences from alpha-seek | Whether sentence decomposition helps retrieval at scale |
+| Decision/belief nodes | Exp 6, 16 | 173 decisions, 1,195 sentences from project-a | Whether sentence decomposition helps retrieval at scale |
 | CITES edges | Exp 40 | D### references extractable by regex. 43 CITES edges from 586 nodes | Coverage on projects without explicit citation patterns |
-| CALLS/PASSES_DATA | Exp 37 | 3,489 resolved CALLS from alpha-seek (18.9% resolution). Disjoint from CO_CHANGED (Jaccard 0.012) | Whether CALLS edges improve retrieval (vs just graph density) |
+| CALLS/PASSES_DATA | Exp 37 | 3,489 resolved CALLS from project-a (18.9% resolution). Disjoint from CO_CHANGED (Jaccard 0.012) | Whether CALLS edges improve retrieval (vs just graph density) |
 | CO_CHANGED | Exp 37 | Captured from git history. Disjoint from CALLS and CITES | Whether CO_CHANGED provides retrieval signal |
 | COMMIT_TOUCHES | Exp 45 (onboarding) | Extracted in pipeline. Links commits to files they modified | Whether commit nodes are useful retrieval targets |
 | TEMPORAL_NEXT | Exp 19 (design only) | Model 3 adopted: sequential edges between commits + content-aware decay | **Never extracted from real data. Never tested for retrieval impact.** |
 | Sentence decomposition | Exp 16, 29 | 86% token reduction. Windowed sentences beat decision-level (12/12 vs 11/12) | Whether sentence FTS5 at scale still wins |
-| Behavioral/directive nodes | Exp 40, 43, 44 | Pattern scan finds 18 behavioral in alpha-seek. Keyword classification 47% accurate | Whether directive extraction generalizes across projects |
+| Behavioral/directive nodes | Exp 40, 43, 44 | Pattern scan finds 18 behavioral in project-a. Keyword classification 47% accurate | Whether directive extraction generalizes across projects |
 | HRR structural retrieval | Exp 34, 40, 45 | 100% recall within capacity. Decision-neighborhood partition works | Whether HRR adds value when the graph is multi-layer (not just behavioral clique) |
 
 ### What Exp 47 revealed about the gap
@@ -55,7 +55,7 @@ More importantly, commit nodes with TEMPORAL_NEXT + COMMIT_TOUCHES create a **te
 ## 3. Hypotheses
 
 **H1: At 2K+ nodes, FTS5 outperforms grep on coverage@15.**
-Grep's lack of ranking becomes a liability when there are hundreds of matches per query. FTS5's BM25 ranking surfaces the most relevant results. Predicted: FTS5 coverage > grep coverage on the alpha-seek 6-topic ground truth when the graph includes commit nodes, file nodes, and sentence nodes.
+Grep's lack of ranking becomes a liability when there are hundreds of matches per query. FTS5's BM25 ranking surfaces the most relevant results. Predicted: FTS5 coverage > grep coverage on the project-a 6-topic ground truth when the graph includes commit nodes, file nodes, and sentence nodes.
 
 **H2: Multi-layer edges increase HRR retrieval value.**
 With CITES, CALLS, CO_CHANGED, and TEMPORAL_NEXT edges creating denser graph structure, HRR has more structural paths to walk. Predicted: FTS5+HRR coverage > FTS5-only coverage at 2K+ nodes, recovering at least 1 decision that FTS5 misses.
@@ -67,7 +67,7 @@ TEMPORAL_NEXT + COMMIT_TOUCHES create paths between code and decisions that no o
 Decision-neighborhood partitioning (Exp 45) keeps partitions at 50-65 edges. With additional edge types, partitions may grow. Predicted: with multi-layer edges, 90%+ of partitions remain below DIM=2048 capacity (~204 edges).
 
 **H5: Extraction scales linearly with project size.**
-The onboarding extractors (Exp 45) ran on alpha-seek in <5 seconds. Predicted: optimus-prime (3x larger) completes in <15 seconds. gsd-2 (5x larger) completes in <25 seconds.
+The onboarding extractors (Exp 45) ran on project-a in <5 seconds. Predicted: project-b (3x larger) completes in <15 seconds. gsd-2 (5x larger) completes in <25 seconds.
 
 **H6: Grep precision degrades at scale while FTS5 precision holds.**
 At 586 nodes, grep precision was 21% (higher than FTS5's 12%). At 2K+ nodes, grep returns more noise per query. Predicted: grep precision drops below 15% while FTS5 precision stays at 12%+.
@@ -82,9 +82,9 @@ At 586 nodes, grep precision was 21% (higher than FTS5's 12%). At 2K+ nodes, gre
 
 | Project | Commits | Files | Archetype | Why |
 |---------|---------|-------|-----------|-----|
-| alpha-seek | 552 | 393 | Dense quant codebase + rich docs | Has 6-topic ground truth. Primary test. |
-| optimus-prime | 1,714 | 1,786 | Large GSD-managed project | Tests scale. Has .planning/ docs. |
-| debserver | 538 | 183 | Rust server, minimal docs | Tests code-heavy/doc-light archetype. |
+| project-a | 552 | 393 | Dense quant codebase + rich docs | Has 6-topic ground truth. Primary test. |
+| project-b | 1,714 | 1,786 | Large GSD-managed project | Tests scale. Has .planning/ docs. |
+| project-d | 538 | 183 | Rust server, minimal docs | Tests code-heavy/doc-light archetype. |
 
 ### 4.2 Extraction Pipeline
 
@@ -108,7 +108,7 @@ Merge all nodes and edges into a single in-memory graph. Compute:
 
 ### 4.4 Retrieval Comparison
 
-On **alpha-seek** (has ground truth), run 5 methods at K=15:
+On **project-a** (has ground truth), run 5 methods at K=15:
 - A. Grep on full graph nodes
 - B. FTS5 on full graph nodes
 - C. FTS5 + PRF
@@ -117,14 +117,14 @@ On **alpha-seek** (has ground truth), run 5 methods at K=15:
 
 Metrics: coverage@15, tokens@15, precision@15, MRR (same as Exp 47).
 
-On **optimus-prime** and **debserver** (no ground truth), run qualitative evaluation:
+On **project-b** and **project-d** (no ground truth), run qualitative evaluation:
 - 3 ad-hoc queries per project
 - Human judgment: are the top-5 results relevant?
 - Compare grep vs FTS5+HRR qualitatively
 
 ### 4.5 Temporal Retrieval Test
 
-Specific test for H3: for each of the 6 alpha-seek topics, check whether any needed decision is reachable from a commit node via TEMPORAL_NEXT + COMMIT_TOUCHES that is NOT reachable via CITES or CALLS. If yes, temporal edges provide unique signal.
+Specific test for H3: for each of the 6 project-a topics, check whether any needed decision is reachable from a commit node via TEMPORAL_NEXT + COMMIT_TOUCHES that is NOT reachable via CITES or CALLS. If yes, temporal edges provide unique signal.
 
 ---
 
@@ -149,7 +149,7 @@ Also addresses:
 
 | Criterion | Threshold | What It Means If We Miss |
 |-----------|-----------|--------------------------|
-| FTS5 coverage > grep coverage on alpha-seek at full graph | FTS5 >= 92%, grep < 92% | Our ranking adds value at scale |
+| FTS5 coverage > grep coverage on project-a at full graph | FTS5 >= 92%, grep < 92% | Our ranking adds value at scale |
 | FTS5+HRR coverage > FTS5 coverage | At least 1 additional decision found | HRR structural retrieval adds value with multi-layer edges |
 | Temporal edges provide unique signal | At least 1 decision reachable only via temporal path | Temporal extraction is worth the complexity |
 | 90%+ partitions within HRR capacity | <= 10% of partitions exceed 204 edges | Decision-neighborhood partitioning works for multi-layer graphs |
@@ -161,8 +161,8 @@ Also addresses:
 
 | Risk | Impact | Mitigation |
 |------|--------|-----------|
-| Grep still wins at 2K+ nodes | Architecture not justified at this scale | Test at 10K+ (optimus-prime). If grep still wins there, fundamental rethink needed. |
+| Grep still wins at 2K+ nodes | Architecture not justified at this scale | Test at 10K+ (project-b). If grep still wins there, fundamental rethink needed. |
 | Multi-layer edges create over-capacity partitions | HRR fails on the richer graph | Increase DIM to 4096. Sub-partition by edge type. |
 | Temporal edges are mostly noise | TEMPORAL_NEXT adds density but not signal | Filter: only link commits that reference D###/M### patterns, not all consecutive commits. |
 | Extraction takes minutes per project | Not practical for onboarding | Profile and optimize. Most time should be git log parsing, not graph construction. |
-| Alpha-seek ground truth is too narrow (6 topics) | Results don't generalize | Qualitative eval on optimus-prime and debserver provides breadth. |
+| Alpha-seek ground truth is too narrow (6 topics) | Results don't generalize | Qualitative eval on project-b and project-d provides breadth. |

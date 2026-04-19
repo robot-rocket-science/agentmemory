@@ -164,11 +164,11 @@ These are open questions without experimental evidence:
 
 2. **Sentence-level HRR at full scale.** We tested on D195's 18-node neighborhood. The full sentence graph is 1,195 nodes / 1,485 edges partitioned into 27 subgraphs. We haven't tested retrieval quality across subgraph boundaries.
 
-3. ~~**HRR + FTS5 combined pipeline.**~~ TESTED in Exp 40. Full end-to-end pipeline on 586 alpha-seek beliefs. FTS5 finds D188 from "agent behavior instructions," HRR walks AGENT_CONSTRAINT edge to recover D157 (sim=0.2487). Combined coverage: 100% (13/13), matching hand-crafted 3-query baseline. Max result inflation 2.1x (precision held). Zero regressions. The hybrid architecture is validated. See HRR_VOCABULARY_BRIDGE.md and experiments/exp40_hybrid_pipeline.py.
+3. ~~**HRR + FTS5 combined pipeline.**~~ TESTED in Exp 40. Full end-to-end pipeline on 586 project-a beliefs. FTS5 finds D188 from "agent behavior instructions," HRR walks AGENT_CONSTRAINT edge to recover D157 (sim=0.2487). Combined coverage: 100% (13/13), matching hand-crafted 3-query baseline. Max result inflation 2.1x (precision held). Zero regressions. The hybrid architecture is validated. See HRR_VOCABULARY_BRIDGE.md and experiments/exp40_hybrid_pipeline.py.
 
 4. **Bootstrap iteration.** We tested one round of bootstrap (partial graph -> propose candidates). We haven't tested the iterative loop (propose -> verify -> encode -> propose again).
 
-5. **HRR on non-GSD documents.** All tests used alpha-seek decisions with D### citation syntax. Documents without explicit citations would rely more heavily on co-occurrence and bootstrap. Not tested.
+5. **HRR on non-GSD documents.** All tests used project-a decisions with D### citation syntax. Documents without explicit citations would rely more heavily on co-occurrence and bootstrap. Not tested.
 
 6. ~~**Vocabulary bridge via shared edge types.**~~ TESTED in Exp 34 Test A. D157 ("ban async_bash") and D188 ("don't elaborate") connected via AGENT_CONSTRAINT edge. 184x separation between behavioral beliefs and distractors. See HRR_VOCABULARY_BRIDGE.md for full analysis and connection to the Exp 39 FTS5 vocabulary gap finding.
 
@@ -186,7 +186,7 @@ From HRR_RESEARCH.md section 6, reliable retrieval (SNR > 3) requires:
 | 4096 | ~455 | Large subgraphs or multi-hop |
 | 8192 | ~910 | Aggressive superposition |
 
-The alpha-seek sentence graph has 1,485 edges total, partitioned into 27 subgraphs of 50-60 edges each. DIM=2048 provides ample headroom per subgraph.
+The project-a sentence graph has 1,485 edges total, partitioned into 27 subgraphs of 50-60 edges each. DIM=2048 provides ample headroom per subgraph.
 
 ---
 
@@ -290,7 +290,7 @@ For single-hop, HRR matches BFS at 5/5 recall (Exp 31, 34). HRR adds fuzzy-start
 
 ### Graph shapes where HRR's value increases
 
-All experiments so far used one project (alpha-seek) with citation-heavy structure (explicit D### references). HRR's relative value increases for:
+All experiments so far used one project (project-a) with citation-heavy structure (explicit D### references). HRR's relative value increases for:
 
 - **Dense topic clusters** with many lateral connections and few explicit citations. FTS5 handles within-cluster if vocabulary overlaps. HRR handles cross-cluster where vocabulary diverges.
 - **Heterogeneous edge types** (SUPPORTS, CONTRADICTS, SUPERSEDES, DEPENDS_ON). BFS without filters treats all edges equally. HRR's geometric selectivity is native -- query with CONTRADICTS and SUPPORTS edges contribute zero signal.
@@ -321,7 +321,7 @@ HRR + FTS5 are co-primary retrieval axes. BFS is exact-depth backup. FFT cost at
 
 ## Cross-Project Validation (2026-04-10)
 
-The findings above were based on a single project (alpha-seek). Cross-project testing on 7 diverse repos (smoltcp, adr, boa, debserver, gsd-2, rclcpp, rustls) confirmed and extended them. Full results in T0_RESULTS.md. Key additions:
+The findings above were based on a single project (project-a). Cross-project testing on 7 diverse repos (smoltcp, adr, boa, project-d, gsd-2, rclcpp, rustls) confirmed and extended them. Full results in T0_RESULTS.md. Key additions:
 
 ### HRR scales with adaptive thresholds + partition routing
 
@@ -329,7 +329,7 @@ Initial cross-project testing showed HRR failing on larger repos (boa R@10=0.074
 
 | Repo | Commits | R@10 (naive) | R@10 (adaptive + routed) |
 |------|---------|-------------|--------------------------|
-| debserver | 526 | 0.880 | 0.900 |
+| project-d | 526 | 0.880 | 0.900 |
 | rustls | 5,024 | -- | 0.711 |
 | smoltcp | 1,577 | 0.378 | 0.641 |
 | boa | 3,354 | 0.074 | 0.466 |

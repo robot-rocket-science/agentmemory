@@ -29,10 +29,10 @@ Run agentmemory against established benchmarks in an isolated environment to pro
 - No project-specific data, no bleeding from personal usage
 - Results and logs captured as artifacts
 
-### Option B: archon (cheaper, less isolated)
-- Dedicated Docker container on archon
+### Option B: server-a (cheaper, less isolated)
+- Dedicated Docker container on server-a
 - Clean volume mount, no shared state
-- Risk: archon has other processes that could affect timing benchmarks
+- Risk: server-a has other processes that could affect timing benchmarks
 
 ### Recommendation: Option A for final results, Option B for development/debugging
 

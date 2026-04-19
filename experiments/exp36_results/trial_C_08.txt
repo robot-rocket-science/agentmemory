@@ -1,1 +1,1 @@
-The palace has a single wing (`alpha_seek`) with 10,000 drawers across 9 rooms. The bulk is in `archive` (6,556), `data` (1,226), and `results` (886). There's no `agentmemory` wing yet -- the palace only reflects the alpha-seek project so far.
+The palace has a single wing (`project_a`) with 10,000 drawers across 9 rooms. The bulk is in `archive` (6,556), `data` (1,226), and `results` (886). There's no `agentmemory` wing yet -- the palace only reflects the project-a project so far.

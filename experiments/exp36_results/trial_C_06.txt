@@ -2,7 +2,7 @@ Here's the current state:
 
 **Research phase, no production code.**
 
-Last session (2026-04-09) completed through Exp 26 (real HRR benchmark on the alpha-seek graph). Key finding: HRR's value is fuzzy-start traversal, not multi-hop -- S^2 fails at scale, iterative BFS is the right mechanism.
+Last session (2026-04-09) completed through Exp 26 (real HRR benchmark on the project-a graph). Key finding: HRR's value is fuzzy-start traversal, not multi-hop -- S^2 fails at scale, iterative BFS is the right mechanism.
 
 **Open research tasks (tiered):**
 

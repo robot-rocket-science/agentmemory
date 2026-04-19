@@ -18,7 +18,7 @@ We test 5 temporal architectures:
   E. Event-sourced (alternative): append-only event log with materialized views,
      explicit supersession chains, session velocity metadata
 
-We simulate temporal scenarios from the case studies using the alpha-seek timeline
+We simulate temporal scenarios from the case studies using the project-a timeline
 and synthetic event sequences, then measure which architecture prevents each failure.
 
 Hypotheses:
@@ -44,46 +44,49 @@ from typing import Any, Final
 # Temporal architecture definitions
 # ============================================================
 
+
 class ContentType(Enum):
-    CONSTRAINT = "constraint"       # no decay (locked rules, axioms)
-    EVIDENCE = "evidence"           # moderate decay (stale as new data arrives)
-    CONTEXT = "context"             # fast decay (activities, debugging, WIP)
-    RATIONALE = "rationale"         # slow decay (why decisions were made)
-    PROCEDURE = "procedure"         # slow decay (how-to, protocols)
-    SUPERSEDED = "superseded"       # no independent decay (pointer to replacement)
+    CONSTRAINT = "constraint"  # no decay (locked rules, axioms)
+    EVIDENCE = "evidence"  # moderate decay (stale as new data arrives)
+    CONTEXT = "context"  # fast decay (activities, debugging, WIP)
+    RATIONALE = "rationale"  # slow decay (why decisions were made)
+    PROCEDURE = "procedure"  # slow decay (how-to, protocols)
+    SUPERSEDED = "superseded"  # no independent decay (pointer to replacement)
 
 
 # Decay half-lives in days (for exponential decay)
 DECAY_HALF_LIVES: Final[dict[ContentType, float | None]] = {
-    ContentType.CONSTRAINT: None,    # never decays
-    ContentType.EVIDENCE: 14.0,      # 2-week half-life
-    ContentType.CONTEXT: 3.0,        # 3-day half-life
-    ContentType.RATIONALE: 30.0,     # 1-month half-life
-    ContentType.PROCEDURE: 21.0,     # 3-week half-life
-    ContentType.SUPERSEDED: None,    # follows the node it points to
+    ContentType.CONSTRAINT: None,  # never decays
+    ContentType.EVIDENCE: 14.0,  # 2-week half-life
+    ContentType.CONTEXT: 3.0,  # 3-day half-life
+    ContentType.RATIONALE: 30.0,  # 1-month half-life
+    ContentType.PROCEDURE: 21.0,  # 3-week half-life
+    ContentType.SUPERSEDED: None,  # follows the node it points to
 }
 
 
 @dataclass
 class Belief:
     """A belief node with temporal metadata."""
+
     id: str
     content: str
     content_type: ContentType
-    created_at: float           # days since project start
-    last_retrieved: float       # days since project start
+    created_at: float  # days since project start
+    last_retrieved: float  # days since project start
     retrieval_count: int
     locked: bool
-    superseded_by: str | None   # ID of the replacing belief
-    session_id: int             # which session created this
-    source: str                 # "user", "agent", "commit", "extraction"
+    superseded_by: str | None  # ID of the replacing belief
+    session_id: int  # which session created this
+    source: str  # "user", "agent", "commit", "extraction"
 
 
 @dataclass
 class Session:
     """A session with velocity metadata."""
+
     id: int
-    start_time: float           # days since project start
+    start_time: float  # days since project start
     duration_hours: float
     items_completed: int
     corrections_issued: int
@@ -92,8 +95,9 @@ class Session:
 @dataclass
 class TemporalEvent:
     """An event in the append-only log (for event-sourced architecture)."""
-    timestamp: float            # days since project start
-    event_type: str             # "created", "retrieved", "superseded", "corrected", "locked"
+
+    timestamp: float  # days since project start
+    event_type: str  # "created", "retrieved", "superseded", "corrected", "locked"
     belief_id: str
     session_id: int
     metadata: dict[str, Any] = field(default_factory=dict)  # type: ignore[arg-type]
@@ -102,6 +106,7 @@ class TemporalEvent:
 # ============================================================
 # Architecture implementations
 # ============================================================
+
 
 def decay_factor(
     belief: Belief,
@@ -180,9 +185,7 @@ def score_event_sourced(
         return 0.01
 
     # Recency: most recent event
-    belief_events: list[TemporalEvent] = [
-        e for e in events if e.belief_id == belief.id
-    ]
+    belief_events: list[TemporalEvent] = [e for e in events if e.belief_id == belief.id]
     if not belief_events:
         return 0.5  # no history -> neutral
 
@@ -218,9 +221,11 @@ def score_event_sourced(
 # Case study temporal scenarios
 # ============================================================
 
+
 @dataclass
 class CaseStudyScenario:
     """A temporal scenario derived from a case study."""
+
     id: str
     name: str
     description: str
@@ -245,364 +250,739 @@ def build_scenarios() -> list[CaseStudyScenario]:
     # CS-001: Redundant Work
     # Temporal need: recency -- know that task was JUST completed
     # -------------------------------------------------------
-    scenarios.append(CaseStudyScenario(
-        id="CS-001",
-        name="Redundant Work",
-        description="Agent re-does work completed 30 seconds ago",
-        temporal_mechanism_needed="recency (sub-minute)",
-        beliefs=[
-            Belief("doc_done", "Documentation task completed: all files updated",
-                   ContentType.CONTEXT, 10.0, 10.0, 1, False, None, 5, "agent"),
-            Belief("doc_task", "Need to document everything",
-                   ContentType.CONTEXT, 9.9, 9.9, 1, False, "doc_done", 5, "user"),
-        ],
-        events=[
-            TemporalEvent(9.9, "created", "doc_task", 5),
-            TemporalEvent(10.0, "created", "doc_done", 5),
-            TemporalEvent(10.0, "superseded", "doc_task", 5, {"by": "doc_done"}),
-        ],
-        sessions=[Session(5, 9.0, 2.0, 5, 0)],
-        current_time=10.001,  # 30 seconds later
-        temporal_order={"doc_task": 1, "doc_done": 2},
-        query="document everything",
-        expected_top=["doc_done"],
-        expected_absent=["doc_task"],
-    ))
+    scenarios.append(
+        CaseStudyScenario(
+            id="CS-001",
+            name="Redundant Work",
+            description="Agent re-does work completed 30 seconds ago",
+            temporal_mechanism_needed="recency (sub-minute)",
+            beliefs=[
+                Belief(
+                    "doc_done",
+                    "Documentation task completed: all files updated",
+                    ContentType.CONTEXT,
+                    10.0,
+                    10.0,
+                    1,
+                    False,
+                    None,
+                    5,
+                    "agent",
+                ),
+                Belief(
+                    "doc_task",
+                    "Need to document everything",
+                    ContentType.CONTEXT,
+                    9.9,
+                    9.9,
+                    1,
+                    False,
+                    "doc_done",
+                    5,
+                    "user",
+                ),
+            ],
+            events=[
+                TemporalEvent(9.9, "created", "doc_task", 5),
+                TemporalEvent(10.0, "created", "doc_done", 5),
+                TemporalEvent(10.0, "superseded", "doc_task", 5, {"by": "doc_done"}),
+            ],
+            sessions=[Session(5, 9.0, 2.0, 5, 0)],
+            current_time=10.001,  # 30 seconds later
+            temporal_order={"doc_task": 1, "doc_done": 2},
+            query="document everything",
+            expected_top=["doc_done"],
+            expected_absent=["doc_task"],
+        )
+    )
 
     # -------------------------------------------------------
     # CS-004: Context Drift Within Session (8+ hours)
     # Temporal need: locked beliefs survive decay over long session
     # -------------------------------------------------------
-    scenarios.append(CaseStudyScenario(
-        id="CS-004",
-        name="Context Drift Within Session",
-        description="Locked correction fades over 8-hour session",
-        temporal_mechanism_needed="lock immunity to decay",
-        beliefs=[
-            Belief("no_impl", "We are in research phase. Do not suggest implementation.",
-                   ContentType.CONSTRAINT, 0.1, 0.1, 3, True, None, 1, "user"),
-            Belief("exp_done", "Experiment 5 completed: Thompson sampling validated",
-                   ContentType.EVIDENCE, 0.2, 0.25, 2, False, None, 1, "agent"),
-            Belief("ready_build", "Research appears complete. Ready for architecture.",
-                   ContentType.CONTEXT, 0.33, 0.33, 1, False, None, 1, "agent"),
-        ],
-        events=[
-            TemporalEvent(0.1, "created", "no_impl", 1),
-            TemporalEvent(0.1, "locked", "no_impl", 1),
-            TemporalEvent(0.2, "created", "exp_done", 1),
-            TemporalEvent(0.33, "created", "ready_build", 1),
-        ],
-        sessions=[Session(1, 0.0, 8.0, 20, 3)],
-        current_time=0.33,  # 8 hours into session
-        temporal_order={"no_impl": 1, "exp_done": 2, "ready_build": 3},
-        query="what should we do next",
-        expected_top=["no_impl"],  # locked constraint must outrank recency
-        expected_absent=[],
-    ))
+    scenarios.append(
+        CaseStudyScenario(
+            id="CS-004",
+            name="Context Drift Within Session",
+            description="Locked correction fades over 8-hour session",
+            temporal_mechanism_needed="lock immunity to decay",
+            beliefs=[
+                Belief(
+                    "no_impl",
+                    "We are in research phase. Do not suggest implementation.",
+                    ContentType.CONSTRAINT,
+                    0.1,
+                    0.1,
+                    3,
+                    True,
+                    None,
+                    1,
+                    "user",
+                ),
+                Belief(
+                    "exp_done",
+                    "Experiment 5 completed: Thompson sampling validated",
+                    ContentType.EVIDENCE,
+                    0.2,
+                    0.25,
+                    2,
+                    False,
+                    None,
+                    1,
+                    "agent",
+                ),
+                Belief(
+                    "ready_build",
+                    "Research appears complete. Ready for architecture.",
+                    ContentType.CONTEXT,
+                    0.33,
+                    0.33,
+                    1,
+                    False,
+                    None,
+                    1,
+                    "agent",
+                ),
+            ],
+            events=[
+                TemporalEvent(0.1, "created", "no_impl", 1),
+                TemporalEvent(0.1, "locked", "no_impl", 1),
+                TemporalEvent(0.2, "created", "exp_done", 1),
+                TemporalEvent(0.33, "created", "ready_build", 1),
+            ],
+            sessions=[Session(1, 0.0, 8.0, 20, 3)],
+            current_time=0.33,  # 8 hours into session
+            temporal_order={"no_impl": 1, "exp_done": 2, "ready_build": 3},
+            query="what should we do next",
+            expected_top=["no_impl"],  # locked constraint must outrank recency
+            expected_absent=[],
+        )
+    )
 
     # -------------------------------------------------------
     # CS-005: Project Maturity Inflation
     # Temporal need: session velocity distinguishes fast sprint from deep work
     # -------------------------------------------------------
-    scenarios.append(CaseStudyScenario(
-        id="CS-005",
-        name="Project Maturity Inflation",
-        description="New agent inflates project maturity from fast sprint",
-        temporal_mechanism_needed="session velocity + rigor tier",
-        beliefs=[
-            Belief("bayesian_done", "Bayesian confidence model validated (ECE=0.066)",
-                   ContentType.EVIDENCE, 0.1, 0.1, 1, False, None, 1, "agent"),
-            Belief("privacy_done", "Privacy threat model completed (8 threats, 9 decisions)",
-                   ContentType.EVIDENCE, 0.12, 0.12, 1, False, None, 1, "agent"),
-            Belief("correction_done", "Correction detection V2 at 92%",
-                   ContentType.EVIDENCE, 0.15, 0.15, 1, False, None, 1, "agent"),
-            Belief("survey_done", "35+ systems surveyed",
-                   ContentType.EVIDENCE, 0.08, 0.08, 1, False, None, 1, "agent"),
-        ],
-        events=[
-            TemporalEvent(0.08, "created", "survey_done", 1),
-            TemporalEvent(0.1, "created", "bayesian_done", 1),
-            TemporalEvent(0.12, "created", "privacy_done", 1),
-            TemporalEvent(0.15, "created", "correction_done", 1),
-        ],
-        sessions=[Session(1, 0.0, 2.5, 20, 0)],  # 20 items in 2.5 hours = fast
-        current_time=1.0,  # next day, new session
-        temporal_order={"survey_done": 1, "bayesian_done": 2,
-                       "privacy_done": 3, "correction_done": 4},
-        query="what have we accomplished and how solid is it",
-        expected_top=[],  # all should be DISCOUNTED (velocity penalty)
-        expected_absent=[],
-    ))
+    scenarios.append(
+        CaseStudyScenario(
+            id="CS-005",
+            name="Project Maturity Inflation",
+            description="New agent inflates project maturity from fast sprint",
+            temporal_mechanism_needed="session velocity + rigor tier",
+            beliefs=[
+                Belief(
+                    "bayesian_done",
+                    "Bayesian confidence model validated (ECE=0.066)",
+                    ContentType.EVIDENCE,
+                    0.1,
+                    0.1,
+                    1,
+                    False,
+                    None,
+                    1,
+                    "agent",
+                ),
+                Belief(
+                    "privacy_done",
+                    "Privacy threat model completed (8 threats, 9 decisions)",
+                    ContentType.EVIDENCE,
+                    0.12,
+                    0.12,
+                    1,
+                    False,
+                    None,
+                    1,
+                    "agent",
+                ),
+                Belief(
+                    "correction_done",
+                    "Correction detection V2 at 92%",
+                    ContentType.EVIDENCE,
+                    0.15,
+                    0.15,
+                    1,
+                    False,
+                    None,
+                    1,
+                    "agent",
+                ),
+                Belief(
+                    "survey_done",
+                    "35+ systems surveyed",
+                    ContentType.EVIDENCE,
+                    0.08,
+                    0.08,
+                    1,
+                    False,
+                    None,
+                    1,
+                    "agent",
+                ),
+            ],
+            events=[
+                TemporalEvent(0.08, "created", "survey_done", 1),
+                TemporalEvent(0.1, "created", "bayesian_done", 1),
+                TemporalEvent(0.12, "created", "privacy_done", 1),
+                TemporalEvent(0.15, "created", "correction_done", 1),
+            ],
+            sessions=[Session(1, 0.0, 2.5, 20, 0)],  # 20 items in 2.5 hours = fast
+            current_time=1.0,  # next day, new session
+            temporal_order={
+                "survey_done": 1,
+                "bayesian_done": 2,
+                "privacy_done": 3,
+                "correction_done": 4,
+            },
+            query="what have we accomplished and how solid is it",
+            expected_top=[],  # all should be DISCOUNTED (velocity penalty)
+            expected_absent=[],
+        )
+    )
 
     # -------------------------------------------------------
     # CS-006: Correction Not Enforced Across Session
     # Temporal need: locked beliefs persist with full strength across sessions
     # -------------------------------------------------------
-    scenarios.append(CaseStudyScenario(
-        id="CS-006",
-        name="Correction Not Enforced Cross-Session",
-        description="Locked 'no implementation' correction lost across session boundary",
-        temporal_mechanism_needed="lock persistence + no decay across sessions",
-        beliefs=[
-            Belief("no_impl_v2", "DO NOT mention implementation until user says so",
-                   ContentType.CONSTRAINT, 0.3, 0.3, 5, True, None, 2, "user"),
-            Belief("recent_work", "Completed graph construction research",
-                   ContentType.CONTEXT, 2.0, 2.0, 1, False, None, 3, "agent"),
-        ],
-        events=[
-            TemporalEvent(0.3, "created", "no_impl_v2", 2),
-            TemporalEvent(0.3, "locked", "no_impl_v2", 2),
-            TemporalEvent(0.3, "corrected", "no_impl_v2", 2),
-            TemporalEvent(2.0, "created", "recent_work", 3),
-        ],
-        sessions=[
-            Session(2, 0.0, 4.0, 10, 3),
-            Session(3, 2.0, 1.0, 3, 0),
-        ],
-        current_time=2.0,  # start of session 3
-        temporal_order={"no_impl_v2": 1, "recent_work": 2},
-        query="where are we at now",
-        expected_top=["no_impl_v2"],  # must outrank recency
-        expected_absent=[],
-    ))
+    scenarios.append(
+        CaseStudyScenario(
+            id="CS-006",
+            name="Correction Not Enforced Cross-Session",
+            description="Locked 'no implementation' correction lost across session boundary",
+            temporal_mechanism_needed="lock persistence + no decay across sessions",
+            beliefs=[
+                Belief(
+                    "no_impl_v2",
+                    "DO NOT mention implementation until user says so",
+                    ContentType.CONSTRAINT,
+                    0.3,
+                    0.3,
+                    5,
+                    True,
+                    None,
+                    2,
+                    "user",
+                ),
+                Belief(
+                    "recent_work",
+                    "Completed graph construction research",
+                    ContentType.CONTEXT,
+                    2.0,
+                    2.0,
+                    1,
+                    False,
+                    None,
+                    3,
+                    "agent",
+                ),
+            ],
+            events=[
+                TemporalEvent(0.3, "created", "no_impl_v2", 2),
+                TemporalEvent(0.3, "locked", "no_impl_v2", 2),
+                TemporalEvent(0.3, "corrected", "no_impl_v2", 2),
+                TemporalEvent(2.0, "created", "recent_work", 3),
+            ],
+            sessions=[
+                Session(2, 0.0, 4.0, 10, 3),
+                Session(3, 2.0, 1.0, 3, 0),
+            ],
+            current_time=2.0,  # start of session 3
+            temporal_order={"no_impl_v2": 1, "recent_work": 2},
+            query="where are we at now",
+            expected_top=["no_impl_v2"],  # must outrank recency
+            expected_absent=[],
+        )
+    )
 
     # -------------------------------------------------------
     # CS-009: Codex Retry Loop
     # Temporal need: SUPERSEDES chain showing approach A failed, B succeeded
     # -------------------------------------------------------
-    scenarios.append(CaseStudyScenario(
-        id="CS-009",
-        name="Codex Retry Loop",
-        description="Agent retries failed approach after context reset",
-        temporal_mechanism_needed="supersession chain + outcome tracking",
-        beliefs=[
-            Belief("approach_a", "Use standard gcloud deployment for cloud functions",
-                   ContentType.PROCEDURE, 1.0, 1.5, 3, False, "approach_b", 1, "agent"),
-            Belief("approach_a_fail", "gcloud deployment failed: missing IAM permissions",
-                   ContentType.EVIDENCE, 1.5, 1.5, 1, False, None, 1, "agent"),
-            Belief("approach_b", "Use terraform for cloud functions (replaces gcloud)",
-                   ContentType.PROCEDURE, 2.0, 3.0, 5, False, None, 2, "user"),
-            Belief("approach_b_ok", "terraform deployment succeeded on first try",
-                   ContentType.EVIDENCE, 2.5, 2.5, 1, False, None, 2, "agent"),
-        ],
-        events=[
-            TemporalEvent(1.0, "created", "approach_a", 1),
-            TemporalEvent(1.5, "created", "approach_a_fail", 1),
-            TemporalEvent(2.0, "created", "approach_b", 2),
-            TemporalEvent(2.0, "superseded", "approach_a", 2, {"by": "approach_b"}),
-            TemporalEvent(2.5, "created", "approach_b_ok", 2),
-        ],
-        sessions=[
-            Session(1, 0.0, 4.0, 5, 1),
-            Session(2, 2.0, 3.0, 4, 0),
-            Session(3, 5.0, 1.0, 1, 0),  # new session, context reset
-        ],
-        current_time=5.0,  # session 3, no memory of sessions 1-2
-        temporal_order={"approach_a": 1, "approach_a_fail": 2,
-                       "approach_b": 3, "approach_b_ok": 4},
-        query="how should we deploy cloud functions",
-        expected_top=["approach_b"],
-        expected_absent=["approach_a"],  # superseded, should not be recommended
-    ))
+    scenarios.append(
+        CaseStudyScenario(
+            id="CS-009",
+            name="Codex Retry Loop",
+            description="Agent retries failed approach after context reset",
+            temporal_mechanism_needed="supersession chain + outcome tracking",
+            beliefs=[
+                Belief(
+                    "approach_a",
+                    "Use standard gcloud deployment for cloud functions",
+                    ContentType.PROCEDURE,
+                    1.0,
+                    1.5,
+                    3,
+                    False,
+                    "approach_b",
+                    1,
+                    "agent",
+                ),
+                Belief(
+                    "approach_a_fail",
+                    "gcloud deployment failed: missing IAM permissions",
+                    ContentType.EVIDENCE,
+                    1.5,
+                    1.5,
+                    1,
+                    False,
+                    None,
+                    1,
+                    "agent",
+                ),
+                Belief(
+                    "approach_b",
+                    "Use terraform for cloud functions (replaces gcloud)",
+                    ContentType.PROCEDURE,
+                    2.0,
+                    3.0,
+                    5,
+                    False,
+                    None,
+                    2,
+                    "user",
+                ),
+                Belief(
+                    "approach_b_ok",
+                    "terraform deployment succeeded on first try",
+                    ContentType.EVIDENCE,
+                    2.5,
+                    2.5,
+                    1,
+                    False,
+                    None,
+                    2,
+                    "agent",
+                ),
+            ],
+            events=[
+                TemporalEvent(1.0, "created", "approach_a", 1),
+                TemporalEvent(1.5, "created", "approach_a_fail", 1),
+                TemporalEvent(2.0, "created", "approach_b", 2),
+                TemporalEvent(2.0, "superseded", "approach_a", 2, {"by": "approach_b"}),
+                TemporalEvent(2.5, "created", "approach_b_ok", 2),
+            ],
+            sessions=[
+                Session(1, 0.0, 4.0, 5, 1),
+                Session(2, 2.0, 3.0, 4, 0),
+                Session(3, 5.0, 1.0, 1, 0),  # new session, context reset
+            ],
+            current_time=5.0,  # session 3, no memory of sessions 1-2
+            temporal_order={
+                "approach_a": 1,
+                "approach_a_fail": 2,
+                "approach_b": 3,
+                "approach_b_ok": 4,
+            },
+            query="how should we deploy cloud functions",
+            expected_top=["approach_b"],
+            expected_absent=["approach_a"],  # superseded, should not be recommended
+        )
+    )
 
     # -------------------------------------------------------
     # CS-014: Research-Execution Divergence
     # Temporal need: IMPLEMENTS edges + temporal ordering shows research -> execution gap
     # -------------------------------------------------------
-    scenarios.append(CaseStudyScenario(
-        id="CS-014",
-        name="Research-Execution Divergence",
-        description="Execution omits flag from research findings",
-        temporal_mechanism_needed="temporal chain from research to execution with verification",
-        beliefs=[
-            Belief("research_finding", "Maximize N requires --delta-lo 0.10",
-                   ContentType.EVIDENCE, 5.0, 5.0, 2, False, None, 10, "agent"),
-            Belief("exec_plan", "Run config B with default parameters",
-                   ContentType.PROCEDURE, 6.0, 6.0, 1, False, None, 11, "agent"),
-        ],
-        events=[
-            TemporalEvent(5.0, "created", "research_finding", 10),
-            TemporalEvent(6.0, "created", "exec_plan", 11),
-        ],
-        sessions=[
-            Session(10, 4.0, 6.0, 8, 0),
-            Session(11, 6.0, 2.0, 3, 0),
-        ],
-        current_time=6.0,
-        temporal_order={"research_finding": 1, "exec_plan": 2},
-        query="run the backtest configuration",
-        expected_top=["research_finding", "exec_plan"],  # both should surface
-        expected_absent=[],
-    ))
+    scenarios.append(
+        CaseStudyScenario(
+            id="CS-014",
+            name="Research-Execution Divergence",
+            description="Execution omits flag from research findings",
+            temporal_mechanism_needed="temporal chain from research to execution with verification",
+            beliefs=[
+                Belief(
+                    "research_finding",
+                    "Maximize N requires --delta-lo 0.10",
+                    ContentType.EVIDENCE,
+                    5.0,
+                    5.0,
+                    2,
+                    False,
+                    None,
+                    10,
+                    "agent",
+                ),
+                Belief(
+                    "exec_plan",
+                    "Run config B with default parameters",
+                    ContentType.PROCEDURE,
+                    6.0,
+                    6.0,
+                    1,
+                    False,
+                    None,
+                    11,
+                    "agent",
+                ),
+            ],
+            events=[
+                TemporalEvent(5.0, "created", "research_finding", 10),
+                TemporalEvent(6.0, "created", "exec_plan", 11),
+            ],
+            sessions=[
+                Session(10, 4.0, 6.0, 8, 0),
+                Session(11, 6.0, 2.0, 3, 0),
+            ],
+            current_time=6.0,
+            temporal_order={"research_finding": 1, "exec_plan": 2},
+            query="run the backtest configuration",
+            expected_top=["research_finding", "exec_plan"],  # both should surface
+            expected_absent=[],
+        )
+    )
 
     # -------------------------------------------------------
     # CS-015: Dead Approaches Re-Proposed
     # Temporal need: SUPERSEDES chain + decay on failed approaches
     # -------------------------------------------------------
-    scenarios.append(CaseStudyScenario(
-        id="CS-015",
-        name="Dead Approaches Re-Proposed",
-        description="Agent re-proposes price filters, DTE floors that were tested and failed",
-        temporal_mechanism_needed="supersession + evidence of failure",
-        beliefs=[
-            Belief("price_filter", "Use price filter to reduce noise",
-                   ContentType.PROCEDURE, 1.0, 1.0, 2, False, "no_filter", 2, "agent"),
-            Belief("price_filter_fail", "Price filter tested: reduces winners more than losers",
-                   ContentType.EVIDENCE, 2.0, 2.0, 1, False, None, 3, "agent"),
-            Belief("no_filter", "No-filter approach adopted (D183). Price filter DEAD.",
-                   ContentType.CONSTRAINT, 3.0, 4.0, 5, True, None, 4, "user"),
-            Belief("dte_floor", "Use DTE floor >20 to avoid near-expiry risk",
-                   ContentType.PROCEDURE, 1.5, 1.5, 1, False, "no_dte_floor", 2, "agent"),
-            Belief("no_dte_floor", "DTE floor rejected: reduces trade count 28%",
-                   ContentType.CONSTRAINT, 3.5, 3.5, 3, True, None, 4, "user"),
-        ],
-        events=[
-            TemporalEvent(1.0, "created", "price_filter", 2),
-            TemporalEvent(1.5, "created", "dte_floor", 2),
-            TemporalEvent(2.0, "created", "price_filter_fail", 3),
-            TemporalEvent(3.0, "created", "no_filter", 4),
-            TemporalEvent(3.0, "superseded", "price_filter", 4, {"by": "no_filter"}),
-            TemporalEvent(3.5, "created", "no_dte_floor", 4),
-            TemporalEvent(3.5, "superseded", "dte_floor", 4, {"by": "no_dte_floor"}),
-        ],
-        sessions=[
-            Session(2, 0.5, 3.0, 5, 0),
-            Session(3, 2.0, 2.0, 3, 0),
-            Session(4, 3.0, 4.0, 6, 2),
-            Session(10, 15.0, 1.0, 1, 0),  # much later session
-        ],
-        current_time=15.0,  # 15 days later
-        temporal_order={"price_filter": 1, "dte_floor": 2,
-                       "price_filter_fail": 3, "no_filter": 4, "no_dte_floor": 5},
-        query="how to reduce noise in the options strategy",
-        expected_top=["no_filter", "no_dte_floor"],  # current decisions
-        expected_absent=["price_filter", "dte_floor"],  # superseded
-    ))
+    scenarios.append(
+        CaseStudyScenario(
+            id="CS-015",
+            name="Dead Approaches Re-Proposed",
+            description="Agent re-proposes price filters, DTE floors that were tested and failed",
+            temporal_mechanism_needed="supersession + evidence of failure",
+            beliefs=[
+                Belief(
+                    "price_filter",
+                    "Use price filter to reduce noise",
+                    ContentType.PROCEDURE,
+                    1.0,
+                    1.0,
+                    2,
+                    False,
+                    "no_filter",
+                    2,
+                    "agent",
+                ),
+                Belief(
+                    "price_filter_fail",
+                    "Price filter tested: reduces winners more than losers",
+                    ContentType.EVIDENCE,
+                    2.0,
+                    2.0,
+                    1,
+                    False,
+                    None,
+                    3,
+                    "agent",
+                ),
+                Belief(
+                    "no_filter",
+                    "No-filter approach adopted (D183). Price filter DEAD.",
+                    ContentType.CONSTRAINT,
+                    3.0,
+                    4.0,
+                    5,
+                    True,
+                    None,
+                    4,
+                    "user",
+                ),
+                Belief(
+                    "dte_floor",
+                    "Use DTE floor >20 to avoid near-expiry risk",
+                    ContentType.PROCEDURE,
+                    1.5,
+                    1.5,
+                    1,
+                    False,
+                    "no_dte_floor",
+                    2,
+                    "agent",
+                ),
+                Belief(
+                    "no_dte_floor",
+                    "DTE floor rejected: reduces trade count 28%",
+                    ContentType.CONSTRAINT,
+                    3.5,
+                    3.5,
+                    3,
+                    True,
+                    None,
+                    4,
+                    "user",
+                ),
+            ],
+            events=[
+                TemporalEvent(1.0, "created", "price_filter", 2),
+                TemporalEvent(1.5, "created", "dte_floor", 2),
+                TemporalEvent(2.0, "created", "price_filter_fail", 3),
+                TemporalEvent(3.0, "created", "no_filter", 4),
+                TemporalEvent(
+                    3.0, "superseded", "price_filter", 4, {"by": "no_filter"}
+                ),
+                TemporalEvent(3.5, "created", "no_dte_floor", 4),
+                TemporalEvent(
+                    3.5, "superseded", "dte_floor", 4, {"by": "no_dte_floor"}
+                ),
+            ],
+            sessions=[
+                Session(2, 0.5, 3.0, 5, 0),
+                Session(3, 2.0, 2.0, 3, 0),
+                Session(4, 3.0, 4.0, 6, 2),
+                Session(10, 15.0, 1.0, 1, 0),  # much later session
+            ],
+            current_time=15.0,  # 15 days later
+            temporal_order={
+                "price_filter": 1,
+                "dte_floor": 2,
+                "price_filter_fail": 3,
+                "no_filter": 4,
+                "no_dte_floor": 5,
+            },
+            query="how to reduce noise in the options strategy",
+            expected_top=["no_filter", "no_dte_floor"],  # current decisions
+            expected_absent=["price_filter", "dte_floor"],  # superseded
+        )
+    )
 
     # -------------------------------------------------------
     # CS-016: Settled Decision Repeatedly Questioned
     # Temporal need: locked constraint immune to decay, evidence of failed challenges
     # -------------------------------------------------------
-    scenarios.append(CaseStudyScenario(
-        id="CS-016",
-        name="Settled Decision Questioned",
-        description="Agent questions calls/puts axiom despite locked decision",
-        temporal_mechanism_needed="lock + accumulation of failed challenges",
-        beliefs=[
-            Belief("calls_puts", "Calls and puts are equal citizens. NEVER question this.",
-                   ContentType.CONSTRAINT, 1.0, 10.0, 25, True, None, 1, "user"),
-            Belief("puts_underperform", "Puts underperformed calls by 15% this quarter",
-                   ContentType.EVIDENCE, 14.0, 14.0, 1, False, None, 20, "agent"),
-        ],
-        events=[
-            TemporalEvent(1.0, "created", "calls_puts", 1),
-            TemporalEvent(1.0, "locked", "calls_puts", 1),
-            TemporalEvent(5.0, "corrected", "calls_puts", 5),  # user reinforced
-            TemporalEvent(8.0, "corrected", "calls_puts", 10),  # user reinforced again
-            TemporalEvent(14.0, "created", "puts_underperform", 20),
-        ],
-        sessions=[Session(1, 0.0, 2.0, 3, 0), Session(20, 14.0, 1.0, 2, 0)],
-        current_time=14.0,
-        temporal_order={"calls_puts": 1, "puts_underperform": 2},
-        query="should we reconsider our approach to puts",
-        expected_top=["calls_puts"],  # locked axiom must dominate
-        expected_absent=[],
-    ))
+    scenarios.append(
+        CaseStudyScenario(
+            id="CS-016",
+            name="Settled Decision Questioned",
+            description="Agent questions calls/puts axiom despite locked decision",
+            temporal_mechanism_needed="lock + accumulation of failed challenges",
+            beliefs=[
+                Belief(
+                    "calls_puts",
+                    "Calls and puts are equal citizens. NEVER question this.",
+                    ContentType.CONSTRAINT,
+                    1.0,
+                    10.0,
+                    25,
+                    True,
+                    None,
+                    1,
+                    "user",
+                ),
+                Belief(
+                    "puts_underperform",
+                    "Puts underperformed calls by 15% this quarter",
+                    ContentType.EVIDENCE,
+                    14.0,
+                    14.0,
+                    1,
+                    False,
+                    None,
+                    20,
+                    "agent",
+                ),
+            ],
+            events=[
+                TemporalEvent(1.0, "created", "calls_puts", 1),
+                TemporalEvent(1.0, "locked", "calls_puts", 1),
+                TemporalEvent(5.0, "corrected", "calls_puts", 5),  # user reinforced
+                TemporalEvent(
+                    8.0, "corrected", "calls_puts", 10
+                ),  # user reinforced again
+                TemporalEvent(14.0, "created", "puts_underperform", 20),
+            ],
+            sessions=[Session(1, 0.0, 2.0, 3, 0), Session(20, 14.0, 1.0, 2, 0)],
+            current_time=14.0,
+            temporal_order={"calls_puts": 1, "puts_underperform": 2},
+            query="should we reconsider our approach to puts",
+            expected_top=["calls_puts"],  # locked axiom must dominate
+            expected_absent=[],
+        )
+    )
 
     # -------------------------------------------------------
     # CS-017: Configuration Drift from Implicit Defaults
     # Temporal need: SUPERSEDES_TEMPORAL on default values with propagation to consumers
     # -------------------------------------------------------
-    scenarios.append(CaseStudyScenario(
-        id="CS-017",
-        name="Configuration Drift",
-        description="Default capital changed from 100K to 5K, consumers not updated",
-        temporal_mechanism_needed="supersession with downstream propagation",
-        beliefs=[
-            Belief("capital_100k", "Default initial_capital = $100,000",
-                   ContentType.CONSTRAINT, 1.0, 5.0, 10, False, "capital_5k", 1, "agent"),
-            Belief("capital_5k", "Default initial_capital = $5,000 (changed from 100K)",
-                   ContentType.CONSTRAINT, 8.0, 8.0, 3, False, None, 15, "user"),
-            Belief("gcp_dispatch", "GCP dispatch uses default initial_capital",
-                   ContentType.PROCEDURE, 3.0, 7.0, 8, False, None, 5, "agent"),
-        ],
-        events=[
-            TemporalEvent(1.0, "created", "capital_100k", 1),
-            TemporalEvent(3.0, "created", "gcp_dispatch", 5),
-            TemporalEvent(8.0, "created", "capital_5k", 15),
-            TemporalEvent(8.0, "superseded", "capital_100k", 15, {"by": "capital_5k"}),
-            # gcp_dispatch NOT updated -- this is the bug
-        ],
-        sessions=[Session(1, 0.0, 2.0, 3, 0), Session(15, 8.0, 1.0, 2, 0)],
-        current_time=8.0,
-        temporal_order={"capital_100k": 1, "gcp_dispatch": 2, "capital_5k": 3},
-        query="what capital does the GCP dispatch use",
-        expected_top=["capital_5k", "gcp_dispatch"],  # both: new value + stale consumer
-        expected_absent=[],
-        # KEY TEST: can the architecture detect that gcp_dispatch references
-        # a superseded value? This requires propagation, not just decay.
-    ))
+    scenarios.append(
+        CaseStudyScenario(
+            id="CS-017",
+            name="Configuration Drift",
+            description="Default capital changed from 100K to 5K, consumers not updated",
+            temporal_mechanism_needed="supersession with downstream propagation",
+            beliefs=[
+                Belief(
+                    "capital_100k",
+                    "Default initial_capital = $100,000",
+                    ContentType.CONSTRAINT,
+                    1.0,
+                    5.0,
+                    10,
+                    False,
+                    "capital_5k",
+                    1,
+                    "agent",
+                ),
+                Belief(
+                    "capital_5k",
+                    "Default initial_capital = $5,000 (changed from 100K)",
+                    ContentType.CONSTRAINT,
+                    8.0,
+                    8.0,
+                    3,
+                    False,
+                    None,
+                    15,
+                    "user",
+                ),
+                Belief(
+                    "gcp_dispatch",
+                    "GCP dispatch uses default initial_capital",
+                    ContentType.PROCEDURE,
+                    3.0,
+                    7.0,
+                    8,
+                    False,
+                    None,
+                    5,
+                    "agent",
+                ),
+            ],
+            events=[
+                TemporalEvent(1.0, "created", "capital_100k", 1),
+                TemporalEvent(3.0, "created", "gcp_dispatch", 5),
+                TemporalEvent(8.0, "created", "capital_5k", 15),
+                TemporalEvent(
+                    8.0, "superseded", "capital_100k", 15, {"by": "capital_5k"}
+                ),
+                # gcp_dispatch NOT updated -- this is the bug
+            ],
+            sessions=[Session(1, 0.0, 2.0, 3, 0), Session(15, 8.0, 1.0, 2, 0)],
+            current_time=8.0,
+            temporal_order={"capital_100k": 1, "gcp_dispatch": 2, "capital_5k": 3},
+            query="what capital does the GCP dispatch use",
+            expected_top=[
+                "capital_5k",
+                "gcp_dispatch",
+            ],  # both: new value + stale consumer
+            expected_absent=[],
+            # KEY TEST: can the architecture detect that gcp_dispatch references
+            # a superseded value? This requires propagation, not just decay.
+        )
+    )
 
     # -------------------------------------------------------
     # CS-022: Multi-Hop Operational Query
     # Temporal need: recent operational facts (paths, machines) must not decay
     # -------------------------------------------------------
-    scenarios.append(CaseStudyScenario(
-        id="CS-022",
-        name="Multi-Hop Operational Query",
-        description="Agent doesn't know where data lives (which machine, which path)",
-        temporal_mechanism_needed="operational facts as non-decaying constraints",
-        beliefs=[
-            Belief("agent_config", "4 paper trading agents: baseline, stallion, firehose, sniper",
-                   ContentType.EVIDENCE, 7.0, 7.0, 3, False, None, 15, "agent"),
-            Belief("data_location", "Paper trading data at ~/projects/alpha-seek/data/paper_trading/ on lorax",
-                   ContentType.CONSTRAINT, 7.0, 7.0, 1, False, None, 15, "agent"),
-            Belief("machine_rule", "alpha-seek dev and data are on lorax. willow is for services.",
-                   ContentType.CONSTRAINT, 2.0, 5.0, 5, False, None, 3, "user"),
-        ],
-        events=[
-            TemporalEvent(2.0, "created", "machine_rule", 3),
-            TemporalEvent(7.0, "created", "agent_config", 15),
-            TemporalEvent(7.0, "created", "data_location", 15),
-        ],
-        sessions=[Session(3, 2.0, 1.0, 2, 0), Session(15, 7.0, 2.0, 5, 0),
-                  Session(16, 10.0, 1.0, 1, 0)],
-        current_time=10.0,  # 3 days after setup
-        temporal_order={"machine_rule": 1, "agent_config": 2, "data_location": 3},
-        query="get paper trading positions",
-        expected_top=["data_location", "machine_rule"],  # operational facts must survive
-        expected_absent=[],
-    ))
+    scenarios.append(
+        CaseStudyScenario(
+            id="CS-022",
+            name="Multi-Hop Operational Query",
+            description="Agent doesn't know where data lives (which machine, which path)",
+            temporal_mechanism_needed="operational facts as non-decaying constraints",
+            beliefs=[
+                Belief(
+                    "agent_config",
+                    "4 paper trading agents: baseline, stallion, firehose, sniper",
+                    ContentType.EVIDENCE,
+                    7.0,
+                    7.0,
+                    3,
+                    False,
+                    None,
+                    15,
+                    "agent",
+                ),
+                Belief(
+                    "data_location",
+                    "Paper trading data at ~/projects/project-a/data/paper_trading/ on lorax",
+                    ContentType.CONSTRAINT,
+                    7.0,
+                    7.0,
+                    1,
+                    False,
+                    None,
+                    15,
+                    "agent",
+                ),
+                Belief(
+                    "machine_rule",
+                    "project-a dev and data are on lorax. server-b is for services.",
+                    ContentType.CONSTRAINT,
+                    2.0,
+                    5.0,
+                    5,
+                    False,
+                    None,
+                    3,
+                    "user",
+                ),
+            ],
+            events=[
+                TemporalEvent(2.0, "created", "machine_rule", 3),
+                TemporalEvent(7.0, "created", "agent_config", 15),
+                TemporalEvent(7.0, "created", "data_location", 15),
+            ],
+            sessions=[
+                Session(3, 2.0, 1.0, 2, 0),
+                Session(15, 7.0, 2.0, 5, 0),
+                Session(16, 10.0, 1.0, 1, 0),
+            ],
+            current_time=10.0,  # 3 days after setup
+            temporal_order={"machine_rule": 1, "agent_config": 2, "data_location": 3},
+            query="get paper trading positions",
+            expected_top=[
+                "data_location",
+                "machine_rule",
+            ],  # operational facts must survive
+            expected_absent=[],
+        )
+    )
 
     # -------------------------------------------------------
     # CS-023: Parallel Session Namespace Collision
     # Temporal need: concurrent event ordering + cross-session visibility
     # -------------------------------------------------------
-    scenarios.append(CaseStudyScenario(
-        id="CS-023",
-        name="Parallel Session Collision",
-        description="Two sessions claim same ID (A032) simultaneously",
-        temporal_mechanism_needed="concurrent event detection + causal ordering",
-        beliefs=[
-            Belief("a032_session_a", "A032: Atomic LLM Calls for Batch Classification",
-                   ContentType.PROCEDURE, 5.0, 5.0, 1, False, None, 8, "agent"),
-            Belief("a032_session_b", "A032: Type-Aware IB Compression Heuristic",
-                   ContentType.PROCEDURE, 5.01, 5.01, 1, False, None, 9, "agent"),
-        ],
-        events=[
-            TemporalEvent(5.0, "created", "a032_session_a", 8),
-            TemporalEvent(5.01, "created", "a032_session_b", 9),
-        ],
-        sessions=[
-            Session(8, 4.0, 3.0, 5, 0),
-            Session(9, 4.5, 2.0, 4, 0),  # parallel
-        ],
-        current_time=5.5,
-        temporal_order={"a032_session_a": 1, "a032_session_b": 2},
-        query="what is A032",
-        expected_top=["a032_session_a", "a032_session_b"],  # BOTH must surface (conflict)
-        expected_absent=[],
-    ))
+    scenarios.append(
+        CaseStudyScenario(
+            id="CS-023",
+            name="Parallel Session Collision",
+            description="Two sessions claim same ID (A032) simultaneously",
+            temporal_mechanism_needed="concurrent event detection + causal ordering",
+            beliefs=[
+                Belief(
+                    "a032_session_a",
+                    "A032: Atomic LLM Calls for Batch Classification",
+                    ContentType.PROCEDURE,
+                    5.0,
+                    5.0,
+                    1,
+                    False,
+                    None,
+                    8,
+                    "agent",
+                ),
+                Belief(
+                    "a032_session_b",
+                    "A032: Type-Aware IB Compression Heuristic",
+                    ContentType.PROCEDURE,
+                    5.01,
+                    5.01,
+                    1,
+                    False,
+                    None,
+                    9,
+                    "agent",
+                ),
+            ],
+            events=[
+                TemporalEvent(5.0, "created", "a032_session_a", 8),
+                TemporalEvent(5.01, "created", "a032_session_b", 9),
+            ],
+            sessions=[
+                Session(8, 4.0, 3.0, 5, 0),
+                Session(9, 4.5, 2.0, 4, 0),  # parallel
+            ],
+            current_time=5.5,
+            temporal_order={"a032_session_a": 1, "a032_session_b": 2},
+            query="what is A032",
+            expected_top=[
+                "a032_session_a",
+                "a032_session_b",
+            ],  # BOTH must surface (conflict)
+            expected_absent=[],
+        )
+    )
 
     return scenarios
 
@@ -611,16 +991,18 @@ def build_scenarios() -> list[CaseStudyScenario]:
 # Evaluation
 # ============================================================
 
+
 @dataclass
 class ArchitectureResult:
     """Result of evaluating one architecture on one scenario."""
+
     architecture: str
     scenario_id: str
     scores: dict[str, float]  # belief_id -> score
-    ranking: list[str]        # belief_ids sorted by score descending
-    top_correct: bool         # expected_top beliefs rank highest
-    absent_correct: bool      # expected_absent beliefs rank lowest / score 0
-    verdict: str              # PASS / PARTIAL / FAIL
+    ranking: list[str]  # belief_ids sorted by score descending
+    top_correct: bool  # expected_top beliefs rank highest
+    absent_correct: bool  # expected_absent beliefs rank lowest / score 0
+    verdict: str  # PASS / PARTIAL / FAIL
 
 
 def evaluate_architecture(
@@ -646,8 +1028,10 @@ def evaluate_architecture(
             )
         elif arch_name == "E_event_sourced":
             scores[belief.id] = score_event_sourced(
-                belief, scenario.current_time,
-                scenario.events, scenario.sessions,
+                belief,
+                scenario.current_time,
+                scenario.events,
+                scenario.sessions,
             )
 
     # Rank by score descending
@@ -668,7 +1052,8 @@ def evaluate_architecture(
                 # Should score lower than all non-absent beliefs
                 absent_score: float = scores[absent_id]
                 non_absent_scores: list[float] = [
-                    s for bid, s in scores.items()
+                    s
+                    for bid, s in scores.items()
                     if bid not in scenario.expected_absent
                 ]
                 if non_absent_scores and absent_score >= min(non_absent_scores):
@@ -697,10 +1082,14 @@ def evaluate_architecture(
 # Main
 # ============================================================
 
+
 def main() -> None:
     t_start: float = time.monotonic()
     print("=" * 70, file=sys.stderr)
-    print("Experiment 57: Time Architecture Evaluation Against Case Studies", file=sys.stderr)
+    print(
+        "Experiment 57: Time Architecture Evaluation Against Case Studies",
+        file=sys.stderr,
+    )
     print("=" * 70, file=sys.stderr)
 
     scenarios: list[CaseStudyScenario] = build_scenarios()
@@ -719,7 +1108,9 @@ def main() -> None:
 
     for scenario in scenarios:
         print(f"--- {scenario.id}: {scenario.name} ---", file=sys.stderr)
-        print(f"    Temporal need: {scenario.temporal_mechanism_needed}", file=sys.stderr)
+        print(
+            f"    Temporal need: {scenario.temporal_mechanism_needed}", file=sys.stderr
+        )
 
         scenario_results[scenario.id] = {}
 
@@ -729,8 +1120,10 @@ def main() -> None:
             scenario_results[scenario.id][arch] = result
 
             scores_str: str = "  ".join(
-                f"{bid}={score:.3f}" for bid, score in
-                sorted(result.scores.items(), key=lambda x: x[1], reverse=True)
+                f"{bid}={score:.3f}"
+                for bid, score in sorted(
+                    result.scores.items(), key=lambda x: x[1], reverse=True
+                )
             )
             print(
                 f"    {arch:25s}: {result.verdict:7s} "
@@ -766,7 +1159,9 @@ def main() -> None:
     # ============================================================
 
     print("\n" + "=" * 70, file=sys.stderr)
-    print("GAP ANALYSIS: WHERE DOES THE ADOPTED ARCHITECTURE (D) FAIL?", file=sys.stderr)
+    print(
+        "GAP ANALYSIS: WHERE DOES THE ADOPTED ARCHITECTURE (D) FAIL?", file=sys.stderr
+    )
     print("=" * 70, file=sys.stderr)
 
     for scenario in scenarios:
@@ -800,7 +1195,7 @@ def main() -> None:
                 )
             else:
                 print(
-                    f"    NO architecture handles this case.",
+                    "    NO architecture handles this case.",
                     file=sys.stderr,
                 )
 
@@ -813,48 +1208,66 @@ def main() -> None:
     print("=" * 70, file=sys.stderr)
 
     d_results: list[ArchitectureResult] = all_results["D_adopted"]
-    d_pass_rate: float = sum(1 for r in d_results if r.verdict == "PASS") / len(d_results)
+    d_pass_rate: float = sum(1 for r in d_results if r.verdict == "PASS") / len(
+        d_results
+    )
 
     e_results: list[ArchitectureResult] = all_results["E_event_sourced"]
-    _e_pass_rate: float = sum(1 for r in e_results if r.verdict == "PASS") / len(e_results)
+    _e_pass_rate: float = sum(1 for r in e_results if r.verdict == "PASS") / len(
+        e_results
+    )
 
-    print(f"\n  H1: Adopted (D) handles >= 80% of temporal failures", file=sys.stderr)
-    print(f"      Result: {d_pass_rate:.0%} -- {'PASS' if d_pass_rate >= 0.8 else 'FAIL'}", file=sys.stderr)
+    print("\n  H1: Adopted (D) handles >= 80% of temporal failures", file=sys.stderr)
+    print(
+        f"      Result: {d_pass_rate:.0%} -- {'PASS' if d_pass_rate >= 0.8 else 'FAIL'}",
+        file=sys.stderr,
+    )
 
     # H2: at least one case study that D can't handle
     d_failures: list[str] = [r.scenario_id for r in d_results if r.verdict != "PASS"]
-    print(f"\n  H2: At least one case D cannot handle", file=sys.stderr)
-    print(f"      Result: {len(d_failures)} failures: {d_failures} -- "
-          f"{'PASS' if d_failures else 'FAIL'}", file=sys.stderr)
+    print("\n  H2: At least one case D cannot handle", file=sys.stderr)
+    print(
+        f"      Result: {len(d_failures)} failures: {d_failures} -- "
+        f"{'PASS' if d_failures else 'FAIL'}",
+        file=sys.stderr,
+    )
 
     # H3: E handles cases D misses
     e_handles_d_misses: list[str] = []
     for scenario_id in d_failures:
         if scenario_results[scenario_id]["E_event_sourced"].verdict == "PASS":
             e_handles_d_misses.append(scenario_id)
-    print(f"\n  H3: Event-sourced (E) handles cases D misses", file=sys.stderr)
+    print("\n  H3: Event-sourced (E) handles cases D misses", file=sys.stderr)
     print(f"      D failures: {d_failures}", file=sys.stderr)
-    print(f"      E handles: {e_handles_d_misses} -- "
-          f"{'PASS' if e_handles_d_misses else 'FAIL'}", file=sys.stderr)
+    print(
+        f"      E handles: {e_handles_d_misses} -- "
+        f"{'PASS' if e_handles_d_misses else 'FAIL'}",
+        file=sys.stderr,
+    )
 
     # H4: decay prevents CS-005 and CS-015
     cs005_b: str = scenario_results["CS-005"]["B_decay_only"].verdict
     cs015_b: str = scenario_results["CS-015"]["B_decay_only"].verdict
-    print(f"\n  H4: Decay alone prevents CS-005 and CS-015", file=sys.stderr)
-    print(f"      CS-005: {cs005_b}, CS-015: {cs015_b} -- "
-          f"{'PASS' if cs005_b == 'PASS' and cs015_b == 'PASS' else 'FAIL'}", file=sys.stderr)
+    print("\n  H4: Decay alone prevents CS-005 and CS-015", file=sys.stderr)
+    print(
+        f"      CS-005: {cs005_b}, CS-015: {cs015_b} -- "
+        f"{'PASS' if cs005_b == 'PASS' and cs015_b == 'PASS' else 'FAIL'}",
+        file=sys.stderr,
+    )
 
     # H5: SUPERSEDES chains load-bearing for CS-009 and CS-015
     cs009_a: str = scenario_results["CS-009"]["A_no_time"].verdict
     cs009_d: str = scenario_results["CS-009"]["D_adopted"].verdict
     cs015_a: str = scenario_results["CS-015"]["A_no_time"].verdict
     cs015_d: str = scenario_results["CS-015"]["D_adopted"].verdict
-    print(f"\n  H5: SUPERSEDES chains load-bearing for CS-009, CS-015", file=sys.stderr)
+    print("\n  H5: SUPERSEDES chains load-bearing for CS-009, CS-015", file=sys.stderr)
     print(f"      CS-009: no_time={cs009_a}, adopted={cs009_d}", file=sys.stderr)
     print(f"      CS-015: no_time={cs015_a}, adopted={cs015_d}", file=sys.stderr)
     supersedes_load_bearing: bool = (
-        cs009_a != "PASS" and cs009_d == "PASS" and
-        cs015_a != "PASS" and cs015_d == "PASS"
+        cs009_a != "PASS"
+        and cs009_d == "PASS"
+        and cs015_a != "PASS"
+        and cs015_d == "PASS"
     )
     print(f"      {'PASS' if supersedes_load_bearing else 'FAIL'}", file=sys.stderr)
 
@@ -903,13 +1316,19 @@ def main() -> None:
         }
 
     output["hypotheses"] = {
-        "H1_adopted_80pct": {"result": d_pass_rate >= 0.8, "rate": round(d_pass_rate, 3)},
+        "H1_adopted_80pct": {
+            "result": d_pass_rate >= 0.8,
+            "rate": round(d_pass_rate, 3),
+        },
         "H2_at_least_one_gap": {"result": bool(d_failures), "gaps": d_failures},
-        "H3_event_sourced_covers_gaps": {"result": bool(e_handles_d_misses),
-                                          "covered": e_handles_d_misses},
+        "H3_event_sourced_covers_gaps": {
+            "result": bool(e_handles_d_misses),
+            "covered": e_handles_d_misses,
+        },
         "H4_decay_prevents_005_015": {
             "result": cs005_b == "PASS" and cs015_b == "PASS",
-            "cs005": cs005_b, "cs015": cs015_b,
+            "cs005": cs005_b,
+            "cs015": cs015_b,
         },
         "H5_supersedes_load_bearing": {"result": supersedes_load_bearing},
     }

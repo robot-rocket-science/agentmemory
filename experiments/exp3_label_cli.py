@@ -18,9 +18,11 @@ from typing import Any
 
 EVAL_PATH = Path("experiments/exp3_eval_sheets_v2.json")
 LABELS_PATH = Path("experiments/exp3_labels.json")
-ALPHA_SEEK_DB = Path("/Users/thelorax/projects/.gsd/workflows/spikes/"
-                     "260406-1-associative-memory-for-gsd-please-explor/"
-                     "sandbox/alpha-seek.db")
+ALPHA_SEEK_DB = Path(
+    "/home/user/projects/.gsd/workflows/spikes/"
+    "260406-1-associative-memory-for-gsd-please-explor/"
+    "sandbox/project-a.db"
+)
 
 
 def load_rich_content() -> dict[str, Any]:
@@ -36,28 +38,48 @@ def load_rich_content() -> dict[str, Any]:
         enriched[row[0]] = " | ".join(p for p in parts if p)
 
     # Milestones: get the title from mem_nodes (already there) but also check milestones table
-    for row in db.execute("SELECT id, content FROM mem_nodes WHERE source_type='milestone'"):
+    for row in db.execute(
+        "SELECT id, content FROM mem_nodes WHERE source_type='milestone'"
+    ):
         node_id: str = row[0]
         if node_id not in enriched:
             # Try to find more context from edges
             edges = db.execute(
                 "SELECT n.id, n.content FROM mem_edges e JOIN mem_nodes n ON e.from_id = n.id "
-                "WHERE e.to_id = ? LIMIT 5", (node_id,)
+                "WHERE e.to_id = ? LIMIT 5",
+                (node_id,),
             ).fetchall()
             if edges:
                 related = "; ".join(f"{e[0]}: {e[1][:60]}" for e in edges)
                 enriched[node_id] = f"{row[1]} -- Related: {related}"
 
     # Compute sequence context: what's the ID range so we can show relative age
-    max_d: int = db.execute("SELECT MAX(CAST(SUBSTR(id, 2) AS INTEGER)) FROM mem_nodes WHERE id LIKE 'D%'").fetchone()[0] or 0
-    max_m: int = db.execute("SELECT MAX(CAST(SUBSTR(id, 3) AS INTEGER)) FROM mem_nodes WHERE id LIKE '_M%'").fetchone()[0] or 0
-    max_k: int = db.execute("SELECT MAX(CAST(SUBSTR(id, 2) AS INTEGER)) FROM mem_nodes WHERE id LIKE 'K%'").fetchone()[0] or 0
+    max_d: int = (
+        db.execute(
+            "SELECT MAX(CAST(SUBSTR(id, 2) AS INTEGER)) FROM mem_nodes WHERE id LIKE 'D%'"
+        ).fetchone()[0]
+        or 0
+    )
+    max_m: int = (
+        db.execute(
+            "SELECT MAX(CAST(SUBSTR(id, 3) AS INTEGER)) FROM mem_nodes WHERE id LIKE '_M%'"
+        ).fetchone()[0]
+        or 0
+    )
+    max_k: int = (
+        db.execute(
+            "SELECT MAX(CAST(SUBSTR(id, 2) AS INTEGER)) FROM mem_nodes WHERE id LIKE 'K%'"
+        ).fetchone()[0]
+        or 0
+    )
     enriched["_meta_max_d"] = max_d
     enriched["_meta_max_m"] = max_m
     enriched["_meta_max_k"] = max_k
 
     # Check supersession
-    for row in db.execute("SELECT id, superseded_by FROM mem_nodes WHERE superseded_by IS NOT NULL"):
+    for row in db.execute(
+        "SELECT id, superseded_by FROM mem_nodes WHERE superseded_by IS NOT NULL"
+    ):
         enriched[f"_superseded_{row[0]}"] = row[1]
 
     db.close()
@@ -82,20 +104,22 @@ def main() -> None:
     total_items = sum(len(e["eval_items"]) for e in evals)
     labeled_count = sum(len(v) for v in labels.values())
 
-    print(f"\n{'='*60}")
-    print(f"Experiment 3: Retrieval Quality Labeling")
+    print(f"\n{'=' * 60}")
+    print("Experiment 3: Retrieval Quality Labeling")
     print(f"  {total_items} total items across {len(evals)} queries")
     print(f"  {labeled_count} already labeled")
-    print(f"{'='*60}")
-    print(f"\nFor each result, score 0-5:")
-    print(f"  5 = Directly answers the query -- the LLM needs this")
-    print(f"  4 = Strongly relevant -- important supporting context")
-    print(f"  3 = Useful but not essential -- helps if token budget allows")
-    print(f"  2 = Tangentially related -- same area but doesn't help this query")
-    print(f"  1 = Not relevant -- noise, wastes tokens")
-    print(f"  0 = Can't assess -- not enough context to judge (temporal, missing detail)")
-    print(f"  S = Skip this query")
-    print(f"  Q = Quit (progress saved)\n")
+    print(f"{'=' * 60}")
+    print("\nFor each result, score 0-5:")
+    print("  5 = Directly answers the query -- the LLM needs this")
+    print("  4 = Strongly relevant -- important supporting context")
+    print("  3 = Useful but not essential -- helps if token budget allows")
+    print("  2 = Tangentially related -- same area but doesn't help this query")
+    print("  1 = Not relevant -- noise, wastes tokens")
+    print(
+        "  0 = Can't assess -- not enough context to judge (temporal, missing detail)"
+    )
+    print("  S = Skip this query")
+    print("  Q = Quit (progress saved)\n")
 
     for ev in evals:
         qid: str = ev["query_id"]
@@ -104,10 +128,10 @@ def main() -> None:
         if qid in labels and len(labels[qid]) == len(ev["eval_items"]):
             continue
 
-        print(f"\n{'---'*20}")
+        print(f"\n{'---' * 20}")
         print(f"Query {qid}: {ev.get('original_query', ev['query'])}")
         print(f"  ({len(ev['eval_items'])} results to label)")
-        print(f"{'---'*20}\n")
+        print(f"{'---' * 20}\n")
 
         if qid not in labels:
             labels[qid] = {}
@@ -146,10 +170,13 @@ def main() -> None:
             if sup_key in rich_content:
                 age_hint += f" [SUPERSEDED by {rich_content[sup_key]}]"
 
-            print(f"  [{i+1}/{len(ev['eval_items'])}] ({node_id}) {display}")
+            print(f"  [{i + 1}/{len(ev['eval_items'])}] ({node_id}) {display}")
             if node_id in rich_content and rich_content[node_id] != item["content"]:
                 print(f"           [short: {item['content'][:80]}]")
-            meta_parts: list[str] = [f"category: {item['category']}", f"source: {item['source_type']}"]
+            meta_parts: list[str] = [
+                f"category: {item['category']}",
+                f"source: {item['source_type']}",
+            ]
             if age_hint:
                 meta_parts.append(age_hint)
             print(f"           {' | '.join(meta_parts)}")
@@ -161,12 +188,16 @@ def main() -> None:
                 except (EOFError, KeyboardInterrupt):
                     print("\nSaving progress...")
                     save_progress(labels)
-                    print(f"Saved. {sum(len(v) for v in labels.values())} labels recorded.")
+                    print(
+                        f"Saved. {sum(len(v) for v in labels.values())} labels recorded."
+                    )
                     return
 
                 if choice == "Q":
                     save_progress(labels)
-                    print(f"\nSaved. {sum(len(v) for v in labels.values())} labels recorded.")
+                    print(
+                        f"\nSaved. {sum(len(v) for v in labels.values())} labels recorded."
+                    )
                     return
                 elif choice == "S":
                     break
@@ -184,10 +215,10 @@ def main() -> None:
         done = sum(len(v) for v in labels.values())
         print(f"  [Saved: {done}/{total_items} labeled]")
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Labeling complete! {sum(len(v) for v in labels.values())} labels recorded.")
-    print(f"Run scoring: uv run python experiments/exp3_score.py")
-    print(f"{'='*60}")
+    print("Run scoring: uv run python experiments/exp3_score.py")
+    print(f"{'=' * 60}")
 
 
 if __name__ == "__main__":

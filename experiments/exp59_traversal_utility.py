@@ -42,24 +42,25 @@ from typing import Final
 # ============================================================
 
 DB_PATH: Final[Path] = Path(
-    "/Users/thelorax/projects/.gsd/workflows/spikes/"
-    "260406-1-associative-memory-for-gsd-please-explor/sandbox/alpha-seek.db"
+    "/home/user/projects/.gsd/workflows/spikes/"
+    "260406-1-associative-memory-for-gsd-please-explor/sandbox/project-a.db"
 )
 TIMELINE_PATH: Final[Path] = Path(
-    "/Users/thelorax/projects/agentmemory/experiments/exp6_timeline.json"
+    "/home/user/projects/agentmemory/experiments/exp6_timeline.json"
 )
 RESULTS_PATH: Final[Path] = Path(
-    "/Users/thelorax/projects/agentmemory/experiments/exp59_results.json"
+    "/home/user/projects/agentmemory/experiments/exp59_results.json"
 )
 
 # Milestone prefix -> canonical full ID (first occurrence by created_at)
 # Built dynamically from DB; type hint here for clarity
-MilestoneMap = dict[str, str]   # "M005" -> "M005-4iw23z"
+MilestoneMap = dict[str, str]  # "M005" -> "M005-4iw23z"
 
 
 # ============================================================
 # Enums and dataclasses
 # ============================================================
+
 
 class QueryCategory(str, Enum):
     RANGE = "RANGE"
@@ -78,6 +79,7 @@ class Method(str, Enum):
 @dataclass
 class Decision:
     """A decision node with derived temporal metadata."""
+
     id: str
     decision: str
     scope: str
@@ -92,33 +94,37 @@ class Decision:
 @dataclass
 class TemporalEdge:
     """A directed temporal edge between two decisions."""
+
     from_id: str
     to_id: str
-    edge_type: str   # TEMPORAL_NEXT | SUPERSEDES | SESSION_BOUNDARY | CITES | DECIDED_IN
+    edge_type: str  # TEMPORAL_NEXT | SUPERSEDES | SESSION_BOUNDARY | CITES | DECIDED_IN
 
 
 @dataclass
 class GroundTruth:
     """Manually defined ground truth for a query."""
+
     query_id: str
-    expected_ids: list[str]   # all relevant decision IDs
+    expected_ids: list[str]  # all relevant decision IDs
     notes: str
 
 
 @dataclass
 class MethodResult:
     """Result of one method applied to one query."""
+
     method: Method
     found_ids: list[str]
-    completeness: float          # fraction of ground truth found
-    unique_ids: list[str]        # IDs this method found that no other did
-    structural_insight: bool     # does result encode ordering/adjacency?
+    completeness: float  # fraction of ground truth found
+    unique_ids: list[str]  # IDs this method found that no other did
+    structural_insight: bool  # does result encode ordering/adjacency?
     notes: str
 
 
 @dataclass
 class QueryResult:
     """Full evaluation of all methods for one query."""
+
     query_id: str
     query_text: str
     category: QueryCategory
@@ -131,6 +137,7 @@ class QueryResult:
 @dataclass
 class TemporalGraph:
     """In-memory temporal graph built from DB + inferred edges."""
+
     decisions: dict[str, Decision]
     # sorted list of decision IDs by timestamp
     sorted_ids: list[str]
@@ -146,6 +153,7 @@ class TemporalGraph:
 # DB helpers
 # ============================================================
 
+
 def load_milestone_timestamps(conn: sqlite3.Connection) -> dict[str, float]:
     """Return {full_milestone_id: days_since_day0}.
 
@@ -158,6 +166,7 @@ def load_milestone_timestamps(conn: sqlite3.Connection) -> dict[str, float]:
         raise RuntimeError("No milestones found in DB")
 
     import datetime
+
     # Parse ISO timestamps
     def parse_ts(s: str) -> datetime.datetime:
         # SQLite stores as "2026-03-25T18:38:31.911Z"
@@ -188,7 +197,7 @@ def load_decisions(conn: sqlite3.Connection) -> dict[str, Decision]:
             scope=scope,
             choice=choice,
             rationale=rationale,
-            timestamp_days=-1.0,   # filled in below
+            timestamp_days=-1.0,  # filled in below
             milestone_prefix="",
         )
     return result
@@ -212,10 +221,11 @@ def derive_decision_timestamps(
     decision_to_ts: dict[str, list[tuple[float, str]]] = defaultdict(list)
     for dec_id, raw_mid in rows:
         # to_id is like "_M001" -- strip leading underscore
-        mid_prefix: str = raw_mid.lstrip("_")   # "M001"
+        mid_prefix: str = raw_mid.lstrip("_")  # "M001"
         # Find the full milestone ID matching this prefix
         matching_ts: list[float] = [
-            ts for full_id, ts in milestone_ts.items()
+            ts
+            for full_id, ts in milestone_ts.items()
             if full_id.startswith(mid_prefix + "-")
         ]
         if matching_ts:
@@ -230,9 +240,7 @@ def derive_decision_timestamps(
             decisions[dec_id].milestone_prefix = ts_list[0][1]
 
     # Decisions with no DECIDED_IN edge get timestamp -1 (unlinked)
-    unlinked: list[str] = [
-        did for did, d in decisions.items() if d.timestamp_days < 0
-    ]
+    unlinked: list[str] = [did for did, d in decisions.items() if d.timestamp_days < 0]
     if unlinked:
         print(
             f"[warn] {len(unlinked)} decisions have no DECIDED_IN edge: "
@@ -252,6 +260,7 @@ def load_mem_edges(conn: sqlite3.Connection) -> list[tuple[str, str, str, float]
 # Graph construction
 # ============================================================
 
+
 def build_temporal_graph(
     decisions: dict[str, Decision],
     mem_edges: list[tuple[str, str, str, float]],
@@ -267,9 +276,7 @@ def build_temporal_graph(
     Also include CITES and DECIDED_IN from the DB for causal queries.
     """
     # Filter to decisions with valid timestamps and sort
-    linked: list[Decision] = [
-        d for d in decisions.values() if d.timestamp_days >= 0
-    ]
+    linked: list[Decision] = [d for d in decisions.values() if d.timestamp_days >= 0]
     linked.sort(key=lambda d: (d.timestamp_days, d.id))
     sorted_ids: list[str] = [d.id for d in linked]
 
@@ -335,6 +342,7 @@ def build_temporal_graph(
 # FTS5 in-memory index
 # ============================================================
 
+
 def build_fts5_index(decisions: dict[str, Decision]) -> sqlite3.Connection:
     """Build an in-memory SQLite FTS5 index over decisions.
 
@@ -344,9 +352,7 @@ def build_fts5_index(decisions: dict[str, Decision]) -> sqlite3.Connection:
     mem_conn: sqlite3.Connection = sqlite3.connect(":memory:")
 
     # Backing table stores the rows; FTS5 uses it as content source.
-    mem_conn.execute(
-        "CREATE TABLE fts_docs(id TEXT, body TEXT)"
-    )
+    mem_conn.execute("CREATE TABLE fts_docs(id TEXT, body TEXT)")
     doc_rows: list[tuple[str, str]] = [
         (d.id, f"{d.decision} {d.choice} {d.rationale} {d.scope}")
         for d in decisions.values()
@@ -382,6 +388,7 @@ def fts5_search(
 # Query methods
 # ============================================================
 
+
 def method_timestamp_only(
     graph: TemporalGraph,
     min_day: float | None = None,
@@ -394,15 +401,9 @@ def method_timestamp_only(
 
     Returns sorted list of matching decision IDs.
     """
-    candidates: list[Decision] = [
-        graph.decisions[did]
-        for did in graph.sorted_ids
-    ]
+    candidates: list[Decision] = [graph.decisions[did] for did in graph.sorted_ids]
     if milestone_prefix is not None:
-        candidates = [
-            d for d in candidates
-            if d.milestone_prefix == milestone_prefix
-        ]
+        candidates = [d for d in candidates if d.milestone_prefix == milestone_prefix]
     if min_day is not None:
         candidates = [d for d in candidates if d.timestamp_days >= min_day]
     if max_day is not None:
@@ -461,10 +462,7 @@ def method_session_group(
     if anchor_id not in graph.decisions:
         return []
     prefix: str = graph.decisions[anchor_id].milestone_prefix
-    return [
-        did for did in graph.session_groups.get(prefix, [])
-        if did != anchor_id
-    ]
+    return [did for did in graph.session_groups.get(prefix, []) if did != anchor_id]
 
 
 def method_supersedes_chain(
@@ -482,7 +480,7 @@ def method_supersedes_chain(
     )
     chain: list[str] = []
     current: str = start_id
-    for _ in range(50):   # safety bound
+    for _ in range(50):  # safety bound
         found_next: str | None = None
         for edge in adjacency.get(current, []):
             neighbor: str = edge.to_id if direction == "forward" else edge.from_id
@@ -539,10 +537,15 @@ def method_cites_plus_time(
     for from_id, edges in graph.out_edges.items():
         for edge in edges:
             if edge.to_id == target_id and edge.edge_type == "CITES":
-                ts: float = graph.decisions[from_id].timestamp_days if from_id in graph.decisions else -1.0
+                ts: float = (
+                    graph.decisions[from_id].timestamp_days
+                    if from_id in graph.decisions
+                    else -1.0
+                )
                 anchor_ts: float = (
                     graph.decisions[target_id].timestamp_days
-                    if target_id in graph.decisions else 0.0
+                    if target_id in graph.decisions
+                    else 0.0
                 )
                 effective_min: float = min_day if min_day is not None else anchor_ts
                 if ts >= effective_min:
@@ -556,6 +559,7 @@ def method_cites_plus_time(
 # Ground truth definitions
 # ============================================================
 
+
 def define_ground_truths(graph: TemporalGraph) -> dict[str, GroundTruth]:
     """Manually defined ground truth for each query."""
     # Q1: decisions in M005
@@ -564,13 +568,15 @@ def define_ground_truths(graph: TemporalGraph) -> dict[str, GroundTruth]:
     # Q2: decisions between day 3 and day 7 (M009-M010 era: 2026-03-26)
     # day 0 = 2026-03-25, day 3 = 2026-03-28
     q2_ids: list[str] = [
-        did for did in graph.sorted_ids
+        did
+        for did in graph.sorted_ids
         if 3.0 <= graph.decisions[did].timestamp_days <= 7.0
     ]
 
     # Q3: 5 most recent decisions (by timestamp)
     q3_ids: list[str] = [
-        d.id for d in sorted(
+        d.id
+        for d in sorted(
             graph.decisions.values(),
             key=lambda x: x.timestamp_days,
             reverse=True,
@@ -618,6 +624,7 @@ def define_ground_truths(graph: TemporalGraph) -> dict[str, GroundTruth]:
 # Evaluation
 # ============================================================
 
+
 def completeness(found: list[str], truth: list[str]) -> float:
     """Fraction of ground truth IDs present in found."""
     if not truth:
@@ -644,6 +651,7 @@ def compute_unique_values(
 # ============================================================
 # Per-query execution
 # ============================================================
+
 
 def run_query(
     qid: str,
@@ -673,7 +681,9 @@ def run_query(
         ts_found = method_timestamp_only(graph, milestone_prefix="M005")
         tn_found = []  # no traversal needed for milestone filter
         sup_found = []
-        fts_found = method_fts5_plus_time(fts_conn, graph, "M005 exit strategy", None, None)
+        fts_found = method_fts5_plus_time(
+            fts_conn, graph, "M005 exit strategy", None, None
+        )
 
     # -------------------------------------------------------
     # Q2: decisions between day 3 and day 7
@@ -681,14 +691,17 @@ def run_query(
     elif qid == "Q2":
         ts_found = method_timestamp_only(graph, min_day=3.0, max_day=7.0)
         # TEMPORAL_NEXT: walk from first decision at day >= 3
-        start_at_day3: list[str] = method_timestamp_only(graph, min_day=3.0, max_day=3.0)
+        start_at_day3: list[str] = method_timestamp_only(
+            graph, min_day=3.0, max_day=3.0
+        )
         if start_at_day3:
             # BFS from first node in that band, collect until day > 7
             raw_traversal: list[str] = method_temporal_next_traversal(
                 graph, start_at_day3[0], "forward", 100
             )
             tn_found = [
-                did for did in raw_traversal
+                did
+                for did in raw_traversal
                 if did in graph.decisions
                 and 3.0 <= graph.decisions[did].timestamp_days <= 7.0
             ]
@@ -702,11 +715,17 @@ def run_query(
         ts_found = method_timestamp_only(graph, ascending=False, limit=5)
         # TEMPORAL_NEXT backward from last decision
         last_id: str = graph.sorted_ids[-1] if graph.sorted_ids else ""
-        tn_found = ([last_id] + method_temporal_next_traversal(
-            graph, last_id, "backward", 4
-        ))[:5] if last_id else []
+        tn_found = (
+            ([last_id] + method_temporal_next_traversal(graph, last_id, "backward", 4))[
+                :5
+            ]
+            if last_id
+            else []
+        )
         sup_found = []
-        fts_found = method_fts5_plus_time(fts_conn, graph, "decision strategy", None, None)[:5]
+        fts_found = method_fts5_plus_time(
+            fts_conn, graph, "decision strategy", None, None
+        )[:5]
 
     # -------------------------------------------------------
     # Q4: immediately after D097
@@ -719,7 +738,9 @@ def run_query(
             ts_found = [x for x in all_after if x != "D097"][:1]
         tn_found = method_temporal_next_traversal(graph, "D097", "forward", 1)
         sup_found = []
-        fts_found = method_fts5_plus_time(fts_conn, graph, "walk forward backtest performance", anchor_id="D097")[:1]
+        fts_found = method_fts5_plus_time(
+            fts_conn, graph, "walk forward backtest performance", anchor_id="D097"
+        )[:1]
 
     # -------------------------------------------------------
     # Q5: 3 decisions before D157
@@ -733,7 +754,9 @@ def run_query(
             ts_found = [x for x in all_before if x != "D157"][:3]
         tn_found = method_temporal_next_traversal(graph, "D157", "backward", 3)
         sup_found = []
-        fts_found = method_fts5_plus_time(fts_conn, graph, "async tooling", None, None)[:3]
+        fts_found = method_fts5_plus_time(fts_conn, graph, "async tooling", None, None)[
+            :3
+        ]
 
     # -------------------------------------------------------
     # Q6: same session as D073 (M008)
@@ -751,14 +774,19 @@ def run_query(
             graph, "D073", "backward", 20, edge_types={"TEMPORAL_NEXT"}
         )
         tn_found = [
-            did for did in tn_raw + tn_rev
-            if did in graph.decisions and graph.decisions[did].milestone_prefix == "M008"
+            did
+            for did in tn_raw + tn_rev
+            if did in graph.decisions
+            and graph.decisions[did].milestone_prefix == "M008"
         ]
         sup_found = []
         fts_found = method_fts5_plus_time(
-            fts_conn, graph, "calls puts direction equal citizens",
+            fts_conn,
+            graph,
+            "calls puts direction equal citizens",
             min_day=graph.decisions["M008-xnku0q"].timestamp_days
-            if "M008-xnku0q" in graph.decisions else None,
+            if "M008-xnku0q" in graph.decisions
+            else None,
         )
 
     # -------------------------------------------------------
@@ -781,7 +809,9 @@ def run_query(
         # SUPERSEDES: follow chain from D089
         sup_found = ["D089"] + method_supersedes_chain(graph, "D089", "forward")
 
-        fts_found = method_fts5_plus_time(fts_conn, graph, "dispatch gate deploy enforcement")
+        fts_found = method_fts5_plus_time(
+            fts_conn, graph, "dispatch gate deploy enforcement"
+        )
 
     # -------------------------------------------------------
     # Q8: current version of capital decision from D099
@@ -790,11 +820,15 @@ def run_query(
         # TIMESTAMP_ONLY: find most recent capital-related decision
         ts_found = method_timestamp_only(graph)
         capital_ids: set[str] = {"D099", "D110"}
-        ts_found_capital: list[str] = [did for did in reversed(ts_found) if did in capital_ids]
+        ts_found_capital: list[str] = [
+            did for did in reversed(ts_found) if did in capital_ids
+        ]
         ts_found = ts_found_capital[:1]  # most recent = current
 
         # TEMPORAL_NEXT: walk forward from D099 looking for capital decisions
-        tn_raw2: list[str] = method_temporal_next_traversal(graph, "D099", "forward", 20)
+        tn_raw2: list[str] = method_temporal_next_traversal(
+            graph, "D099", "forward", 20
+        )
         tn_found = [did for did in tn_raw2 if did in capital_ids][:1]
 
         # SUPERSEDES: follow chain from D099 -> D110
@@ -802,7 +836,9 @@ def run_query(
         sup_found = sup_full[-1:] if sup_full else []  # only the final version
 
         fts_found = method_fts5_plus_time(
-            fts_conn, graph, "starting bankroll capital initial",
+            fts_conn,
+            graph,
+            "starting bankroll capital initial",
             anchor_id="D099",
         )[:1]
 
@@ -824,7 +860,7 @@ def run_query(
         # Causal method (ground truth method): cites + time
         causal_found: list[str] = method_cites_plus_time(graph, "D097")
         # Assign causal result to sup_found slot for display
-        sup_found = causal_found   # SUPERSEDES slot repurposed for CITES here
+        sup_found = causal_found  # SUPERSEDES slot repurposed for CITES here
 
     # -------------------------------------------------------
     # Q10: full calls/puts correction chain
@@ -900,6 +936,7 @@ def run_query(
 # ============================================================
 # Reporting
 # ============================================================
+
 
 def print_query_table(query_results: list[QueryResult]) -> None:
     """Print a formatted comparison table to stderr."""
@@ -987,13 +1024,13 @@ def print_summary(query_results: list[QueryResult]) -> None:
 # Main
 # ============================================================
 
+
 def main() -> None:
     """Run Exp 59: Traversal Utility of TEMPORAL_NEXT Edges."""
-    print("=== Exp 59: Traversal Utility of TEMPORAL_NEXT Edges ===\n",
-          file=sys.stderr)
+    print("=== Exp 59: Traversal Utility of TEMPORAL_NEXT Edges ===\n", file=sys.stderr)
 
     # Load data
-    print("[1/4] Loading alpha-seek DB...", file=sys.stderr)
+    print("[1/4] Loading project-a DB...", file=sys.stderr)
     conn: sqlite3.Connection = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
 
@@ -1015,16 +1052,19 @@ def main() -> None:
     graph: TemporalGraph = build_temporal_graph(decisions, mem_edges)
 
     n_tn_edges: int = sum(
-        1 for edges in graph.out_edges.values()
-        for e in edges if e.edge_type == "TEMPORAL_NEXT"
+        1
+        for edges in graph.out_edges.values()
+        for e in edges
+        if e.edge_type == "TEMPORAL_NEXT"
     )
     n_sup_edges: int = sum(
-        1 for edges in graph.out_edges.values()
-        for e in edges if e.edge_type == "SUPERSEDES"
+        1
+        for edges in graph.out_edges.values()
+        for e in edges
+        if e.edge_type == "SUPERSEDES"
     )
     n_cites_edges: int = sum(
-        1 for edges in graph.out_edges.values()
-        for e in edges if e.edge_type == "CITES"
+        1 for edges in graph.out_edges.values() for e in edges if e.edge_type == "CITES"
     )
     print(
         f"    Graph: {len(graph.sorted_ids)} nodes, {n_tn_edges} TEMPORAL_NEXT edges, "
@@ -1042,16 +1082,36 @@ def main() -> None:
 
     # Query definitions
     queries: list[tuple[str, str, QueryCategory]] = [
-        ("Q1",  "What decisions were made during milestone M005?",              QueryCategory.RANGE),
-        ("Q2",  "What decisions were made between day 3 and day 7?",            QueryCategory.RANGE),
-        ("Q3",  "What are the 5 most recent decisions?",                        QueryCategory.RANGE),
-        ("Q4",  "What was decided immediately after D097?",                     QueryCategory.SEQUENCE),
-        ("Q5",  "What were the 3 decisions before D157?",                       QueryCategory.SEQUENCE),
-        ("Q6",  "What decisions were made in the same session as D073?",        QueryCategory.SEQUENCE),
-        ("Q7",  "How did the dispatch gate protocol evolve?",                   QueryCategory.EVOLUTION),
-        ("Q8",  "What is the current version of the capital decision?",         QueryCategory.EVOLUTION),
-        ("Q9",  "What decisions CITE D097 and were made after it?",             QueryCategory.CAUSAL),
-        ("Q10", "Trace the full correction chain for the calls/puts topic.",    QueryCategory.CAUSAL),
+        ("Q1", "What decisions were made during milestone M005?", QueryCategory.RANGE),
+        (
+            "Q2",
+            "What decisions were made between day 3 and day 7?",
+            QueryCategory.RANGE,
+        ),
+        ("Q3", "What are the 5 most recent decisions?", QueryCategory.RANGE),
+        ("Q4", "What was decided immediately after D097?", QueryCategory.SEQUENCE),
+        ("Q5", "What were the 3 decisions before D157?", QueryCategory.SEQUENCE),
+        (
+            "Q6",
+            "What decisions were made in the same session as D073?",
+            QueryCategory.SEQUENCE,
+        ),
+        ("Q7", "How did the dispatch gate protocol evolve?", QueryCategory.EVOLUTION),
+        (
+            "Q8",
+            "What is the current version of the capital decision?",
+            QueryCategory.EVOLUTION,
+        ),
+        (
+            "Q9",
+            "What decisions CITE D097 and were made after it?",
+            QueryCategory.CAUSAL,
+        ),
+        (
+            "Q10",
+            "Trace the full correction chain for the calls/puts topic.",
+            QueryCategory.CAUSAL,
+        ),
     ]
 
     # Run queries
@@ -1063,10 +1123,10 @@ def main() -> None:
         query_results.append(qr)
         print(
             f"  {qid} [{category.value}]: truth={len(gt.expected_ids)}, "
-            f"TS={qr.method_results[Method.TIMESTAMP_ONLY.value].completeness*100:.0f}% "
-            f"TN={qr.method_results[Method.TEMPORAL_NEXT.value].completeness*100:.0f}% "
-            f"SUP={qr.method_results[Method.SUPERSEDES.value].completeness*100:.0f}% "
-            f"FTS={qr.method_results[Method.FTS5_TIME.value].completeness*100:.0f}%",
+            f"TS={qr.method_results[Method.TIMESTAMP_ONLY.value].completeness * 100:.0f}% "
+            f"TN={qr.method_results[Method.TEMPORAL_NEXT.value].completeness * 100:.0f}% "
+            f"SUP={qr.method_results[Method.SUPERSEDES.value].completeness * 100:.0f}% "
+            f"FTS={qr.method_results[Method.FTS5_TIME.value].completeness * 100:.0f}%",
             file=sys.stderr,
         )
 
@@ -1080,10 +1140,18 @@ def main() -> None:
 
     # Hypothesis evaluation
     print("\n=== HYPOTHESIS EVALUATION ===", file=sys.stderr)
-    range_qs: list[QueryResult] = [qr for qr in query_results if qr.category == QueryCategory.RANGE]
-    seq_qs: list[QueryResult] = [qr for qr in query_results if qr.category == QueryCategory.SEQUENCE]
-    evol_qs: list[QueryResult] = [qr for qr in query_results if qr.category == QueryCategory.EVOLUTION]
-    causal_qs: list[QueryResult] = [qr for qr in query_results if qr.category == QueryCategory.CAUSAL]
+    range_qs: list[QueryResult] = [
+        qr for qr in query_results if qr.category == QueryCategory.RANGE
+    ]
+    seq_qs: list[QueryResult] = [
+        qr for qr in query_results if qr.category == QueryCategory.SEQUENCE
+    ]
+    evol_qs: list[QueryResult] = [
+        qr for qr in query_results if qr.category == QueryCategory.EVOLUTION
+    ]
+    causal_qs: list[QueryResult] = [
+        qr for qr in query_results if qr.category == QueryCategory.CAUSAL
+    ]
 
     h1_pass: bool = all(not qr.requires_structural for qr in range_qs)
     h2_pass: bool = any(qr.requires_structural for qr in seq_qs)
@@ -1101,8 +1169,7 @@ def main() -> None:
         file=sys.stderr,
     )
     print(
-        f"  H3 (EVOLUTION queries require SUPERSEDES): "
-        f"{'PASS' if h3_pass else 'FAIL'}",
+        f"  H3 (EVOLUTION queries require SUPERSEDES): {'PASS' if h3_pass else 'FAIL'}",
         file=sys.stderr,
     )
     print(
@@ -1119,10 +1186,22 @@ def main() -> None:
             "that timestamps alone cannot."
         ),
         "hypotheses": {
-            "H1": {"text": "RANGE queries fully answerable by timestamps", "result": "PASS" if h1_pass else "FAIL"},
-            "H2": {"text": "SEQUENCE queries require TEMPORAL_NEXT", "result": "PASS" if h2_pass else "FAIL"},
-            "H3": {"text": "EVOLUTION queries require SUPERSEDES", "result": "PASS" if h3_pass else "FAIL"},
-            "H4": {"text": "CAUSAL queries require graph structure", "result": "PASS" if h4_pass else "FAIL"},
+            "H1": {
+                "text": "RANGE queries fully answerable by timestamps",
+                "result": "PASS" if h1_pass else "FAIL",
+            },
+            "H2": {
+                "text": "SEQUENCE queries require TEMPORAL_NEXT",
+                "result": "PASS" if h2_pass else "FAIL",
+            },
+            "H3": {
+                "text": "EVOLUTION queries require SUPERSEDES",
+                "result": "PASS" if h3_pass else "FAIL",
+            },
+            "H4": {
+                "text": "CAUSAL queries require graph structure",
+                "result": "PASS" if h4_pass else "FAIL",
+            },
         },
         "graph_stats": {
             "decisions_total": len(decisions),
@@ -1155,12 +1234,21 @@ def main() -> None:
         ],
         "summary": {
             "total_queries": len(query_results),
-            "timestamp_sufficient": sum(1 for qr in query_results if not qr.requires_structural),
-            "requires_structural": sum(1 for qr in query_results if qr.requires_structural),
-            "requires_supersedes": sum(1 for qr in query_results if qr.requires_supersedes),
+            "timestamp_sufficient": sum(
+                1 for qr in query_results if not qr.requires_structural
+            ),
+            "requires_structural": sum(
+                1 for qr in query_results if qr.requires_structural
+            ),
+            "requires_supersedes": sum(
+                1 for qr in query_results if qr.requires_supersedes
+            ),
             "avg_completeness_by_method": {
                 method_val: round(
-                    sum(qr.method_results[method_val].completeness for qr in query_results)
+                    sum(
+                        qr.method_results[method_val].completeness
+                        for qr in query_results
+                    )
                     / len(query_results),
                     4,
                 )

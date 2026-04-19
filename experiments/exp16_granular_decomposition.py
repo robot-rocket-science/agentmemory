@@ -18,9 +18,11 @@ from pathlib import Path
 from typing import Any
 
 
-ALPHA_SEEK_DB = Path("/Users/thelorax/projects/.gsd/workflows/spikes/"
-                     "260406-1-associative-memory-for-gsd-please-explor/"
-                     "sandbox/alpha-seek.db")
+ALPHA_SEEK_DB = Path(
+    "/home/user/projects/.gsd/workflows/spikes/"
+    "260406-1-associative-memory-for-gsd-please-explor/"
+    "sandbox/project-a.db"
+)
 
 
 def split_into_sentences(text: str) -> list[str]:
@@ -33,12 +35,12 @@ def split_into_sentences(text: str) -> list[str]:
     # Split on sentence boundaries
     # Negative lookbehind: don't split after single uppercase letter (abbreviations)
     # or after digits (D097. should not split)
-    parts = re.split(r'(?<=[.!?])\s+(?=[A-Z])', text)
+    parts = re.split(r"(?<=[.!?])\s+(?=[A-Z])", text)
 
     sentences: list[str] = []
     for part in parts:
         # Further split on pipe separator (decision | rationale format)
-        subparts = part.split(' | ')
+        subparts = part.split(" | ")
         for sp in subparts:
             sp = sp.strip()
             if len(sp) > 10:  # skip very short fragments
@@ -51,26 +53,30 @@ def classify_sentence(sentence: str) -> str:
     """Classify a sentence by its role in a decision."""
     s = sentence.lower()
 
-    if any(w in s for w in ['because', 'rationale', 'reason', 'driven by', 'root cause']):
-        return 'rationale'
-    if any(w in s for w in ['supersede', 'replace', 'retire', 'override']):
-        return 'supersession'
-    if any(w in s for w in ['must', 'always', 'never', 'mandatory', 'require', 'rule']):
-        return 'constraint'
-    if any(w in s for w in ['data', 'showed', 'result', 'found', 'measured', '%', 'x ']):
-        return 'evidence'
-    if any(w in s for w in ['script', 'implement', 'code', '.py', 'function']):
-        return 'implementation'
-    if re.match(r'^[A-Z].*:', s):  # starts with "Topic: ..."
-        return 'assertion'
+    if any(
+        w in s for w in ["because", "rationale", "reason", "driven by", "root cause"]
+    ):
+        return "rationale"
+    if any(w in s for w in ["supersede", "replace", "retire", "override"]):
+        return "supersession"
+    if any(w in s for w in ["must", "always", "never", "mandatory", "require", "rule"]):
+        return "constraint"
+    if any(
+        w in s for w in ["data", "showed", "result", "found", "measured", "%", "x "]
+    ):
+        return "evidence"
+    if any(w in s for w in ["script", "implement", "code", ".py", "function"]):
+        return "implementation"
+    if re.match(r"^[A-Z].*:", s):  # starts with "Topic: ..."
+        return "assertion"
 
-    return 'context'
+    return "context"
 
 
 def extract_refs(sentence: str) -> list[str]:
     """Extract D###, M###, K### references from a sentence."""
     refs: set[str] = set()
-    for m in re.finditer(r'\b(D\d{2,3}|M\d{2,3}|K\d{2,3})\b', sentence):
+    for m in re.finditer(r"\b(D\d{2,3}|M\d{2,3}|K\d{2,3})\b", sentence):
         refs.add(m.group(1))
     return sorted(refs)
 
@@ -82,8 +88,10 @@ def main() -> None:
         "SELECT id, decision, choice, rationale FROM decisions ORDER BY seq"
     ).fetchall()
 
-    print(f"Decomposing {len(decisions)} decisions into sentence-level nodes\n",
-          file=sys.stderr)
+    print(
+        f"Decomposing {len(decisions)} decisions into sentence-level nodes\n",
+        file=sys.stderr,
+    )
 
     all_nodes: list[dict[str, Any]] = []
     total_original_tokens = 0
@@ -129,35 +137,51 @@ def main() -> None:
 
     # Statistics
     import numpy as np
+
     spd = np.array(sentences_per_decision)
 
-    print(f"{'='*60}", file=sys.stderr)
-    print(f"DECOMPOSITION RESULTS", file=sys.stderr)
-    print(f"{'='*60}", file=sys.stderr)
+    print(f"{'=' * 60}", file=sys.stderr)
+    print("DECOMPOSITION RESULTS", file=sys.stderr)
+    print(f"{'=' * 60}", file=sys.stderr)
     print(f"  Decisions: {len(decisions)}", file=sys.stderr)
     print(f"  Sentence nodes: {len(all_nodes)}", file=sys.stderr)
-    print(f"  Avg sentences/decision: {spd.mean():.1f} "
-          f"(median: {np.median(spd):.0f}, max: {spd.max()})", file=sys.stderr)
-    print(f"  Original tokens (all decisions): {total_original_tokens:,}", file=sys.stderr)
+    print(
+        f"  Avg sentences/decision: {spd.mean():.1f} "
+        f"(median: {np.median(spd):.0f}, max: {spd.max()})",
+        file=sys.stderr,
+    )
+    print(
+        f"  Original tokens (all decisions): {total_original_tokens:,}", file=sys.stderr
+    )
     print(f"  Cross-references between sentences: {cross_refs}", file=sys.stderr)
 
-    print(f"\n  Sentence type distribution:", file=sys.stderr)
+    print("\n  Sentence type distribution:", file=sys.stderr)
     for stype, count in sorted(type_counts.items(), key=lambda x: x[1], reverse=True):
-        print(f"    {stype}: {count} ({count/len(all_nodes):.0%})", file=sys.stderr)
+        print(f"    {stype}: {count} ({count / len(all_nodes):.0%})", file=sys.stderr)
 
     # Token analysis: if we only load the relevant sentence(s) instead of whole decision
     # For anchor nodes, we might load just the assertion sentence
-    assertion_nodes: list[dict[str, Any]] = [n for n in all_nodes if n["type"] == "assertion"]
-    constraint_nodes: list[dict[str, Any]] = [n for n in all_nodes if n["type"] == "constraint"]
+    assertion_nodes: list[dict[str, Any]] = [
+        n for n in all_nodes if n["type"] == "assertion"
+    ]
+    constraint_nodes: list[dict[str, Any]] = [
+        n for n in all_nodes if n["type"] == "constraint"
+    ]
     core_nodes = assertion_nodes + constraint_nodes
     core_tokens: int = sum(n["tokens"] for n in core_nodes)
 
-    print(f"\n  Token analysis:", file=sys.stderr)
+    print("\n  Token analysis:", file=sys.stderr)
     print(f"    All sentences total: {total_sentence_tokens:,} tokens", file=sys.stderr)
-    print(f"    Core nodes (assertion + constraint): {len(core_nodes)} nodes, "
-          f"{core_tokens:,} tokens", file=sys.stderr)
-    print(f"    Token reduction (core only vs all): "
-          f"{(1 - core_tokens/total_sentence_tokens):.0%}", file=sys.stderr)
+    print(
+        f"    Core nodes (assertion + constraint): {len(core_nodes)} nodes, "
+        f"{core_tokens:,} tokens",
+        file=sys.stderr,
+    )
+    print(
+        f"    Token reduction (core only vs all): "
+        f"{(1 - core_tokens / total_sentence_tokens):.0%}",
+        file=sys.stderr,
+    )
 
     # What would anchor context look like?
     # Top 10 most-referenced decisions, loading only their assertion sentences
@@ -166,27 +190,39 @@ def main() -> None:
         for ref in n["references"]:
             ref_counts[ref] = ref_counts.get(ref, 0) + 1
 
-    top_anchors: list[tuple[str, int]] = sorted(ref_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+    top_anchors: list[tuple[str, int]] = sorted(
+        ref_counts.items(), key=lambda x: x[1], reverse=True
+    )[:10]
 
-    print(f"\n  Top 10 anchor candidates (by cross-reference count):", file=sys.stderr)
+    print("\n  Top 10 anchor candidates (by cross-reference count):", file=sys.stderr)
     anchor_tokens_full = 0
     anchor_tokens_core = 0
     for anchor_id, count in top_anchors:
-        anchor_sentences: list[dict[str, Any]] = [n for n in all_nodes if n["parent_decision"] == anchor_id]
-        anchor_core: list[dict[str, Any]] = [n for n in anchor_sentences if n["type"] in ("assertion", "constraint")]
+        anchor_sentences: list[dict[str, Any]] = [
+            n for n in all_nodes if n["parent_decision"] == anchor_id
+        ]
+        anchor_core: list[dict[str, Any]] = [
+            n for n in anchor_sentences if n["type"] in ("assertion", "constraint")
+        ]
 
         full_tok: int = sum(n["tokens"] for n in anchor_sentences)
         core_tok: int = sum(n["tokens"] for n in anchor_core)
         anchor_tokens_full += full_tok
         anchor_tokens_core += core_tok
 
-        print(f"    {anchor_id} ({count} refs): {len(anchor_sentences)} sentences, "
-              f"{full_tok} tok full / {core_tok} tok core", file=sys.stderr)
+        print(
+            f"    {anchor_id} ({count} refs): {len(anchor_sentences)} sentences, "
+            f"{full_tok} tok full / {core_tok} tok core",
+            file=sys.stderr,
+        )
 
-    print(f"\n  Anchor context (top 10):", file=sys.stderr)
+    print("\n  Anchor context (top 10):", file=sys.stderr)
     print(f"    Full sentences: {anchor_tokens_full} tokens", file=sys.stderr)
     print(f"    Core only: {anchor_tokens_core} tokens", file=sys.stderr)
-    print(f"    Reduction: {(1 - anchor_tokens_core/anchor_tokens_full):.0%}", file=sys.stderr)
+    print(
+        f"    Reduction: {(1 - anchor_tokens_core / anchor_tokens_full):.0%}",
+        file=sys.stderr,
+    )
 
     # Output
     output: dict[str, Any] = {
@@ -210,7 +246,7 @@ def main() -> None:
         json.dumps(all_nodes[:50], indent=2)  # first 50 for inspection
     )
 
-    print(f"\nOutput: experiments/exp16_results.json", file=sys.stderr)
+    print("\nOutput: experiments/exp16_results.json", file=sys.stderr)
     db.close()
 
 

@@ -6,7 +6,7 @@ Date: 2026-04-11
 
 ## 1. MCP Server (server.py)
 
-8 tools registered via FastMCP. Entry point: `python -m agentmemory.server`.  
+8 tools registered via FastMCP. Entry point: `python -m agentmemory.server`.
 Config: `.mcp.json` uses `uv run --project ... python -m agentmemory.server` (stdio transport).
 
 ### Tool-by-Tool Assessment
@@ -35,7 +35,7 @@ Config: `.mcp.json` uses `uv run --project ... python -m agentmemory.server` (st
 
 ## 2. CLI (cli.py)
 
-Entry point: `agentmemory` (installed at `/Users/thelorax/.local/bin/agentmemory`).
+Entry point: `agentmemory` (installed at `/home/user/.local/bin/agentmemory`).
 
 ### Command-by-Command Assessment
 

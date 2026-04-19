@@ -19,9 +19,11 @@ import sys
 from pathlib import Path
 from typing import Any, TypedDict
 
-ALPHA_SEEK_DB: Path = Path("/Users/thelorax/projects/.gsd/workflows/spikes/"
-                     "260406-1-associative-memory-for-gsd-please-explor/"
-                     "sandbox/alpha-seek.db")
+ALPHA_SEEK_DB: Path = Path(
+    "/home/user/projects/.gsd/workflows/spikes/"
+    "260406-1-associative-memory-for-gsd-please-explor/"
+    "sandbox/project-a.db"
+)
 
 
 class TopicInfo(TypedDict):
@@ -51,7 +53,7 @@ CRITICAL: dict[str, TopicInfo] = {
         "needed": {"D071", "D113"},
     },
     "gcp_primary": {
-        "query": "GCP primary compute platform archon overflow",
+        "query": "GCP primary compute platform server-a overflow",
         "needed": {"D078", "D120"},
     },
 }
@@ -72,10 +74,10 @@ class SentenceItem(TypedDict):
 
 
 def split_into_sentences(text: str) -> list[str]:
-    parts: list[str] = re.split(r'(?<=[.!?])\s+(?=[A-Z])', text)
+    parts: list[str] = re.split(r"(?<=[.!?])\s+(?=[A-Z])", text)
     sentences: list[str] = []
     for part in parts:
-        for sp in part.split(' | '):
+        for sp in part.split(" | "):
             sp = sp.strip()
             if len(sp) > 10:
                 sentences.append(sp)
@@ -113,9 +115,13 @@ def load_data() -> tuple[dict[str, DecisionItem], dict[str, SentenceItem]]:
     return decisions, sentences
 
 
-def build_fts(items: dict[str, DecisionItem] | dict[str, SentenceItem], table_name: str = "fts") -> sqlite3.Connection:
+def build_fts(
+    items: dict[str, DecisionItem] | dict[str, SentenceItem], table_name: str = "fts"
+) -> sqlite3.Connection:
     db: sqlite3.Connection = sqlite3.connect(":memory:")
-    db.execute(f"CREATE VIRTUAL TABLE {table_name} USING fts5(id, content, tokenize='porter')")
+    db.execute(
+        f"CREATE VIRTUAL TABLE {table_name} USING fts5(id, content, tokenize='porter')"
+    )
     for nid, item in items.items():
         db.execute(f"INSERT INTO {table_name} VALUES (?, ?)", (nid, item["content"]))
     db.commit()
@@ -134,7 +140,7 @@ def search(
     try:
         results: list[Any] = fts_db.execute(
             f"SELECT id FROM {table_name} WHERE {table_name} MATCH ? ORDER BY rank LIMIT 50",
-            (q,)
+            (q,),
         ).fetchall()
     except sqlite3.OperationalError:
         return [], 0
@@ -185,14 +191,18 @@ def main() -> None:
         # Decision-level retrieval
         dec_retrieved: list[str]
         dec_tokens: int
-        dec_retrieved, dec_tokens = search(query, fts_dec, decisions, TOKEN_BUDGET, "fts_dec")
+        dec_retrieved, dec_tokens = search(
+            query, fts_dec, decisions, TOKEN_BUDGET, "fts_dec"
+        )
         dec_found: set[str] = needed & set(dec_retrieved)
         dec_items: int = len(dec_retrieved)
 
         # Sentence-level retrieval
         sent_retrieved: list[str]
         sent_tokens: int
-        sent_retrieved, sent_tokens = search(query, fts_sent, sentences, TOKEN_BUDGET, "fts_sent")
+        sent_retrieved, sent_tokens = search(
+            query, fts_sent, sentences, TOKEN_BUDGET, "fts_sent"
+        )
         # Map sentence IDs back to parent decisions
         sent_parents: set[str] = {sentences[sid]["parent"] for sid in sent_retrieved}
         sent_found: set[str] = needed & sent_parents
@@ -216,22 +226,34 @@ def main() -> None:
         )
 
         print(f"  {topic_id}:", file=sys.stderr)
-        print(f"    Decision: {len(dec_found)}/{len(needed)} found, "
-              f"{dec_items} items, {dec_tokens} tokens", file=sys.stderr)
-        print(f"    Sentence: {len(sent_found)}/{len(needed)} found, "
-              f"{sent_items} items, {sent_tokens} tokens", file=sys.stderr)
+        print(
+            f"    Decision: {len(dec_found)}/{len(needed)} found, "
+            f"{dec_items} items, {dec_tokens} tokens",
+            file=sys.stderr,
+        )
+        print(
+            f"    Sentence: {len(sent_found)}/{len(needed)} found, "
+            f"{sent_items} items, {sent_tokens} tokens",
+            file=sys.stderr,
+        )
 
         # Show what sentence-level actually returns vs decision-level
         if sent_retrieved:
-            print(f"    Sentence content sample:", file=sys.stderr)
+            print("    Sentence content sample:", file=sys.stderr)
             for sid in sent_retrieved[:3]:
                 sent_item: SentenceItem = sentences[sid]
-                print(f"      [{sent_item['parent']}_s{sent_item['index']}] {sent_item['content'][:80]}", file=sys.stderr)
+                print(
+                    f"      [{sent_item['parent']}_s{sent_item['index']}] {sent_item['content'][:80]}",
+                    file=sys.stderr,
+                )
 
     # Summary
-    print(f"\n{'='*60}", file=sys.stderr)
-    print(f"{'Topic':<18} {'Dec Cov':>8} {'Dec Tok':>8} {'Dec #':>5} "
-          f"{'Sent Cov':>9} {'Sent Tok':>9} {'Sent #':>6}", file=sys.stderr)
+    print(f"\n{'=' * 60}", file=sys.stderr)
+    print(
+        f"{'Topic':<18} {'Dec Cov':>8} {'Dec Tok':>8} {'Dec #':>5} "
+        f"{'Sent Cov':>9} {'Sent Tok':>9} {'Sent #':>6}",
+        file=sys.stderr,
+    )
     print("-" * 70, file=sys.stderr)
 
     dec_total_found: int = 0
@@ -250,24 +272,53 @@ def main() -> None:
         dec_total_tokens += d["tokens_used"]
         sent_total_tokens += sl["tokens_used"]
 
-        print(f"{topic_id:<18} {d['coverage']:>8.0%} {d['tokens_used']:>8} {d['items_retrieved']:>5} "
-              f"{sl['coverage']:>9.0%} {sl['tokens_used']:>9} {sl['items_retrieved']:>6}", file=sys.stderr)
+        print(
+            f"{topic_id:<18} {d['coverage']:>8.0%} {d['tokens_used']:>8} {d['items_retrieved']:>5} "
+            f"{sl['coverage']:>9.0%} {sl['tokens_used']:>9} {sl['items_retrieved']:>6}",
+            file=sys.stderr,
+        )
 
-    print(f"\n  Decision-level: {dec_total_found}/{total_needed} found, "
-          f"avg {dec_total_tokens/6:.0f} tokens/topic", file=sys.stderr)
-    print(f"  Sentence-level: {sent_total_found}/{total_needed} found, "
-          f"avg {sent_total_tokens/6:.0f} tokens/topic", file=sys.stderr)
-    print(f"  Token efficiency: sentence uses "
-          f"{sent_total_tokens/max(dec_total_tokens,1):.0%} of decision's budget", file=sys.stderr)
+    print(
+        f"\n  Decision-level: {dec_total_found}/{total_needed} found, "
+        f"avg {dec_total_tokens / 6:.0f} tokens/topic",
+        file=sys.stderr,
+    )
+    print(
+        f"  Sentence-level: {sent_total_found}/{total_needed} found, "
+        f"avg {sent_total_tokens / 6:.0f} tokens/topic",
+        file=sys.stderr,
+    )
+    print(
+        f"  Token efficiency: sentence uses "
+        f"{sent_total_tokens / max(dec_total_tokens, 1):.0%} of decision's budget",
+        file=sys.stderr,
+    )
 
     # The key question: does sentence-level give ENOUGH context?
-    print(f"\n  QUALITATIVE: Does sentence-level retrieval provide enough context?", file=sys.stderr)
-    print(f"  Decision-level returns {dec_total_found} decisions with full rationale.", file=sys.stderr)
-    sent_total_items: int = sum(r['sentence_level']['items_retrieved'] for r in results.values())
-    print(f"  Sentence-level returns {sent_total_items} "
-          f"individual sentences -- more items, less context per item.", file=sys.stderr)
-    print(f"  The question: can the agent act on isolated sentences, or does it need", file=sys.stderr)
-    print(f"  the surrounding rationale? This requires qualitative inspection.", file=sys.stderr)
+    print(
+        "\n  QUALITATIVE: Does sentence-level retrieval provide enough context?",
+        file=sys.stderr,
+    )
+    print(
+        f"  Decision-level returns {dec_total_found} decisions with full rationale.",
+        file=sys.stderr,
+    )
+    sent_total_items: int = sum(
+        r["sentence_level"]["items_retrieved"] for r in results.values()
+    )
+    print(
+        f"  Sentence-level returns {sent_total_items} "
+        f"individual sentences -- more items, less context per item.",
+        file=sys.stderr,
+    )
+    print(
+        "  The question: can the agent act on isolated sentences, or does it need",
+        file=sys.stderr,
+    )
+    print(
+        "  the surrounding rationale? This requires qualitative inspection.",
+        file=sys.stderr,
+    )
 
     Path("experiments/exp29_results.json").write_text(json.dumps(results, indent=2))
 

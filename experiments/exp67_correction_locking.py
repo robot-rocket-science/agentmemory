@@ -3,6 +3,7 @@
 Tests whether locking all unlocked corrections improves retrieval quality
 (MRR@10 and coverage) on ground-truth queries.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -21,7 +22,7 @@ from agentmemory.store import MemoryStore
 # Config
 # ---------------------------------------------------------------------------
 
-CWD: Final[str] = "/Users/thelorax/projects/agentmemory"
+CWD: Final[str] = "/home/user/projects/agentmemory"
 DB_HASH: Final[str] = hashlib.sha256(CWD.encode()).hexdigest()[:12]
 LIVE_DB: Final[Path] = Path.home() / ".agentmemory" / "projects" / DB_HASH / "memory.db"
 
@@ -48,6 +49,7 @@ QUERIES: Final[list[str]] = [
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def measure_retrieval(
     store: MemoryStore,
@@ -83,7 +85,9 @@ def measure_retrieval(
             if b.belief_type == "correction":
                 correction_ids_in_top10.add(b.id)
 
-    mrr: float = sum(reciprocal_ranks) / len(reciprocal_ranks) if reciprocal_ranks else 0.0
+    mrr: float = (
+        sum(reciprocal_ranks) / len(reciprocal_ranks) if reciprocal_ranks else 0.0
+    )
     coverage: float = total_hits / total_expected if total_expected > 0 else 0.0
 
     return {
@@ -98,6 +102,7 @@ def measure_retrieval(
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     if not LIVE_DB.exists():

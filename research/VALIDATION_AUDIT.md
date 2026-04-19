@@ -50,9 +50,9 @@
 
 **Potential issues:**
 - [ ] **Topic assignment is manual.** I defined the 10 topic categories and their keywords by reading the overrides. A different researcher might cluster them differently. The 79% number depends on my topic definitions.
-- [ ] **Some overrides were miscategorized.** The dispatch_gate cluster (13 overrides) includes some that are about archon vs GCP compute, contract filters, and annualized returns -- not strictly "dispatch gate." The keyword matching is too broad. D103 (annualized returns) and D118 (no artificial filters) got pulled into the dispatch cluster because they matched keywords like "gate" or "dispatch" in the scope text.
+- [ ] **Some overrides were miscategorized.** The dispatch_gate cluster (13 overrides) includes some that are about server-a vs GCP compute, contract filters, and annualized returns -- not strictly "dispatch gate." The keyword matching is too broad. D103 (annualized returns) and D118 (no artificial filters) got pulled into the dispatch cluster because they matched keywords like "gate" or "dispatch" in the scope text.
 - [ ] **6 uncategorized overrides were not analyzed.** What are they? Do they reveal additional failure patterns?
-- [ ] **The database (alpha-seek.db) is a stale snapshot from April 6.** D209 doesn't exist in it. Other recent decisions may also be missing.
+- [ ] **The database (project-a.db) is a stale snapshot from April 6.** D209 doesn't exist in it. Other recent decisions may also be missing.
 
 **What's missing:**
 - Inter-rater reliability (only one person defined the clusters)

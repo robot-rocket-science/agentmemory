@@ -26,9 +26,11 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
-ALPHA_SEEK_DB = Path("/Users/thelorax/projects/.gsd/workflows/spikes/"
-                     "260406-1-associative-memory-for-gsd-please-explor/"
-                     "sandbox/alpha-seek.db")
+ALPHA_SEEK_DB = Path(
+    "/home/user/projects/.gsd/workflows/spikes/"
+    "260406-1-associative-memory-for-gsd-please-explor/"
+    "sandbox/project-a.db"
+)
 
 DIM = 2048  # higher dim for more capacity headroom
 
@@ -40,25 +42,33 @@ EdgeList = list[tuple[str, str, str]]
 
 # --- HRR Core ---
 
+
 def make_vec(rng: np.random.Generator) -> NDArr:
     v: NDArr = rng.standard_normal(DIM)
     return v / np.linalg.norm(v)
+
 
 def bind(a: NDArr, b: NDArr) -> NDArr:
     result: NDArr = np.real(np.fft.ifft(np.fft.fft(a) * np.fft.fft(b)))
     return result
 
+
 def unbind(key: NDArr, bound: NDArr) -> NDArr:
     result: NDArr = np.real(np.fft.ifft(np.conj(np.fft.fft(key)) * np.fft.fft(bound)))
     return result
 
+
 def cos_sim(a: NDArr, b: NDArr) -> float:
     na = float(np.linalg.norm(a))
     nb = float(np.linalg.norm(b))
-    if na == 0 or nb == 0: return 0.0
+    if na == 0 or nb == 0:
+        return 0.0
     return float(np.dot(a, b) / (na * nb))
 
-def nearest_k(query: NDArr, memory: dict[str, NDArr], k: int = 5) -> list[tuple[str, float]]:
+
+def nearest_k(
+    query: NDArr, memory: dict[str, NDArr], k: int = 5
+) -> list[tuple[str, float]]:
     sims: list[tuple[str, float]] = [(l, cos_sim(query, v)) for l, v in memory.items()]
     sims.sort(key=lambda x: x[1], reverse=True)
     return sims[:k]
@@ -66,11 +76,12 @@ def nearest_k(query: NDArr, memory: dict[str, NDArr], k: int = 5) -> list[tuple[
 
 # --- Step 1: Sentence Decomposition ---
 
+
 def split_sentences(text: str) -> list[str]:
-    parts: list[str | Any] = re.split(r'(?<=[.!?])\s+(?=[A-Z])', text)
+    parts: list[str | Any] = re.split(r"(?<=[.!?])\s+(?=[A-Z])", text)
     sents: list[str] = []
     for p in parts:
-        for sp in str(p).split(' | '):
+        for sp in str(p).split(" | "):
             sp = sp.strip()
             if len(sp) > 10:
                 sents.append(sp)
@@ -105,16 +116,17 @@ def build_sentence_nodes(db: sqlite3.Connection) -> tuple[SentDict, GroupDict]:
 
 # --- Step 2: Build Typed Edges Between Sentences ---
 
+
 def build_sentence_edges(sentences: SentDict, groups: GroupDict) -> EdgeList:
     edges: EdgeList = []
 
     # NEXT_IN_DECISION: sequential within same decision
     for _did, group in groups.items():
         for i in range(len(group) - 1):
-            edges.append((group[i], group[i+1], "NEXT_IN_DECISION"))
+            edges.append((group[i], group[i + 1], "NEXT_IN_DECISION"))
 
     # CITES: sentence mentioning D### -> first sentence of that decision
-    d_ref_pattern = re.compile(r'\bD(\d{2,3})\b')
+    d_ref_pattern = re.compile(r"\bD(\d{2,3})\b")
     for sid, sent in sentences.items():
         parent: str = str(sent["parent"])
         for match in d_ref_pattern.finditer(str(sent["content"])):
@@ -124,7 +136,7 @@ def build_sentence_edges(sentences: SentDict, groups: GroupDict) -> EdgeList:
                 edges.append((sid, target_sid, "CITES"))
 
     # M### references: sentence mentioning M### -> create MILESTONE_REF edge
-    m_ref_pattern = re.compile(r'\bM(\d{2,3})\b')
+    m_ref_pattern = re.compile(r"\bM(\d{2,3})\b")
     milestone_sids: dict[str, list[str]] = {}
 
     for sid, sent in sentences.items():
@@ -143,7 +155,7 @@ def build_sentence_edges(sentences: SentDict, groups: GroupDict) -> EdgeList:
 
         parents = list(by_parent.keys())
         for i in range(len(parents)):
-            for j in range(i+1, min(i+3, len(parents))):  # limit to avoid explosion
+            for j in range(i + 1, min(i + 3, len(parents))):  # limit to avoid explosion
                 src = by_parent[parents[i]][0]
                 dst = by_parent[parents[j]][0]
                 edges.append((src, dst, "SAME_TOPIC"))
@@ -153,12 +165,13 @@ def build_sentence_edges(sentences: SentDict, groups: GroupDict) -> EdgeList:
 
 # --- Main ---
 
+
 def main() -> None:
     rng = np.random.default_rng(42)
 
     print("=" * 60, file=sys.stderr)
     print("Experiment 31: Sentence-Level HRR (Real)", file=sys.stderr)
-    print(f"  DIM={DIM}, capacity ~{DIM//10} bindings", file=sys.stderr)
+    print(f"  DIM={DIM}, capacity ~{DIM // 10} bindings", file=sys.stderr)
     print("=" * 60, file=sys.stderr)
 
     db = sqlite3.connect(str(ALPHA_SEEK_DB))
@@ -174,7 +187,7 @@ def main() -> None:
 
     print(f"\n  Sentence nodes: {len(sentences)}", file=sys.stderr)
     print(f"  Sentence edges: {len(edges)}", file=sys.stderr)
-    print(f"  Edge types:", file=sys.stderr)
+    print("  Edge types:", file=sys.stderr)
     for et, count in sorted(edge_types.items(), key=lambda x: x[1], reverse=True):
         print(f"    {et}: {count}", file=sys.stderr)
 
@@ -229,8 +242,12 @@ def main() -> None:
     # --- Tests ---
 
     # Find a good test node: a sentence that CITES another decision
-    citing_sentences: list[tuple[str, str]] = [(src, dst) for src, dst, et in edges if et == "CITES"]
-    print(f"\n  CITES edges between sentences: {len(citing_sentences)}", file=sys.stderr)
+    citing_sentences: list[tuple[str, str]] = [
+        (src, dst) for src, dst, et in edges if et == "CITES"
+    ]
+    print(
+        f"\n  CITES edges between sentences: {len(citing_sentences)}", file=sys.stderr
+    )
 
     if not citing_sentences:
         print("  ERROR: No CITES edges found!", file=sys.stderr)
@@ -242,7 +259,9 @@ def main() -> None:
         if et == "CITES":
             cites_out[src].append(dst)
 
-    best_citers: list[tuple[str, list[str]]] = sorted(cites_out.items(), key=lambda x: len(x[1]), reverse=True)[:5]
+    best_citers: list[tuple[str, list[str]]] = sorted(
+        cites_out.items(), key=lambda x: len(x[1]), reverse=True
+    )[:5]
     test_sid: str = best_citers[0][0]
     test_targets: list[str] = best_citers[0][1]
 
@@ -257,14 +276,19 @@ def main() -> None:
     result: NDArr = unbind(query, S_union)
     matches: list[tuple[str, float]] = nearest_k(result, node_vecs, k=10)
 
-    print(f"  HRR top-10:", file=sys.stderr)
+    print("  HRR top-10:", file=sys.stderr)
     for label, sim in matches:
         marker = "***" if label in test_targets else "   "
         content = str(sentences[label]["content"])[:50] if label in sentences else "?"
         print(f"    {marker} {label} ({sim:.4f}): {content}", file=sys.stderr)
 
-    found: set[str] = set(m[0] for m in matches[:len(test_targets)]) & set(test_targets)
-    print(f"  Recall@{len(test_targets)}: {len(found)}/{len(test_targets)}", file=sys.stderr)
+    found: set[str] = set(m[0] for m in matches[: len(test_targets)]) & set(
+        test_targets
+    )
+    print(
+        f"  Recall@{len(test_targets)}: {len(found)}/{len(test_targets)}",
+        file=sys.stderr,
+    )
 
     # --- TEST 2: NEXT_IN_DECISION (sequential within decision) ---
     test_group: list[str] = list(groups.values())[10]  # pick a decision with sentences
@@ -274,26 +298,36 @@ def main() -> None:
 
         print(f"\n  TEST 2: NEXT_IN_DECISION from {test_src}", file=sys.stderr)
         print(f"  Source: {str(sentences[test_src]['content'])[:60]}", file=sys.stderr)
-        print(f"  Expected next: {str(sentences[expected_next]['content'])[:60]}", file=sys.stderr)
+        print(
+            f"  Expected next: {str(sentences[expected_next]['content'])[:60]}",
+            file=sys.stderr,
+        )
 
         query = bind(node_vecs[test_src], edge_type_vecs["NEXT_IN_DECISION"])
         result = unbind(query, S_union)
         matches = nearest_k(result, node_vecs, k=5)
 
-        print(f"  HRR top-5:", file=sys.stderr)
+        print("  HRR top-5:", file=sys.stderr)
         for label, sim in matches:
             marker = "***" if label == expected_next else "   "
-            content = str(sentences[label]["content"])[:50] if label in sentences else "?"
+            content = (
+                str(sentences[label]["content"])[:50] if label in sentences else "?"
+            )
             print(f"    {marker} {label} ({sim:.4f}): {content}", file=sys.stderr)
 
         if matches[0][0] == expected_next:
-            print(f"  CORRECT: top-1 is the expected next sentence", file=sys.stderr)
+            print("  CORRECT: top-1 is the expected next sentence", file=sys.stderr)
         else:
             rank = next((i for i, m in enumerate(matches) if m[0] == expected_next), -1)
-            print(f"  Expected next at rank {rank+1}" if rank >= 0 else "  NOT FOUND in top-5", file=sys.stderr)
+            print(
+                f"  Expected next at rank {rank + 1}"
+                if rank >= 0
+                else "  NOT FOUND in top-5",
+                file=sys.stderr,
+            )
 
     # --- TEST 3: Edge-type selectivity ---
-    print(f"\n  TEST 3: Edge selectivity (CITES vs NEXT_IN_DECISION)", file=sys.stderr)
+    print("\n  TEST 3: Edge selectivity (CITES vs NEXT_IN_DECISION)", file=sys.stderr)
     print(f"  Query {test_sid} with CITES type:", file=sys.stderr)
 
     query_cites: NDArr = bind(node_vecs[test_sid], edge_type_vecs["CITES"])
@@ -312,25 +346,45 @@ def main() -> None:
     if idx + 1 < len(group):
         actual_next_targets.add(group[idx + 1])
 
-    cites_in_cites_results: set[str] = set(m[0] for m in matches_cites) & actual_cites_targets
-    next_in_cites_results: set[str] = set(m[0] for m in matches_cites) & actual_next_targets
-    cites_in_next_results: set[str] = set(m[0] for m in matches_next) & actual_cites_targets
-    next_in_next_results: set[str] = set(m[0] for m in matches_next) & actual_next_targets
+    cites_in_cites_results: set[str] = (
+        set(m[0] for m in matches_cites) & actual_cites_targets
+    )
+    next_in_cites_results: set[str] = (
+        set(m[0] for m in matches_cites) & actual_next_targets
+    )
+    cites_in_next_results: set[str] = (
+        set(m[0] for m in matches_next) & actual_cites_targets
+    )
+    next_in_next_results: set[str] = (
+        set(m[0] for m in matches_next) & actual_next_targets
+    )
 
-    print(f"  CITES query -> correct CITES targets: {len(cites_in_cites_results)}", file=sys.stderr)
-    print(f"  CITES query -> NEXT bleed-in: {len(next_in_cites_results)}", file=sys.stderr)
-    print(f"  NEXT query -> correct NEXT targets: {len(next_in_next_results)}", file=sys.stderr)
-    print(f"  NEXT query -> CITES bleed-in: {len(cites_in_next_results)}", file=sys.stderr)
+    print(
+        f"  CITES query -> correct CITES targets: {len(cites_in_cites_results)}",
+        file=sys.stderr,
+    )
+    print(
+        f"  CITES query -> NEXT bleed-in: {len(next_in_cites_results)}", file=sys.stderr
+    )
+    print(
+        f"  NEXT query -> correct NEXT targets: {len(next_in_next_results)}",
+        file=sys.stderr,
+    )
+    print(
+        f"  NEXT query -> CITES bleed-in: {len(cites_in_next_results)}", file=sys.stderr
+    )
 
     # --- Summary ---
-    print(f"\n{'='*60}", file=sys.stderr)
-    print(f"SUMMARY", file=sys.stderr)
-    print(f"{'='*60}", file=sys.stderr)
-    print(f"  Sentence graph: {len(sentences)} nodes, {len(edges)} edges", file=sys.stderr)
+    print(f"\n{'=' * 60}", file=sys.stderr)
+    print("SUMMARY", file=sys.stderr)
+    print(f"{'=' * 60}", file=sys.stderr)
+    print(
+        f"  Sentence graph: {len(sentences)} nodes, {len(edges)} edges", file=sys.stderr
+    )
     print(f"  Partitioned into {len(subgraph_edges)} subgraphs", file=sys.stderr)
-    print(f"  DIM={DIM}, capacity ~{DIM//10} per subgraph", file=sys.stderr)
-    print(f"  Edge types encode correctly (selectivity test)", file=sys.stderr)
-    print(f"  This IS sentence-level HRR with real typed edges.", file=sys.stderr)
+    print(f"  DIM={DIM}, capacity ~{DIM // 10} per subgraph", file=sys.stderr)
+    print("  Edge types encode correctly (selectivity test)", file=sys.stderr)
+    print("  This IS sentence-level HRR with real typed edges.", file=sys.stderr)
 
 
 if __name__ == "__main__":

@@ -43,8 +43,8 @@ echo '{}' | bash ~/.claude/hooks/agentmemory-inject.sh
 ### Test: Project isolation
 ```bash
 # Run from two different project directories, verify different beliefs
-cd /Users/thelorax/projects/agentmemory && echo '{}' | bash ~/.claude/hooks/agentmemory-inject.sh > /tmp/proj1.json
-cd /Users/thelorax/projects/alpha-seek-memtest && echo '{}' | bash ~/.claude/hooks/agentmemory-inject.sh > /tmp/proj2.json
+cd /home/user/projects/agentmemory && echo '{}' | bash ~/.claude/hooks/agentmemory-inject.sh > /tmp/proj1.json
+cd /home/user/projects/project-a-test && echo '{}' | bash ~/.claude/hooks/agentmemory-inject.sh > /tmp/proj2.json
 # Beliefs should differ
 python3 -c "
 import json

@@ -3,7 +3,7 @@
 **Date:** 2026-04-10
 **Status:** Planning
 **Risk level:** EXISTENTIAL. If grep wins, the project needs to understand why before building more.
-**Depends on:** Exp 9/39 (ground truth topics), Exp 40 (hybrid pipeline), alpha-seek belief corpus
+**Depends on:** Exp 9/39 (ground truth topics), Exp 40 (hybrid pipeline), project-a belief corpus
 
 ---
 
@@ -11,7 +11,7 @@
 
 PLAN.md Phase 0 requires: "Implement filesystem baseline (Letta's grep approach)" and compare against our architecture. Letta reported 74% LoCoMo with filesystem+grep+gpt-4o-mini. We have never run this comparison.
 
-The question is NOT "do we beat 74% on LoCoMo?" (different benchmark, different conditions). The question is: **on our own real-world test cases (6 topics, 13 critical decisions from alpha-seek), does our retrieval architecture outperform grep?**
+The question is NOT "do we beat 74% on LoCoMo?" (different benchmark, different conditions). The question is: **on our own real-world test cases (6 topics, 13 critical decisions from project-a), does our retrieval architecture outperform grep?**
 
 If grep achieves 100% coverage on the same test set, our architecture adds complexity for zero retrieval gain. The value would then need to come from other dimensions (token efficiency, confidence, conflict detection) -- but retrieval is the foundation.
 
@@ -66,7 +66,7 @@ For each method, measure the total tokens returned in the top-K results. The bud
 Of the top-K results returned, what fraction are actually relevant to the topic? Methods that return noise alongside signal are worse even if coverage is high.
 
 ### 3d. Task Scenarios (new -- the real test)
-Design 5 task scenarios that an agent would encounter on the alpha-seek project. Each scenario requires specific prior decisions to produce a correct response. Measure: given each method's retrieval as context, does the agent produce the correct answer?
+Design 5 task scenarios that an agent would encounter on the project-a project. Each scenario requires specific prior decisions to produce a correct response. Measure: given each method's retrieval as context, does the agent produce the correct answer?
 
 **Proposed scenarios:**
 

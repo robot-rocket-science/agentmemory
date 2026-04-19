@@ -29,9 +29,9 @@ import numpy as np
 from scipy import stats as scipy_stats  # type: ignore[import-untyped]
 
 ALPHA_SEEK_DB = Path(
-    "/Users/thelorax/projects/.gsd/workflows/spikes/"
+    "/home/user/projects/.gsd/workflows/spikes/"
     "260406-1-associative-memory-for-gsd-please-explor/"
-    "sandbox/alpha-seek.db"
+    "sandbox/project-a.db"
 )
 
 CRITICAL_BELIEFS: dict[str, dict[str, list[str] | str]] = {
@@ -78,7 +78,7 @@ CRITICAL_BELIEFS: dict[str, dict[str, list[str] | str]] = {
     "gcp_primary": {
         "queries": [
             "GCP primary compute platform",
-            "archon overflow only",
+            "server-a overflow only",
             "cloud compute infrastructure",
         ],
         "needed": ["D078", "D120"],
@@ -86,19 +86,115 @@ CRITICAL_BELIEFS: dict[str, dict[str, list[str] | str]] = {
 }
 
 STOPWORDS: set[str] = {
-    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-    "have", "has", "had", "do", "does", "did", "will", "would", "shall",
-    "should", "may", "might", "can", "could", "must", "to", "of", "in",
-    "for", "on", "with", "at", "by", "from", "as", "into", "through",
-    "during", "before", "after", "above", "below", "between", "but",
-    "and", "or", "nor", "not", "no", "so", "if", "then", "than",
-    "too", "very", "just", "about", "up", "out", "off", "over",
-    "under", "again", "further", "once", "here", "there", "when",
-    "where", "why", "how", "all", "each", "every", "both", "few",
-    "more", "most", "other", "some", "such", "only", "own", "same",
-    "that", "this", "these", "those", "what", "which", "who", "whom",
-    "it", "its", "he", "she", "they", "them", "his", "her", "their",
-    "we", "us", "our", "you", "your", "i", "me", "my",
+    "the",
+    "a",
+    "an",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "being",
+    "have",
+    "has",
+    "had",
+    "do",
+    "does",
+    "did",
+    "will",
+    "would",
+    "shall",
+    "should",
+    "may",
+    "might",
+    "can",
+    "could",
+    "must",
+    "to",
+    "of",
+    "in",
+    "for",
+    "on",
+    "with",
+    "at",
+    "by",
+    "from",
+    "as",
+    "into",
+    "through",
+    "during",
+    "before",
+    "after",
+    "above",
+    "below",
+    "between",
+    "but",
+    "and",
+    "or",
+    "nor",
+    "not",
+    "no",
+    "so",
+    "if",
+    "then",
+    "than",
+    "too",
+    "very",
+    "just",
+    "about",
+    "up",
+    "out",
+    "off",
+    "over",
+    "under",
+    "again",
+    "further",
+    "once",
+    "here",
+    "there",
+    "when",
+    "where",
+    "why",
+    "how",
+    "all",
+    "each",
+    "every",
+    "both",
+    "few",
+    "more",
+    "most",
+    "other",
+    "some",
+    "such",
+    "only",
+    "own",
+    "same",
+    "that",
+    "this",
+    "these",
+    "those",
+    "what",
+    "which",
+    "who",
+    "whom",
+    "it",
+    "its",
+    "he",
+    "she",
+    "they",
+    "them",
+    "his",
+    "her",
+    "their",
+    "we",
+    "us",
+    "our",
+    "you",
+    "your",
+    "i",
+    "me",
+    "my",
 }
 
 
@@ -111,10 +207,10 @@ SentenceNode = dict[str, Any]
 
 def split_into_sentences(text: str) -> list[str]:
     """Split text into sentences. Simple rule-based splitter."""
-    parts: list[str] = re.split(r'(?<=[.!?])\s+(?=[A-Z])', text)
+    parts: list[str] = re.split(r"(?<=[.!?])\s+(?=[A-Z])", text)
     sentences: list[str] = []
     for part in parts:
-        subparts: list[str] = part.split(' | ')
+        subparts: list[str] = part.split(" | ")
         for sp in subparts:
             sp = sp.strip()
             if len(sp) > 10:
@@ -125,17 +221,21 @@ def split_into_sentences(text: str) -> list[str]:
 def classify_sentence(sentence: str) -> str:
     """Classify a sentence by its role in a decision."""
     s: str = sentence.lower()
-    if any(w in s for w in ['because', 'rationale', 'reason', 'driven by', 'root cause']):
-        return 'rationale'
-    if any(w in s for w in ['supersede', 'replace', 'retire', 'override']):
-        return 'supersession'
-    if any(w in s for w in ['must', 'always', 'never', 'mandatory', 'require', 'rule']):
-        return 'constraint'
-    if any(w in s for w in ['data', 'showed', 'result', 'found', 'measured', '%', 'x ']):
-        return 'evidence'
-    if any(w in s for w in ['script', 'implement', 'code', '.py', 'function']):
-        return 'implementation'
-    return 'context'
+    if any(
+        w in s for w in ["because", "rationale", "reason", "driven by", "root cause"]
+    ):
+        return "rationale"
+    if any(w in s for w in ["supersede", "replace", "retire", "override"]):
+        return "supersession"
+    if any(w in s for w in ["must", "always", "never", "mandatory", "require", "rule"]):
+        return "constraint"
+    if any(
+        w in s for w in ["data", "showed", "result", "found", "measured", "%", "x "]
+    ):
+        return "evidence"
+    if any(w in s for w in ["script", "implement", "code", ".py", "function"]):
+        return "implementation"
+    return "context"
 
 
 def count_tokens(text: str) -> int:
@@ -147,28 +247,46 @@ def count_tokens(text: str) -> int:
 # Simple Porter-like stemmer (matches FTS5 porter tokenizer)
 # ============================================================
 
+
 def stem(word: str) -> str:
     """Minimal suffix stripping to approximate FTS5 porter stemmer."""
     w: str = word.lower()
     if len(w) <= 3:
         return w
-    for suffix in ['ation', 'ment', 'ness', 'ing', 'tion', 'sion',
-                    'ies', 'ied', 'ous', 'ive', 'ful', 'able',
-                    'ly', 'ed', 'er', 'es', 's']:
+    for suffix in [
+        "ation",
+        "ment",
+        "ness",
+        "ing",
+        "tion",
+        "sion",
+        "ies",
+        "ied",
+        "ous",
+        "ive",
+        "ful",
+        "able",
+        "ly",
+        "ed",
+        "er",
+        "es",
+        "s",
+    ]:
         if w.endswith(suffix) and len(w) - len(suffix) >= 3:
-            return w[:-len(suffix)]
+            return w[: -len(suffix)]
     return w
 
 
 def tokenize(text: str) -> list[str]:
     """Tokenize and stem, removing stopwords."""
-    words: list[str] = re.findall(r'[a-zA-Z0-9_]+', text.lower())
+    words: list[str] = re.findall(r"[a-zA-Z0-9_]+", text.lower())
     return [stem(w) for w in words if w not in STOPWORDS and len(w) >= 2]
 
 
 # ============================================================
 # Term statistics and MI computation
 # ============================================================
+
 
 class CorpusStats:
     """Precomputed term statistics for MI scoring."""
@@ -265,6 +383,7 @@ class CorpusStats:
 # FTS5 search with score access
 # ============================================================
 
+
 def build_fts_index(nodes: list[SentenceNode]) -> sqlite3.Connection:
     """Build an in-memory FTS5 index from sentence nodes."""
     db: sqlite3.Connection = sqlite3.connect(":memory:")
@@ -304,18 +423,21 @@ def fts_search_ranked(
 
     results: list[dict[str, Any]] = []
     for i, row in enumerate(rows):
-        results.append({
-            "node_id": str(row[0]),
-            "parent_decision": str(row[1]),
-            "bm25_score": float(row[2]),  # FTS5 rank (lower = better)
-            "bm25_rank": i,
-        })
+        results.append(
+            {
+                "node_id": str(row[0]),
+                "parent_decision": str(row[1]),
+                "bm25_score": float(row[2]),  # FTS5 rank (lower = better)
+                "bm25_rank": i,
+            }
+        )
     return results
 
 
 # ============================================================
 # Ranking quality metrics
 # ============================================================
+
 
 def reciprocal_rank(
     ranked_decisions: list[str],
@@ -399,8 +521,9 @@ def deduplicate_by_decision(
 # Main experiment
 # ============================================================
 
+
 def main() -> None:
-    # Load decisions from alpha-seek DB
+    # Load decisions from project-a DB
     db: sqlite3.Connection = sqlite3.connect(str(ALPHA_SEEK_DB))
     decisions: list[tuple[str, ...]] = db.execute(
         "SELECT id, decision, choice, rationale FROM decisions ORDER BY seq"
@@ -441,9 +564,7 @@ def main() -> None:
     fts_db: sqlite3.Connection = build_fts_index(all_nodes)
 
     # Build node_id -> index mapping for MI lookup
-    id_to_idx: dict[str, int] = {
-        str(n["id"]): i for i, n in enumerate(all_nodes)
-    }
+    id_to_idx: dict[str, int] = {str(n["id"]): i for i, n in enumerate(all_nodes)}
 
     # Run comparison on all 18 queries
     print("\nRunning retrieval comparison...", file=sys.stderr)
@@ -464,17 +585,37 @@ def main() -> None:
             )
 
             if not fts_results:
-                per_query_results.append({
-                    "topic": topic,
-                    "query": query,
-                    "fts_hits": 0,
-                    "bm25": {"mrr": 0.0, "p5": 0.0, "p10": 0.0, "p15": 0.0,
-                             "r15": 0.0, "ndcg15": 0.0},
-                    "pmi": {"mrr": 0.0, "p5": 0.0, "p10": 0.0, "p15": 0.0,
-                            "r15": 0.0, "ndcg15": 0.0},
-                    "nmi": {"mrr": 0.0, "p5": 0.0, "p10": 0.0, "p15": 0.0,
-                            "r15": 0.0, "ndcg15": 0.0},
-                })
+                per_query_results.append(
+                    {
+                        "topic": topic,
+                        "query": query,
+                        "fts_hits": 0,
+                        "bm25": {
+                            "mrr": 0.0,
+                            "p5": 0.0,
+                            "p10": 0.0,
+                            "p15": 0.0,
+                            "r15": 0.0,
+                            "ndcg15": 0.0,
+                        },
+                        "pmi": {
+                            "mrr": 0.0,
+                            "p5": 0.0,
+                            "p10": 0.0,
+                            "p15": 0.0,
+                            "r15": 0.0,
+                            "ndcg15": 0.0,
+                        },
+                        "nmi": {
+                            "mrr": 0.0,
+                            "p5": 0.0,
+                            "p10": 0.0,
+                            "p15": 0.0,
+                            "r15": 0.0,
+                            "ndcg15": 0.0,
+                        },
+                    }
+                )
                 bm25_mrrs.append(0.0)
                 mi_mrrs.append(0.0)
                 nmi_mrrs.append(0.0)
@@ -543,18 +684,20 @@ def main() -> None:
             mi_mrrs.append(pmi_metrics["mrr"])
             nmi_mrrs.append(nmi_metrics["mrr"])
 
-            per_query_results.append({
-                "topic": topic,
-                "query": query,
-                "fts_hits": len(fts_results),
-                "unique_decisions": len(bm25_decisions),
-                "bm25": bm25_metrics,
-                "pmi": pmi_metrics,
-                "nmi": nmi_metrics,
-                "bm25_top5": bm25_decisions[:5],
-                "pmi_top5": pmi_decisions[:5],
-                "nmi_top5": nmi_decisions[:5],
-            })
+            per_query_results.append(
+                {
+                    "topic": topic,
+                    "query": query,
+                    "fts_hits": len(fts_results),
+                    "unique_decisions": len(bm25_decisions),
+                    "bm25": bm25_metrics,
+                    "pmi": pmi_metrics,
+                    "nmi": nmi_metrics,
+                    "bm25_top5": bm25_decisions[:5],
+                    "pmi_top5": pmi_decisions[:5],
+                    "nmi_top5": nmi_decisions[:5],
+                }
+            )
 
     # ============================================================
     # Statistical tests
@@ -571,19 +714,29 @@ def main() -> None:
     nmi_arr: np.ndarray = np.array(nmi_mrrs)
 
     print(f"\nN queries: {n_queries}", file=sys.stderr)
-    print(f"\nMean MRR:", file=sys.stderr)
-    print(f"  BM25: {np.mean(bm25_arr):.3f} (std {np.std(bm25_arr):.3f})", file=sys.stderr)
-    print(f"  PMI:  {np.mean(pmi_arr):.3f} (std {np.std(pmi_arr):.3f})", file=sys.stderr)
-    print(f"  NMI:  {np.mean(nmi_arr):.3f} (std {np.std(nmi_arr):.3f})", file=sys.stderr)
+    print("\nMean MRR:", file=sys.stderr)
+    print(
+        f"  BM25: {np.mean(bm25_arr):.3f} (std {np.std(bm25_arr):.3f})", file=sys.stderr
+    )
+    print(
+        f"  PMI:  {np.mean(pmi_arr):.3f} (std {np.std(pmi_arr):.3f})", file=sys.stderr
+    )
+    print(
+        f"  NMI:  {np.mean(nmi_arr):.3f} (std {np.std(nmi_arr):.3f})", file=sys.stderr
+    )
 
     # MRR improvement
     bm25_mean: float = float(np.mean(bm25_arr))
     pmi_mean: float = float(np.mean(pmi_arr))
     nmi_mean: float = float(np.mean(nmi_arr))
-    pmi_improvement: float = (pmi_mean - bm25_mean) / bm25_mean * 100 if bm25_mean > 0 else 0.0
-    nmi_improvement: float = (nmi_mean - bm25_mean) / bm25_mean * 100 if bm25_mean > 0 else 0.0
+    pmi_improvement: float = (
+        (pmi_mean - bm25_mean) / bm25_mean * 100 if bm25_mean > 0 else 0.0
+    )
+    nmi_improvement: float = (
+        (nmi_mean - bm25_mean) / bm25_mean * 100 if bm25_mean > 0 else 0.0
+    )
 
-    print(f"\nMRR improvement over BM25:", file=sys.stderr)
+    print("\nMRR improvement over BM25:", file=sys.stderr)
     print(f"  PMI: {pmi_improvement:+.1f}%", file=sys.stderr)
     print(f"  NMI: {nmi_improvement:+.1f}%", file=sys.stderr)
 
@@ -603,46 +756,70 @@ def main() -> None:
         w_pmi: float = float(pmi_wres.statistic)
         p_pmi: float = float(pmi_wres.pvalue)
         r_pmi: float = w_pmi / math.sqrt(len(nonzero_pmi))
-        pmi_stat_result.update({
-            "W": w_pmi, "p": p_pmi,
-            "r_effect": round(r_pmi, 3),
-            "n_nonzero_pairs": int(len(nonzero_pmi)),
-        })
-        print(f"\nWilcoxon BM25 vs PMI: W={w_pmi:.0f}, p={p_pmi:.4f}, "
-              f"r={r_pmi:.3f}, n={len(nonzero_pmi)}", file=sys.stderr)
+        pmi_stat_result.update(
+            {
+                "W": w_pmi,
+                "p": p_pmi,
+                "r_effect": round(r_pmi, 3),
+                "n_nonzero_pairs": int(len(nonzero_pmi)),
+            }
+        )
+        print(
+            f"\nWilcoxon BM25 vs PMI: W={w_pmi:.0f}, p={p_pmi:.4f}, "
+            f"r={r_pmi:.3f}, n={len(nonzero_pmi)}",
+            file=sys.stderr,
+        )
     else:
         pmi_stat_result["note"] = f"Too few nonzero differences ({len(nonzero_pmi)})"
-        print(f"\nWilcoxon BM25 vs PMI: insufficient data "
-              f"({len(nonzero_pmi)} nonzero diffs)", file=sys.stderr)
+        print(
+            f"\nWilcoxon BM25 vs PMI: insufficient data "
+            f"({len(nonzero_pmi)} nonzero diffs)",
+            file=sys.stderr,
+        )
 
     if len(nonzero_nmi) >= 5:
         nmi_wres: Any = scipy_stats.wilcoxon(nonzero_nmi)  # pyright: ignore[reportUnknownMemberType]
         w_nmi: float = float(nmi_wres.statistic)
         p_nmi: float = float(nmi_wres.pvalue)
         r_nmi: float = w_nmi / math.sqrt(len(nonzero_nmi))
-        nmi_stat_result.update({
-            "W": w_nmi, "p": p_nmi,
-            "r_effect": round(r_nmi, 3),
-            "n_nonzero_pairs": int(len(nonzero_nmi)),
-        })
-        print(f"Wilcoxon BM25 vs NMI: W={w_nmi:.0f}, p={p_nmi:.4f}, "
-              f"r={r_nmi:.3f}, n={len(nonzero_nmi)}", file=sys.stderr)
+        nmi_stat_result.update(
+            {
+                "W": w_nmi,
+                "p": p_nmi,
+                "r_effect": round(r_nmi, 3),
+                "n_nonzero_pairs": int(len(nonzero_nmi)),
+            }
+        )
+        print(
+            f"Wilcoxon BM25 vs NMI: W={w_nmi:.0f}, p={p_nmi:.4f}, "
+            f"r={r_nmi:.3f}, n={len(nonzero_nmi)}",
+            file=sys.stderr,
+        )
     else:
         nmi_stat_result["note"] = f"Too few nonzero differences ({len(nonzero_nmi)})"
-        print(f"Wilcoxon BM25 vs NMI: insufficient data "
-              f"({len(nonzero_nmi)} nonzero diffs)", file=sys.stderr)
+        print(
+            f"Wilcoxon BM25 vs NMI: insufficient data "
+            f"({len(nonzero_nmi)} nonzero diffs)",
+            file=sys.stderr,
+        )
 
     # Per-query detail table
-    print(f"\n{'Query':<40s} {'BM25':>6s} {'PMI':>6s} {'NMI':>6s} "
-          f"{'B-P5':>5s} {'P-P5':>5s} {'N-P5':>5s}", file=sys.stderr)
+    print(
+        f"\n{'Query':<40s} {'BM25':>6s} {'PMI':>6s} {'NMI':>6s} "
+        f"{'B-P5':>5s} {'P-P5':>5s} {'N-P5':>5s}",
+        file=sys.stderr,
+    )
     print("-" * 80, file=sys.stderr)
     for r in per_query_results:
         q_short: str = r["query"][:38]
-        print(f"  {q_short:<38s} "
-              f"{r['bm25']['mrr']:>6.3f} {r['pmi']['mrr']:>6.3f} "
-              f"{r['nmi']['mrr']:>6.3f} "
-              f"{r['bm25']['p5']:>5.2f} {r['pmi']['p5']:>5.2f} "
-              f"{r['nmi']['p5']:>5.2f}", file=sys.stderr)
+        print(
+            f"  {q_short:<38s} "
+            f"{r['bm25']['mrr']:>6.3f} {r['pmi']['mrr']:>6.3f} "
+            f"{r['nmi']['mrr']:>6.3f} "
+            f"{r['bm25']['p5']:>5.2f} {r['pmi']['p5']:>5.2f} "
+            f"{r['nmi']['p5']:>5.2f}",
+            file=sys.stderr,
+        )
 
     # Aggregate P@5, NDCG@15, R@15
     metrics_names: list[str] = ["p5", "p10", "p15", "r15", "ndcg15"]
@@ -662,21 +839,33 @@ def main() -> None:
         print(f"  {m:<10s} {bm:>8.3f} {pm:>8.3f} {nm:>8.3f}", file=sys.stderr)
 
     # Decision against criteria
-    print(f"\n--- Decision ---", file=sys.stderr)
+    print("\n--- Decision ---", file=sys.stderr)
     best_method: str = "pmi" if pmi_mean >= nmi_mean else "nmi"
     best_improvement: float = max(pmi_improvement, nmi_improvement)
     if best_improvement >= 10.0:
-        print(f"  ADOPT: {best_method.upper()} scoring as re-ranker "
-              f"({best_improvement:+.1f}% MRR improvement)", file=sys.stderr)
+        print(
+            f"  ADOPT: {best_method.upper()} scoring as re-ranker "
+            f"({best_improvement:+.1f}% MRR improvement)",
+            file=sys.stderr,
+        )
     elif best_improvement >= 5.0:
-        print(f"  MARGINAL: {best_method.upper()} shows {best_improvement:+.1f}% "
-              f"improvement. Test on other datasets for confirmation.", file=sys.stderr)
+        print(
+            f"  MARGINAL: {best_method.upper()} shows {best_improvement:+.1f}% "
+            f"improvement. Test on other datasets for confirmation.",
+            file=sys.stderr,
+        )
     elif best_improvement > -5.0:
-        print(f"  REJECT: MI scoring adds < 5% improvement "
-              f"({best_improvement:+.1f}%). BM25 sufficient.", file=sys.stderr)
+        print(
+            f"  REJECT: MI scoring adds < 5% improvement "
+            f"({best_improvement:+.1f}%). BM25 sufficient.",
+            file=sys.stderr,
+        )
     else:
-        print(f"  REJECT: MI scoring DECREASES ranking quality "
-              f"({best_improvement:+.1f}%).", file=sys.stderr)
+        print(
+            f"  REJECT: MI scoring DECREASES ranking quality "
+            f"({best_improvement:+.1f}%).",
+            file=sys.stderr,
+        )
 
     # ============================================================
     # Save results

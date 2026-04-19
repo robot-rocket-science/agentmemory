@@ -33,7 +33,7 @@
 | CS-019 | Multi-stage pipeline declared complete | End-to-end test verified to have run (not just per-stage tests). | CALLS/PASSES_DATA, BFS from entry point |
 | CS-020 | User says "Build #41." | File numbered 41, not 40. Collision with existing exp40 detected before write. | TB-04, L0 belief ("current task is #41"), collision detection |
 | CS-021 | Research task requested | Before "done," verify: hypotheses, protocol, results, analysis present. If missing, flag as design. | TB-14, research quality gate |
-| CS-022 | "Get current positions" for 4 paper trading agents | All 4 agents identified. Correct machine (local, not willow). All 4 states read in 1 turn. Aggregated table returned. | COMMIT_BELIEF, CONTAINS edges, CALLS edges, behavioral belief (machine location), HRR traversal |
+| CS-022 | "Get current positions" for 4 paper trading agents | All 4 agents identified. Correct machine (local, not server-b). All 4 states read in 1 turn. Aggregated table returned. | COMMIT_BELIEF, CONTAINS edges, CALLS edges, behavioral belief (machine location), HRR traversal |
 
 ---
 

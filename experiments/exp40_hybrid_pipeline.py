@@ -27,9 +27,11 @@ import numpy as np
 # Config
 # ============================================================
 
-ALPHA_SEEK_DB = Path("/Users/thelorax/projects/.gsd/workflows/spikes/"
-                     "260406-1-associative-memory-for-gsd-please-explor/"
-                     "sandbox/alpha-seek.db")
+ALPHA_SEEK_DB = Path(
+    "/home/user/projects/.gsd/workflows/spikes/"
+    "260406-1-associative-memory-for-gsd-please-explor/"
+    "sandbox/project-a.db"
+)
 
 DIM = 2048
 HRR_THRESHOLD = 0.08  # Exp 34: worst behavior node 0.149, best distractor 0.013
@@ -71,11 +73,14 @@ BEHAVIORAL_BELIEFS = ["D157", "D188", "D100", "D073"]
 # Data loading
 # ============================================================
 
+
 def load_nodes() -> dict[str, str]:
-    """Load all active belief nodes from alpha-seek DB."""
+    """Load all active belief nodes from project-a DB."""
     db = sqlite3.connect(str(ALPHA_SEEK_DB))
     nodes: dict[str, str] = {}
-    for row in db.execute("SELECT id, content FROM mem_nodes WHERE superseded_by IS NULL"):
+    for row in db.execute(
+        "SELECT id, content FROM mem_nodes WHERE superseded_by IS NULL"
+    ):
         nodes[str(row[0])] = str(row[1])
     db.close()
     return nodes
@@ -84,6 +89,7 @@ def load_nodes() -> dict[str, str]:
 # ============================================================
 # FTS5
 # ============================================================
+
 
 def build_fts(nodes: dict[str, str]) -> sqlite3.Connection:
     db = sqlite3.connect(":memory:")
@@ -94,7 +100,9 @@ def build_fts(nodes: dict[str, str]) -> sqlite3.Connection:
     return db
 
 
-def search_fts(query: str, fts_db: sqlite3.Connection, top_k: int = 30) -> list[tuple[str, float]]:
+def search_fts(
+    query: str, fts_db: sqlite3.Connection, top_k: int = 30
+) -> list[tuple[str, float]]:
     """FTS5 search returning (node_id, bm25_score) pairs."""
     terms = [t.strip() for t in query.split() if len(t.strip()) > 2]
     if not terms:
@@ -103,7 +111,7 @@ def search_fts(query: str, fts_db: sqlite3.Connection, top_k: int = 30) -> list[
     try:
         results = fts_db.execute(
             "SELECT id, rank FROM fts WHERE fts MATCH ? ORDER BY rank LIMIT ?",
-            (fts_query, top_k)
+            (fts_query, top_k),
         ).fetchall()
         return [(str(r[0]), float(r[1])) for r in results]
     except Exception:
@@ -113,6 +121,7 @@ def search_fts(query: str, fts_db: sqlite3.Connection, top_k: int = 30) -> list[
 # ============================================================
 # Graph construction
 # ============================================================
+
 
 def extract_cites_edges(nodes: dict[str, str]) -> list[tuple[str, str]]:
     """Extract CITES edges from D### references in belief content."""
@@ -139,7 +148,9 @@ def extract_cites_edges(nodes: dict[str, str]) -> list[tuple[str, str]]:
     return edges
 
 
-def build_agent_constraint_edges(nodes: dict[str, str], behavioral_ids: list[str]) -> list[tuple[str, str]]:
+def build_agent_constraint_edges(
+    nodes: dict[str, str], behavioral_ids: list[str]
+) -> list[tuple[str, str]]:
     """Connect all behavioral beliefs to each other via AGENT_CONSTRAINT.
 
     Every pair of behavioral belief nodes gets an edge. This means querying
@@ -156,14 +167,16 @@ def build_agent_constraint_edges(nodes: dict[str, str], behavioral_ids: list[str
     # Fully connect behavioral nodes
     edges: list[tuple[str, str]] = []
     for i, a in enumerate(behavioral_nodes):
-        for b in behavioral_nodes[i+1:]:
+        for b in behavioral_nodes[i + 1 :]:
             edges.append((a, b))
             edges.append((b, a))  # Bidirectional
 
     return edges
 
 
-def scan_for_additional_behavioral(nodes: dict[str, str], known: list[str]) -> list[str]:
+def scan_for_additional_behavioral(
+    nodes: dict[str, str], known: list[str]
+) -> list[str]:
     """Scan for additional behavioral beliefs using directive patterns.
 
     Returns decision IDs not already in the known list.
@@ -198,6 +211,7 @@ def scan_for_additional_behavioral(nodes: dict[str, str], known: list[str]) -> l
 # ============================================================
 # HRR encoding
 # ============================================================
+
 
 def make_vector(dim: int) -> np.ndarray:
     """Random unit vector in R^dim."""
@@ -243,7 +257,9 @@ class HRRGraph:
         if etype not in self.edge_type_vecs:
             self.edge_type_vecs[etype] = make_vector(self.dim)
 
-    def encode_partition(self, partition_id: str, edges: list[tuple[str, str, str]]) -> None:
+    def encode_partition(
+        self, partition_id: str, edges: list[tuple[str, str, str]]
+    ) -> None:
         """Encode a set of (source, target, edge_type) edges into a superposition."""
         superpos = np.zeros(self.dim)
         for src, tgt, etype in edges:
@@ -257,8 +273,9 @@ class HRRGraph:
 
         self.partitions[partition_id] = superpos
 
-    def query_neighbors(self, node_id: str, edge_type: str,
-                        threshold: float = HRR_THRESHOLD) -> list[tuple[str, float]]:
+    def query_neighbors(
+        self, node_id: str, edge_type: str, threshold: float = HRR_THRESHOLD
+    ) -> list[tuple[str, float]]:
         """Find neighbors of node_id via edge_type in its partition."""
         if node_id not in self.node_to_partition:
             return []
@@ -290,6 +307,7 @@ class HRRGraph:
 # Hybrid pipeline
 # ============================================================
 
+
 def run_hybrid_pipeline(
     query: str,
     fts_db: sqlite3.Connection,
@@ -303,7 +321,9 @@ def run_hybrid_pipeline(
     fts_ids = {nid for nid, _ in fts_results}
 
     # Step 2: HRR walk from each FTS5 hit
-    hrr_results: dict[str, list[tuple[str, float, str]]] = {}  # seed -> [(neighbor, sim, edge_type)]
+    hrr_results: dict[
+        str, list[tuple[str, float, str]]
+    ] = {}  # seed -> [(neighbor, sim, edge_type)]
 
     for seed_id, _bm25 in fts_results:
         for etype in edge_types:
@@ -335,6 +355,7 @@ def run_hybrid_pipeline(
 # Evaluation
 # ============================================================
 
+
 def extract_decision_id(node_id: str) -> str | None:
     m = re.match(r"(D\d{3})", node_id)
     return m.group(1) if m else None
@@ -348,15 +369,21 @@ def evaluate_topic(
     needed: set[str] = set(topic_data["needed"])
 
     # Decisions found by FTS5 only
-    fts_decisions: set[str | None] = {extract_decision_id(str(nid)) for nid in pipeline_result["fts_ids"]}
+    fts_decisions: set[str | None] = {
+        extract_decision_id(str(nid)) for nid in pipeline_result["fts_ids"]
+    }
     fts_found: set[str] = needed & (fts_decisions - {None})  # type: ignore[arg-type]
 
     # Decisions found by combined pipeline
-    all_decisions: set[str | None] = {extract_decision_id(str(nid)) for nid in pipeline_result["all_ids"]}
+    all_decisions: set[str | None] = {
+        extract_decision_id(str(nid)) for nid in pipeline_result["all_ids"]
+    }
     combined_found: set[str] = needed & (all_decisions - {None})  # type: ignore[arg-type]
 
     # Decisions found ONLY via HRR (not by FTS5)
-    hrr_only_decisions: set[str | None] = {extract_decision_id(str(nid)) for nid in pipeline_result["hrr_only_ids"]}
+    hrr_only_decisions: set[str | None] = {
+        extract_decision_id(str(nid)) for nid in pipeline_result["hrr_only_ids"]
+    }
     hrr_rescued: set[str] = needed & (hrr_only_decisions - {None})  # type: ignore[arg-type]
 
     return {
@@ -378,6 +405,7 @@ def evaluate_topic(
 # ============================================================
 # Main
 # ============================================================
+
 
 def main() -> None:
     print("=" * 70, file=sys.stderr)
@@ -413,9 +441,14 @@ def main() -> None:
     print(f"    CITES edges: {len(cites_edges)}", file=sys.stderr)
 
     agent_constraint_edges = build_agent_constraint_edges(nodes, all_behavioral)
-    behavioral_node_ids = [nid for nid in nodes if any(nid.startswith(bid) for bid in all_behavioral)]
-    print(f"    AGENT_CONSTRAINT edges: {len(agent_constraint_edges)} "
-          f"(connecting {len(behavioral_node_ids)} behavioral nodes)", file=sys.stderr)
+    behavioral_node_ids = [
+        nid for nid in nodes if any(nid.startswith(bid) for bid in all_behavioral)
+    ]
+    print(
+        f"    AGENT_CONSTRAINT edges: {len(agent_constraint_edges)} "
+        f"(connecting {len(behavioral_node_ids)} behavioral nodes)",
+        file=sys.stderr,
+    )
 
     # Build HRR graph
     print("\n[5] Encoding HRR graph...", file=sys.stderr)
@@ -424,7 +457,9 @@ def main() -> None:
 
     # Partition strategy: put ALL behavioral beliefs in one partition ("behavioral")
     # Put CITES edges in subgraph-based partitions (group by source decision neighborhood)
-    behavioral_edge_triples = [(s, t, "AGENT_CONSTRAINT") for s, t in agent_constraint_edges]
+    behavioral_edge_triples = [
+        (s, t, "AGENT_CONSTRAINT") for s, t in agent_constraint_edges
+    ]
 
     # Also add CITES edges that touch behavioral nodes into the behavioral partition
     behavioral_cites: list[tuple[str, str, str]] = []
@@ -442,11 +477,17 @@ def main() -> None:
 
     # Encode behavioral partition (AGENT_CONSTRAINT + any CITES touching behavioral nodes)
     behavioral_all_edges = behavioral_edge_triples + behavioral_cites
-    print(f"    Behavioral partition: {len(behavioral_all_edges)} edges "
-          f"({len(behavioral_edge_triples)} AGENT_CONSTRAINT + {len(behavioral_cites)} CITES)", file=sys.stderr)
+    print(
+        f"    Behavioral partition: {len(behavioral_all_edges)} edges "
+        f"({len(behavioral_edge_triples)} AGENT_CONSTRAINT + {len(behavioral_cites)} CITES)",
+        file=sys.stderr,
+    )
 
     if len(behavioral_all_edges) > 200:
-        print(f"    WARNING: {len(behavioral_all_edges)} edges exceeds DIM=2048 comfortable capacity (~200)", file=sys.stderr)
+        print(
+            f"    WARNING: {len(behavioral_all_edges)} edges exceeds DIM=2048 comfortable capacity (~200)",
+            file=sys.stderr,
+        )
 
     hrr.encode_partition("behavioral", behavioral_all_edges)
 
@@ -464,7 +505,10 @@ def main() -> None:
         chunk_id += 1
 
     total_partitions = 1 + chunk_id  # behavioral + cites chunks
-    print(f"    Total partitions: {total_partitions} (1 behavioral + {chunk_id} CITES chunks)", file=sys.stderr)
+    print(
+        f"    Total partitions: {total_partitions} (1 behavioral + {chunk_id} CITES chunks)",
+        file=sys.stderr,
+    )
 
     # Verify: are D157 and D188 in the same partition?
     d157_nodes = [nid for nid in hrr.node_to_partition if nid.startswith("D157")]
@@ -472,12 +516,21 @@ def main() -> None:
     print(f"\n    D157 nodes in graph: {d157_nodes}", file=sys.stderr)
     print(f"    D188 nodes in graph: {d188_nodes}", file=sys.stderr)
     for nid in d157_nodes:
-        print(f"    D157 partition: {hrr.node_to_partition.get(nid, 'NOT FOUND')}", file=sys.stderr)
+        print(
+            f"    D157 partition: {hrr.node_to_partition.get(nid, 'NOT FOUND')}",
+            file=sys.stderr,
+        )
     for nid in d188_nodes:
-        print(f"    D188 partition: {hrr.node_to_partition.get(nid, 'NOT FOUND')}", file=sys.stderr)
+        print(
+            f"    D188 partition: {hrr.node_to_partition.get(nid, 'NOT FOUND')}",
+            file=sys.stderr,
+        )
 
     # Sanity check: HRR single-hop from D188 via AGENT_CONSTRAINT
-    print("\n[6] Sanity check: HRR walk from D188 via AGENT_CONSTRAINT...", file=sys.stderr)
+    print(
+        "\n[6] Sanity check: HRR walk from D188 via AGENT_CONSTRAINT...",
+        file=sys.stderr,
+    )
     for d188_nid in d188_nodes:
         neighbors = hrr.query_neighbors(d188_nid, "AGENT_CONSTRAINT", threshold=0.0)
         print(f"    From {d188_nid}:", file=sys.stderr)
@@ -485,7 +538,9 @@ def main() -> None:
             is_behavioral = any(nid.startswith(bid) for bid in all_behavioral)
             marker = " <-- BEHAVIORAL" if is_behavioral else ""
             d157_marker = " *** D157 FOUND ***" if nid.startswith("D157") else ""
-            print(f"      {nid:>12} sim={sim:.4f}{marker}{d157_marker}", file=sys.stderr)
+            print(
+                f"      {nid:>12} sim={sim:.4f}{marker}{d157_marker}", file=sys.stderr
+            )
 
     # Run the hybrid pipeline on all 6 topics
     print("\n[7] Running hybrid pipeline on all topics...", file=sys.stderr)
@@ -508,56 +563,107 @@ def main() -> None:
         total_combined_found += len(eval_result["combined_found"])
 
         # Print per-topic results
-        fts_status = "OK" if not eval_result["fts_missed"] else f"MISSED: {eval_result['fts_missed']}"
-        combined_status = "OK" if not eval_result["combined_missed"] else f"MISSED: {eval_result['combined_missed']}"
-        rescued = f" [HRR rescued: {eval_result['hrr_rescued']}]" if eval_result["hrr_rescued"] else ""
+        fts_status = (
+            "OK"
+            if not eval_result["fts_missed"]
+            else f"MISSED: {eval_result['fts_missed']}"
+        )
+        combined_status = (
+            "OK"
+            if not eval_result["combined_missed"]
+            else f"MISSED: {eval_result['combined_missed']}"
+        )
+        rescued = (
+            f" [HRR rescued: {eval_result['hrr_rescued']}]"
+            if eval_result["hrr_rescued"]
+            else ""
+        )
 
         print(f"\n    {topic_name}:", file=sys.stderr)
-        print(f"      FTS5:     {eval_result['fts_coverage']:.0%} ({eval_result['fts_result_count']} results)  {fts_status}", file=sys.stderr)
-        print(f"      Combined: {eval_result['combined_coverage']:.0%} ({eval_result['combined_result_count']} results)  {combined_status}{rescued}", file=sys.stderr)
+        print(
+            f"      FTS5:     {eval_result['fts_coverage']:.0%} ({eval_result['fts_result_count']} results)  {fts_status}",
+            file=sys.stderr,
+        )
+        print(
+            f"      Combined: {eval_result['combined_coverage']:.0%} ({eval_result['combined_result_count']} results)  {combined_status}{rescued}",
+            file=sys.stderr,
+        )
 
         # For agent_behavior, show detailed diagnostics
         if topic_name == "agent_behavior":
-            print(f"\n      --- DETAILED DIAGNOSTICS (agent_behavior) ---", file=sys.stderr)
-            print(f"      FTS5 hits containing D157: {[nid for nid in pipeline_result['fts_ids'] if 'D157' in nid]}", file=sys.stderr)
-            print(f"      FTS5 hits containing D188: {[nid for nid in pipeline_result['fts_ids'] if 'D188' in nid]}", file=sys.stderr)
-            print(f"      HRR-only hits containing D157: {[nid for nid in pipeline_result['hrr_only_ids'] if 'D157' in nid]}", file=sys.stderr)
+            print(
+                "\n      --- DETAILED DIAGNOSTICS (agent_behavior) ---", file=sys.stderr
+            )
+            print(
+                f"      FTS5 hits containing D157: {[nid for nid in pipeline_result['fts_ids'] if 'D157' in nid]}",
+                file=sys.stderr,
+            )
+            print(
+                f"      FTS5 hits containing D188: {[nid for nid in pipeline_result['fts_ids'] if 'D188' in nid]}",
+                file=sys.stderr,
+            )
+            print(
+                f"      HRR-only hits containing D157: {[nid for nid in pipeline_result['hrr_only_ids'] if 'D157' in nid]}",
+                file=sys.stderr,
+            )
 
             if pipeline_result["hrr_neighbors"]:
-                print(f"      HRR neighbor details:", file=sys.stderr)
+                print("      HRR neighbor details:", file=sys.stderr)
                 for nid, sources in pipeline_result["hrr_neighbors"].items():
                     if any("D157" in nid or "D188" in nid for _ in [0]):
                         pass
                     # Show all HRR-discovered neighbors
                     for seed, sim, etype in sources:
-                        print(f"        {nid} <- {seed} via {etype} (sim={sim:.4f})", file=sys.stderr)
+                        print(
+                            f"        {nid} <- {seed} via {etype} (sim={sim:.4f})",
+                            file=sys.stderr,
+                        )
 
     # Summary
-    print(f"\n{'='*70}", file=sys.stderr)
+    print(f"\n{'=' * 70}", file=sys.stderr)
     print("SUMMARY", file=sys.stderr)
-    print(f"{'='*70}", file=sys.stderr)
-    print(f"\n{'Topic':<20} {'FTS5':>8} {'Combined':>10} {'HRR Rescued':>15} {'Precision':>12}", file=sys.stderr)
+    print(f"{'=' * 70}", file=sys.stderr)
+    print(
+        f"\n{'Topic':<20} {'FTS5':>8} {'Combined':>10} {'HRR Rescued':>15} {'Precision':>12}",
+        file=sys.stderr,
+    )
     print("-" * 67, file=sys.stderr)
     for topic_name, r in all_results.items():
         rescued_str = ", ".join(r["hrr_rescued"]) if r["hrr_rescued"] else "--"
         precision = f"{r['fts_result_count']}->{r['combined_result_count']}"
-        print(f"{topic_name:<20} {r['fts_coverage']:>8.0%} {r['combined_coverage']:>10.0%} "
-              f"{rescued_str:>15} {precision:>12}", file=sys.stderr)
+        print(
+            f"{topic_name:<20} {r['fts_coverage']:>8.0%} {r['combined_coverage']:>10.0%} "
+            f"{rescued_str:>15} {precision:>12}",
+            file=sys.stderr,
+        )
 
     fts_overall = round(total_fts_found / total_needed, 3)
     combined_overall = round(total_combined_found / total_needed, 3)
-    print(f"\n{'OVERALL':<20} {fts_overall:>8.0%} {combined_overall:>10.0%}", file=sys.stderr)
-    print(f"\nExp 9 hand-crafted:                 100%", file=sys.stderr)
+    print(
+        f"\n{'OVERALL':<20} {fts_overall:>8.0%} {combined_overall:>10.0%}",
+        file=sys.stderr,
+    )
+    print("\nExp 9 hand-crafted:                 100%", file=sys.stderr)
 
     # THE QUESTION
-    d157_found = any("D157" in d for r in all_results.values() for d in r["combined_found"])
-    print(f"\n*** D157 found by combined pipeline: {'YES' if d157_found else 'NO'} ***", file=sys.stderr)
+    d157_found = any(
+        "D157" in d for r in all_results.values() for d in r["combined_found"]
+    )
+    print(
+        f"\n*** D157 found by combined pipeline: {'YES' if d157_found else 'NO'} ***",
+        file=sys.stderr,
+    )
 
     # H2: precision check
-    max_inflation = max(r["combined_result_count"] / max(1, r["fts_result_count"])
-                        for r in all_results.values())
-    print(f"*** Max result inflation (combined/fts): {max_inflation:.1f}x "
-          f"(threshold: < 3x) ***", file=sys.stderr)
+    max_inflation = max(
+        r["combined_result_count"] / max(1, r["fts_result_count"])
+        for r in all_results.values()
+    )
+    print(
+        f"*** Max result inflation (combined/fts): {max_inflation:.1f}x "
+        f"(threshold: < 3x) ***",
+        file=sys.stderr,
+    )
 
     # Save results
     out = Path("experiments/exp40_results.json")

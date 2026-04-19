@@ -4,21 +4,37 @@
 Validates entity-aware query expansion, correction-priority scoring,
 supersession-chain following, and action-context detection.
 """
+
 from __future__ import annotations
 
+import random
 from pathlib import Path
+
+import pytest
 
 from agentmemory.hook_search import (
     ScoredBelief,
     SearchResult,
+    _process_pending_feedback,
     detect_action_targets,
     extract_entity_candidates,
     extract_query_words,
     format_ba_injection,
     search_for_prompt,
 )
-from agentmemory.models import BELIEF_FACTUAL, BSRC_AGENT_INFERRED, BSRC_USER_CORRECTED, Belief
+from agentmemory.models import (
+    BELIEF_FACTUAL,
+    BSRC_AGENT_INFERRED,
+    BSRC_USER_CORRECTED,
+    Belief,
+)
 from agentmemory.store import MemoryStore
+
+
+@pytest.fixture(autouse=True)
+def _seed_random() -> None:  # pyright: ignore[reportUnusedFunction]
+    """Seed random for deterministic Thompson sampling in tests."""
+    random.seed(42)
 
 
 def _make_store(tmp_path: Path) -> MemoryStore:
@@ -59,6 +75,7 @@ def _make_store(tmp_path: Path) -> MemoryStore:
 
 # --- Query construction tests ---
 
+
 def test_extract_query_words() -> None:
     """Words > 2 chars are extracted, limited to 15."""
     words: list[str] = extract_query_words("push to robotrocketscience repo")
@@ -94,10 +111,12 @@ def test_detect_action_targets() -> None:
 
 # --- Scoring and search tests ---
 
+
 def test_correction_surfaces_for_entity_query(tmp_path: Path) -> None:
     """When searching for 'robotrocketscience', the correction about it being locked must surface."""
     store: MemoryStore = _make_store(tmp_path)
     import sqlite3
+
     db: sqlite3.Connection = sqlite3.connect(str(tmp_path / "hook.db"))
     db.row_factory = sqlite3.Row
 
@@ -105,7 +124,9 @@ def test_correction_surfaces_for_entity_query(tmp_path: Path) -> None:
 
     # The correction about robotrocketscience being locked must be in results
     contents: list[str] = [b.content for b in result.beliefs]
-    found_correction: bool = any("locked" in c and "robotrocketscience" in c for c in contents)
+    found_correction: bool = any(
+        "locked" in c and "robotrocketscience" in c for c in contents
+    )
     assert found_correction, f"Correction not found in results: {contents}"
 
     db.close()
@@ -116,6 +137,7 @@ def test_correction_ranks_above_old_fact(tmp_path: Path) -> None:
     """The correction about repo access must rank above the old factual belief."""
     store: MemoryStore = _make_store(tmp_path)
     import sqlite3
+
     db: sqlite3.Connection = sqlite3.connect(str(tmp_path / "hook.db"))
     db.row_factory = sqlite3.Row
 
@@ -143,6 +165,7 @@ def test_action_target_search(tmp_path: Path) -> None:
     """'deploy to production' should trigger action-context search for 'production'."""
     store: MemoryStore = _make_store(tmp_path)
     import sqlite3
+
     db: sqlite3.Connection = sqlite3.connect(str(tmp_path / "hook.db"))
     db.row_factory = sqlite3.Row
 
@@ -159,6 +182,7 @@ def test_unrelated_beliefs_filtered(tmp_path: Path) -> None:
     """Beliefs about FTS5 internals should not surface for repo access queries."""
     store: MemoryStore = _make_store(tmp_path)
     import sqlite3
+
     db: sqlite3.Connection = sqlite3.connect(str(tmp_path / "hook.db"))
     db.row_factory = sqlite3.Row
 
@@ -167,7 +191,9 @@ def test_unrelated_beliefs_filtered(tmp_path: Path) -> None:
     # FTS5 belief should either not appear or rank below the correction
     if result.beliefs:
         top_content: str = result.beliefs[0].content
-        assert "BM25" not in top_content, "FTS5 internals belief should not be top result"
+        assert "BM25" not in top_content, (
+            "FTS5 internals belief should not be top result"
+        )
 
     db.close()
     store.close()
@@ -177,6 +203,7 @@ def test_empty_prompt_returns_empty() -> None:
     """Empty or short prompts return no results."""
     import sqlite3
     import tempfile
+
     with tempfile.TemporaryDirectory() as td:
         db_path: Path = Path(td) / "empty.db"
         store: MemoryStore = MemoryStore(db_path)
@@ -216,6 +243,7 @@ def test_supersession_following(tmp_path: Path) -> None:
     store.supersede_belief(old.id, new.id, "user correction")
 
     import sqlite3
+
     db: sqlite3.Connection = sqlite3.connect(str(db_path))
     db.row_factory = sqlite3.Row
 
@@ -249,6 +277,7 @@ def test_recent_observations_surface(tmp_path: Path) -> None:
     )
 
     import sqlite3
+
     db: sqlite3.Connection = sqlite3.connect(str(db_path))
     db.row_factory = sqlite3.Row
 
@@ -260,7 +289,9 @@ def test_recent_observations_surface(tmp_path: Path) -> None:
     assert found_obs, f"Recent observation not found in results: {contents}"
 
     # Verify it's tagged as an observation
-    obs_results: list[ScoredBelief] = [b for b in result.beliefs if b.via == "recent_observation"]
+    obs_results: list[ScoredBelief] = [
+        b for b in result.beliefs if b.via == "recent_observation"
+    ]
     assert len(obs_results) > 0, "Should be tagged as recent_observation"
 
     db.close()
@@ -273,27 +304,51 @@ def test_ba_format_three_zones() -> None:
         beliefs=[
             # Recent correction -> OPERATIONAL STATE
             ScoredBelief(
-                id="c1", content="robotrocketscience is locked, use yoshi280",
-                belief_type="correction", source_type="user_corrected",
-                locked=False, confidence=0.9, score=5.0, age_days=0.5, via="entity",
+                id="c1",
+                content="robotrocketscience is locked, use yoshi280",
+                belief_type="correction",
+                source_type="user_corrected",
+                locked=False,
+                confidence=0.9,
+                score=5.0,
+                age_days=0.5,
+                via="entity",
             ),
             # Locked belief -> STANDING CONSTRAINTS
             ScoredBelief(
-                id="l1", content="always use uv for Python",
-                belief_type="preference", source_type="user_stated",
-                locked=True, confidence=0.95, score=3.0, age_days=30.0, via="fts5",
+                id="l1",
+                content="always use uv for Python",
+                belief_type="preference",
+                source_type="user_stated",
+                locked=True,
+                confidence=0.95,
+                score=3.0,
+                age_days=30.0,
+                via="fts5",
             ),
             # Speculative belief -> ACTIVE HYPOTHESES
             ScoredBelief(
-                id="s1", content="should we add embedding retrieval?",
-                belief_type="speculative", source_type="agent_inferred",
-                locked=False, confidence=0.5, score=1.5, age_days=0.1, via="fts5",
+                id="s1",
+                content="should we add embedding retrieval?",
+                belief_type="speculative",
+                source_type="agent_inferred",
+                locked=False,
+                confidence=0.5,
+                score=1.5,
+                age_days=0.1,
+                via="fts5",
             ),
             # Regular fact -> BACKGROUND
             ScoredBelief(
-                id="b1", content="agentmemory uses SQLite with FTS5",
-                belief_type="factual", source_type="agent_inferred",
-                locked=False, confidence=0.7, score=1.0, age_days=10.0, via="fts5",
+                id="b1",
+                content="agentmemory uses SQLite with FTS5",
+                belief_type="factual",
+                source_type="agent_inferred",
+                locked=False,
+                confidence=0.7,
+                score=1.0,
+                age_days=10.0,
+                via="fts5",
             ),
         ],
         source_docs=["ARCHITECTURE.md"],
@@ -312,7 +367,9 @@ def test_ba_format_three_zones() -> None:
 
     # Locked belief as bare imperative (no score, no percentage)
     assert "- always use uv for Python" in output
-    assert "%" not in output.split("STANDING CONSTRAINTS")[1].split("ACTIVE HYPOTHESES")[0]
+    assert (
+        "%" not in output.split("STANDING CONSTRAINTS")[1].split("ACTIVE HYPOTHESES")[0]
+    )
 
     # Speculative belief with [?] prefix
     assert "[?] should we add embedding retrieval?" in output
@@ -336,9 +393,15 @@ def test_ba_format_no_state_changes() -> None:
     result: SearchResult = SearchResult(
         beliefs=[
             ScoredBelief(
-                id="l1", content="never use em dashes",
-                belief_type="preference", source_type="user_stated",
-                locked=True, confidence=0.95, score=3.0, age_days=30.0, via="fts5",
+                id="l1",
+                content="never use em dashes",
+                belief_type="preference",
+                source_type="user_stated",
+                locked=True,
+                confidence=0.95,
+                score=3.0,
+                age_days=30.0,
+                via="fts5",
             ),
         ],
     )
@@ -353,22 +416,39 @@ def test_ba_format_no_state_changes() -> None:
 # Hook feedback loop tests (agentmemory#177cbfc)
 # ---------------------------------------------------------------------------
 
-from agentmemory.hook_search import _process_pending_feedback
+
+def _make_feedback_store(tmp_path: Path) -> MemoryStore:
+    """Create a store for feedback tests -- no competing corrections."""
+    db: Path = tmp_path / "feedback.db"
+    store: MemoryStore = MemoryStore(db)
+    store.insert_belief(
+        content="yoshi280 is the private GitHub repo for deploying builds to Cloudflare",
+        belief_type=BELIEF_FACTUAL,
+        source_type=BSRC_AGENT_INFERRED,
+    )
+    store.insert_belief(
+        content="always use uv for Python package management",
+        belief_type="preference",
+        source_type="user_stated",
+    )
+    return store
 
 
 def test_hook_feedback_loop_records_pending(tmp_path: Path) -> None:
     """search_for_prompt() records pending feedback for returned beliefs."""
     store: MemoryStore = _make_store(tmp_path)
     import sqlite3
+
     db: sqlite3.Connection = sqlite3.connect(str(tmp_path / "hook.db"))
     db.row_factory = sqlite3.Row
 
-    result: SearchResult = search_for_prompt(db, "deploy to cloudflare")
+    # Use a query with strong term overlap to ensure beliefs survive relevance floor
+    result: SearchResult = search_for_prompt(
+        db, "yoshi280 deploying builds to cloudflare"
+    )
 
     # Pending feedback should be recorded
-    pending: list[sqlite3.Row] = db.execute(
-        "SELECT * FROM pending_feedback"
-    ).fetchall()
+    pending: list[sqlite3.Row] = db.execute("SELECT * FROM pending_feedback").fetchall()
     assert len(pending) > 0, "No pending feedback recorded"
 
     # Pending entries should match returned belief IDs
@@ -384,13 +464,14 @@ def test_hook_feedback_loop_records_pending(tmp_path: Path) -> None:
 
 def test_hook_feedback_loop_updates_alpha(tmp_path: Path) -> None:
     """Next search processes pending feedback and updates alpha for matched beliefs."""
-    store: MemoryStore = _make_store(tmp_path)
+    store: MemoryStore = _make_feedback_store(tmp_path)
     import sqlite3
-    db: sqlite3.Connection = sqlite3.connect(str(tmp_path / "hook.db"))
+
+    db: sqlite3.Connection = sqlite3.connect(str(tmp_path / "feedback.db"))
     db.row_factory = sqlite3.Row
 
-    # First search: retrieves beliefs about cloudflare/deploy
-    search_for_prompt(db, "deploy to cloudflare")
+    # First search: retrieves cloudflare belief (no competing correction to dominate)
+    search_for_prompt(db, "deploying builds to cloudflare")
 
     # Record alpha before feedback
     row: sqlite3.Row = db.execute(
@@ -418,19 +499,24 @@ def test_hook_feedback_loop_updates_alpha(tmp_path: Path) -> None:
 
 def test_hook_feedback_loop_clears_processed(tmp_path: Path) -> None:
     """Pending feedback entries are cleared after processing."""
-    store: MemoryStore = _make_store(tmp_path)
+    store: MemoryStore = _make_feedback_store(tmp_path)
     import sqlite3
-    db: sqlite3.Connection = sqlite3.connect(str(tmp_path / "hook.db"))
+
+    db: sqlite3.Connection = sqlite3.connect(str(tmp_path / "feedback.db"))
     db.row_factory = sqlite3.Row
 
-    # First search creates pending entries
-    search_for_prompt(db, "deploy to cloudflare")
-    pending_before: int = db.execute("SELECT COUNT(*) FROM pending_feedback").fetchone()[0]
+    # First search creates pending entries (no competing correction to dominate)
+    search_for_prompt(db, "deploying builds to cloudflare")
+    pending_before: int = db.execute(
+        "SELECT COUNT(*) FROM pending_feedback"
+    ).fetchone()[0]
     assert pending_before > 0
 
     # Second search processes old entries and creates new ones
     search_for_prompt(db, "configure wrangler deploy")
-    pending_after: int = db.execute("SELECT COUNT(*) FROM pending_feedback").fetchone()[0]
+    pending_after: int = db.execute("SELECT COUNT(*) FROM pending_feedback").fetchone()[
+        0
+    ]
 
     # Old entries should be cleared; new entries from second search remain
     # The count should be the number of beliefs returned by the second search,
@@ -447,6 +533,7 @@ def test_hook_feedback_no_match_no_update(tmp_path: Path) -> None:
     """When prompt terms don't overlap with pending beliefs, alpha stays unchanged."""
     store: MemoryStore = _make_store(tmp_path)
     import sqlite3
+
     db: sqlite3.Connection = sqlite3.connect(str(tmp_path / "hook.db"))
     db.row_factory = sqlite3.Row
 
@@ -455,14 +542,18 @@ def test_hook_feedback_no_match_no_update(tmp_path: Path) -> None:
 
     # Record all alphas
     alphas_before: dict[str, float] = {}
-    for row in db.execute("SELECT id, alpha FROM beliefs WHERE valid_to IS NULL").fetchall():
+    for row in db.execute(
+        "SELECT id, alpha FROM beliefs WHERE valid_to IS NULL"
+    ).fetchall():
         alphas_before[row["id"]] = row["alpha"]
 
     # Second search: completely different topic, no overlap
     search_for_prompt(db, "what is quantum computing theory")
 
     # Check that cloudflare belief alpha did NOT change (no term overlap)
-    for row in db.execute("SELECT id, alpha FROM beliefs WHERE valid_to IS NULL AND content LIKE '%cloudflare%'").fetchall():
+    for row in db.execute(
+        "SELECT id, alpha FROM beliefs WHERE valid_to IS NULL AND content LIKE '%cloudflare%'"
+    ).fetchall():
         assert row["alpha"] == alphas_before[row["id"]], (
             f"Alpha should not change for unmatched belief: {alphas_before[row['id']]} -> {row['alpha']}"
         )
@@ -473,9 +564,10 @@ def test_hook_feedback_no_match_no_update(tmp_path: Path) -> None:
 
 def test_hook_feedback_updates_last_retrieved_at(tmp_path: Path) -> None:
     """search_for_prompt() updates last_retrieved_at for returned beliefs."""
-    store: MemoryStore = _make_store(tmp_path)
+    store: MemoryStore = _make_feedback_store(tmp_path)
     import sqlite3
-    db: sqlite3.Connection = sqlite3.connect(str(tmp_path / "hook.db"))
+
+    db: sqlite3.Connection = sqlite3.connect(str(tmp_path / "feedback.db"))
     db.row_factory = sqlite3.Row
 
     # Verify no last_retrieved_at initially
@@ -485,8 +577,8 @@ def test_hook_feedback_updates_last_retrieved_at(tmp_path: Path) -> None:
     assert row is not None
     assert row["last_retrieved_at"] is None
 
-    # Search retrieves the belief
-    search_for_prompt(db, "deploy to cloudflare")
+    # Search retrieves the belief (no competing correction to dominate)
+    search_for_prompt(db, "deploying builds to cloudflare")
 
     # last_retrieved_at should now be set
     row_after: sqlite3.Row = db.execute(
@@ -502,6 +594,7 @@ def test_process_pending_feedback_empty_table(tmp_path: Path) -> None:
     """_process_pending_feedback handles empty pending_feedback table gracefully."""
     store: MemoryStore = _make_store(tmp_path)
     import sqlite3
+
     db: sqlite3.Connection = sqlite3.connect(str(tmp_path / "hook.db"))
     db.row_factory = sqlite3.Row
 

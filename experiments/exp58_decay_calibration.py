@@ -1,6 +1,6 @@
 """Exp 58: Decay Half-Life Calibration on Real Correction Data
 
-Uses the alpha-seek spike DB (173 decisions) and 38 user corrections from
+Uses the project-a spike DB (173 decisions) and 38 user corrections from
 exp6_failures_v2.json to empirically calibrate exponential decay half-lives
 per content type.
 
@@ -37,22 +37,28 @@ from typing import Any, Final
 # ============================================================
 
 ALPHA_SEEK_DB: Final[Path] = Path(
-    "/Users/thelorax/projects/.gsd/workflows/spikes/"
+    "/home/user/projects/.gsd/workflows/spikes/"
     "260406-1-associative-memory-for-gsd-please-explor/"
-    "sandbox/alpha-seek.db"
+    "sandbox/project-a.db"
 )
 
 EXP6_FAILURES: Final[Path] = Path(
-    "/Users/thelorax/projects/agentmemory/experiments/exp6_failures_v2.json"
+    "/home/user/projects/agentmemory/experiments/exp6_failures_v2.json"
 )
 
 RESULTS_PATH: Final[Path] = Path(
-    "/Users/thelorax/projects/agentmemory/experiments/exp58_results.json"
+    "/home/user/projects/agentmemory/experiments/exp58_results.json"
 )
 
 # Half-life candidates in days; None = no decay (score always 1.0)
 HALF_LIFE_CANDIDATES: Final[list[float | None]] = [
-    1.0, 3.0, 7.0, 14.0, 30.0, 60.0, None
+    1.0,
+    3.0,
+    7.0,
+    14.0,
+    30.0,
+    60.0,
+    None,
 ]
 
 RANKING_THRESHOLDS: Final[list[int]] = [5, 10, 15]
@@ -65,6 +71,7 @@ PROJECT_EPOCH: Final[str] = "2026-03-25T00:00:00.000Z"
 # Content type classification
 # ============================================================
 
+
 class ContentType(Enum):
     CONSTRAINT = "CONSTRAINT"
     EVIDENCE = "EVIDENCE"
@@ -74,21 +81,21 @@ class ContentType(Enum):
 
 
 # Scope -> content type mappings per spec
-SCOPE_TO_CONSTRAINT: Final[frozenset[str]] = frozenset({
-    "architecture", "infrastructure", "operations", "agent behavior"
-})
+SCOPE_TO_CONSTRAINT: Final[frozenset[str]] = frozenset(
+    {"architecture", "infrastructure", "operations", "agent behavior"}
+)
 
-SCOPE_TO_PROCEDURE: Final[frozenset[str]] = frozenset({
-    "methodology", "strategy", "configuration", "tooling"
-})
+SCOPE_TO_PROCEDURE: Final[frozenset[str]] = frozenset(
+    {"methodology", "strategy", "configuration", "tooling"}
+)
 
-CATEGORY_TO_EVIDENCE: Final[frozenset[str]] = frozenset({
-    "knowledge", "backtesting", "evaluation", "validation", "hypothesis"
-})
+CATEGORY_TO_EVIDENCE: Final[frozenset[str]] = frozenset(
+    {"knowledge", "backtesting", "evaluation", "validation", "hypothesis"}
+)
 
-CATEGORY_TO_CONTEXT: Final[frozenset[str]] = frozenset({
-    "milestone", "bugfix", "reporting", "documentation"
-})
+CATEGORY_TO_CONTEXT: Final[frozenset[str]] = frozenset(
+    {"milestone", "bugfix", "reporting", "documentation"}
+)
 
 RATIONALE_KEYWORDS: Final[tuple[str, ...]] = ("because", "rationale", "reason")
 
@@ -96,6 +103,7 @@ RATIONALE_KEYWORDS: Final[tuple[str, ...]] = ("because", "rationale", "reason")
 # ============================================================
 # Data structures
 # ============================================================
+
 
 @dataclass
 class Decision:
@@ -106,7 +114,7 @@ class Decision:
     decision_text: str
     rationale_text: str
     superseded_by: str | None
-    created_at_days: float       # days since PROJECT_EPOCH
+    created_at_days: float  # days since PROJECT_EPOCH
     content_type: ContentType
     locked: bool
 
@@ -116,7 +124,7 @@ class CorrectionCluster:
     topic_id: str
     description: str
     decision_refs: list[str]
-    correction_timestamps: list[str]   # ISO strings
+    correction_timestamps: list[str]  # ISO strings
     is_memory_failure: bool
 
 
@@ -124,8 +132,8 @@ class CorrectionCluster:
 class RankingResult:
     topic_id: str
     correction_iso: str
-    correct_refs_found: list[str]    # refs that exist in decisions
-    best_rank: int | None            # best rank of any correct ref (1-indexed), None if not found
+    correct_refs_found: list[str]  # refs that exist in decisions
+    best_rank: int | None  # best rank of any correct ref (1-indexed), None if not found
     total_decisions: int
 
 
@@ -150,17 +158,20 @@ class HalfLifeConfig:
 
 @dataclass
 class SweepResult:
-    content_type_swept: str          # which type was swept ("combined" for final pass)
-    half_life: float | None          # the half-life tested for that type
+    content_type_swept: str  # which type was swept ("combined" for final pass)
+    half_life: float | None  # the half-life tested for that type
     prevention_rate_top5: float
     prevention_rate_top10: float
     prevention_rate_top15: float
-    per_cluster: dict[str, dict[str, float]] = field(default_factory=lambda: dict[str, dict[str, float]]())
+    per_cluster: dict[str, dict[str, float]] = field(
+        default_factory=lambda: dict[str, dict[str, float]]()
+    )
 
 
 # ============================================================
 # Date utilities
 # ============================================================
+
 
 def parse_iso_days(iso_str: str, epoch_days: float) -> float:
     """Convert ISO 8601 timestamp to days since epoch."""
@@ -189,6 +200,7 @@ def iso_to_days(iso_str: str) -> float:
 # ============================================================
 # Content type classification
 # ============================================================
+
 
 def _is_locked(revisable_raw: str) -> bool:
     """Return True if the revisable field starts with 'No' (case-insensitive)."""
@@ -238,6 +250,7 @@ def classify_decision(
 # Data loading
 # ============================================================
 
+
 def load_milestone_dates(conn: sqlite3.Connection) -> dict[str, float]:
     """Return mapping from milestone prefix (e.g. 'M006') to days since epoch.
 
@@ -248,8 +261,8 @@ def load_milestone_dates(conn: sqlite3.Connection) -> dict[str, float]:
     cursor = conn.execute("SELECT id, created_at FROM milestones ORDER BY created_at")
     milestone_dates: dict[str, float] = {}
     for row in cursor.fetchall():
-        m_id: str = row[0]           # e.g. "M006-wz8eaf"
-        m_date: str = row[1]         # ISO timestamp
+        m_id: str = row[0]  # e.g. "M006-wz8eaf"
+        m_date: str = row[1]  # ISO timestamp
         prefix: str = m_id.split("-")[0]  # "M006"
         # Take the earliest date if multiple milestones share a prefix
         days: float = iso_to_days(m_date)
@@ -281,14 +294,14 @@ def load_decisions(conn: sqlite3.Connection) -> list[Decision]:
 
     # Compute median date for decisions without milestone links
     all_linked_days: list[float] = [
-        d for days_list in decision_to_milestone_days.values()
-        for d in days_list
+        d for days_list in decision_to_milestone_days.values() for d in days_list
     ]
     if all_linked_days:
         sorted_days: list[float] = sorted(all_linked_days)
         mid: int = len(sorted_days) // 2
         median_days: float = (
-            sorted_days[mid] if len(sorted_days) % 2 == 1
+            sorted_days[mid]
+            if len(sorted_days) % 2 == 1
             else (sorted_days[mid - 1] + sorted_days[mid]) / 2.0
         )
     else:
@@ -329,18 +342,20 @@ def load_decisions(conn: sqlite3.Connection) -> list[Decision]:
         )
         locked: bool = _is_locked(revisable_raw)
 
-        decisions.append(Decision(
-            id=d_id,
-            scope=scope,
-            made_by=made_by,
-            revisable_raw=revisable_raw,
-            decision_text=decision_text,
-            rationale_text=rationale_text,
-            superseded_by=superseded_by,
-            created_at_days=created_at_days,
-            content_type=content_type,
-            locked=locked,
-        ))
+        decisions.append(
+            Decision(
+                id=d_id,
+                scope=scope,
+                made_by=made_by,
+                revisable_raw=revisable_raw,
+                decision_text=decision_text,
+                rationale_text=rationale_text,
+                superseded_by=superseded_by,
+                created_at_days=created_at_days,
+                content_type=content_type,
+                locked=locked,
+            )
+        )
 
     print(f"[load] loaded {len(decisions)} decisions", file=sys.stderr)
 
@@ -374,13 +389,15 @@ def load_correction_clusters(failures_path: Path) -> list[CorrectionCluster]:
             if "timestamp" in ov
         ]
 
-        clusters.append(CorrectionCluster(
-            topic_id=str(cluster["topic_id"]),
-            description=str(cluster.get("description", "")),
-            decision_refs=list[str](cluster.get("decision_refs", [])),
-            correction_timestamps=timestamps,
-            is_memory_failure=True,
-        ))
+        clusters.append(
+            CorrectionCluster(
+                topic_id=str(cluster["topic_id"]),
+                description=str(cluster.get("description", "")),
+                decision_refs=list[str](cluster.get("decision_refs", [])),
+                correction_timestamps=timestamps,
+                is_memory_failure=True,
+            )
+        )
 
     print(
         f"[load] loaded {len(clusters)} memory-failure correction clusters",
@@ -394,6 +411,7 @@ def load_correction_clusters(failures_path: Path) -> list[CorrectionCluster]:
 # ============================================================
 # Scoring
 # ============================================================
+
 
 def decay_score(
     decision: Decision,
@@ -462,6 +480,7 @@ def find_best_rank(
 # Evaluation
 # ============================================================
 
+
 def evaluate_config(
     decisions: list[Decision],
     clusters: list[CorrectionCluster],
@@ -491,21 +510,22 @@ def evaluate_config(
                 decisions, current_days, half_lives
             )
             best_rank: int | None = find_best_rank(ranked, target_ids)
-            results.append(RankingResult(
-                topic_id=cluster.topic_id,
-                correction_iso=ts_iso,
-                correct_refs_found=found_refs,
-                best_rank=best_rank,
-                total_decisions=len(decisions),
-            ))
+            results.append(
+                RankingResult(
+                    topic_id=cluster.topic_id,
+                    correction_iso=ts_iso,
+                    correct_refs_found=found_refs,
+                    best_rank=best_rank,
+                    total_decisions=len(decisions),
+                )
+            )
 
     # Compute overall prevention rates
     total: int = len(results)
     threshold_rates: dict[int, float] = {}
     for threshold in RANKING_THRESHOLDS:
         hits: int = sum(
-            1 for r in results
-            if r.best_rank is not None and r.best_rank <= threshold
+            1 for r in results if r.best_rank is not None and r.best_rank <= threshold
         )
         threshold_rates[threshold] = hits / total if total > 0 else 0.0
 
@@ -519,7 +539,8 @@ def evaluate_config(
         cluster_rates: dict[str, float] = {}
         for threshold in RANKING_THRESHOLDS:
             hits = sum(
-                1 for r in cluster_results
+                1
+                for r in cluster_results
                 if r.best_rank is not None and r.best_rank <= threshold
             )
             cluster_rates[f"top{threshold}"] = (
@@ -533,6 +554,7 @@ def evaluate_config(
 # ============================================================
 # Grid search
 # ============================================================
+
 
 def _make_config_varying_one(
     content_type: ContentType,
@@ -586,7 +608,9 @@ def grid_search(
         print(f"  [sweep] {ct.value}:", file=sys.stderr)
         for hl in HALF_LIFE_CANDIDATES:
             config: HalfLifeConfig = _make_config_varying_one(ct, hl, defaults)
-            _, threshold_rates, per_cluster = evaluate_config(decisions, clusters, config)
+            _, threshold_rates, per_cluster = evaluate_config(
+                decisions, clusters, config
+            )
             r5: float = threshold_rates[5]
             r10: float = threshold_rates[10]
             r15: float = threshold_rates[15]
@@ -666,6 +690,7 @@ def sensitivity_analysis(
 # Main
 # ============================================================
 
+
 def main() -> None:
     print("=== Exp 58: Decay Half-Life Calibration ===", file=sys.stderr)
 
@@ -679,8 +704,7 @@ def main() -> None:
     # Filter to clusters with at least one known decision ref
     decision_id_set: set[str] = {d.id for d in decisions}
     active_clusters: list[CorrectionCluster] = [
-        c for c in clusters
-        if any(ref in decision_id_set for ref in c.decision_refs)
+        c for c in clusters if any(ref in decision_id_set for ref in c.decision_refs)
     ]
     print(
         f"[main] clusters with known decision refs: {len(active_clusters)} / {len(clusters)}",
@@ -688,20 +712,24 @@ def main() -> None:
     )
     for c in active_clusters:
         known_refs: list[str] = [r for r in c.decision_refs if r in decision_id_set]
-        print(f"  {c.topic_id}: refs={known_refs} events={len(c.correction_timestamps)}",
-              file=sys.stderr)
+        print(
+            f"  {c.topic_id}: refs={known_refs} events={len(c.correction_timestamps)}",
+            file=sys.stderr,
+        )
 
     # Diagnostic: show locked/type breakdown of target decisions
     print("\n[diagnostic] Target decision attributes:", file=sys.stderr)
     all_target_refs: set[str] = {
-        ref for c in active_clusters for ref in c.decision_refs
+        ref
+        for c in active_clusters
+        for ref in c.decision_refs
         if ref in decision_id_set
     }
     decision_by_id: dict[str, Decision] = {d.id: d for d in decisions}
     locked_count_all: int = sum(1 for d in decisions if d.locked)
     print(
         f"  Total locked decisions: {locked_count_all} / {len(decisions)} "
-        f"({100*locked_count_all/len(decisions):.0f}%)",
+        f"({100 * locked_count_all / len(decisions):.0f}%)",
         file=sys.stderr,
     )
     for ref in sorted(all_target_refs):
@@ -724,7 +752,10 @@ def main() -> None:
     )
 
     # Diagnostic: print actual ranks for targets under baseline
-    print("[diagnostic] Target ranks at first correction event per cluster (baseline):", file=sys.stderr)
+    print(
+        "[diagnostic] Target ranks at first correction event per cluster (baseline):",
+        file=sys.stderr,
+    )
     for cluster in active_clusters:
         if not cluster.correction_timestamps:
             continue
@@ -733,12 +764,14 @@ def main() -> None:
         ranked: list[tuple[str, float]] = rank_decisions(
             decisions, current_days, baseline_config
         )
-        target_ids: set[str] = {r for r in cluster.decision_refs if r in decision_id_set}
+        target_ids: set[str] = {
+            r for r in cluster.decision_refs if r in decision_id_set
+        }
         for ref in sorted(target_ids):
             for i, (d_id, _s) in enumerate(ranked):
                 if d_id == ref:
                     print(
-                        f"  {cluster.topic_id}/{ref}: rank={i+1} score={_s:.4f}",
+                        f"  {cluster.topic_id}/{ref}: rank={i + 1} score={_s:.4f}",
                         file=sys.stderr,
                     )
                     break
@@ -765,7 +798,10 @@ def main() -> None:
     )
 
     # Diagnostic: ranks under combined config
-    print("[diagnostic] Target ranks at first correction event per cluster (combined):", file=sys.stderr)
+    print(
+        "[diagnostic] Target ranks at first correction event per cluster (combined):",
+        file=sys.stderr,
+    )
     for cluster in active_clusters:
         if not cluster.correction_timestamps:
             continue
@@ -777,13 +813,21 @@ def main() -> None:
             for i, (d_id, _s) in enumerate(ranked):
                 if d_id == ref:
                     print(
-                        f"  {cluster.topic_id}/{ref}: rank={i+1} score={_s:.4f}",
+                        f"  {cluster.topic_id}/{ref}: rank={i + 1} score={_s:.4f}",
                         file=sys.stderr,
                     )
                     break
 
     # Rank distribution for all correction events under combined config
-    rank_buckets: dict[str, int] = {"1-5": 0, "6-10": 0, "11-15": 0, "16-30": 0, "31-50": 0, "51+": 0, "not_found": 0}
+    rank_buckets: dict[str, int] = {
+        "1-5": 0,
+        "6-10": 0,
+        "11-15": 0,
+        "16-30": 0,
+        "31-50": 0,
+        "51+": 0,
+        "not_found": 0,
+    }
     for rr in combined_detail_results:
         if rr.best_rank is None:
             rank_buckets["not_found"] += 1
@@ -812,9 +856,15 @@ def main() -> None:
     print(f"Active clusters: {len(active_clusters)}", file=sys.stderr)
     total_events: int = sum(len(c.correction_timestamps) for c in active_clusters)
     print(f"Total correction events: {total_events}", file=sys.stderr)
-    print(f"\nBaseline (no decay): top5={baseline_rates[5]:.3f}  top10={baseline_rates[10]:.3f}  top15={baseline_rates[15]:.3f}", file=sys.stderr)
-    print(f"Combined best:       top5={combined_rates[5]:.3f}  top10={combined_rates[10]:.3f}  top15={combined_rates[15]:.3f}", file=sys.stderr)
-    print(f"\nOptimal half-lives:", file=sys.stderr)
+    print(
+        f"\nBaseline (no decay): top5={baseline_rates[5]:.3f}  top10={baseline_rates[10]:.3f}  top15={baseline_rates[15]:.3f}",
+        file=sys.stderr,
+    )
+    print(
+        f"Combined best:       top5={combined_rates[5]:.3f}  top10={combined_rates[10]:.3f}  top15={combined_rates[15]:.3f}",
+        file=sys.stderr,
+    )
+    print("\nOptimal half-lives:", file=sys.stderr)
     for ct, hl in best_per_type.items():
         hl_label: str = "never" if hl is None else f"{hl}d"
         print(f"  {ct.value}: {hl_label}", file=sys.stderr)

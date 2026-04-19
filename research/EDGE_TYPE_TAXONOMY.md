@@ -89,21 +89,21 @@ This gives the graph a temporal belief-evolution chain: tentative local -> revis
 **Not applicable to public repos** -- we only have what was pushed.
 
 **Multi-source history for personal projects:**
-The user develops on two machines (lorax, archon) and pushes to two remotes (Gitea on mintaka:2222 for personal projects, GitHub for public contributions). This means:
+The user develops on two machines (lorax, server-a) and pushes to two remotes (Gitea on server-c:2222 for personal projects, GitHub for public contributions). This means:
 - Gitea history = canonical "remote" for personal projects (receives pushes from both machines)
-- Local reflogs on lorax and archon = ephemeral in-progress commits
+- Local reflogs on lorax and server-a = ephemeral in-progress commits
 - GitHub = public contributions and issue tracking
-- The research corpus on archon has only pushed history (rsync'd .git, no reflog from lorax)
+- The research corpus on server-a has only pushed history (rsync'd .git, no reflog from lorax)
 - For production use, the extractor should query both the repo's git log AND the local reflog to capture the full local/remote distinction.
 
 **Multi-machine development complication:**
-The same project (e.g., alpha-seek) is developed on both lorax and archon, with Gitea as the unifying remote. This means:
+The same project (e.g., project-a) is developed on both lorax and server-a, with Gitea as the unifying remote. This means:
 - Gitea has the union of all pushed commits from both machines
 - lorax's reflog has lorax-local ephemeral commits (amends, rebases, abandoned branches)
-- archon's reflog has archon-local ephemeral commits
-- A commit authored on archon and pushed to Gitea will appear in lorax's `git log` after a fetch, but NOT in lorax's reflog (it was never a local HEAD there)
+- server-a's reflog has server-a-local ephemeral commits
+- A commit authored on server-a and pushed to Gitea will appear in lorax's `git log` after a fetch, but NOT in lorax's reflog (it was never a local HEAD there)
 - To get the full picture for a project, the extractor must: (a) pull from Gitea for all pushed history, (b) read the local reflog on whichever machine it's running on for ephemeral local history, (c) tag each commit with origin machine if determinable (author hostname, committer date alignment with reflog)
-- The research corpus on archon only has pushed history (rsync'd .git without lorax's reflog). This is sufficient for the graph construction experiments.
+- The research corpus on server-a only has pushed history (rsync'd .git without lorax's reflog). This is sufficient for the graph construction experiments.
 
 ---
 

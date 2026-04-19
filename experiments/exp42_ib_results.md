@@ -3,7 +3,7 @@
 **Date:** 2026-04-10
 **Input:** Exp 16 sentence nodes (1,195 nodes from 173 decisions, 35,741 tokens)
 **Builds on:** Exp 20 (IB theory), Exp 16 (sentence decomposition), Exp 9/39 (retrieval ground truth)
-**Method:** Simulated on real alpha-seek belief corpus. Zero-LLM.
+**Method:** Simulated on real project-a belief corpus. Zero-LLM.
 **Rigor tier:** Empirically tested (real data, single dataset)
 
 ---
@@ -109,7 +109,7 @@ Every type has CV > 0.5, meaning the coefficient of variation is high. In theory
 
 **Assumptions:**
 - SNR target = 5.0 (reliable single-hop retrieval, from Exp 35)
-- Edges per node = 25 (observed neighborhood size in alpha-seek graph)
+- Edges per node = 25 (observed neighborhood size in project-a graph)
 - Bits per token ~ 16 (4 bits/char * 4 chars/token, conservative for English)
 - HRR information capacity ~ D/2 bits per superposition slot (Johnson-Lindenstrauss bound)
 

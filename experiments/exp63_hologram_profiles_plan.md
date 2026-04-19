@@ -59,7 +59,7 @@ These are chosen to be open-ended enough that the profile should influence the d
 {
   "profile_name": "strict_reviewer",
   "created_at": "ISO8601",
-  "source_graph": "alpha-seek",
+  "source_graph": "project-a",
   "belief_count": 87,
   "beliefs": [
     {"id": "abc123", "content": "...", "type": "constraint", "confidence": 0.95, "locked": true}

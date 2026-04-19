@@ -4,6 +4,7 @@ These tests simulate multi-cycle retrieval+feedback patterns from the case studi
 and verify that the Bayesian edge system produces measurably better outcomes over
 time: useful edges strengthen, harmful edges weaken, and BFS prefers proven paths.
 """
+
 from __future__ import annotations
 
 from collections.abc import Generator
@@ -52,15 +53,18 @@ class TestCS015DeadApproachEdges:
         discovers replacements via topic-level RELATES_TO edges.)"""
         topic: Belief = store.insert_belief(
             "Signal quality filtering approaches for options strategy",
-            BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
+            BELIEF_FACTUAL,
+            BSRC_AGENT_INFERRED,
         )
         dead: Belief = store.insert_belief(
             "Use price filters to remove low-quality signals",
-            BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
+            BELIEF_FACTUAL,
+            BSRC_AGENT_INFERRED,
         )
         replacement: Belief = store.insert_belief(
             "No-filter approach with BEP threshold is superior to price filters (D183)",
-            BELIEF_CORRECTION, BSRC_USER_CORRECTED,
+            BELIEF_CORRECTION,
+            BSRC_USER_CORRECTED,
         )
         store.supersede_belief(dead.id, replacement.id, "price filters failed")
         # Topic connects to replacement via RELATES_TO
@@ -88,19 +92,24 @@ class TestCS015DeadApproachEdges:
         """After feedback, BFS should prefer the path to the replacement."""
         dead: Belief = store.insert_belief(
             "Exit rules with fixed DTE floors",
-            BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
+            BELIEF_FACTUAL,
+            BSRC_AGENT_INFERRED,
         )
         replacement: Belief = store.insert_belief(
             "Dynamic exit based on realized volatility, not fixed DTE (D209)",
-            BELIEF_CORRECTION, BSRC_USER_CORRECTED,
+            BELIEF_CORRECTION,
+            BSRC_USER_CORRECTED,
         )
         # Both connect to a common root
         root: Belief = store.insert_belief(
             "Exit strategy for options positions",
-            BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
+            BELIEF_FACTUAL,
+            BSRC_AGENT_INFERRED,
         )
         store.insert_edge(root.id, dead.id, "RELATES_TO", alpha=1.0, beta_param=1.0)
-        store.insert_edge(root.id, replacement.id, "RELATES_TO", alpha=1.0, beta_param=1.0)
+        store.insert_edge(
+            root.id, replacement.id, "RELATES_TO", alpha=1.0, beta_param=1.0
+        )
 
         # Simulate: replacement is always "used", dead is always "ignored"
         for _ in range(5):
@@ -110,7 +119,9 @@ class TestCS015DeadApproachEdges:
 
         # Now expand with max_nodes=1 -- should pick the stronger edge
         result = store.expand_graph([root.id], depth=1, max_nodes=1)
-        assert replacement.id in result, "BFS should prefer the replacement after feedback"
+        assert replacement.id in result, (
+            "BFS should prefer the replacement after feedback"
+        )
         assert dead.id not in result, "Dead approach should be deprioritized"
 
 
@@ -129,11 +140,14 @@ class TestCS016SettledDecisionEdges:
     def test_locked_decision_edges_strengthen(self, store: MemoryStore) -> None:
         d073: Belief = store.insert_belief(
             "Calls and puts are equal citizens in the strategy (D073). Not negotiable.",
-            BELIEF_REQUIREMENT, BSRC_USER_STATED, locked=True,
+            BELIEF_REQUIREMENT,
+            BSRC_USER_STATED,
+            locked=True,
         )
         topic: Belief = store.insert_belief(
             "Options strategy direction and instrument selection",
-            BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
+            BELIEF_FACTUAL,
+            BSRC_AGENT_INFERRED,
         )
         edge_id: int = store.insert_edge(topic.id, d073.id, "SUPPORTS")
 
@@ -143,11 +157,14 @@ class TestCS016SettledDecisionEdges:
             store.update_confidence(d073.id, "used")
 
         row = store.query(
-            "SELECT alpha, beta_param FROM edges WHERE id = ?", (edge_id,),
+            "SELECT alpha, beta_param FROM edges WHERE id = ?",
+            (edge_id,),
         )[0]
         alpha: float = float(str(row["alpha"]))
         confidence: float = alpha / (alpha + float(str(row["beta_param"])))
-        assert confidence > 0.9, f"Edge to locked decision should be very confident: {confidence:.3f}"
+        assert confidence > 0.9, (
+            f"Edge to locked decision should be very confident: {confidence:.3f}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -155,7 +172,7 @@ class TestCS016SettledDecisionEdges:
 #
 # Scenario: Agent has beliefs about machine locations and project data.
 # "paper trading data is on lorax (local)" should be reachable via edges.
-# After the user corrects "not on willow, on lorax", the edge to the
+# After the user corrects "not on remote_srv, on lorax", the edge to the
 # wrong machine should weaken and the edge to the right one strengthen.
 # ---------------------------------------------------------------------------
 
@@ -163,18 +180,23 @@ class TestCS016SettledDecisionEdges:
 class TestCS022MultiHopCorrection:
     """Verify that correction feedback reshapes the edge graph."""
 
-    def test_wrong_path_weakens_correct_path_strengthens(self, store: MemoryStore) -> None:
+    def test_wrong_path_weakens_correct_path_strengthens(
+        self, store: MemoryStore
+    ) -> None:
         query_node: Belief = store.insert_belief(
             "Where is the paper trading data stored?",
-            BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
+            BELIEF_FACTUAL,
+            BSRC_AGENT_INFERRED,
         )
         wrong: Belief = store.insert_belief(
-            "Paper trading data is on willow via SSH",
-            BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
+            "Paper trading data is on remote_srv via SSH",
+            BELIEF_FACTUAL,
+            BSRC_AGENT_INFERRED,
         )
         correct: Belief = store.insert_belief(
-            "Paper trading data is local on lorax, not on willow",
-            BELIEF_CORRECTION, BSRC_USER_CORRECTED,
+            "Paper trading data is local on lorax, not on remote_srv",
+            BELIEF_CORRECTION,
+            BSRC_USER_CORRECTED,
         )
         e_wrong: int = store.insert_edge(query_node.id, wrong.id, "RELATES_TO")
         e_correct: int = store.insert_edge(query_node.id, correct.id, "RELATES_TO")
@@ -190,8 +212,12 @@ class TestCS022MultiHopCorrection:
             store.update_confidence(correct.id, "used")
 
         # Check edges
-        r_wrong = store.query("SELECT alpha, beta_param FROM edges WHERE id = ?", (e_wrong,))[0]
-        r_correct = store.query("SELECT alpha, beta_param FROM edges WHERE id = ?", (e_correct,))[0]
+        r_wrong = store.query(
+            "SELECT alpha, beta_param FROM edges WHERE id = ?", (e_wrong,)
+        )[0]
+        r_correct = store.query(
+            "SELECT alpha, beta_param FROM edges WHERE id = ?", (e_correct,)
+        )[0]
 
         conf_wrong: float = float(str(r_wrong["alpha"])) / (
             float(str(r_wrong["alpha"])) + float(str(r_wrong["beta_param"]))
@@ -208,30 +234,33 @@ class TestCS022MultiHopCorrection:
         """After correction cycles, BFS should prefer the corrected path."""
         root: Belief = store.insert_belief(
             "Agent deployment infrastructure",
-            BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
+            BELIEF_FACTUAL,
+            BSRC_AGENT_INFERRED,
         )
-        willow: Belief = store.insert_belief(
-            "Agents run on willow remote server",
-            BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
+        remote_srv: Belief = store.insert_belief(
+            "Agents run on remote_srv remote server",
+            BELIEF_FACTUAL,
+            BSRC_AGENT_INFERRED,
         )
         lorax: Belief = store.insert_belief(
             "Agents run locally on lorax workstation",
-            BELIEF_CORRECTION, BSRC_USER_CORRECTED,
+            BELIEF_CORRECTION,
+            BSRC_USER_CORRECTED,
         )
 
-        store.insert_edge(root.id, willow.id, "RELATES_TO")
+        store.insert_edge(root.id, remote_srv.id, "RELATES_TO")
         store.insert_edge(root.id, lorax.id, "RELATES_TO")
 
         # 3 correction cycles
         for _ in range(3):
             store.expand_graph([root.id], depth=1)
-            store.update_confidence(willow.id, "harmful")
+            store.update_confidence(remote_srv.id, "harmful")
             store.update_confidence(lorax.id, "used")
 
         # BFS with max_nodes=1 should pick lorax
         result = store.expand_graph([root.id], depth=1, max_nodes=1)
         assert lorax.id in result
-        assert willow.id not in result
+        assert remote_srv.id not in result
 
 
 # ---------------------------------------------------------------------------
@@ -249,15 +278,18 @@ class TestCS001RedundantWorkEdges:
     """Verify that edges help prevent redundant work over sessions."""
 
     def test_completion_edge_strengthens_with_correct_behavior(
-        self, store: MemoryStore,
+        self,
+        store: MemoryStore,
     ) -> None:
         completed: Belief = store.insert_belief(
             "Documentation task completed: updated README, CHANGELOG, CONTRIBUTING",
-            BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
+            BELIEF_FACTUAL,
+            BSRC_AGENT_INFERRED,
         )
         task_desc: Belief = store.insert_belief(
             "Document the project with README and changelog files",
-            BELIEF_PROCEDURAL, BSRC_USER_STATED,
+            BELIEF_PROCEDURAL,
+            BSRC_USER_STATED,
         )
         edge_id: int = store.insert_edge(completed.id, task_desc.id, "RELATES_TO")
 
@@ -266,7 +298,10 @@ class TestCS001RedundantWorkEdges:
             store.expand_graph([task_desc.id], depth=1)
             store.update_confidence(completed.id, "used")
 
-        row = store.query("SELECT alpha, beta_param, traversal_count FROM edges WHERE id = ?", (edge_id,))[0]
+        row = store.query(
+            "SELECT alpha, beta_param, traversal_count FROM edges WHERE id = ?",
+            (edge_id,),
+        )[0]
         alpha: float = float(str(row["alpha"]))
         beta: float = float(str(row["beta_param"]))
         assert alpha > 3.0, f"Edge alpha should have grown from 1.0: got {alpha}"
@@ -289,15 +324,18 @@ class TestFeedbackLoopConvergence:
         """Good edges and bad edges should diverge in confidence over time."""
         root: Belief = store.insert_belief(
             "Central topic belief for convergence test",
-            BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
+            BELIEF_FACTUAL,
+            BSRC_AGENT_INFERRED,
         )
         good: Belief = store.insert_belief(
             "Consistently useful belief that helps the agent",
-            BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
+            BELIEF_FACTUAL,
+            BSRC_AGENT_INFERRED,
         )
         bad: Belief = store.insert_belief(
             "Consistently irrelevant belief that wastes tokens",
-            BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
+            BELIEF_FACTUAL,
+            BSRC_AGENT_INFERRED,
         )
         e_good: int = store.insert_edge(root.id, good.id, "SUPPORTS")
         e_bad: int = store.insert_edge(root.id, bad.id, "RELATES_TO")
@@ -308,8 +346,12 @@ class TestFeedbackLoopConvergence:
             store.update_confidence(good.id, "used")
             store.update_confidence(bad.id, "ignored")
 
-        r_good = store.query("SELECT alpha, beta_param FROM edges WHERE id = ?", (e_good,))[0]
-        r_bad = store.query("SELECT alpha, beta_param FROM edges WHERE id = ?", (e_bad,))[0]
+        r_good = store.query(
+            "SELECT alpha, beta_param FROM edges WHERE id = ?", (e_good,)
+        )[0]
+        r_bad = store.query(
+            "SELECT alpha, beta_param FROM edges WHERE id = ?", (e_bad,)
+        )[0]
 
         conf_good: float = float(str(r_good["alpha"])) / (
             float(str(r_good["alpha"])) + float(str(r_good["beta_param"]))
@@ -326,20 +368,24 @@ class TestFeedbackLoopConvergence:
         )
 
     def test_harmful_feedback_degrades_faster_than_ignored(
-        self, store: MemoryStore,
+        self,
+        store: MemoryStore,
     ) -> None:
         """'harmful' should degrade edge confidence faster than 'ignored'."""
         root: Belief = store.insert_belief(
             "Root for degradation test",
-            BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
+            BELIEF_FACTUAL,
+            BSRC_AGENT_INFERRED,
         )
         ignored_target: Belief = store.insert_belief(
             "Belief that gets ignored",
-            BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
+            BELIEF_FACTUAL,
+            BSRC_AGENT_INFERRED,
         )
         harmful_target: Belief = store.insert_belief(
             "Belief that causes harm",
-            BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
+            BELIEF_FACTUAL,
+            BSRC_AGENT_INFERRED,
         )
         e_ign: int = store.insert_edge(root.id, ignored_target.id, "RELATES_TO")
         e_harm: int = store.insert_edge(root.id, harmful_target.id, "RELATES_TO")
@@ -350,8 +396,12 @@ class TestFeedbackLoopConvergence:
             store.update_confidence(ignored_target.id, "ignored")
             store.update_confidence(harmful_target.id, "harmful")
 
-        r_ign = store.query("SELECT alpha, beta_param FROM edges WHERE id = ?", (e_ign,))[0]
-        r_harm = store.query("SELECT alpha, beta_param FROM edges WHERE id = ?", (e_harm,))[0]
+        r_ign = store.query(
+            "SELECT alpha, beta_param FROM edges WHERE id = ?", (e_ign,)
+        )[0]
+        r_harm = store.query(
+            "SELECT alpha, beta_param FROM edges WHERE id = ?", (e_harm,)
+        )[0]
 
         conf_ign: float = float(str(r_ign["alpha"])) / (
             float(str(r_ign["alpha"])) + float(str(r_ign["beta_param"]))
@@ -365,17 +415,23 @@ class TestFeedbackLoopConvergence:
         )
 
     def test_traversal_counts_accumulate_across_cycles(
-        self, store: MemoryStore,
+        self,
+        store: MemoryStore,
     ) -> None:
         """Traversal count should monotonically increase with retrieval cycles."""
-        a: Belief = store.insert_belief("Traversal counter A", BELIEF_FACTUAL, BSRC_AGENT_INFERRED)
-        b: Belief = store.insert_belief("Traversal counter B", BELIEF_FACTUAL, BSRC_AGENT_INFERRED)
+        a: Belief = store.insert_belief(
+            "Traversal counter A", BELIEF_FACTUAL, BSRC_AGENT_INFERRED
+        )
+        b: Belief = store.insert_belief(
+            "Traversal counter B", BELIEF_FACTUAL, BSRC_AGENT_INFERRED
+        )
         edge_id: int = store.insert_edge(a.id, b.id, "SUPPORTS")
 
         for cycle in range(1, 6):
             store.expand_graph([a.id], depth=1)
             row = store.query(
-                "SELECT traversal_count FROM edges WHERE id = ?", (edge_id,),
+                "SELECT traversal_count FROM edges WHERE id = ?",
+                (edge_id,),
             )[0]
             assert int(str(row["traversal_count"])) == cycle
 
@@ -389,12 +445,19 @@ class TestEdgeHealthMetrics:
     """Verify edge health metrics reflect actual state."""
 
     def test_edge_credal_gap_decreases_with_feedback(
-        self, store: MemoryStore,
+        self,
+        store: MemoryStore,
     ) -> None:
         """Edges that receive feedback should leave the credal gap."""
-        a: Belief = store.insert_belief("Gap test A", BELIEF_FACTUAL, BSRC_AGENT_INFERRED)
-        b: Belief = store.insert_belief("Gap test B", BELIEF_FACTUAL, BSRC_AGENT_INFERRED)
-        c: Belief = store.insert_belief("Gap test C", BELIEF_FACTUAL, BSRC_AGENT_INFERRED)
+        a: Belief = store.insert_belief(
+            "Gap test A", BELIEF_FACTUAL, BSRC_AGENT_INFERRED
+        )
+        b: Belief = store.insert_belief(
+            "Gap test B", BELIEF_FACTUAL, BSRC_AGENT_INFERRED
+        )
+        c: Belief = store.insert_belief(
+            "Gap test C", BELIEF_FACTUAL, BSRC_AGENT_INFERRED
+        )
         store.insert_edge(a.id, b.id, "SUPPORTS")
         store.insert_edge(a.id, c.id, "RELATES_TO")
 
@@ -408,4 +471,6 @@ class TestEdgeHealthMetrics:
 
         health_after: dict[str, object] = store.get_edge_health()
         gap_after: int = int(str(health_after["edge_credal_gap"]))
-        assert gap_after < 2, f"Credal gap should decrease after feedback, got {gap_after}"
+        assert gap_after < 2, (
+            f"Credal gap should decrease after feedback, got {gap_after}"
+        )

@@ -15,7 +15,7 @@ Can you meaningfully diff two holograms to detect how an agent's worldview shift
 
 **H1 (Structural diff is computable):** A set-theoretic diff (added/removed/modified beliefs, added/removed edges, confidence shifts) between two holograms can be computed in under 100ms for graphs up to 2,000 nodes.
 
-**H2 (Drift is detectable):** Simulating 50 conversation turns on the alpha-seek graph will produce measurable drift in the hologram: at least 10% of the top-100 beliefs at turn 50 will not appear in the top-100 at turn 0. The drift is not random -- it correlates with the topics of the simulated turns.
+**H2 (Drift is detectable):** Simulating 50 conversation turns on the project-a graph will produce measurable drift in the hologram: at least 10% of the top-100 beliefs at turn 50 will not appear in the top-100 at turn 0. The drift is not random -- it correlates with the topics of the simulated turns.
 
 **H3 (Diff is informative):** The hologram diff between "before a correction" and "after a correction" will surface the corrected belief as the highest-impact change (largest confidence delta). This tests whether the diff captures semantically meaningful shifts, not just noise.
 

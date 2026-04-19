@@ -36,7 +36,7 @@ The research has been calibrated toward **retrieval coverage**: can the system f
 
 None of these measure: **how many wrong things did the system store that the human will have to fix?**
 
-The entity detector (Exp 45c) found 364 "person" entities in debserver. Most are false positives: "Apple Home", "Smart Home", "Dev Environment", "Home Assistant", "Shelly Plug." Each false positive is a wrong belief in the graph. If any of these gets surfaced to the user as "people involved in the debserver project," the user has to correct it. The memory system just created work instead of reducing it.
+The entity detector (Exp 45c) found 364 "person" entities in project-d. Most are false positives: "Apple Home", "Smart Home", "Dev Environment", "Home Assistant", "Shelly Plug." Each false positive is a wrong belief in the graph. If any of these gets surfaced to the user as "people involved in the project-d project," the user has to correct it. The memory system just created work instead of reducing it.
 
 ### 2.1 The Asymmetry
 
@@ -51,7 +51,7 @@ The research has been optimizing for recall (reduce false negatives) when it sho
 
 ### 2.2 Where This Matters Most
 
-1. **Entity detection** (Exp 45c): 364 "person" entities on debserver, majority are false positives. Each is a potential future correction.
+1. **Entity detection** (Exp 45c): 364 "person" entities on project-d, majority are false positives. Each is a potential future correction.
 2. **Belief extraction** (Exp 1): Correction detection V2 at 92% accuracy means 8% of detected "corrections" are false positives -- beliefs the system would lock that shouldn't be locked.
 3. **Edge creation** (T0): CO_CHANGED edges at w>=3 have ~100% precision against commit intent. CITES edges at 100% precision. Good. But auto-classified AGENT_CONSTRAINT edges from directive scan depend on pattern matching that could misfire.
 4. **Source priors** (Exp 38): If a belief is misclassified as user_stated (Beta(9,1)) when it's actually agent_inferred, it gets locked with false confidence and resists correction. The prior itself becomes the source of correction burden.
@@ -111,18 +111,18 @@ Every extractor should report its expected false positive rate. Extractors with 
 | AST CALLS (resolved) | ~0% (syntactically verifiable) | Store with high confidence |
 | AST CALLS (unresolved) | Unknown | Do not store (resolution failed) |
 | Directive scan (patterns) | ~8% (from V2 accuracy 92%) | Store with medium confidence, flag |
-| Entity detection (names) | **~50%+ on debserver** | Must filter or flag everything |
+| Entity detection (names) | **~50%+ on project-d** | Must filter or flag everything |
 
 ### 4.3 Interview Bursts: Targeted at High-FP Extractors
 
-The interview protocol should prioritize questions about extractions with the highest false positive risk. For debserver onboarding, the first interview burst should be:
+The interview protocol should prioritize questions about extractions with the highest false positive risk. For project-d onboarding, the first interview burst should be:
 
 > "I detected these as key entities in your project. Which are right?"
-> - [x] willow (hostname)
-> - [x] archon (hostname)
-> - [ ] Apple Home (person?) 
+> - [x] server-b (hostname)
+> - [x] server-a (hostname)
+> - [ ] Apple Home (person?)
 > - [ ] Smart Home (person?)
-> - [x] mintaka (hostname)
+> - [x] server-c (hostname)
 
 3 seconds of human time, prevents 2 false beliefs from entering the graph. That's the correct ROI for human attention: catch the system's mistakes before they persist.
 
@@ -133,7 +133,7 @@ Every future experiment should include a correction burden metric alongside retr
 For each extracted belief/edge, estimate: "would a human looking at this need to correct it?" This can be approximated by:
 - Manual review of a random sample (gold standard but expensive)
 - Cross-validation against other extraction methods (if two independent extractors agree, likely correct)
-- Comparison against known ground truth where available (alpha-seek D### decisions are human-authored)
+- Comparison against known ground truth where available (project-a D### decisions are human-authored)
 
 ---
 
@@ -171,9 +171,9 @@ For every belief/node the extractor pipeline stores in the graph, is it factuall
 
 1. **Markdown tables stored as "sentences."** Lines like `| File | Status | ...` were parsed as belief nodes. That's not a belief -- it's a table fragment. Nobody wants that retrieved as project context. Fix: skip lines starting with `|` or `---`.
 
-2. **"Apple Home", "Smart Home", "Dev Environment" classified as people.** The entity detector looked for capitalized two-word phrases and assumed person names. On debserver (infrastructure project), this produced 1,196 false edges connecting unrelated sentences through fake "person" links. If the system told the user "Apple Home is a person involved in debserver," the user would have to correct it. Fix: filter out bigrams containing words like "home", "server", "environment", "assistant".
+2. **"Apple Home", "Smart Home", "Dev Environment" classified as people.** The entity detector looked for capitalized two-word phrases and assumed person names. On project-d (infrastructure project), this produced 1,196 false edges connecting unrelated sentences through fake "person" links. If the system told the user "Apple Home is a person involved in project-d," the user would have to correct it. Fix: filter out bigrams containing words like "home", "server", "environment", "assistant".
 
-**Before fixes:** debserver stored 17.5 wrong things per session's worth of retrievals. Roughly every third query would surface something incorrect.
+**Before fixes:** project-d stored 17.5 wrong things per session's worth of retrievals. Roughly every third query would surface something incorrect.
 
 **After fixes:** All three projects store < 0.65 wrong things per session. Less than 1 correction per session on average.
 

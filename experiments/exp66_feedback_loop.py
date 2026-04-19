@@ -3,6 +3,7 @@
 Tests whether Bayesian feedback (alpha/beta updates via record_test_result)
 improves MRR@10 over 50 simulated retrieval rounds on a copy of the live DB.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -20,7 +21,7 @@ from agentmemory.store import MemoryStore
 # Config
 # ---------------------------------------------------------------------------
 
-CWD: Final[str] = "/Users/thelorax/projects/agentmemory"
+CWD: Final[str] = "/home/user/projects/agentmemory"
 DB_HASH: Final[str] = hashlib.sha256(CWD.encode()).hexdigest()[:12]
 LIVE_DB: Final[Path] = Path.home() / ".agentmemory" / "projects" / DB_HASH / "memory.db"
 
@@ -52,6 +53,7 @@ QUERIES: Final[list[str]] = [
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def compute_mrr(
     results: dict[str, list[str]],
@@ -91,6 +93,7 @@ def run_retrieval_round(
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:
     if not LIVE_DB.exists():
         print(f"ERROR: Live DB not found at {LIVE_DB}", file=sys.stderr)
@@ -117,7 +120,9 @@ def main() -> None:
     for q, ids in initial_results.items():
         ground_truth[q] = set(ids[:3])
 
-    print(f"Ground truth: {sum(len(v) for v in ground_truth.values())} beliefs across {len(QUERIES)} queries")
+    print(
+        f"Ground truth: {sum(len(v) for v in ground_truth.values())} beliefs across {len(QUERIES)} queries"
+    )
 
     # Run 50 rounds of retrieval + feedback
     mrr_per_round: list[float] = []

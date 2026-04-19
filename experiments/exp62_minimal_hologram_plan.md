@@ -34,7 +34,7 @@ If there is no knee, the hologram concept is theoretically interesting but pract
 
 ## Materials
 
-**Dataset:** The existing alpha-seek belief graph (1,195 nodes, 1,485 edges, 173 decisions). Same 6-topic ground truth from Exp 47 (13 critical beliefs needed).
+**Dataset:** The existing project-a belief graph (1,195 nodes, 1,485 edges, 173 decisions). Same 6-topic ground truth from Exp 47 (13 critical beliefs needed).
 
 **Scoring pipeline:** Thompson sampling + temporal decay + lock boost (existing `scoring.py` implementation).
 

@@ -6,7 +6,7 @@ Here's where things stand:
 
 **Completed last session:**
 - Full architecture design (SQLite + WAL, scientific method model, MCP server)
-- 9+ experiments -- key results: Thompson + Jeffreys prior passing (ECE=0.066), HRR vs BFS on real alpha-seek graph (exp26)
+- 9+ experiments -- key results: Thompson + Jeffreys prior passing (ECE=0.066), HRR vs BFS on real project-a graph (exp26)
 - HRR verdict: real value is fuzzy-start traversal, not multi-hop. S^2 two-hop fails at scale.
 - Requirements REQ-001 through REQ-030
 - Privacy threat model, graph construction design, Bayesian/info-theory research docs

@@ -1,7 +1,0 @@
-[doc-refs] optimus-prime
-  files: 969
-  sentences: 50678
-  reference types: {'D': 95, 'M': 141, 'file_path': 24064, 'heading': 3458}
-  direct edges: 6558
-  co-citation edges: 64192
-  avg refs/file: 29.66

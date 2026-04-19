@@ -5,7 +5,7 @@
 
 ## Current State of Temporal Data
 
-From the alpha-seek timeline (1,790 events):
+From the project-a timeline (1,790 events):
 - 1,743 events have timestamps (97%)
 - Temporal span: 16 days (Mar 24 - Apr 9, 2026)
 - 213 active hours

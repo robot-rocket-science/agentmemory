@@ -137,7 +137,7 @@ Each requirement has:
 **Plan trace:** Phase 2 (retrieval pipeline)
 **Experiment trace:** Experiment 3
 **Status:** Verified (simulation)
-**Evidence:** Exp 56: FTS5+HRR achieves 100% coverage (13/13 decisions) at K=30. Exp 60: MRR 0.867 with LOCK_BOOST_TYPED. Ground truth is synthetic (13 decisions from alpha-seek). Human-labeled precision@15 on diverse queries not yet run.
+**Evidence:** Exp 56: FTS5+HRR achieves 100% coverage (13/13 decisions) at K=30. Exp 60: MRR 0.867 with LOCK_BOOST_TYPED. Ground truth is synthetic (13 decisions from project-a). Human-labeled precision@15 on diverse queries not yet run.
 
 ### REQ-008: False Positive Control
 
@@ -305,7 +305,7 @@ Each requirement has:
 
 **Requirement:** When a user corrects the agent, the correction must be recorded as a high-confidence, always-loaded belief immediately. The user should never have to issue the same correction twice, regardless of which LLM backend, CLI tool, or session they're using.
 
-**Rationale:** Exp 6 analysis of the alpha-seek project found 38 user corrections, 79% of which were re-statements of prior corrections. The most extreme case was a single procedural rule corrected 13 times over 5 days. Every correction after the first is a system failure.
+**Rationale:** Exp 6 analysis of the project-a project found 38 user corrections, 79% of which were re-statements of prior corrections. The most extreme case was a single procedural rule corrected 13 times over 5 days. Every correction after the first is a system failure.
 
 **Detection mechanism (model-agnostic):** A "user correction" is any user statement that contradicts or overrides the agent's prior action or assumption. Detection methods:
 - Explicit: user calls a `correct` or `revise` MCP tool
@@ -314,14 +314,14 @@ Each requirement has:
 
 The correction creates a belief with source_type = user_corrected (highest Bayesian prior), automatically locked (REQ-020), and loaded into L0 if behavioral (REQ-021) or L1 otherwise.
 
-**Verification method:** Replay the alpha-seek correction history through the memory system. After the first correction on each of the 6 identified topics, verify a locked L0/L1 belief is created. Measure: how many of the 32 subsequent corrections would have been prevented?
+**Verification method:** Replay the project-a correction history through the memory system. After the first correction on each of the 6 identified topics, verify a locked L0/L1 belief is created. Measure: how many of the 32 subsequent corrections would have been prevented?
 
 **Acceptance threshold:** >= 90% of second-and-subsequent corrections prevented across any LLM backend.
 
 **Plan trace:** Phase 3 (feedback loop, belief promotion)
 **Experiment trace:** Exp 6 Phase D
 **Status:** Implemented
-**Evidence:** correct() MCP tool creates locked belief on first correction. Correction detection V2 at 92% accuracy. Locked beliefs injected via get_locked() at session start. Formal alpha-seek replay not yet run, but mechanism is end-to-end. Exp 6: 30/38 overrides (79%) cluster into 6 topics.
+**Evidence:** correct() MCP tool creates locked belief on first correction. Correction detection V2 at 92% accuracy. Locked beliefs injected via get_locked() at session start. Formal project-a replay not yet run, but mechanism is end-to-end. Exp 6: 30/38 overrides (79%) cluster into 6 topics.
 
 ### REQ-020: Locked Beliefs
 
@@ -498,7 +498,7 @@ The memory system CANNOT guarantee (not under our control):
 - Tier 6: Track compliance rate. If below 95%, the directive injection format needs revision (stronger wording, different position in context, etc.)
 
 **Plan trace:** Phase 1 (storage, persistence), Phase 3 (detection), Phase 4 (MCP enforcement, hooks)
-**Experiment trace:** CS-002, CS-004 acceptance tests, alpha-seek override replay
+**Experiment trace:** CS-002, CS-004 acceptance tests, project-a override replay
 **Status:** Partially implemented (Tiers 1-3)
 **Evidence:** Tier 1 (storage): SQLite WAL + locked beliefs (store.py:64, 498-508). Tier 2 (injection): get_locked() MCP tool + L0 injection in retrieve() (server.py:454-470, retrieval.py:131-146). Tier 3 (compression survival): locked beliefs prioritized first in candidate list, correction/preference types kept as full text in compression (compression.py:52-77). Tiers 4-5 (violation detection/blocking): not implemented. Exp 6: 30/38 overrides (66%) are repeated directives.
 

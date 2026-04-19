@@ -18,18 +18,18 @@
 
 | Repo | Sentences | Batches | Offline (s) | LLM est. (s) | LLM (min) | Ratio |
 |---|---|---|---|---|---|---|
-| debserver | 5,595 | 280 | 2.2 | 422 | 7.0 | 192x |
-| email-secretary | 8,173 | 409 | 4.3 | 618 | 10.3 | 144x |
+| project-d | 5,595 | 280 | 2.2 | 422 | 7.0 | 192x |
+| project-f | 8,173 | 409 | 4.3 | 618 | 10.3 | 144x |
 | bigtime | 1,427 | 72 | 0.6 | 109 | 1.8 | 181x |
 | mud_rust | 247 | 13 | 0.3 | 20 | 0.3 | 66x |
 
 **Formula:** `LLM_time = scan_time + (batches * 1.5s) + (scan_time * 0.1)`
 
-The LLM call dominates. For a 500-commit repo (debserver), onboarding takes ~7 minutes. For a small repo (mud_rust, 5 commits), ~20 seconds.
+The LLM call dominates. For a 500-commit repo (project-d), onboarding takes ~7 minutes. For a small repo (mud_rust, 5 commits), ~20 seconds.
 
 ### Parallelism Opportunity
 
-Batches are currently sequential (classification.py iterates with a for-loop). Async batching with 5-10 concurrent requests would cut debserver from 7 min to ~1 min and email-secretary from 10 min to ~2 min. This is the obvious optimization if onboarding time becomes a concern.
+Batches are currently sequential (classification.py iterates with a for-loop). Async batching with 5-10 concurrent requests would cut project-d from 7 min to ~1 min and project-f from 10 min to ~2 min. This is the obvious optimization if onboarding time becomes a concern.
 
 ---
 
@@ -47,8 +47,8 @@ Batches are currently sequential (classification.py iterates with a for-loop). A
 
 | Repo | Sentences | Batches | Input tokens | Output tokens | Cost |
 |---|---|---|---|---|---|
-| debserver | 5,595 | 280 | 187,320 | 70,700 | $0.43 |
-| email-secretary | 8,173 | 409 | 273,621 | 103,272 | $0.63 |
+| project-d | 5,595 | 280 | 187,320 | 70,700 | $0.43 |
+| project-f | 8,173 | 409 | 273,621 | 103,272 | $0.63 |
 | bigtime | 1,427 | 72 | 48,168 | 18,180 | $0.11 |
 | mud_rust | 247 | 13 | 8,697 | 3,282 | $0.02 |
 | **TOTAL** | **15,442** | **774** | **517,806** | **195,435** | **$1.20** |
@@ -83,7 +83,7 @@ Typical project sizes from our survey:
 From CORRECTION_BURDEN_REFRAME.md and Exp 50:
 - Each false locked belief costs ~500 tokens to correct (user notices, explains, agent processes)
 - Offline classifier produces 80-96% false locks (validated)
-- debserver: 417 offline locks vs 69 LLM locks = 348 prevented false locks
+- project-d: 417 offline locks vs 69 LLM locks = 348 prevented false locks
 - Correction cost prevented: 348 * 500 = 174,000 tokens
 - LLM cost to prevent: 258,020 tokens (187K input + 71K output)
 - **Single-session ROI: 0.67x** (cost ~= savings)

@@ -7,7 +7,7 @@
 
 ## Why Multiple Projects Matter
 
-All HRR experiments to date used one project (alpha-seek) with one graph shape: citation-heavy, explicit D### references, consistent vocabulary within a single domain (options trading). That graph is easy to construct (regex) and easy to search (FTS5 keywords overlap heavily).
+All HRR experiments to date used one project (project-a) with one graph shape: citation-heavy, explicit D### references, consistent vocabulary within a single domain (options trading). That graph is easy to construct (regex) and easy to search (FTS5 keywords overlap heavily).
 
 The open question from HRR_FINDINGS.md: does HRR's value increase for graphs with heterogeneous edge types, sparse explicit references, vocabulary drift, and dense cross-cluster connections? We need different graph shapes to answer that.
 
@@ -20,10 +20,10 @@ The open question from HRR_FINDINGS.md: does HRR's value increase for graphs wit
 | Project | Graph Shape | Why It's Interesting |
 |---------|------------|---------------------|
 | **gsd-2** | Citation graph with 7 edge types (CITES, DECIDED_IN, RELATES_TO, SOURCED_FROM, SUPERSEDES, CONCEPT_LINK, EVIDENCED_BY) | Already has SQLite graph tables (graph_nodes, graph_edges, mem_nodes, mem_edges). BFS retrieval implemented. Most heterogeneous edge types of any project. Direct comparison: their BFS vs our HRR on same graph. |
-| **alpha-seek** | Decision citation graph, 202 decisions, 300+ references | Already tested (Exp 30-35). Baseline. Citation-heavy, regex-constructible. |
-| **optimus-prime** | Fork of alpha-seek at larger scale, 40+ milestones, mempalace integration | Same graph shape as alpha-seek but more data. Tests: does HRR scale with more decisions? Vocabulary drift over 40 milestones? |
-| **debserver** | Physical network topology (router, switch, AP, client nodes) + infrastructure decision graph | Two distinct graph layers: physical (Cytoscape) and logical (GSD decisions/knowledge). Edge types: ethernet, wifi, backhaul, tailscale. Tests HRR on non-document graphs. |
-| **code-monkey** | Module catalog with FTS5 + 384-dim vector embeddings + PostgreSQL contract pipeline | Already has FTS5 and embeddings. Direct A/B: their embedding search vs HRR on module relationships. Multi-layer: contract -> execution -> delivery chain for BFS testing. |
+| **project-a** | Decision citation graph, 202 decisions, 300+ references | Already tested (Exp 30-35). Baseline. Citation-heavy, regex-constructible. |
+| **project-b** | Fork of project-a at larger scale, 40+ milestones, mempalace integration | Same graph shape as project-a but more data. Tests: does HRR scale with more decisions? Vocabulary drift over 40 milestones? |
+| **project-d** | Physical network topology (router, switch, AP, client nodes) + infrastructure decision graph | Two distinct graph layers: physical (Cytoscape) and logical (GSD decisions/knowledge). Edge types: ethernet, wifi, backhaul, tailscale. Tests HRR on non-document graphs. |
+| **project-e** | Module catalog with FTS5 + 384-dim vector embeddings + PostgreSQL contract pipeline | Already has FTS5 and embeddings. Direct A/B: their embedding search vs HRR on module relationships. Multi-layer: contract -> execution -> delivery chain for BFS testing. |
 | **evolve** | Skill tree DAG (100+ nodes, prerequisite edges, stat modifications) | Hierarchical graph, not lateral citations. Tests: can HRR traverse prerequisite chains? Nodes have stat-based relationships (armor, thrust, energy) that are semantic but not lexical. |
 
 ### Tier 2: Moderate structure, tests specific aspects
@@ -31,10 +31,10 @@ The open question from HRR_FINDINGS.md: does HRR's value increase for graphs wit
 | Project | Graph Shape | What It Tests |
 |---------|------------|--------------|
 | **bigtime** | Requirement-to-phase mapping (50 reqs -> 8 phases), phase dependency DAG | No code, only planning docs. Tests: can we construct a useful graph from planning documents alone? Pure structural relationships. |
-| **email-secretary** | Classification taxonomy (priority x category x flags) + subscription tracking | Flat relational, not graph-heavy. Tests: does HRR add value when relationships are categorical (email -> classification) rather than citation-based? |
-| **sports-betting-arbitrage** | API pipeline (sportsbook -> normalize -> cache -> analyze), TimescaleDB | Temporal data flow. Tests: can we build and traverse time-ordered event chains via HRR? |
-| **alpha-seek-memtest** | Same as alpha-seek + mempalace rooms | Tests mempalace-to-graph bridge: can mempalace room structure inform HRR subgraph partitioning? |
-| **jose-bully** | Incident -> evidence -> meeting -> escalation path | Unique: narrative graph with temporal and evidentiary relationships. No code, pure documentation. Tests graph construction from unstructured narrative. |
+| **project-f** | Classification taxonomy (priority x category x flags) + subscription tracking | Flat relational, not graph-heavy. Tests: does HRR add value when relationships are categorical (email -> classification) rather than citation-based? |
+| **project-g-arbitrage** | API pipeline (sportsbook -> normalize -> cache -> analyze), TimescaleDB | Temporal data flow. Tests: can we build and traverse time-ordered event chains via HRR? |
+| **project-a-test** | Same as project-a + mempalace rooms | Tests mempalace-to-graph bridge: can mempalace room structure inform HRR subgraph partitioning? |
+| **project-c** | Incident -> evidence -> meeting -> escalation path | Unique: narrative graph with temporal and evidentiary relationships. No code, pure documentation. Tests graph construction from unstructured narrative. |
 
 ### Tier 3: Limited structure, low priority (personal)
 
@@ -50,7 +50,7 @@ The open question from HRR_FINDINGS.md: does HRR's value increase for graphs wit
 
 ---
 
-### Public GitHub Repos (clone to archon with full git history)
+### Public GitHub Repos (clone to server-a with full git history)
 
 Organized by discipline. Each chosen for a distinct graph shape that tests different aspects of automatic type discovery, graph construction, and retrieval.
 
@@ -208,12 +208,12 @@ Can we build sentence-level belief graphs from projects that DON'T have explicit
 
 | Method | Works For | Doesn't Work For |
 |--------|----------|-----------------|
-| Regex citation extraction | alpha-seek, optimus-prime, gsd-2 (D###, M### syntax) | Everything else |
+| Regex citation extraction | project-a, project-b, gsd-2 (D###, M### syntax) | Everything else |
 | Co-occurrence (same file/section) | All projects with docs | Low precision without filtering |
 | Keyword/entity co-reference | Projects with consistent terminology | Vocabulary-drift projects |
-| Planning doc structure (requirement -> phase mapping) | bigtime, debserver, code-monkey (have .planning/) | Projects without structured planning |
-| Import/dependency parsing | code-monkey (Python imports), gsd-2 (TypeScript), evolve (Rust use statements) | Non-code projects |
-| Config/YAML relationship extraction | debserver (docker-compose, ansible), stash (plugin hooks) | Code-only projects |
+| Planning doc structure (requirement -> phase mapping) | bigtime, project-d, project-e (have .planning/) | Projects without structured planning |
+| Import/dependency parsing | project-e (Python imports), gsd-2 (TypeScript), evolve (Rust use statements) | Non-code projects |
+| Config/YAML relationship extraction | project-d (docker-compose, ansible), stash (plugin hooks) | Code-only projects |
 | **Git history: co-change analysis** | All projects with commits | New/empty repos |
 | **Git history: commit message decomposition** | All projects (commit msgs are universal) | Repos with empty/unhelpful commit msgs |
 | **Git history: issue/PR references** | Projects using #123/fixes #N conventions | Projects without issue trackers |
@@ -235,14 +235,14 @@ This means even a repo with zero documentation still produces a graph from its c
 
 ### T2: HRR Vocabulary Bridge Across Graph Shapes
 
-The 184x separation result (Exp 34 Test A) used manually-classified AGENT_CONSTRAINT edges in alpha-seek. Does the vocabulary bridge hold for:
+The 184x separation result (Exp 34 Test A) used manually-classified AGENT_CONSTRAINT edges in project-a. Does the vocabulary bridge hold for:
 
 | Graph Shape | Test Case | Expected Difficulty |
 |-------------|----------|-------------------|
 | Heterogeneous edges | gsd-2: CONCEPT_LINK edges connecting decisions with different vocabulary | Medium -- edges exist, 7 types give rich selectivity |
 | Skill tree | evolve: can HRR connect "armor plating" (defense perk) to "energy shield" (different perk, same defensive category) via prerequisite paths? | Hard -- prerequisite edges are structural, not semantic |
-| Infrastructure topology | debserver: can HRR connect "willow GPU" to "jellyfin transcoding" when they share no words but are linked by service dependency? | Hard -- physical/logical gap |
-| Module catalog | code-monkey: can HRR connect aerospace modules in different subdomains that share no keywords but have similar usage patterns? | Medium -- embeddings exist for comparison |
+| Infrastructure topology | project-d: can HRR connect "server-b GPU" to "jellyfin transcoding" when they share no words but are linked by service dependency? | Hard -- physical/logical gap |
+| Module catalog | project-e: can HRR connect aerospace modules in different subdomains that share no keywords but have similar usage patterns? | Medium -- embeddings exist for comparison |
 | Planning-only | bigtime: can HRR connect Phase 4 (Work Scheduling) to Phase 7 (Preemption) via shared dependency on Phase 3 (Resource Monitoring)? | Easy -- clean DAG, small graph |
 
 ### T3: Where FTS5 Fails and HRR Succeeds (and Vice Versa)
@@ -259,11 +259,11 @@ This directly measures the complementarity claim from HRR_FINDINGS.md.
 
 | Project | Expected Max Useful Depth | Why |
 |---------|--------------------------|-----|
-| alpha-seek | 2-3 hops (D -> cites -> cites -> D) | Citation chains |
+| project-a | 2-3 hops (D -> cites -> cites -> D) | Citation chains |
 | gsd-2 | 3-4 hops (decision -> milestone -> concept_link -> decision) | Richer edge types allow deeper meaningful traversal |
 | evolve | 5-10 hops (root -> perk -> perk -> ... -> leaf) | Deep tree structure |
-| debserver | 3-4 hops (service -> host -> network -> host -> service) | Infrastructure path traversal |
-| code-monkey | 4-5 hops (contract -> scope -> module -> similar_module -> prior_contract) | Pipeline depth |
+| project-d | 3-4 hops (service -> host -> network -> host -> service) | Infrastructure path traversal |
+| project-e | 4-5 hops (contract -> scope -> module -> similar_module -> prior_contract) | Pipeline depth |
 
 ### T5: Subgraph Partitioning Strategies
 
@@ -271,11 +271,11 @@ HRR requires subgraph partitioning to stay within capacity (k < n/9). Different 
 
 | Strategy | Natural Fit |
 |----------|------------|
-| By topic/cluster | alpha-seek (by milestone), gsd-2 (by extension) |
-| By edge type | gsd-2 (7 types), debserver (physical vs logical) |
-| By mempalace room | optimus-prime, alpha-seek-memtest (already have room assignments) |
-| By module/directory | code-monkey (by layer), evolve (by system) |
-| By time window | sports-betting-arbitrage (temporal), optimus-prime (by milestone era) |
+| By topic/cluster | project-a (by milestone), gsd-2 (by extension) |
+| By edge type | gsd-2 (7 types), project-d (physical vs logical) |
+| By mempalace room | project-b, project-a-test (already have room assignments) |
+| By module/directory | project-e (by layer), evolve (by system) |
+| By time window | project-g-arbitrage (temporal), project-b (by milestone era) |
 
 ---
 
@@ -283,11 +283,11 @@ HRR requires subgraph partitioning to stay within capacity (k < n/9). Different 
 
 ### Phase 1: Extract and normalize graphs (no HRR yet)
 - [ ] gsd-2: Export existing SQLite graph (graph_nodes, graph_edges, mem_nodes, mem_edges) to a common format
-- [ ] alpha-seek: Already have sentence graph from Exp 31 (1,195 nodes, 1,485 edges). Export to same format.
-- [ ] optimus-prime: Build sentence graph using same methods as alpha-seek (regex D### + co-occurrence)
+- [ ] project-a: Already have sentence graph from Exp 31 (1,195 nodes, 1,485 edges). Export to same format.
+- [ ] project-b: Build sentence graph using same methods as project-a (regex D### + co-occurrence)
 - [ ] evolve: Extract skill tree from GENOME_GRAPH in genome.py. Convert to node/edge format.
-- [ ] debserver: Extract topology graph from netmap models.py + GSD decisions
-- [ ] code-monkey: Extract module catalog relationships + contract pipeline edges
+- [ ] project-d: Extract topology graph from netmap models.py + GSD decisions
+- [ ] project-e: Extract module catalog relationships + contract pipeline edges
 - [ ] bigtime: Extract requirement-to-phase mapping + phase dependency DAG from planning docs
 
 ### Phase 2: Characterize graph shapes
@@ -326,28 +326,28 @@ HRR requires subgraph partitioning to stay within capacity (k < n/9). Different 
 
 ## Infrastructure
 
-**Research corpus host: archon** (192.168.1.169 / Tailscale 100.115.33.31)
+**Research corpus host: server-a** (192.168.1.169 / Tailscale 100.115.33.31)
 - CachyOS (Arch-based), development workstation
 - More disk and CPU than local machine
 - Access via SSH over Tailscale
 - Clone ALL repos here with full git history (no shallow clones -- we need commit history for temporal graph construction)
 - Run extraction scripts and experiments here
 
-**Corpus layout on archon:**
+**Corpus layout on server-a:**
 ```
 ~/agentmemory-corpus/
   personal/          # mirror of ~/projects/ Tier 1-2 (full git history)
-    alpha-seek/
-    optimus-prime/
+    project-a/
+    project-b/
     gsd-2/
-    debserver/
-    code-monkey/
+    project-d/
+    project-e/
     evolve/
     bigtime/
-    email-secretary/
-    sports-betting-arbitrage/
-    alpha-seek-memtest/
-    jose-bully/
+    project-f/
+    project-g-arbitrage/
+    project-a-test/
+    project-c/
   public/            # full clones from GitHub
     web/saleor/
     web/blitz/

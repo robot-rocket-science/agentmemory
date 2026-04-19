@@ -4,7 +4,7 @@
 
 ## What Was Tested
 
-Real HRR (not BoW cosine) on the alpha-seek graph:
+Real HRR (not BoW cosine) on the project-a graph:
 - Random node vectors (not derived from content)
 - Typed edges encoded via circular convolution binding
 - Cleanup memory for nearest-neighbor recovery

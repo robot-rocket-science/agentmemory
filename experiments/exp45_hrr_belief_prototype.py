@@ -10,7 +10,7 @@ belief graph.  Tests five questions:
   4. Vocabulary-gap retrieval (D157 recovery via AGENT_CONSTRAINT walk)
   5. Capacity analysis -- partition count, memory footprint, scaling
 
-Data source: alpha-seek.db (586 decisions -> 1,195 sentence nodes, 1,485 edges)
+Data source: project-a.db (586 decisions -> 1,195 sentence nodes, 1,485 edges)
 Ground truth: 6 critical topics from Exp 9/39 (13 decisions)
 
 Only numpy/scipy + stdlib.  Strict pyright typing.
@@ -46,9 +46,9 @@ EdgeList: TypeAlias = list[EdgeTriple]
 # ---------------------------------------------------------------------------
 
 ALPHA_SEEK_DB: Final[Path] = Path(
-    "/Users/thelorax/projects/.gsd/workflows/spikes/"
+    "/home/user/projects/.gsd/workflows/spikes/"
     "260406-1-associative-memory-for-gsd-please-explor/"
-    "sandbox/alpha-seek.db"
+    "sandbox/project-a.db"
 )
 
 BEHAVIORAL_DECISIONS: Final[list[str]] = ["D157", "D188", "D100", "D073"]
@@ -86,6 +86,7 @@ TOPICS: Final[dict[str, dict[str, Any]]] = {
 # HRR Core (dimension-agnostic)
 # ===================================================================
 
+
 def make_vec(rng: np.random.Generator, dim: int) -> NDArr:
     """Unit-norm random vector in R^dim."""
     v: NDArr = rng.standard_normal(dim).astype(np.float64)
@@ -99,9 +100,7 @@ def make_vec(rng: np.random.Generator, dim: int) -> NDArr:
 
 def bind(a: NDArr, b: NDArr) -> NDArr:
     """Circular convolution via FFT."""
-    out: NDArr = np.real(np.fft.ifft(np.fft.fft(a) * np.fft.fft(b))).astype(
-        np.float64
-    )
+    out: NDArr = np.real(np.fft.ifft(np.fft.fft(a) * np.fft.fft(b))).astype(np.float64)
     return out
 
 
@@ -131,9 +130,7 @@ def nearest_k(
     """Return k nearest nodes by cosine similarity."""
     ex: set[str] = exclude if exclude is not None else set()
     sims: list[tuple[str, float]] = [
-        (label, cos_sim(query, vec))
-        for label, vec in memory.items()
-        if label not in ex
+        (label, cos_sim(query, vec)) for label, vec in memory.items() if label not in ex
     ]
     sims.sort(key=lambda x: x[1], reverse=True)
     return sims[:k]
@@ -142,6 +139,7 @@ def nearest_k(
 # ===================================================================
 # Data loading
 # ===================================================================
+
 
 def split_sentences(text: str) -> list[str]:
     """Split decision text into sentences."""
@@ -156,14 +154,12 @@ def split_sentences(text: str) -> list[str]:
 
 
 def load_sentence_graph() -> tuple[SentDict, GroupDict, EdgeList]:
-    """Load sentences and build typed edges from alpha-seek DB."""
+    """Load sentences and build typed edges from project-a DB."""
     db: sqlite3.Connection = sqlite3.connect(str(ALPHA_SEEK_DB))
     sentences: SentDict = {}
     groups: GroupDict = {}
 
-    for row in db.execute(
-        "SELECT id, decision, choice, rationale FROM decisions"
-    ):
+    for row in db.execute("SELECT id, decision, choice, rationale FROM decisions"):
         did: str = str(row[0])
         full: str = f"{row[1]}: {row[2]}"
         if row[3]:
@@ -233,18 +229,15 @@ def build_agent_constraint_edges(
     edges: EdgeList = []
     for i in range(len(behavior_sids)):
         for j in range(i + 1, len(behavior_sids)):
-            edges.append(
-                (behavior_sids[i], behavior_sids[j], "AGENT_CONSTRAINT")
-            )
-            edges.append(
-                (behavior_sids[j], behavior_sids[i], "AGENT_CONSTRAINT")
-            )
+            edges.append((behavior_sids[i], behavior_sids[j], "AGENT_CONSTRAINT"))
+            edges.append((behavior_sids[j], behavior_sids[i], "AGENT_CONSTRAINT"))
     return edges
 
 
 # ===================================================================
 # Partition strategies
 # ===================================================================
+
 
 def partition_by_decision_neighborhood(
     edges: EdgeList, sentences: SentDict
@@ -277,9 +270,7 @@ def partition_by_edge_type(edges: EdgeList) -> dict[str, EdgeList]:
     return dict(by_type)
 
 
-def partition_fixed_size(
-    edges: EdgeList, max_edges: int = 100
-) -> dict[str, EdgeList]:
+def partition_fixed_size(edges: EdgeList, max_edges: int = 100) -> dict[str, EdgeList]:
     """Strategy C: fixed-size partitions, k edges each."""
     partitions: dict[str, EdgeList] = {}
     for i in range(0, len(edges), max_edges):
@@ -291,6 +282,7 @@ def partition_fixed_size(
 # ===================================================================
 # HRR Graph with partitions
 # ===================================================================
+
 
 class HRRGraph:
     """HRR-encoded partitioned graph."""
@@ -312,9 +304,7 @@ class HRRGraph:
         if etype not in self.edge_type_vecs:
             self.edge_type_vecs[etype] = make_vec(self.rng, self.dim)
 
-    def encode_partition(
-        self, partition_id: str, edges: EdgeList
-    ) -> None:
+    def encode_partition(self, partition_id: str, edges: EdgeList) -> None:
         """Encode edges into a superposition vector."""
         s_vec: NDArr = np.zeros(self.dim, dtype=np.float64)
         for src, dst, etype in edges:
@@ -357,9 +347,7 @@ class HRRGraph:
 
         # Query each partition and aggregate
         all_scores: dict[str, float] = {}
-        q_vec: NDArr = bind(
-            self.node_vecs[source], self.edge_type_vecs[edge_type]
-        )
+        q_vec: NDArr = bind(self.node_vecs[source], self.edge_type_vecs[edge_type])
 
         for pid in pids:
             s_vec: NDArr = self.partitions[pid]
@@ -394,6 +382,7 @@ class HRRGraph:
 # ===================================================================
 # BFS on explicit edge list (multi-hop)
 # ===================================================================
+
 
 def bfs_multi_hop(
     start_nodes: set[str],
@@ -432,16 +421,13 @@ def bfs_multi_hop(
 # FTS5 helpers
 # ===================================================================
 
+
 def build_fts_index(sentences: SentDict) -> sqlite3.Connection:
     """Build an in-memory FTS5 index on sentence content."""
     db: sqlite3.Connection = sqlite3.connect(":memory:")
-    db.execute(
-        "CREATE VIRTUAL TABLE fts USING fts5(id, content, tokenize='porter')"
-    )
+    db.execute("CREATE VIRTUAL TABLE fts USING fts5(id, content, tokenize='porter')")
     for sid, sent in sentences.items():
-        db.execute(
-            "INSERT INTO fts VALUES (?, ?)", (sid, str(sent["content"]))
-        )
+        db.execute("INSERT INTO fts VALUES (?, ?)", (sid, str(sent["content"])))
     db.commit()
     return db
 
@@ -473,6 +459,7 @@ def extract_decision_id(sid: str) -> str | None:
 # ===================================================================
 # Test 1: Partition strategy comparison
 # ===================================================================
+
 
 def test_partition_strategies(
     sentences: SentDict,
@@ -506,9 +493,7 @@ def test_partition_strategies(
         )
 
     strategies: dict[str, dict[str, EdgeList]] = {
-        "decision_neighborhood": partition_by_decision_neighborhood(
-            edges, sentences
-        ),
+        "decision_neighborhood": partition_by_decision_neighborhood(edges, sentences),
         "edge_type": partition_by_edge_type(edges),
         "fixed_100": partition_fixed_size(edges, max_edges=100),
     }
@@ -543,9 +528,7 @@ def test_partition_strategies(
                     sim for nid, sim in hits if nid in set(targets)
                 ]
                 noise_sims: list[float] = [
-                    sim
-                    for nid, sim in hits
-                    if nid not in set(targets) and nid != src
+                    sim for nid, sim in hits if nid not in set(targets) and nid != src
                 ]
 
                 query_results.append(
@@ -559,9 +542,7 @@ def test_partition_strategies(
                     }
                 )
 
-            partition_sizes: list[int] = [
-                len(pe) for pe in partitions.values()
-            ]
+            partition_sizes: list[int] = [len(pe) for pe in partitions.values()]
             avg_recall: float = (
                 total_recall / total_targets if total_targets > 0 else 0.0
             )
@@ -595,6 +576,7 @@ def test_partition_strategies(
 # ===================================================================
 # Test 2: DIM=4096 vs DIM=2048
 # ===================================================================
+
 
 def test_dim_comparison(
     sentences: SentDict,
@@ -657,9 +639,7 @@ def test_dim_comparison(
             total_recall += len(found)
             total_targets += len(targets)
 
-            target_sims: list[float] = [
-                sim for nid, sim in hits if nid in set(targets)
-            ]
+            target_sims: list[float] = [sim for nid, sim in hits if nid in set(targets)]
             best_noise: float = max(
                 (sim for nid, sim in hits if nid not in set(targets)),
                 default=0.0,
@@ -678,26 +658,20 @@ def test_dim_comparison(
                     ),
                     "best_noise_sim": round(best_noise, 4),
                     "separation": (
-                        round(
-                            min(target_sims) / max(best_noise, 0.001), 2
-                        )
+                        round(min(target_sims) / max(best_noise, 0.001), 2)
                         if target_sims
                         else 0.0
                     ),
                 }
             )
 
-        avg_recall: float = (
-            total_recall / total_targets if total_targets > 0 else 0.0
-        )
+        avg_recall: float = total_recall / total_targets if total_targets > 0 else 0.0
 
         results[f"dim_{dim}"] = {
             "avg_recall": round(avg_recall, 3),
             "total_recall": f"{total_recall}/{total_targets}",
             "encode_time_s": round(encode_time, 3),
-            "avg_query_time_ms": round(
-                1000.0 * sum(query_times) / len(query_times), 2
-            ),
+            "avg_query_time_ms": round(1000.0 * sum(query_times) / len(query_times), 2),
             "memory_bytes": graph.memory_footprint_bytes(),
             "per_query": query_results,
         }
@@ -726,6 +700,7 @@ def test_dim_comparison(
 # Test 3: Integrated HRR single-hop + BFS multi-hop pipeline
 # ===================================================================
 
+
 def test_integrated_pipeline(
     sentences: SentDict,
     groups: GroupDict,
@@ -737,9 +712,7 @@ def test_integrated_pipeline(
     print("=" * 70, file=sys.stderr)
 
     # Add AGENT_CONSTRAINT edges for behavioral beliefs
-    ac_edges: EdgeList = build_agent_constraint_edges(
-        groups, BEHAVIORAL_DECISIONS
-    )
+    ac_edges: EdgeList = build_agent_constraint_edges(groups, BEHAVIORAL_DECISIONS)
     all_edges: EdgeList = edges + ac_edges
 
     # Build HRR graph with decision-neighborhood partitions
@@ -765,9 +738,7 @@ def test_integrated_pipeline(
         needed: set[str] = set(str(d) for d in topic_data["needed"])
 
         # Step 1: FTS5 keyword search
-        fts_hits: list[tuple[str, float]] = search_fts(
-            query_text, fts_db, top_k=30
-        )
+        fts_hits: list[tuple[str, float]] = search_fts(query_text, fts_db, top_k=30)
         fts_sids: set[str] = set(h[0] for h in fts_hits)
         fts_dids: set[str] = set()
         for sid in fts_sids:
@@ -794,7 +765,10 @@ def test_integrated_pipeline(
         # Step 3: BFS 2-hop from all HRR+FTS5 hits
         start_sids: set[str] = fts_sids | hrr_sids
         bfs_result: dict[str, int] = bfs_multi_hop(
-            start_sids, all_edges, edge_type_filter=None, max_hops=2,
+            start_sids,
+            all_edges,
+            edge_type_filter=None,
+            max_hops=2,
             sentences=sentences,
         )
         bfs_dids: set[str] = set()
@@ -823,7 +797,9 @@ def test_integrated_pipeline(
             "bfs_result_count": len(bfs_result),
         }
 
-        status: str = "OK" if combined == needed else f"MISSED: {sorted(needed - combined)}"
+        status: str = (
+            "OK" if combined == needed else f"MISSED: {sorted(needed - combined)}"
+        )
         print(
             f"\n  {topic_name}: "
             f"FTS={len(fts_found)}/{len(needed)} "
@@ -836,12 +812,8 @@ def test_integrated_pipeline(
     fts_db.close()
 
     # Totals
-    total_needed: int = sum(
-        len(r["needed"]) for r in results.values()
-    )
-    total_combined: int = sum(
-        len(r["combined_found"]) for r in results.values()
-    )
+    total_needed: int = sum(len(r["needed"]) for r in results.values())
+    total_combined: int = sum(len(r["combined_found"]) for r in results.values())
     results["overall"] = {
         "total_needed": total_needed,
         "total_combined": total_combined,
@@ -860,6 +832,7 @@ def test_integrated_pipeline(
 # Test 4: Vocabulary-gap retrieval (D157 recovery)
 # ===================================================================
 
+
 def test_vocabulary_gap(
     sentences: SentDict,
     groups: GroupDict,
@@ -870,9 +843,7 @@ def test_vocabulary_gap(
     print("TEST 4: Vocabulary-Gap Retrieval (D157 Recovery)", file=sys.stderr)
     print("=" * 70, file=sys.stderr)
 
-    ac_edges: EdgeList = build_agent_constraint_edges(
-        groups, BEHAVIORAL_DECISIONS
-    )
+    ac_edges: EdgeList = build_agent_constraint_edges(groups, BEHAVIORAL_DECISIONS)
     all_edges: EdgeList = edges + ac_edges
 
     # Build HRR graph
@@ -901,8 +872,11 @@ def test_vocabulary_gap(
     d157_in_fts: bool = "D157" in fts_dids
     d188_in_fts: bool = "D188" in fts_dids
 
-    print(f"\n  FTS5-only: D157={'FOUND' if d157_in_fts else 'MISSED'}, "
-          f"D188={'FOUND' if d188_in_fts else 'MISSED'}", file=sys.stderr)
+    print(
+        f"\n  FTS5-only: D157={'FOUND' if d157_in_fts else 'MISSED'}, "
+        f"D188={'FOUND' if d188_in_fts else 'MISSED'}",
+        file=sys.stderr,
+    )
 
     # --- HRR-only (from known D188 seed) ---
     d188_sid: str = groups["D188"][0] if "D188" in groups else ""
@@ -911,22 +885,21 @@ def test_vocabulary_gap(
         hrr_from_d188 = graph.query_single_hop(
             d188_sid, "AGENT_CONSTRAINT", top_k=10, threshold=0.0
         )
-    d157_in_hrr: bool = any(
-        nid.startswith("D157") for nid, _sim in hrr_from_d188
-    )
+    d157_in_hrr: bool = any(nid.startswith("D157") for nid, _sim in hrr_from_d188)
     d157_hrr_sim: float = 0.0
     for nid, sim in hrr_from_d188:
         if nid.startswith("D157"):
             d157_hrr_sim = sim
             break
 
-    print(f"  HRR-only (from D188): D157={'FOUND' if d157_in_hrr else 'MISSED'} "
-          f"(sim={d157_hrr_sim:.4f})", file=sys.stderr)
-    print(f"    HRR neighbors of D188:", file=sys.stderr)
+    print(
+        f"  HRR-only (from D188): D157={'FOUND' if d157_in_hrr else 'MISSED'} "
+        f"(sim={d157_hrr_sim:.4f})",
+        file=sys.stderr,
+    )
+    print("    HRR neighbors of D188:", file=sys.stderr)
     for nid, sim in hrr_from_d188[:8]:
-        is_behavioral: bool = any(
-            nid.startswith(d) for d in BEHAVIORAL_DECISIONS
-        )
+        is_behavioral: bool = any(nid.startswith(d) for d in BEHAVIORAL_DECISIONS)
         marker: str = " <-- BEHAVIORAL" if is_behavioral else ""
         print(f"      {nid}: sim={sim:.4f}{marker}", file=sys.stderr)
 
@@ -944,37 +917,31 @@ def test_vocabulary_gap(
 
     d157_in_combined: bool = "D157" in combined_dids
 
-    print(f"  Combined: D157={'FOUND' if d157_in_combined else 'MISSED'}",
-          file=sys.stderr)
-    print(f"    FTS5 finds D188, HRR walks AGENT_CONSTRAINT to find D157",
-          file=sys.stderr)
+    print(
+        f"  Combined: D157={'FOUND' if d157_in_combined else 'MISSED'}", file=sys.stderr
+    )
+    print(
+        "    FTS5 finds D188, HRR walks AGENT_CONSTRAINT to find D157", file=sys.stderr
+    )
 
     # Separation analysis for HRR results
     behavioral_sims: list[float] = []
     distractor_sims: list[float] = []
     for nid, sim in hrr_from_d188:
-        is_behavioral = any(
-            nid.startswith(d) for d in BEHAVIORAL_DECISIONS
-        )
+        is_behavioral = any(nid.startswith(d) for d in BEHAVIORAL_DECISIONS)
         if is_behavioral:
             behavioral_sims.append(sim)
         else:
             distractor_sims.append(sim)
 
     mean_behavioral: float = (
-        sum(behavioral_sims) / len(behavioral_sims)
-        if behavioral_sims
-        else 0.0
+        sum(behavioral_sims) / len(behavioral_sims) if behavioral_sims else 0.0
     )
     mean_distractor: float = (
-        sum(distractor_sims) / len(distractor_sims)
-        if distractor_sims
-        else 0.0
+        sum(distractor_sims) / len(distractor_sims) if distractor_sims else 0.0
     )
     separation: float = (
-        mean_behavioral / max(abs(mean_distractor), 0.001)
-        if behavioral_sims
-        else 0.0
+        mean_behavioral / max(abs(mean_distractor), 0.001) if behavioral_sims else 0.0
     )
 
     fts_db.close()
@@ -1014,6 +981,7 @@ def test_vocabulary_gap(
 # Test 5: Capacity analysis
 # ===================================================================
 
+
 def test_capacity_analysis(
     sentences: SentDict,
     groups: GroupDict,
@@ -1037,12 +1005,8 @@ def test_capacity_analysis(
     capacity_2048: int = 2048 // 9  # ~227
     capacity_4096: int = 4096 // 9  # ~455
 
-    over_capacity_2048: int = sum(
-        1 for s in partition_sizes if s > capacity_2048
-    )
-    over_capacity_4096: int = sum(
-        1 for s in partition_sizes if s > capacity_4096
-    )
+    over_capacity_2048: int = sum(1 for s in partition_sizes if s > capacity_2048)
+    over_capacity_4096: int = sum(1 for s in partition_sizes if s > capacity_4096)
 
     # Memory footprint
     n_partitions: int = len(partitions)
@@ -1074,18 +1038,14 @@ def test_capacity_analysis(
 
         # Assume avg partition size stays ~50-60 edges
         avg_partition_size: float = (
-            sum(partition_sizes) / len(partition_sizes)
-            if partition_sizes
-            else 50.0
+            sum(partition_sizes) / len(partition_sizes) if partition_sizes else 50.0
         )
         projected_partitions: int = max(
             1, math.ceil(projected_edges / avg_partition_size)
         )
 
         for dim in [2048, 4096]:
-            total_vecs: int = (
-                projected_partitions + target_nodes + n_edge_types
-            )
+            total_vecs: int = projected_partitions + target_nodes + n_edge_types
             mem_bytes = total_vecs * dim * 8
             mem_mb = mem_bytes / (1024 * 1024)
 
@@ -1114,15 +1074,11 @@ def test_capacity_analysis(
                 "min": min(partition_sizes) if partition_sizes else 0,
                 "max": max(partition_sizes) if partition_sizes else 0,
                 "mean": (
-                    round(
-                        sum(partition_sizes) / len(partition_sizes), 1
-                    )
+                    round(sum(partition_sizes) / len(partition_sizes), 1)
                     if partition_sizes
                     else 0.0
                 ),
-                "median": round(
-                    float(np.median(partition_sizes)), 1
-                )
+                "median": round(float(np.median(partition_sizes)), 1)
                 if partition_sizes
                 else 0.0,
             },
@@ -1136,13 +1092,11 @@ def test_capacity_analysis(
         },
         "memory_footprint": {
             "dim_2048_mb": round(
-                (n_partitions + n_nodes + n_edge_types) * 2048 * 8
-                / (1024 * 1024),
+                (n_partitions + n_nodes + n_edge_types) * 2048 * 8 / (1024 * 1024),
                 2,
             ),
             "dim_4096_mb": round(
-                (n_partitions + n_nodes + n_edge_types) * 4096 * 8
-                / (1024 * 1024),
+                (n_partitions + n_nodes + n_edge_types) * 4096 * 8 / (1024 * 1024),
                 2,
             ),
         },
@@ -1156,6 +1110,7 @@ def test_capacity_analysis(
 # Main
 # ===================================================================
 
+
 def main() -> None:
     print("=" * 70, file=sys.stderr)
     print("Experiment 45: HRR Belief Prototype", file=sys.stderr)
@@ -1165,17 +1120,14 @@ def main() -> None:
     print("\nLoading sentence graph...", file=sys.stderr)
     sentences, groups, edges = load_sentence_graph()
     print(
-        f"  {len(sentences)} sentences, {len(groups)} decisions, "
-        f"{len(edges)} edges",
+        f"  {len(sentences)} sentences, {len(groups)} decisions, {len(edges)} edges",
         file=sys.stderr,
     )
 
     edge_type_counts: defaultdict[str, int] = defaultdict(int)
     for _src, _dst, et in edges:
         edge_type_counts[et] += 1
-    for et, count in sorted(
-        edge_type_counts.items(), key=lambda x: x[1], reverse=True
-    ):
+    for et, count in sorted(edge_type_counts.items(), key=lambda x: x[1], reverse=True):
         print(f"    {et}: {count}", file=sys.stderr)
 
     # Run all tests
@@ -1184,15 +1136,11 @@ def main() -> None:
     all_results["test1_partition_strategies"] = test_partition_strategies(
         sentences, groups, edges
     )
-    all_results["test2_dim_comparison"] = test_dim_comparison(
-        sentences, groups, edges
-    )
+    all_results["test2_dim_comparison"] = test_dim_comparison(sentences, groups, edges)
     all_results["test3_integrated_pipeline"] = test_integrated_pipeline(
         sentences, groups, edges
     )
-    all_results["test4_vocabulary_gap"] = test_vocabulary_gap(
-        sentences, groups, edges
-    )
+    all_results["test4_vocabulary_gap"] = test_vocabulary_gap(sentences, groups, edges)
     all_results["test5_capacity_analysis"] = test_capacity_analysis(
         sentences, groups, edges
     )

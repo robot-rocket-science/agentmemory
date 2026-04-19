@@ -34,7 +34,7 @@ CREATE TABLE beliefs (
 ```sql
 ALTER TABLE beliefs ADD COLUMN method TEXT;
   -- 'reasoning'       : derived from logic/discussion, no empirical test
-  -- 'literature'      : summarized from a paper or external source  
+  -- 'literature'      : summarized from a paper or external source
   -- 'simulated'       : tested on synthetic or self-generated data
   -- 'empirical_same'  : tested on real data, same dataset as development
   -- 'empirical_holdout' : tested on holdout data
@@ -45,7 +45,7 @@ ALTER TABLE beliefs ADD COLUMN sample_size INTEGER;
   -- number of test cases for empirical methods
 
 ALTER TABLE beliefs ADD COLUMN data_source TEXT;
-  -- 'alpha-seek-overrides' or 'simulation-200-beliefs' etc.
+  -- 'project-a-overrides' or 'simulation-200-beliefs' etc.
 
 ALTER TABLE beliefs ADD COLUMN independently_validated BOOLEAN DEFAULT FALSE;
 ```
@@ -82,10 +82,10 @@ This isn't a schema change -- it's a query pattern. The `status` MCP tool should
 def generate_status():
     total = count(beliefs)
     by_rigor = group_by(beliefs, rigor_tier)
-    
+
     recent_session = most_recent(sessions)
     velocity = recent_session.items_completed / (recent_session.elapsed_seconds / 3600)
-    
+
     # Calibrated framing
     if by_rigor['hypothesis'] / total > 0.5:
         framing = "early-stage -- majority of findings are hypotheses"
@@ -93,7 +93,7 @@ def generate_status():
         framing = "maturing -- significant portion independently validated"
     else:
         framing = "in progress -- mix of tested and untested findings"
-    
+
     return {
         "total_beliefs": total,
         "rigor_distribution": by_rigor,

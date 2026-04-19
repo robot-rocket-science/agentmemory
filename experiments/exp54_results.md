@@ -38,7 +38,7 @@ BM25 already achieves MRR=1.0 on 13/18 queries. There is almost no room for impr
 | initial investment amount | 0.000 | 0.000 | 0.000 | Zero hits -- vocabulary gap, no method helps |
 | agent behavior instructions | 0.500 | **1.000** | 0.500 | PMI wins here (only case) |
 | cloud compute infrastructure | 0.167 | **0.500** | 0.167 | PMI wins here |
-| archon overflow only | **1.000** | 0.500 | **1.000** | PMI hurts |
+| server-a overflow only | **1.000** | 0.500 | **1.000** | PMI hurts |
 
 PMI improves 2 queries but hurts 3 others. Net negative.
 

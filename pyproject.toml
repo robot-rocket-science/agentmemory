@@ -27,7 +27,7 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/yoshi280/agentmemory"
 Repository = "https://github.com/yoshi280/agentmemory"
-Changelog = "https://github.com/yoshi280/agentmemory/blob/master/CHANGELOG.md"
+Changelog = "https://github.com/robot-rocket-science/agentmemory/blob/master/CHANGELOG.md"
 
 [project.scripts]
 agentmemory = "agentmemory.cli:main"
@@ -47,4 +47,10 @@ dev = [
 [tool.pyright]
 pythonVersion = "3.12"
 typeCheckingMode = "strict"
-exclude = ["experiments/exp4[0-9]*.py", "experiments/exp5[0-9]*.py", "experiments/exp60*.py"]
+exclude = ["experiments/"]
+
+[tool.ruff]
+extend-exclude = ["experiments/"]
+
+[tool.ruff.lint]
+extend-ignore = ["E402"]

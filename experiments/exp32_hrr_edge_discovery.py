@@ -33,9 +33,11 @@ import numpy.typing as npt
 
 DIM = 2048
 
-DB = Path("/Users/thelorax/projects/.gsd/workflows/spikes/"
-          "260406-1-associative-memory-for-gsd-please-explor/"
-          "sandbox/alpha-seek.db")
+DB = Path(
+    "/home/user/projects/.gsd/workflows/spikes/"
+    "260406-1-associative-memory-for-gsd-please-explor/"
+    "sandbox/project-a.db"
+)
 
 NDArr = npt.NDArray[np.float64]
 
@@ -44,26 +46,30 @@ def make_vec(rng: np.random.Generator) -> NDArr:
     v: NDArr = rng.standard_normal(DIM)
     return v / np.linalg.norm(v)
 
+
 def bind(a: NDArr, b: NDArr) -> NDArr:
     result: NDArr = np.real(np.fft.ifft(np.fft.fft(a) * np.fft.fft(b)))
     return result
+
 
 def unbind(key: NDArr, bound: NDArr) -> NDArr:
     result: NDArr = np.real(np.fft.ifft(np.conj(np.fft.fft(key)) * np.fft.fft(bound)))
     return result
 
+
 def cos_sim(a: NDArr, b: NDArr) -> float:
     na: np.floating[Any] = np.linalg.norm(a)
     nb: np.floating[Any] = np.linalg.norm(b)
-    if na == 0 or nb == 0: return 0.0
+    if na == 0 or nb == 0:
+        return 0.0
     return float(np.dot(a, b) / (na * nb))
 
 
 def split_sents(text: str) -> list[str]:
-    parts: list[str | Any] = re.split(r'(?<=[.!?])\s+(?=[A-Z])', text)
+    parts: list[str | Any] = re.split(r"(?<=[.!?])\s+(?=[A-Z])", text)
     sents: list[str] = []
     for p in parts:
-        for sp in str(p).split(' | '):
+        for sp in str(p).split(" | "):
             sp = sp.strip()
             if len(sp) > 10:
                 sents.append(sp)
@@ -72,15 +78,18 @@ def split_sents(text: str) -> list[str]:
 
 def classify(s: str) -> str:
     sl: str = s.lower()
-    if any(w in sl for w in ['must', 'always', 'never', 'mandatory', 'require', 'banned', 'do not']):
-        return 'constraint'
-    if any(w in sl for w in ['because', 'rationale', 'reason', 'driven by']):
-        return 'rationale'
-    if any(w in sl for w in ['data', 'showed', 'result', 'found', '%', 'measured']):
-        return 'evidence'
-    if any(w in sl for w in ['supersede', 'replace', 'retire']):
-        return 'supersession'
-    return 'context'
+    if any(
+        w in sl
+        for w in ["must", "always", "never", "mandatory", "require", "banned", "do not"]
+    ):
+        return "constraint"
+    if any(w in sl for w in ["because", "rationale", "reason", "driven by"]):
+        return "rationale"
+    if any(w in sl for w in ["data", "showed", "result", "found", "%", "measured"]):
+        return "evidence"
+    if any(w in sl for w in ["supersede", "replace", "retire"]):
+        return "supersession"
+    return "context"
 
 
 SentDict = dict[str, dict[str, Any]]
@@ -122,7 +131,7 @@ def main() -> None:
     print(f"  {len(sentences)} sentences from {len(groups)} decisions", file=sys.stderr)
 
     # --- Ground truth: regex-extracted CITES edges ---
-    d_ref: re.Pattern[str] = re.compile(r'\bD(\d{2,3})\b')
+    d_ref: re.Pattern[str] = re.compile(r"\bD(\d{2,3})\b")
     regex_edges: set[tuple[str, str]] = set()
     for sid, sent in sentences.items():
         parent: str = sent["parent"]
@@ -138,15 +147,19 @@ def main() -> None:
     # --- HRR encoding: bind sentences with structural context ---
     node_vecs: dict[str, NDArr] = {sid: make_vec(rng) for sid in sentences}
     parent_vecs: dict[str, NDArr] = {did: make_vec(rng) for did in groups}
-    type_vecs: dict[str, NDArr] = {t: make_vec(rng) for t in ['constraint', 'rationale', 'evidence', 'supersession', 'context']}
+    type_vecs: dict[str, NDArr] = {
+        t: make_vec(rng)
+        for t in ["constraint", "rationale", "evidence", "supersession", "context"]
+    }
 
     # Build a structural encoding for each sentence:
     # encoded[sid] = node_vec * parent_vec * type_vec
     # This captures: what sentence is this, what decision is it from, what role does it play
     encoded: dict[str, NDArr] = {}
     for sid, sent in sentences.items():
-        encoded[sid] = bind(bind(node_vecs[sid], parent_vecs[sent["parent"]]),
-                           type_vecs[sent["type"]])
+        encoded[sid] = bind(
+            bind(node_vecs[sid], parent_vecs[sent["parent"]]), type_vecs[sent["type"]]
+        )
 
     # Build superposition per decision: all sentences in a decision, encoded
     decision_supers: dict[str, NDArr] = {}
@@ -163,7 +176,7 @@ def main() -> None:
     # The HRR way: unbind my structural encoding from another decision's superposition.
     # If the result is close to any known node vector, there's a relationship.
 
-    print(f"\n  Discovering edges via HRR structural similarity...", file=sys.stderr)
+    print("\n  Discovering edges via HRR structural similarity...", file=sys.stderr)
 
     discovered_edges: set[tuple[str, str]] = set()
     discovery_scores: dict[tuple[str, str], float] = {}
@@ -205,13 +218,17 @@ def main() -> None:
     false_positives: set[tuple[str, str]] = discovered_edges - regex_edges
     false_negatives: set[tuple[str, str]] = regex_edges - discovered_edges
 
-    precision: float = len(true_positives) / len(discovered_edges) if discovered_edges else 0
+    precision: float = (
+        len(true_positives) / len(discovered_edges) if discovered_edges else 0
+    )
     recall: float = len(true_positives) / len(regex_edges) if regex_edges else 0
-    f1: float = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
+    f1: float = (
+        2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
+    )
 
-    print(f"\n{'='*60}", file=sys.stderr)
-    print(f"RESULTS: HRR Edge Discovery vs Regex Ground Truth", file=sys.stderr)
-    print(f"{'='*60}", file=sys.stderr)
+    print(f"\n{'=' * 60}", file=sys.stderr)
+    print("RESULTS: HRR Edge Discovery vs Regex Ground Truth", file=sys.stderr)
+    print(f"{'=' * 60}", file=sys.stderr)
     print(f"  Regex edges (ground truth): {len(regex_edges)}", file=sys.stderr)
     print(f"  HRR discovered edges:       {len(discovered_edges)}", file=sys.stderr)
     print(f"  True positives:             {len(true_positives)}", file=sys.stderr)
@@ -223,7 +240,9 @@ def main() -> None:
 
     # Show some true positives
     if true_positives:
-        print(f"\n  Sample TRUE POSITIVES (HRR found what regex found):", file=sys.stderr)
+        print(
+            "\n  Sample TRUE POSITIVES (HRR found what regex found):", file=sys.stderr
+        )
         for src, dst in list(true_positives)[:5]:
             sim: float = discovery_scores.get((src, dst), 0)
             print(f"    {src} -> {dst} (sim={sim:.4f})", file=sys.stderr)
@@ -232,9 +251,13 @@ def main() -> None:
 
     # Show some false positives (HRR found something regex didn't)
     if false_positives:
-        print(f"\n  Sample FALSE POSITIVES (HRR found, regex didn't -- are these real?):",
-              file=sys.stderr)
-        fps: list[tuple[str, str]] = sorted(false_positives, key=lambda e: discovery_scores.get(e, 0), reverse=True)
+        print(
+            "\n  Sample FALSE POSITIVES (HRR found, regex didn't -- are these real?):",
+            file=sys.stderr,
+        )
+        fps: list[tuple[str, str]] = sorted(
+            false_positives, key=lambda e: discovery_scores.get(e, 0), reverse=True
+        )
         for src, dst in fps[:5]:
             sim = discovery_scores.get((src, dst), 0)
             print(f"    {src} -> {dst} (sim={sim:.4f})", file=sys.stderr)
@@ -243,9 +266,14 @@ def main() -> None:
 
     # Key question: are the false positives actually useful relationships
     # that regex couldn't find because there's no D### reference?
-    print(f"\n  KEY QUESTION: Are the {len(false_positives)} 'false positives' actually", file=sys.stderr)
-    print(f"  useful relationships that regex missed (no D### reference)?", file=sys.stderr)
-    print(f"  Manual inspection of the samples above is needed.", file=sys.stderr)
+    print(
+        f"\n  KEY QUESTION: Are the {len(false_positives)} 'false positives' actually",
+        file=sys.stderr,
+    )
+    print(
+        "  useful relationships that regex missed (no D### reference)?", file=sys.stderr
+    )
+    print("  Manual inspection of the samples above is needed.", file=sys.stderr)
 
 
 if __name__ == "__main__":

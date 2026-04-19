@@ -1,4 +1,4 @@
-The palace has one wing (`alpha_seek`) with ~10K drawers -- no `agentmemory` wing mined yet.
+The palace has one wing (`project_a`) with ~10K drawers -- no `agentmemory` wing mined yet.
 
 Based on the TODO.md I read, here's where the project stands:
 

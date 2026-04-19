@@ -237,13 +237,13 @@ Measured as: Wall-clock time for full CALLS + PASSES_DATA extraction on each pil
 
 ### 5.1 Test Repositories
 
-From the existing T0 corpus (archon:~/agentmemory-corpus/extracted/):
+From the existing T0 corpus (server-a:~/agentmemory-corpus/extracted/):
 
 | Repo | Language | Files | Commits | Why |
 |------|----------|-------|---------|-----|
 | smoltcp | Rust | ~200 | 1,577 | Protocol layers, deep call chains, moderate size |
 | gsd-2 | TypeScript | ~450 | 2,150 | Our own tooling, known ground truth from development |
-| debserver | Python/TS | ~100 | 526 | Infrastructure, thin call graph, tests baseline assumptions |
+| project-d | Python/TS | ~100 | 526 | Infrastructure, thin call graph, tests baseline assumptions |
 | boa | Rust | ~400 | 3,354 | Compiler pipeline, deep data flow, stress tests scale |
 | rustls | Rust | ~300 | 5,024 | Crypto library, clean API boundaries, validates precision |
 
@@ -564,7 +564,7 @@ This validates H1 (structural novelty) decisively. Jaccard of 0.012 is far below
 
 ### 11.2 Resolution Rate Is a Problem
 
-18.9% resolution on alpha-seek (worse than the 24.4% on agentmemory). The cause is clear from the unresolved calls: Python is method-call-heavy, and attribute access (obj.method()) requires type information that AST parsing alone cannot provide.
+18.9% resolution on project-a (worse than the 24.4% on agentmemory). The cause is clear from the unresolved calls: Python is method-call-heavy, and attribute access (obj.method()) requires type information that AST parsing alone cannot provide.
 
 **But:** 3,489 resolved CALLS edges is still substantial. And the resolution rate primarily affects *cross-file* CALLS edges. Intra-file calls resolve well because the callee is defined in the same scope.
 
@@ -615,7 +615,7 @@ Each answer is correct and partial. Combined, they give a much richer picture of
 2. **Type annotation harvesting** (zero-LLM): Extract type hints from function signatures and variable annotations. `def foo(x: Portfolio) -> float` resolves `x.history` to `Portfolio.history`.
 3. **LSP fallback** (heavier): Run pyright in batch mode for full type resolution. Higher accuracy but adds a dependency.
 
-**For Rust/TypeScript repos:** Resolution rates should be dramatically better due to static dispatch. Validate with the T0 corpus repos on archon as next step.
+**For Rust/TypeScript repos:** Resolution rates should be dramatically better due to static dispatch. Validate with the T0 corpus repos on server-a as next step.
 
 **Recommended Tier placement:** Tier 2.5 confirmed. Between IMPORTS (module-level) and structural types (TESTS, CITES).
 

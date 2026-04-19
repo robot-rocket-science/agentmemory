@@ -16,13 +16,13 @@ Experiment 6 Phase B: Detecting Memory Failure Patterns
       1: Execution order and gate policy for queued milestones after M023-vyt1ni: Run all
       2: Execution priority for 4 milestones after M024-60hkjc, informed by M023-vyt1ni k
     D194-D195: sim=0.278
-      1: How to prevent research findings from being ignored during milestone execution: 
+      1: How to prevent research findings from being ignored during milestone execution:
       2: Execution fidelity gap: research findings must be verified as actually incorpora
     D159-D160: sim=0.267
       1: Which contextual bandit algorithm to use for M024 contract selection: Thompson S
       2: Arm discretization for M024 bandit contract selection: 9 arms: 3 delta buckets x
     D127-D163: sim=0.263
-      1: D097 walk-forward verdict for highvol fixed-family (highvol_strict and highvol) 
+      1: D097 walk-forward verdict for highvol fixed-family (highvol_strict and highvol)
       2: D097 walk-forward verdict for Thompson Sampling bandit contract selector (M024):
     D148-D160: sim=0.250
       1: Revised scope for M024-60hkjc (Contextual Bandit): 4 runs: LinUCB + Thompson Sam
@@ -31,7 +31,7 @@ Experiment 6 Phase B: Detecting Memory Failure Patterns
     1 cross-milestone overlaps (sim >= 0.30)
     1 without cross-citation (potential repeated research)
     K183(M018) - K191(M001): sim=0.417
-      1: M018: KNOWLEDGE.md M001 OTM baseline E[V]=+2.854 is bothsides (calls+puts), not 
+      1: M018: KNOWLEDGE.md M001 OTM baseline E[V]=+2.854 is bothsides (calls+puts), not
       2: M001_OTM_baseline call-only E[V] is -0.08 (margin=-1.7pp), NOT +2.854
   P3: Detecting repeated debugging sessions...
     169 fix/debug commits out of 1154 total
@@ -49,13 +49,13 @@ Experiment 6 Phase B: Detecting Memory Failure Patterns
       2026-03-24 Fix put intrinsic pricing bug, redispatch argmax runs, update docs
       2026-03-24 Redispatch argmax runs with REAL put intrinsic fix (putfix image)
     Cluster (size 4):
-      2026-03-24 fix: export_event_routing_v2a.py API mismatches with optimus-prime
-      2026-03-24 fix: export_event_routing_v2a.py API mismatches with optimus-prime
+      2026-03-24 fix: export_event_routing_v2a.py API mismatches with project-b
+      2026-03-24 fix: export_event_routing_v2a.py API mismatches with project-b
       2026-03-24 fix: sys.path ordering in export_event_routing_v2a.py (append optimus-
     Cluster (size 4):
-      2026-03-24 fix: platform-aware sys.path for archon compatibility
-      2026-03-24 fix: platform-aware sys.path for archon compatibility
-      2026-03-24 fix(S01/T01): Fixed sys.path and module resolution for archon, dispatc
+      2026-03-24 fix: platform-aware sys.path for server-a compatibility
+      2026-03-24 fix: platform-aware sys.path for server-a compatibility
+      2026-03-24 fix(S01/T01): Fixed sys.path and module resolution for server-a, dispatc
   P4: Detecting repeated procedural instructions...
     100 procedural decisions out of 173
     9 clusters of repeated instructions
@@ -65,7 +65,7 @@ Experiment 6 Phase B: Detecting Memory Failure Patterns
       D124: D097 walk-forward verdict for F4 (delta_spread_trail) exit rule on arg
       D127: D097 walk-forward verdict for highvol fixed-family (highvol_strict and
       D163: D097 walk-forward verdict for Thompson Sampling bandit contract select
-    Cluster (size 2): Config selection criterion for holdout re-derivation sweep: 
+    Cluster (size 2): Config selection criterion for holdout re-derivation sweep:
       D091: Config selection criterion for holdout re-derivation sweep: Use the sa
       D095: Re-derived best config for holdout validation (M007-xtpz0d S01): 0.05/
     Cluster (size 2): How to evaluate strategy performance across time: Walk-forwa

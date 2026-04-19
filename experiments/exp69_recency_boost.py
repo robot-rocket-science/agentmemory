@@ -3,6 +3,7 @@
 Tests whether recency_boost() helps newly inserted beliefs penetrate the
 existing top-10 retrieval results.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -26,7 +27,7 @@ from agentmemory.store import MemoryStore
 # Config
 # ---------------------------------------------------------------------------
 
-CWD: Final[str] = "/Users/thelorax/projects/agentmemory"
+CWD: Final[str] = "/home/user/projects/agentmemory"
 DB_HASH: Final[str] = hashlib.sha256(CWD.encode()).hexdigest()[:12]
 LIVE_DB: Final[Path] = Path.home() / ".agentmemory" / "projects" / DB_HASH / "memory.db"
 
@@ -35,26 +36,86 @@ MRR_K: Final[int] = 10
 
 # New beliefs to insert: (topic_query, content)
 NEW_BELIEFS: Final[list[tuple[str, str]]] = [
-    ("locked beliefs constraints", "All locked beliefs must be obeyed without exception in every session."),
-    ("locked beliefs constraints", "Locked corrections override all other belief types during retrieval."),
-    ("FTS5 retrieval search", "FTS5 uses porter stemming tokenizer for belief content indexing."),
-    ("FTS5 retrieval search", "BM25 ranking is the primary FTS5 scoring mechanism for search."),
-    ("correction detection pipeline", "Corrections are detected via explicit user statements and implicit contradictions."),
-    ("correction detection pipeline", "Detected corrections are automatically locked and assigned high alpha priors."),
-    ("belief type priors weights", "Requirement beliefs have the highest type weight at 2.5."),
-    ("belief type priors weights", "Correction beliefs have a type weight of 2.0 in the scoring pipeline."),
-    ("HRR vocabulary bridge", "HRR vocabulary bridge finds structurally connected beliefs that FTS5 misses."),
-    ("HRR vocabulary bridge", "HRR uses holographic reduced representations with circular convolution."),
-    ("scoring pipeline Thompson sampling", "Thompson sampling draws from Beta(alpha, beta_param) for ranking."),
-    ("scoring pipeline Thompson sampling", "Score combines Thompson sample, decay factor, and lock boost."),
-    ("recency boost new beliefs", "Recency boost gives 2x multiplier to brand-new beliefs decaying over 24 hours."),
-    ("recency boost new beliefs", "Recency boost uses exponential decay with configurable half-life."),
-    ("token budget compression", "Token budget defaults to 2000 tokens for retrieval context injection."),
-    ("token budget compression", "Belief compression strips metadata and truncates long content."),
-    ("session tracking tokens", "Sessions track retrieval tokens, classification tokens, and feedback counts."),
-    ("session tracking tokens", "Session token accounting enables cost amortization analysis."),
-    ("edge graph triples", "Graph edges encode CITES, RELATES_TO, SUPERSEDES, CONTRADICTS, SUPPORTS relationships."),
-    ("edge graph triples", "Edge triples feed the HRR graph for vocabulary bridge expansion."),
+    (
+        "locked beliefs constraints",
+        "All locked beliefs must be obeyed without exception in every session.",
+    ),
+    (
+        "locked beliefs constraints",
+        "Locked corrections override all other belief types during retrieval.",
+    ),
+    (
+        "FTS5 retrieval search",
+        "FTS5 uses porter stemming tokenizer for belief content indexing.",
+    ),
+    (
+        "FTS5 retrieval search",
+        "BM25 ranking is the primary FTS5 scoring mechanism for search.",
+    ),
+    (
+        "correction detection pipeline",
+        "Corrections are detected via explicit user statements and implicit contradictions.",
+    ),
+    (
+        "correction detection pipeline",
+        "Detected corrections are automatically locked and assigned high alpha priors.",
+    ),
+    (
+        "belief type priors weights",
+        "Requirement beliefs have the highest type weight at 2.5.",
+    ),
+    (
+        "belief type priors weights",
+        "Correction beliefs have a type weight of 2.0 in the scoring pipeline.",
+    ),
+    (
+        "HRR vocabulary bridge",
+        "HRR vocabulary bridge finds structurally connected beliefs that FTS5 misses.",
+    ),
+    (
+        "HRR vocabulary bridge",
+        "HRR uses holographic reduced representations with circular convolution.",
+    ),
+    (
+        "scoring pipeline Thompson sampling",
+        "Thompson sampling draws from Beta(alpha, beta_param) for ranking.",
+    ),
+    (
+        "scoring pipeline Thompson sampling",
+        "Score combines Thompson sample, decay factor, and lock boost.",
+    ),
+    (
+        "recency boost new beliefs",
+        "Recency boost gives 2x multiplier to brand-new beliefs decaying over 24 hours.",
+    ),
+    (
+        "recency boost new beliefs",
+        "Recency boost uses exponential decay with configurable half-life.",
+    ),
+    (
+        "token budget compression",
+        "Token budget defaults to 2000 tokens for retrieval context injection.",
+    ),
+    (
+        "token budget compression",
+        "Belief compression strips metadata and truncates long content.",
+    ),
+    (
+        "session tracking tokens",
+        "Sessions track retrieval tokens, classification tokens, and feedback counts.",
+    ),
+    (
+        "session tracking tokens",
+        "Session token accounting enables cost amortization analysis.",
+    ),
+    (
+        "edge graph triples",
+        "Graph edges encode CITES, RELATES_TO, SUPERSEDES, CONTRADICTS, SUPPORTS relationships.",
+    ),
+    (
+        "edge graph triples",
+        "Edge triples feed the HRR graph for vocabulary bridge expansion.",
+    ),
 ]
 
 QUERIES: Final[list[str]] = sorted(set(topic for topic, _ in NEW_BELIEFS))
@@ -63,6 +124,7 @@ QUERIES: Final[list[str]] = sorted(set(topic for topic, _ in NEW_BELIEFS))
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -130,6 +192,7 @@ def find_new_with_recency(
     time_iso: str,
 ) -> dict[str, list[str]]:
     """Retrieve with monkey-patched recency boost, return new IDs in top-k."""
+
     def patched_score(belief: Belief, query: str, current_time_iso: str) -> float:
         return score_belief_with_recency(belief, query, time_iso)
 
@@ -145,6 +208,7 @@ def find_new_with_recency(
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     if not LIVE_DB.exists():
@@ -182,7 +246,7 @@ def main() -> None:
             print(f"    {q}: {len(found)} found")
 
     # Test 2: With recency boost (current time)
-    print(f"\nTest 2: With recency boost (t=now)...")
+    print("\nTest 2: With recency boost (t=now)...")
     with_boost: dict[str, list[str]] = find_new_with_recency(
         store, QUERIES, new_ids, MRR_K, now_iso
     )
@@ -194,7 +258,7 @@ def main() -> None:
 
     # Test 3: With recency boost (t=now+48h) -- should decay
     future_iso: str = _future_iso(48.0)
-    print(f"\nTest 3: With recency boost (t=now+48h)...")
+    print("\nTest 3: With recency boost (t=now+48h)...")
     with_boost_48h: dict[str, list[str]] = find_new_with_recency(
         store, QUERIES, new_ids, MRR_K, future_iso
     )

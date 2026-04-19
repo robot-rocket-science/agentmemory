@@ -6,10 +6,10 @@ the next session. Hour-scale decay creates natural separation between
 fast-sprint findings and locked constraints from months of use.
 
 Data sources (same as Exp 58b):
-  - /Users/thelorax/projects/alpha-seek-memtest/.gsd/DECISIONS.md (183 active)
-  - /Users/thelorax/projects/alpha-seek/docs/DECISIONS-ARCHIVE.md (35 superseded)
-  - /Users/thelorax/projects/agentmemory/experiments/exp6_failures_v2.json (38 corrections)
-  - git log from optimus-prime + alpha-seek + alpha-seek-memtest repos
+  - /home/user/projects/project-a-test/.gsd/DECISIONS.md (183 active)
+  - /home/user/projects/project-a/docs/DECISIONS-ARCHIVE.md (35 superseded)
+  - /home/user/projects/agentmemory/experiments/exp6_failures_v2.json (38 corrections)
+  - git log from project-b + project-a + project-a-test repos
 
 KEY CHANGE vs Exp 58b:
   - ALL timestamps stored and compared in HOURS since project start (not days).
@@ -43,53 +43,62 @@ from typing import Any, Final
 # Paths
 # ============================================================
 
-DECISIONS_MD: Final[Path] = Path(
-    "/Users/thelorax/projects/alpha-seek-memtest/.gsd/DECISIONS.md"
-)
+DECISIONS_MD: Final[Path] = Path("/home/user/projects/project-a-test/.gsd/DECISIONS.md")
 ARCHIVE_MD: Final[Path] = Path(
-    "/Users/thelorax/projects/alpha-seek/docs/DECISIONS-ARCHIVE.md"
+    "/home/user/projects/project-a/docs/DECISIONS-ARCHIVE.md"
 )
 EXP6_FAILURES: Final[Path] = Path(
-    "/Users/thelorax/projects/agentmemory/experiments/exp6_failures_v2.json"
+    "/home/user/projects/agentmemory/experiments/exp6_failures_v2.json"
 )
 RESULTS_PATH: Final[Path] = Path(
-    "/Users/thelorax/projects/agentmemory/experiments/exp58c_results.json"
+    "/home/user/projects/agentmemory/experiments/exp58c_results.json"
 )
 
-OPTIMUS_PRIME_REPO: Final[Path] = Path("/Users/thelorax/projects/optimus-prime")
-ALPHA_SEEK_REPO: Final[Path] = Path("/Users/thelorax/projects/alpha-seek")
-ALPHA_SEEK_MEMTEST_REPO: Final[Path] = Path("/Users/thelorax/projects/alpha-seek-memtest")
+OPTIMUS_PRIME_REPO: Final[Path] = Path("/home/user/projects/project-b")
+ALPHA_SEEK_REPO: Final[Path] = Path("/home/user/projects/project-a")
+ALPHA_SEEK_MEMTEST_REPO: Final[Path] = Path("/home/user/projects/project-a-test")
 
 # ============================================================
 # Config
 # ============================================================
 
-# Project epoch: earliest optimus-prime commit (Dec 2025)
+# Project epoch: earliest project-b commit (Dec 2025)
 # Used for "inherited" decisions and as t=0 for all hour-scale measurements.
 PROJECT_EPOCH: Final[str] = "2025-12-01T00:00:00+00:00"
 
 # Half-life sweep candidates in HOURS
 HALF_LIFE_CANDIDATES_H: Final[list[float]] = [
-    0.5, 1.0, 2.0, 4.0, 8.0, 12.0, 24.0, 48.0, 168.0, 336.0, 720.0
+    0.5,
+    1.0,
+    2.0,
+    4.0,
+    8.0,
+    12.0,
+    24.0,
+    48.0,
+    168.0,
+    336.0,
+    720.0,
 ]
 
 RANKING_THRESHOLDS: Final[list[int]] = [5, 10, 15]
 
 # Content-type multipliers for Strategy B
 CONTENT_TYPE_MULTIPLIERS: Final[dict[str, float]] = {
-    "CONSTRAINT": 0.0,    # never decays (locked) -- special-cased in scorer
-    "EVIDENCE":   1.0,
-    "CONTEXT":    0.25,
-    "PROCEDURE":  2.0,
-    "RATIONALE":  3.0,
+    "CONSTRAINT": 0.0,  # never decays (locked) -- special-cased in scorer
+    "EVIDENCE": 1.0,
+    "CONTEXT": 0.25,
+    "PROCEDURE": 2.0,
+    "RATIONALE": 3.0,
 }
 
 # Velocity thresholds (decisions per hour)
-VELOCITY_FAST: Final[float] = 10.0    # > 10 items/hour
+VELOCITY_FAST: Final[float] = 10.0  # > 10 items/hour
 VELOCITY_MOD_HI: Final[float] = 10.0
 VELOCITY_MOD_LO: Final[float] = 5.0
 VELOCITY_DEEP_HI: Final[float] = 5.0
 VELOCITY_DEEP_LO: Final[float] = 2.0
+
 
 # Velocity scale factors for Strategy C
 def velocity_scale(velocity: float) -> float:
@@ -107,6 +116,7 @@ def velocity_scale(velocity: float) -> float:
 # Enums and data structures
 # ============================================================
 
+
 class ContentType(Enum):
     CONSTRAINT = "CONSTRAINT"
     EVIDENCE = "EVIDENCE"
@@ -114,25 +124,46 @@ class ContentType(Enum):
     PROCEDURE = "PROCEDURE"
 
 
-SCOPE_CONSTRAINT: Final[frozenset[str]] = frozenset({
-    "architecture", "infrastructure", "operations", "agent behavior", "code-quality",
-})
-SCOPE_EVIDENCE: Final[frozenset[str]] = frozenset({
-    "strategy", "signal-model", "backtesting", "evaluation", "validation",
-})
-SCOPE_CONTEXT: Final[frozenset[str]] = frozenset({
-    "milestone", "bugfix", "reporting", "documentation",
-})
-SCOPE_PROCEDURE: Final[frozenset[str]] = frozenset({
-    "methodology", "configuration", "tooling",
-})
+SCOPE_CONSTRAINT: Final[frozenset[str]] = frozenset(
+    {
+        "architecture",
+        "infrastructure",
+        "operations",
+        "agent behavior",
+        "code-quality",
+    }
+)
+SCOPE_EVIDENCE: Final[frozenset[str]] = frozenset(
+    {
+        "strategy",
+        "signal-model",
+        "backtesting",
+        "evaluation",
+        "validation",
+    }
+)
+SCOPE_CONTEXT: Final[frozenset[str]] = frozenset(
+    {
+        "milestone",
+        "bugfix",
+        "reporting",
+        "documentation",
+    }
+)
+SCOPE_PROCEDURE: Final[frozenset[str]] = frozenset(
+    {
+        "methodology",
+        "configuration",
+        "tooling",
+    }
+)
 
 
 @dataclass
 class MilestoneInfo:
     milestone_id: str
-    first_commit_hours: float   # hours since PROJECT_EPOCH
-    last_commit_hours: float    # hours since PROJECT_EPOCH
+    first_commit_hours: float  # hours since PROJECT_EPOCH
+    last_commit_hours: float  # hours since PROJECT_EPOCH
     decision_count: int = 0
 
     @property
@@ -162,12 +193,12 @@ class Decision:
     made_by: str
     superseded_by: str | None
     is_archived: bool
-    created_at_hours: float      # HOURS since PROJECT_EPOCH (key change from 58b)
+    created_at_hours: float  # HOURS since PROJECT_EPOCH (key change from 58b)
     content_type: ContentType
     locked: bool
     is_inherited: bool
-    milestone_id: str | None     # primary milestone ID (for velocity lookup)
-    session_velocity: float      # decisions/hour for the session that produced this
+    milestone_id: str | None  # primary milestone ID (for velocity lookup)
+    session_velocity: float  # decisions/hour for the session that produced this
 
 
 @dataclass
@@ -194,7 +225,9 @@ class FlatSweepResult:
     prevention_rate_top5: float
     prevention_rate_top10: float
     prevention_rate_top15: float
-    per_cluster: dict[str, dict[str, float]] = field(default_factory=lambda: dict[str, dict[str, float]]())
+    per_cluster: dict[str, dict[str, float]] = field(
+        default_factory=lambda: dict[str, dict[str, float]]()
+    )
 
 
 @dataclass
@@ -203,8 +236,12 @@ class StrategyBResult:
     prevention_rate_top5: float
     prevention_rate_top10: float
     prevention_rate_top15: float
-    per_cluster: dict[str, dict[str, float]] = field(default_factory=lambda: dict[str, dict[str, float]]())
-    locked_unlocked_separation: dict[str, float] = field(default_factory=lambda: dict[str, float]())
+    per_cluster: dict[str, dict[str, float]] = field(
+        default_factory=lambda: dict[str, dict[str, float]]()
+    )
+    locked_unlocked_separation: dict[str, float] = field(
+        default_factory=lambda: dict[str, float]()
+    )
     score_distribution: dict[str, int] = field(default_factory=lambda: dict[str, int]())
 
 
@@ -214,8 +251,12 @@ class StrategyCResult:
     prevention_rate_top5: float
     prevention_rate_top10: float
     prevention_rate_top15: float
-    per_cluster: dict[str, dict[str, float]] = field(default_factory=lambda: dict[str, dict[str, float]]())
-    locked_unlocked_separation: dict[str, float] = field(default_factory=lambda: dict[str, float]())
+    per_cluster: dict[str, dict[str, float]] = field(
+        default_factory=lambda: dict[str, dict[str, float]]()
+    )
+    locked_unlocked_separation: dict[str, float] = field(
+        default_factory=lambda: dict[str, float]()
+    )
     score_distribution: dict[str, int] = field(default_factory=lambda: dict[str, int]())
 
 
@@ -224,12 +265,12 @@ class CS005Result:
     fastest_milestone_id: str
     fastest_milestone_velocity: float
     fast_sprint_decision_count: int
-    eval_at_hours: float   # milestone end + 12h
+    eval_at_hours: float  # milestone end + 12h
     fast_sprint_avg_score: float
     locked_avg_score: float
     inherited_avg_score: float
     fast_sprint_below_locked: bool
-    fast_sprint_ranks: list[tuple[str, int, float]]   # (d_id, rank, score)
+    fast_sprint_ranks: list[tuple[str, int, float]]  # (d_id, rank, score)
     locked_ranks: list[tuple[str, int, float]]
     inherited_ranks: list[tuple[str, int, float]]
 
@@ -237,6 +278,7 @@ class CS005Result:
 # ============================================================
 # Date utilities (HOURS not days)
 # ============================================================
+
 
 def _epoch_dt() -> datetime:
     return datetime.fromisoformat(PROJECT_EPOCH)
@@ -261,6 +303,7 @@ def git_date_to_hours(date_str: str) -> float:
 # ============================================================
 # Git log helpers
 # ============================================================
+
 
 def load_git_log(repo: Path) -> list[tuple[str, str, str]]:
     """Run git log and return list of (sha, date_str, subject)."""
@@ -289,9 +332,7 @@ def build_milestone_hour_index(repos: list[Path]) -> dict[str, MilestoneInfo]:
     Scans git commit messages for milestone IDs of the form M\\d+-[a-z0-9]{6}.
     Returns a dict keyed by uppercase milestone ID.
     """
-    milestone_pattern: re.Pattern[str] = re.compile(
-        r"M\d+-[a-z0-9]{6}", re.IGNORECASE
-    )
+    milestone_pattern: re.Pattern[str] = re.compile(r"M\d+-[a-z0-9]{6}", re.IGNORECASE)
 
     # milestone_id -> (first_hours, last_hours)
     first_hours: dict[str, float] = {}
@@ -348,6 +389,7 @@ def extract_all_milestones(when_raw: str) -> list[str]:
 # Markdown parsers
 # ============================================================
 
+
 def _parse_decisions_row(line: str) -> tuple[str, ...] | None:
     """Parse '| D### | when | scope | ... |' into 8-field tuple."""
     line = line.strip()
@@ -361,14 +403,14 @@ def _parse_decisions_row(line: str) -> tuple[str, ...] | None:
     if not re.match(r"D\d+$", d_id):
         return None
     return (
-        parts[0].strip(),   # D###
-        parts[1].strip(),   # When
-        parts[2].strip(),   # Scope
-        parts[3].strip(),   # Decision
-        parts[4].strip(),   # Choice
-        parts[5].strip(),   # Rationale
-        parts[6].strip(),   # Revisable?
-        parts[7].strip(),   # Made By
+        parts[0].strip(),  # D###
+        parts[1].strip(),  # When
+        parts[2].strip(),  # Scope
+        parts[3].strip(),  # Decision
+        parts[4].strip(),  # Choice
+        parts[5].strip(),  # Rationale
+        parts[6].strip(),  # Revisable?
+        parts[7].strip(),  # Made By
     )
 
 
@@ -431,7 +473,16 @@ def load_active_decisions(
         parsed = _parse_decisions_row(line)
         if parsed is None:
             continue
-        d_id, when_raw, scope, decision_text, choice_text, rationale_text, revisable_raw, made_by = parsed
+        (
+            d_id,
+            when_raw,
+            scope,
+            decision_text,
+            choice_text,
+            rationale_text,
+            revisable_raw,
+            made_by,
+        ) = parsed
 
         created_at_hours: float = _derive_hours(
             when_raw, milestone_index, optimus_earliest_hours, median_hours
@@ -442,24 +493,26 @@ def load_active_decisions(
         primary_mid: str | None = extract_primary_milestone(when_raw)
 
         # Velocity is resolved after all decisions loaded (second pass)
-        decisions.append(Decision(
-            d_id=d_id,
-            when_raw=when_raw,
-            scope=scope,
-            decision_text=decision_text,
-            choice_text=choice_text,
-            rationale_text=rationale_text,
-            revisable_raw=revisable_raw,
-            made_by=made_by,
-            superseded_by=None,
-            is_archived=False,
-            created_at_hours=created_at_hours,
-            content_type=content_type,
-            locked=locked,
-            is_inherited=is_inherited,
-            milestone_id=primary_mid,
-            session_velocity=1.0,  # filled in populate_velocities()
-        ))
+        decisions.append(
+            Decision(
+                d_id=d_id,
+                when_raw=when_raw,
+                scope=scope,
+                decision_text=decision_text,
+                choice_text=choice_text,
+                rationale_text=rationale_text,
+                revisable_raw=revisable_raw,
+                made_by=made_by,
+                superseded_by=None,
+                is_archived=False,
+                created_at_hours=created_at_hours,
+                content_type=content_type,
+                locked=locked,
+                is_inherited=is_inherited,
+                milestone_id=primary_mid,
+                session_velocity=1.0,  # filled in populate_velocities()
+            )
+        )
 
     print(f"[parse] active decisions: {len(decisions)}", file=sys.stderr)
     return decisions
@@ -514,24 +567,26 @@ def load_archived_decisions(
         is_inherited: bool = when_raw.strip().lower() == "inherited"
         primary_mid: str | None = extract_primary_milestone(when_raw)
 
-        decisions.append(Decision(
-            d_id=d_id,
-            when_raw=when_raw,
-            scope=scope,
-            decision_text=d_id,
-            choice_text=choice_text,
-            rationale_text=rationale_text,
-            revisable_raw="Yes",
-            made_by="unknown",
-            superseded_by=superseded_by,
-            is_archived=True,
-            created_at_hours=created_at_hours,
-            content_type=content_type,
-            locked=locked,
-            is_inherited=is_inherited,
-            milestone_id=primary_mid,
-            session_velocity=1.0,  # filled in populate_velocities()
-        ))
+        decisions.append(
+            Decision(
+                d_id=d_id,
+                when_raw=when_raw,
+                scope=scope,
+                decision_text=d_id,
+                choice_text=choice_text,
+                rationale_text=rationale_text,
+                revisable_raw="Yes",
+                made_by="unknown",
+                superseded_by=superseded_by,
+                is_archived=True,
+                created_at_hours=created_at_hours,
+                content_type=content_type,
+                locked=locked,
+                is_inherited=is_inherited,
+                milestone_id=primary_mid,
+                session_velocity=1.0,  # filled in populate_velocities()
+            )
+        )
 
     print(f"[parse] archived decisions: {len(decisions)}", file=sys.stderr)
     return decisions
@@ -540,6 +595,7 @@ def load_archived_decisions(
 # ============================================================
 # Velocity computation (second pass)
 # ============================================================
+
 
 def populate_velocities(
     decisions: list[Decision],
@@ -557,7 +613,9 @@ def populate_velocities(
     milestone_counts: dict[str, int] = {}
     for d in decisions:
         if d.milestone_id is not None and not d.is_inherited:
-            milestone_counts[d.milestone_id] = milestone_counts.get(d.milestone_id, 0) + 1
+            milestone_counts[d.milestone_id] = (
+                milestone_counts.get(d.milestone_id, 0) + 1
+            )
 
     # Update MilestoneInfo counts
     for mid, count in milestone_counts.items():
@@ -580,6 +638,7 @@ def populate_velocities(
 # Correction cluster loading
 # ============================================================
 
+
 def load_correction_clusters(path: Path) -> list[CorrectionCluster]:
     with path.open("r", encoding="utf-8") as fh:
         data: dict[str, Any] = json.load(fh)
@@ -591,13 +650,15 @@ def load_correction_clusters(path: Path) -> list[CorrectionCluster]:
             for ov in list[dict[str, Any]](cluster.get("overrides", []))
             if "timestamp" in ov
         ]
-        clusters.append(CorrectionCluster(
-            topic_id=str(cluster["topic_id"]),
-            description=str(cluster.get("description", "")),
-            decision_refs=list[str](cluster.get("decision_refs", [])),
-            correction_timestamps=timestamps,
-            is_memory_failure=bool(cluster.get("is_memory_failure", False)),
-        ))
+        clusters.append(
+            CorrectionCluster(
+                topic_id=str(cluster["topic_id"]),
+                description=str(cluster.get("description", "")),
+                decision_refs=list[str](cluster.get("decision_refs", [])),
+                correction_timestamps=timestamps,
+                is_memory_failure=bool(cluster.get("is_memory_failure", False)),
+            )
+        )
 
     total: int = sum(len(c.correction_timestamps) for c in clusters)
     mf_count: int = sum(1 for c in clusters if c.is_memory_failure)
@@ -612,6 +673,7 @@ def load_correction_clusters(path: Path) -> list[CorrectionCluster]:
 # ============================================================
 # Scoring -- Strategy A (flat hour-scale)
 # ============================================================
+
 
 def decay_score_flat(
     decision: Decision,
@@ -633,6 +695,7 @@ def decay_score_flat(
 # ============================================================
 # Scoring -- Strategy B (content-type-aware)
 # ============================================================
+
 
 def decay_score_type_aware(
     decision: Decision,
@@ -662,6 +725,7 @@ def decay_score_type_aware(
 # Scoring -- Strategy C (velocity-scaled)
 # ============================================================
 
+
 def decay_score_velocity(
     decision: Decision,
     current_time_hours: float,
@@ -680,7 +744,9 @@ def decay_score_velocity(
     if decision.superseded_by is not None:
         return 0.01
 
-    ct_multiplier: float = CONTENT_TYPE_MULTIPLIERS.get(decision.content_type.value, 1.0)
+    ct_multiplier: float = CONTENT_TYPE_MULTIPLIERS.get(
+        decision.content_type.value, 1.0
+    )
     if ct_multiplier == 0.0:
         return 1.0
 
@@ -696,6 +762,7 @@ def decay_score_velocity(
 # Ranking helpers
 # ============================================================
 
+
 def rank_by_scores(
     decisions: list[Decision],
     scores: list[float],
@@ -703,8 +770,7 @@ def rank_by_scores(
     """Sort (d_id, score) pairs by score desc, then by recency as tiebreaker."""
     assert len(decisions) == len(scores)
     combined: list[tuple[str, float, float]] = [
-        (d.d_id, s, d.created_at_hours)
-        for d, s in zip(decisions, scores)
+        (d.d_id, s, d.created_at_hours) for d, s in zip(decisions, scores)
     ]
     combined.sort(key=lambda x: (x[1], x[2]), reverse=True)
     return [(d_id, score) for d_id, score, _ in combined]
@@ -724,6 +790,7 @@ def find_best_rank(
 # Evaluation
 # ============================================================
 
+
 def _score_all_flat(
     decisions: list[Decision],
     current_time_hours: float,
@@ -742,7 +809,9 @@ def evaluate_flat(
     results: list[RankingResult] = []
 
     for cluster in clusters:
-        target_ids: set[str] = {r for r in cluster.decision_refs if r in decision_id_set}
+        target_ids: set[str] = {
+            r for r in cluster.decision_refs if r in decision_id_set
+        }
         found_refs: list[str] = sorted(target_ids)
 
         for ts_iso in cluster.correction_timestamps:
@@ -750,18 +819,22 @@ def evaluate_flat(
             scores = _score_all_flat(decisions, current_h, half_life_hours)
             ranked = rank_by_scores(decisions, scores)
             best_rank: int | None = find_best_rank(ranked, target_ids)
-            results.append(RankingResult(
-                topic_id=cluster.topic_id,
-                correction_iso=ts_iso,
-                correct_refs_found=found_refs,
-                best_rank=best_rank,
-                total_decisions=len(decisions),
-            ))
+            results.append(
+                RankingResult(
+                    topic_id=cluster.topic_id,
+                    correction_iso=ts_iso,
+                    correct_refs_found=found_refs,
+                    best_rank=best_rank,
+                    total_decisions=len(decisions),
+                )
+            )
 
     total: int = len(results)
     rates: dict[int, float] = {
-        t: sum(1 for r in results if r.best_rank is not None and r.best_rank <= t) / total
-        if total > 0 else 0.0
+        t: sum(1 for r in results if r.best_rank is not None and r.best_rank <= t)
+        / total
+        if total > 0
+        else 0.0
         for t in RANKING_THRESHOLDS
     }
 
@@ -772,7 +845,8 @@ def evaluate_flat(
         per_cluster[cluster.topic_id] = {
             f"top{t}": (
                 sum(1 for r in crs if r.best_rank is not None and r.best_rank <= t) / ct
-                if ct > 0 else 0.0
+                if ct > 0
+                else 0.0
             )
             for t in RANKING_THRESHOLDS
         }
@@ -791,7 +865,9 @@ def evaluate_typed(
     results: list[RankingResult] = []
 
     for cluster in clusters:
-        target_ids: set[str] = {r for r in cluster.decision_refs if r in decision_id_set}
+        target_ids: set[str] = {
+            r for r in cluster.decision_refs if r in decision_id_set
+        }
         found_refs: list[str] = sorted(target_ids)
 
         for ts_iso in cluster.correction_timestamps:
@@ -799,18 +875,22 @@ def evaluate_typed(
             scores = [scorer_fn(d, current_h, base_hl) for d in decisions]
             ranked = rank_by_scores(decisions, scores)
             best_rank: int | None = find_best_rank(ranked, target_ids)
-            results.append(RankingResult(
-                topic_id=cluster.topic_id,
-                correction_iso=ts_iso,
-                correct_refs_found=found_refs,
-                best_rank=best_rank,
-                total_decisions=len(decisions),
-            ))
+            results.append(
+                RankingResult(
+                    topic_id=cluster.topic_id,
+                    correction_iso=ts_iso,
+                    correct_refs_found=found_refs,
+                    best_rank=best_rank,
+                    total_decisions=len(decisions),
+                )
+            )
 
     total: int = len(results)
     rates: dict[int, float] = {
-        t: sum(1 for r in results if r.best_rank is not None and r.best_rank <= t) / total
-        if total > 0 else 0.0
+        t: sum(1 for r in results if r.best_rank is not None and r.best_rank <= t)
+        / total
+        if total > 0
+        else 0.0
         for t in RANKING_THRESHOLDS
     }
 
@@ -821,7 +901,8 @@ def evaluate_typed(
         per_cluster[cluster.topic_id] = {
             f"top{t}": (
                 sum(1 for r in crs if r.best_rank is not None and r.best_rank <= t) / ct
-                if ct > 0 else 0.0
+                if ct > 0
+                else 0.0
             )
             for t in RANKING_THRESHOLDS
         }
@@ -833,11 +914,10 @@ def evaluate_typed(
 # Score distribution histogram
 # ============================================================
 
+
 def score_distribution(scores: list[float]) -> dict[str, int]:
     """Bucket scores into histogram bands."""
-    buckets: dict[str, int] = {
-        "gt_0.9": 0, "0.5-0.9": 0, "0.1-0.5": 0, "lt_0.1": 0
-    }
+    buckets: dict[str, int] = {"gt_0.9": 0, "0.5-0.9": 0, "0.1-0.5": 0, "lt_0.1": 0}
     for s in scores:
         if s > 0.9:
             buckets["gt_0.9"] += 1
@@ -854,9 +934,14 @@ def score_distribution(scores: list[float]) -> dict[str, int]:
 # Locked vs unlocked separation
 # ============================================================
 
-def locked_unlocked_separation(scores: list[float], decisions: list[Decision]) -> dict[str, float]:
+
+def locked_unlocked_separation(
+    scores: list[float], decisions: list[Decision]
+) -> dict[str, float]:
     locked_s: list[float] = [s for d, s in zip(decisions, scores) if d.locked]
-    unlocked_s: list[float] = [s for d, s in zip(decisions, scores) if not d.locked and d.superseded_by is None]
+    unlocked_s: list[float] = [
+        s for d, s in zip(decisions, scores) if not d.locked and d.superseded_by is None
+    ]
 
     def _mean(lst: list[float]) -> float:
         return sum(lst) / len(lst) if lst else 0.0
@@ -873,6 +958,7 @@ def locked_unlocked_separation(scores: list[float], decisions: list[Decision]) -
 # ============================================================
 # Strategy A: Flat hour-scale sweep
 # ============================================================
+
 
 def run_strategy_a(
     decisions: list[Decision],
@@ -894,13 +980,15 @@ def run_strategy_a(
             f"  hl={hl:6.1f}h  top5={r5:.3f}  top10={r10:.3f}  top15={r15:.3f}",
             file=sys.stderr,
         )
-        sweep_results.append(FlatSweepResult(
-            half_life_hours=hl,
-            prevention_rate_top5=r5,
-            prevention_rate_top10=r10,
-            prevention_rate_top15=r15,
-            per_cluster=per_cluster,
-        ))
+        sweep_results.append(
+            FlatSweepResult(
+                half_life_hours=hl,
+                prevention_rate_top5=r5,
+                prevention_rate_top10=r10,
+                prevention_rate_top15=r15,
+                per_cluster=per_cluster,
+            )
+        )
         # Prefer top10, use top5 as tiebreaker
         combined: float = r10 + r5 * 0.001
         if combined > best_score:
@@ -915,6 +1003,7 @@ def run_strategy_a(
 # Strategy B: Content-type-aware
 # ============================================================
 
+
 def run_strategy_b(
     decisions: list[Decision],
     clusters: list[CorrectionCluster],
@@ -923,7 +1012,10 @@ def run_strategy_b(
     eval_at_hours: float,
 ) -> StrategyBResult:
     """Content-type-differentiated decay using best flat half-life from A."""
-    print(f"\n=== Strategy B: Content-Type-Aware (base_hl={base_hl}h) ===", file=sys.stderr)
+    print(
+        f"\n=== Strategy B: Content-Type-Aware (base_hl={base_hl}h) ===",
+        file=sys.stderr,
+    )
     _, rates, per_cluster = evaluate_typed(
         decisions, clusters, base_hl, decision_id_set, decay_score_type_aware
     )
@@ -933,7 +1025,9 @@ def run_strategy_b(
     )
 
     # Score distribution and locked/unlocked separation at median correction time
-    scores_at_eval = [decay_score_type_aware(d, eval_at_hours, base_hl) for d in decisions]
+    scores_at_eval = [
+        decay_score_type_aware(d, eval_at_hours, base_hl) for d in decisions
+    ]
     sep = locked_unlocked_separation(scores_at_eval, decisions)
     dist = score_distribution(scores_at_eval)
     print(
@@ -958,6 +1052,7 @@ def run_strategy_b(
 # Strategy C: Velocity-scaled
 # ============================================================
 
+
 def run_strategy_c(
     decisions: list[Decision],
     clusters: list[CorrectionCluster],
@@ -966,7 +1061,10 @@ def run_strategy_c(
     eval_at_hours: float,
 ) -> StrategyCResult:
     """Velocity-scaled decay: fast sprints get aggressive decay."""
-    print(f"\n=== Strategy C: Velocity-Scaled Decay (base_hl={base_hl}h) ===", file=sys.stderr)
+    print(
+        f"\n=== Strategy C: Velocity-Scaled Decay (base_hl={base_hl}h) ===",
+        file=sys.stderr,
+    )
     _, rates, per_cluster = evaluate_typed(
         decisions, clusters, base_hl, decision_id_set, decay_score_velocity
     )
@@ -975,7 +1073,9 @@ def run_strategy_c(
         file=sys.stderr,
     )
 
-    scores_at_eval = [decay_score_velocity(d, eval_at_hours, base_hl) for d in decisions]
+    scores_at_eval = [
+        decay_score_velocity(d, eval_at_hours, base_hl) for d in decisions
+    ]
     sep = locked_unlocked_separation(scores_at_eval, decisions)
     dist = score_distribution(scores_at_eval)
     print(
@@ -987,7 +1087,10 @@ def run_strategy_c(
 
     # Velocity distribution across decisions
     velocity_buckets: dict[str, int] = {
-        "very_fast_gt10": 0, "moderate_5to10": 0, "medium_2to5": 0, "deep_lt2": 0
+        "very_fast_gt10": 0,
+        "moderate_5to10": 0,
+        "medium_2to5": 0,
+        "deep_lt2": 0,
     }
     for d in decisions:
         v: float = d.session_velocity
@@ -1016,6 +1119,7 @@ def run_strategy_c(
 # CS-005 Simulation
 # ============================================================
 
+
 def run_cs005_simulation(
     decisions: list[Decision],
     milestone_index: dict[str, MilestoneInfo],
@@ -1031,8 +1135,7 @@ def run_cs005_simulation(
 
     # Find the fastest milestone that has decisions
     milestones_with_decisions: list[MilestoneInfo] = [
-        info for info in milestone_index.values()
-        if info.decision_count > 0
+        info for info in milestone_index.values() if info.decision_count > 0
     ]
     if not milestones_with_decisions:
         # Fallback: compute from decision data
@@ -1049,7 +1152,9 @@ def run_cs005_simulation(
         fastest_velocity = 0.0
         eval_at = mid_last.get(fastest_mid, 0.0) + 12.0
     else:
-        fastest: MilestoneInfo = max(milestones_with_decisions, key=lambda x: x.velocity)
+        fastest: MilestoneInfo = max(
+            milestones_with_decisions, key=lambda x: x.velocity
+        )
         fastest_mid = fastest.milestone_id
         fastest_velocity = fastest.velocity
         eval_at = fastest.last_commit_hours + 12.0
@@ -1080,7 +1185,9 @@ def run_cs005_simulation(
     ranked_all: list[tuple[str, float]] = rank_by_scores(decisions, all_scores)
 
     # Build rank lookup
-    rank_lookup: dict[str, int] = {d_id: i + 1 for i, (d_id, _) in enumerate(ranked_all)}
+    rank_lookup: dict[str, int] = {
+        d_id: i + 1 for i, (d_id, _) in enumerate(ranked_all)
+    }
     score_lookup: dict[str, float] = {d_id: s for d_id, s in ranked_all}
 
     def _avg_score(ds: list[Decision]) -> float:
@@ -1106,20 +1213,26 @@ def run_cs005_simulation(
 
     # Show top-ranked fast sprint decisions
     fast_ranks: list[tuple[str, int, float]] = sorted(
-        [(d.d_id, rank_lookup.get(d.d_id, 9999), score_lookup.get(d.d_id, 0.0))
-         for d in fast_sprint_decisions],
+        [
+            (d.d_id, rank_lookup.get(d.d_id, 9999), score_lookup.get(d.d_id, 0.0))
+            for d in fast_sprint_decisions
+        ],
         key=lambda x: x[1],
     )[:20]  # limit to top 20
 
     locked_ranks: list[tuple[str, int, float]] = sorted(
-        [(d.d_id, rank_lookup.get(d.d_id, 9999), score_lookup.get(d.d_id, 0.0))
-         for d in locked_decisions],
+        [
+            (d.d_id, rank_lookup.get(d.d_id, 9999), score_lookup.get(d.d_id, 0.0))
+            for d in locked_decisions
+        ],
         key=lambda x: x[1],
     )[:10]
 
     inherited_ranks: list[tuple[str, int, float]] = sorted(
-        [(d.d_id, rank_lookup.get(d.d_id, 9999), score_lookup.get(d.d_id, 0.0))
-         for d in inherited_decisions],
+        [
+            (d.d_id, rank_lookup.get(d.d_id, 9999), score_lookup.get(d.d_id, 0.0))
+            for d in inherited_decisions
+        ],
         key=lambda x: x[1],
     )[:10]
 
@@ -1150,19 +1263,22 @@ def run_cs005_simulation(
 # Main
 # ============================================================
 
+
 def main() -> None:
     print("=== Exp 58c: Hour-Scale Decay + Velocity-Scaled Decay ===", file=sys.stderr)
 
     # --- Step 1: Git log index (in hours) ---
     print("\n[git] Building milestone hour index from 3 repos...", file=sys.stderr)
-    milestone_index: dict[str, MilestoneInfo] = build_milestone_hour_index([
-        OPTIMUS_PRIME_REPO,
-        ALPHA_SEEK_REPO,
-        ALPHA_SEEK_MEMTEST_REPO,
-    ])
+    milestone_index: dict[str, MilestoneInfo] = build_milestone_hour_index(
+        [
+            OPTIMUS_PRIME_REPO,
+            ALPHA_SEEK_REPO,
+            ALPHA_SEEK_MEMTEST_REPO,
+        ]
+    )
 
     # Optimus-prime earliest commit (hours since epoch) for "inherited" decisions
-    print("[git] Fetching optimus-prime earliest commit...", file=sys.stderr)
+    print("[git] Fetching project-b earliest commit...", file=sys.stderr)
     op_result = subprocess.run(
         ["git", "log", "--all", "--format=%ad", "--date=iso", "--reverse"],
         cwd=str(OPTIMUS_PRIME_REPO),
@@ -1181,8 +1297,8 @@ def main() -> None:
         except ValueError:
             continue
     print(
-        f"[git] optimus-prime earliest: {optimus_earliest_hours:.1f}h since epoch "
-        f"({optimus_earliest_hours/24:.1f} days)",
+        f"[git] project-b earliest: {optimus_earliest_hours:.1f}h since epoch "
+        f"({optimus_earliest_hours / 24:.1f} days)",
         file=sys.stderr,
     )
 
@@ -1191,9 +1307,7 @@ def main() -> None:
     )
     mid_idx: int = len(all_milestone_hours) // 2
     median_hours: float = (
-        all_milestone_hours[mid_idx]
-        if all_milestone_hours
-        else optimus_earliest_hours
+        all_milestone_hours[mid_idx] if all_milestone_hours else optimus_earliest_hours
     )
     print(
         f"[git] milestone hour range: {min(all_milestone_hours):.1f}h - "
@@ -1230,7 +1344,7 @@ def main() -> None:
         type_counts[d.content_type.value] = type_counts.get(d.content_type.value, 0) + 1
 
     print(
-        f"[parse] span: {span_h:.0f}h ({span_h/24:.1f}d, {span_h/720:.1f} months)",
+        f"[parse] span: {span_h:.0f}h ({span_h / 24:.1f}d, {span_h / 720:.1f} months)",
         file=sys.stderr,
     )
     print(
@@ -1240,7 +1354,9 @@ def main() -> None:
     print(f"[parse] content types: {type_counts}", file=sys.stderr)
 
     # Velocity distribution summary
-    velocities: list[float] = [d.session_velocity for d in all_decisions if not d.is_inherited]
+    velocities: list[float] = [
+        d.session_velocity for d in all_decisions if not d.is_inherited
+    ]
     if velocities:
         velocities_sorted = sorted(velocities)
         n_v = len(velocities_sorted)
@@ -1254,12 +1370,13 @@ def main() -> None:
     # --- Step 4: Load corrections ---
     print("\n[load] Loading correction clusters...", file=sys.stderr)
     all_clusters: list[CorrectionCluster] = load_correction_clusters(EXP6_FAILURES)
-    mf_clusters: list[CorrectionCluster] = [c for c in all_clusters if c.is_memory_failure]
+    mf_clusters: list[CorrectionCluster] = [
+        c for c in all_clusters if c.is_memory_failure
+    ]
 
     decision_id_set: set[str] = {d.d_id for d in all_decisions}
     active_clusters: list[CorrectionCluster] = [
-        c for c in mf_clusters
-        if any(ref in decision_id_set for ref in c.decision_refs)
+        c for c in mf_clusters if any(ref in decision_id_set for ref in c.decision_refs)
     ]
     print(
         f"[load] active_clusters: {len(active_clusters)} / {len(mf_clusters)}",
@@ -1276,9 +1393,7 @@ def main() -> None:
 
     # Median correction time for secondary analyses
     all_corr_hours: list[float] = sorted(
-        iso_to_hours(ts)
-        for c in active_clusters
-        for ts in c.correction_timestamps
+        iso_to_hours(ts) for c in active_clusters for ts in c.correction_timestamps
     )
     mid_corr: int = len(all_corr_hours) // 2
     eval_at_hours: float = all_corr_hours[mid_corr] if all_corr_hours else median_hours
@@ -1318,15 +1433,17 @@ def main() -> None:
         file=sys.stderr,
     )
     print(
-        f"Temporal span: {span_h:.0f}h ({span_h/24:.1f}d / {span_h/720:.1f} months)",
+        f"Temporal span: {span_h:.0f}h ({span_h / 24:.1f}d / {span_h / 720:.1f} months)",
         file=sys.stderr,
     )
     print(f"Content types: {type_counts}", file=sys.stderr)
     print(f"Active correction clusters: {len(active_clusters)}", file=sys.stderr)
     print(f"Total correction events: {total_events}", file=sys.stderr)
-    print(f"\nBaseline (720h ~ no decay): top5={baseline_rates[5]:.3f}  "
-          f"top10={baseline_rates[10]:.3f}  top15={baseline_rates[15]:.3f}",
-          file=sys.stderr)
+    print(
+        f"\nBaseline (720h ~ no decay): top5={baseline_rates[5]:.3f}  "
+        f"top10={baseline_rates[10]:.3f}  top15={baseline_rates[15]:.3f}",
+        file=sys.stderr,
+    )
     print(f"Strategy A best half-life: {best_hl_a}h", file=sys.stderr)
     print(
         f"Strategy A best:           top5={sweep_a[-1].prevention_rate_top5:.3f}  "
@@ -1335,7 +1452,9 @@ def main() -> None:
         file=sys.stderr,
     )
     # Find the actual best result
-    best_a = max(sweep_a, key=lambda r: r.prevention_rate_top10 + r.prevention_rate_top5 * 0.001)
+    best_a = max(
+        sweep_a, key=lambda r: r.prevention_rate_top10 + r.prevention_rate_top5 * 0.001
+    )
     print(
         f"Strategy A best (hl={best_a.half_life_hours}h): "
         f"top5={best_a.prevention_rate_top5:.3f}  "
@@ -1377,7 +1496,11 @@ def main() -> None:
             "active_decisions": str(DECISIONS_MD),
             "archived_decisions": str(ARCHIVE_MD),
             "corrections": str(EXP6_FAILURES),
-            "git_repos": [str(OPTIMUS_PRIME_REPO), str(ALPHA_SEEK_REPO), str(ALPHA_SEEK_MEMTEST_REPO)],
+            "git_repos": [
+                str(OPTIMUS_PRIME_REPO),
+                str(ALPHA_SEEK_REPO),
+                str(ALPHA_SEEK_MEMTEST_REPO),
+            ],
         },
         "summary": {
             "total_decisions": len(all_decisions),
@@ -1439,7 +1562,9 @@ def main() -> None:
         "cs005_simulation": {
             "scenario": "CS-005: new agent mistakes fast-sprint findings for months of research",
             "fastest_milestone_id": cs005.fastest_milestone_id,
-            "fastest_milestone_velocity_per_hour": round(cs005.fastest_milestone_velocity, 4),
+            "fastest_milestone_velocity_per_hour": round(
+                cs005.fastest_milestone_velocity, 4
+            ),
             "fast_sprint_decision_count": cs005.fast_sprint_decision_count,
             "eval_at_hours": round(cs005.eval_at_hours, 2),
             "eval_description": "milestone_end + 12 hours (simulating next session)",

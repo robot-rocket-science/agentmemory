@@ -10,7 +10,7 @@
 
 **Mem0 (v0.1+):** Uses `user_id` + `app_id` + `run_id` as a composite key. Memories are scoped per app by default, but user-level memories span apps. No structural enforcement -- it's tag filtering on flat storage. Source: Mem0 docs, github.com/mem0ai/mem0.
 
-**MemPalace:** Uses a wing/room/drawer hierarchy. Wings are top-level partitions (e.g., "work", "personal", "projects/alpha-seek"). Rooms within wings hold related drawers. Cross-wing search is opt-in. The structure is spatial metaphor over SQLite, not hard isolation.
+**MemPalace:** Uses a wing/room/drawer hierarchy. Wings are top-level partitions (e.g., "work", "personal", "projects/project-a"). Rooms within wings hold related drawers. Cross-wing search is opt-in. The structure is spatial metaphor over SQLite, not hard isolation.
 
 **Letta (ex-MemGPT):** Uses "agents" as isolation units. Each agent has its own archival memory, core memory, and recall storage. Cross-agent memory sharing requires explicit tool calls. Closest to true DB-level isolation. Source: github.com/letta-ai/letta.
 
@@ -20,9 +20,9 @@
 
 ## 2. Privacy Within Local (REQ-017 Extension)
 
-REQ-017 says fully local. But "local" is not sufficient for isolation. A user working on a proprietary trading strategy (alpha-seek) and an open-source web app should not have alpha-seek beliefs injected into web app context that gets sent to a cloud LLM via F4 (see PRIVACY_THREAT_MODEL.md).
+REQ-017 says fully local. But "local" is not sufficient for isolation. A user working on a proprietary trading strategy (project-a) and an open-source web app should not have project-a beliefs injected into web app context that gets sent to a cloud LLM via F4 (see PRIVACY_THREAT_MODEL.md).
 
-**Concrete risk:** User works on alpha-seek with local Ollama (no cloud leak). Switches to web-app project using Claude API. Memory system retrieves "Capital is $5K, sell puts on SPY" into the web-app session. That belief is now in the prompt sent to Anthropic's API. The user never consented to sharing trading strategy data with a cloud provider.
+**Concrete risk:** User works on project-a with local Ollama (no cloud leak). Switches to web-app project using Claude API. Memory system retrieves "Capital is $5K, sell puts on SPY" into the web-app session. That belief is now in the prompt sent to Anthropic's API. The user never consented to sharing trading strategy data with a cloud provider.
 
 **Implication:** Project scoping is a privacy boundary, not just a convenience feature. Default behavior must be: beliefs from project A are NOT retrievable when working on project B, unless explicitly tagged as cross-project.
 
@@ -69,7 +69,7 @@ Misclassification cost: behavioral tagged as domain = user repeats correction in
 - One SQLite DB. Every belief/observation row has a `project_id` column (nullable = global).
 - Retrieval queries always include `WHERE project_id = ? OR project_id IS NULL`.
 - Behavioral beliefs get `project_id = NULL` (global scope).
-- Domain beliefs get `project_id = 'alpha-seek'` (project scope).
+- Domain beliefs get `project_id = 'project-a'` (project scope).
 - Cross-project search: user explicitly opts in, query drops the WHERE filter.
 - **Verdict:** Best balance. Single source of truth, soft isolation, easy to query.
 
@@ -93,7 +93,7 @@ One graph. Nodes carry a `project_id` attribute. Traversal respects partition bo
 - **Global partition:** Behavioral beliefs live in a virtual "global" partition. Always traversable from any project context.
 
 ```
-[global/behavioral]          [alpha-seek/domain]       [webapp/domain]
+[global/behavioral]          [project-a/domain]       [webapp/domain]
   "use strict typing" ----APPLIED_IN----> "tsconfig"
                        ----APPLIED_IN----> "mypy config"
   "don't use async"                       "capital=$5K"    "use React"
@@ -105,7 +105,7 @@ Traversal from webapp context: sees global nodes + webapp domain nodes. Cannot r
 ### Project detection
 
 The MCP server needs to know which project is active. Options:
-1. **CWD-based:** Infer from working directory (e.g., `/projects/alpha-seek` -> project_id = "alpha-seek"). Simple, fragile.
+1. **CWD-based:** Infer from working directory (e.g., `/projects/project-a` -> project_id = "project-a"). Simple, fragile.
 2. **Explicit parameter:** Every MCP tool call includes `project_id`. Reliable, verbose.
 3. **Session-level:** Set project context once per session. MCP `set_project` tool. Balanced.
 
@@ -125,5 +125,5 @@ Recommendation: CWD-based with explicit override. Most sessions work in one proj
 
 Open questions for implementation:
 - How to handle project rename/restructure (update project_id across rows?)
-- Should the system warn when a domain belief looks cross-cutting ("you said this in alpha-seek too")?
+- Should the system warn when a domain belief looks cross-cutting ("you said this in project-a too")?
 - Granularity: is project_id per-repo, per-directory, or user-defined?

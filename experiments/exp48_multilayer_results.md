@@ -8,7 +8,7 @@
 
 ## 1. Summary
 
-Multi-layer extraction (commits, files, sentences, AST, citations, directives, temporal edges) was run on 3 projects. On alpha-seek, the graph grew from 586 nodes (Exp 47 baseline) to 16,463 nodes. Retrieval was tested on the 6-topic ground truth at K=15.
+Multi-layer extraction (commits, files, sentences, AST, citations, directives, temporal edges) was run on 3 projects. On project-a, the graph grew from 586 nodes (Exp 47 baseline) to 16,463 nodes. Retrieval was tested on the 6-topic ground truth at K=15.
 
 **Key finding: All hypotheses failed except H4 (partition capacity) and H5 (scaling).** The multi-layer graph diluted the belief nodes, making retrieval harder, not easier. Grep dropped from 92% to 85% coverage; FTS5 dropped from 85% to 69%. HRR added zero value. Temporal edges provided zero unique signal.
 
@@ -22,9 +22,9 @@ This is a significant negative result that reveals a fundamental problem: adding
 
 | Project | Nodes | Edges | LCC% | Components | Extract Time |
 |---------|-------|-------|------|------------|-------------|
-| alpha-seek | 16,463 | 29,053 | 85% | 1,528 | 1.87s |
-| optimus-prime | 71,628 | 116,886 | 88% | 6,379 | 4.06s |
-| debserver | 5,054 | 8,338 | 74% | 142 | 0.66s |
+| project-a | 16,463 | 29,053 | 85% | 1,528 | 1.87s |
+| project-b | 71,628 | 116,886 | 88% | 6,379 | 4.06s |
+| project-d | 5,054 | 8,338 | 74% | 142 | 0.66s |
 
 ### 2.2 Alpha-Seek Node Type Distribution
 
@@ -107,7 +107,7 @@ FTS5+HRR = FTS5 exactly. HRR added zero new decisions. The partition strategy wo
 
 ### H3: Temporal edges provide unique retrieval signal -- FAIL
 
-Zero commit messages in alpha-seek contain D### decision references. The temporal analysis found 0 relevant commits for all 6 topics. TEMPORAL_NEXT edges connect commits to each other, and COMMIT_TOUCHES connects commits to files, but neither path leads to belief nodes.
+Zero commit messages in project-a contain D### decision references. The temporal analysis found 0 relevant commits for all 6 topics. TEMPORAL_NEXT edges connect commits to each other, and COMMIT_TOUCHES connects commits to files, but neither path leads to belief nodes.
 
 **Root cause:** The D### decision IDs exist only in the spike DB and in .md docs that reference them. Commit messages use natural language ("add backtest module") without decision IDs.
 
@@ -119,11 +119,11 @@ Zero commit messages in alpha-seek contain D### decision references. The tempora
 
 | Project | Nodes | Time | Nodes/sec |
 |---------|-------|------|-----------|
-| debserver | 5,054 | 0.66s | 7,657 |
-| alpha-seek | 16,463 | 1.87s | 8,803 |
-| optimus-prime | 71,628 | 4.06s | 17,642 |
+| project-d | 5,054 | 0.66s | 7,657 |
+| project-a | 16,463 | 1.87s | 8,803 |
+| project-b | 71,628 | 4.06s | 17,642 |
 
-All under 5 seconds. optimus-prime (71K nodes) extracted in 4s. Linear or better.
+All under 5 seconds. project-b (71K nodes) extracted in 4s. Linear or better.
 
 ### H6: Grep precision degrades at scale while FTS5 holds -- FAIL
 

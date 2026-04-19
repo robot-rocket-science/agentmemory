@@ -26,33 +26,59 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
-ALPHA_SEEK_DB = Path("/Users/thelorax/projects/.gsd/workflows/spikes/"
-                     "260406-1-associative-memory-for-gsd-please-explor/"
-                     "sandbox/alpha-seek.db")
+ALPHA_SEEK_DB = Path(
+    "/home/user/projects/.gsd/workflows/spikes/"
+    "260406-1-associative-memory-for-gsd-please-explor/"
+    "sandbox/project-a.db"
+)
 
 CRITICAL: dict[str, dict[str, Any]] = {
     "dispatch_gate": {
-        "queries": ["dispatch gate deploy protocol", "follow deploy gate verification", "dispatch runbook GCP"],
+        "queries": [
+            "dispatch gate deploy protocol",
+            "follow deploy gate verification",
+            "dispatch runbook GCP",
+        ],
         "needed": {"D089", "D106", "D137"},
     },
     "calls_puts": {
-        "queries": ["calls puts equal citizens", "put call strategy direction", "options both directions"],
+        "queries": [
+            "calls puts equal citizens",
+            "put call strategy direction",
+            "options both directions",
+        ],
         "needed": {"D073", "D096", "D100"},
     },
     "capital_5k": {
-        "queries": ["starting capital bankroll", "initial investment amount", "how much money USD"],
+        "queries": [
+            "starting capital bankroll",
+            "initial investment amount",
+            "how much money USD",
+        ],
         "needed": {"D099"},
     },
     "agent_behavior": {
-        "queries": ["agent behavior instructions", "dont elaborate pontificate", "execute precisely return control"],
+        "queries": [
+            "agent behavior instructions",
+            "dont elaborate pontificate",
+            "execute precisely return control",
+        ],
         "needed": {"D157", "D188"},
     },
     "strict_typing": {
-        "queries": ["typing pyright strict", "type annotations python", "static type checking"],
+        "queries": [
+            "typing pyright strict",
+            "type annotations python",
+            "static type checking",
+        ],
         "needed": {"D071", "D113"},
     },
     "gcp_primary": {
-        "queries": ["GCP primary compute platform", "archon overflow only", "cloud compute infrastructure"],
+        "queries": [
+            "GCP primary compute platform",
+            "server-a overflow only",
+            "cloud compute infrastructure",
+        ],
         "needed": {"D078", "D120"},
     },
 }
@@ -67,7 +93,9 @@ AdjDict = defaultdict[str, list[tuple[str, str, float]]]
 def load_data() -> tuple[dict[str, str], AdjDict]:
     db = sqlite3.connect(str(ALPHA_SEEK_DB))
     nodes: dict[str, str] = {}
-    for row in db.execute("SELECT id, content FROM mem_nodes WHERE superseded_by IS NULL"):
+    for row in db.execute(
+        "SELECT id, content FROM mem_nodes WHERE superseded_by IS NULL"
+    ):
         nodes[str(row[0])] = str(row[1])
 
     adj: AdjDict = defaultdict(list)
@@ -98,27 +126,60 @@ def search_fts(query: str, fts_db: sqlite3.Connection, top_k: int = 20) -> list[
         return []
     q = " OR ".join(terms)
     try:
-        return [str(r[0]) for r in fts_db.execute(
-            "SELECT id FROM fts WHERE fts MATCH ? ORDER BY rank LIMIT ?", (q, top_k)
-        ).fetchall()]
+        return [
+            str(r[0])
+            for r in fts_db.execute(
+                "SELECT id FROM fts WHERE fts MATCH ? ORDER BY rank LIMIT ?", (q, top_k)
+            ).fetchall()
+        ]
     except Exception:
         return []
 
 
-def build_hrr(nodes: dict[str, str], rng: np.random.Generator) -> tuple[dict[str, NDArr], dict[str, NDArr]]:
-    stopwords: set[str] = {"the", "a", "an", "is", "are", "was", "were", "it", "this", "that",
-                 "to", "of", "in", "for", "on", "with", "at", "by", "from", "and",
-                 "or", "but", "not", "be", "has", "have", "had"}
+def build_hrr(
+    nodes: dict[str, str], rng: np.random.Generator
+) -> tuple[dict[str, NDArr], dict[str, NDArr]]:
+    stopwords: set[str] = {
+        "the",
+        "a",
+        "an",
+        "is",
+        "are",
+        "was",
+        "were",
+        "it",
+        "this",
+        "that",
+        "to",
+        "of",
+        "in",
+        "for",
+        "on",
+        "with",
+        "at",
+        "by",
+        "from",
+        "and",
+        "or",
+        "but",
+        "not",
+        "be",
+        "has",
+        "have",
+        "had",
+    }
     vocab: set[str] = set()
     for content in nodes.values():
-        words: list[str] = re.findall(r'[a-z0-9]+', content.lower())
+        words: list[str] = re.findall(r"[a-z0-9]+", content.lower())
         vocab.update(w for w in words if w not in stopwords and len(w) > 2)
 
-    word_vecs: dict[str, NDArr] = {w: rng.standard_normal(DIM) / np.sqrt(DIM) for w in vocab}
+    word_vecs: dict[str, NDArr] = {
+        w: rng.standard_normal(DIM) / np.sqrt(DIM) for w in vocab
+    }
 
     node_vecs: dict[str, NDArr] = {}
     for nid, content in nodes.items():
-        words_set: set[str] = set(re.findall(r'[a-z0-9]+', content.lower())) - stopwords
+        words_set: set[str] = set(re.findall(r"[a-z0-9]+", content.lower())) - stopwords
         vec: NDArr = np.zeros(DIM)
         for w in words_set:
             if w in word_vecs:
@@ -129,11 +190,42 @@ def build_hrr(nodes: dict[str, str], rng: np.random.Generator) -> tuple[dict[str
     return node_vecs, word_vecs
 
 
-def search_hrr(query: str, node_vecs: dict[str, NDArr], word_vecs: dict[str, NDArr], top_k: int = 20) -> list[str]:
-    stopwords: set[str] = {"the", "a", "an", "is", "are", "was", "were", "it", "this", "that",
-                 "to", "of", "in", "for", "on", "with", "at", "by", "from", "and",
-                 "or", "but", "not", "be", "has", "have", "had"}
-    words: set[str] = set(re.findall(r'[a-z0-9]+', query.lower())) - stopwords
+def search_hrr(
+    query: str,
+    node_vecs: dict[str, NDArr],
+    word_vecs: dict[str, NDArr],
+    top_k: int = 20,
+) -> list[str]:
+    stopwords: set[str] = {
+        "the",
+        "a",
+        "an",
+        "is",
+        "are",
+        "was",
+        "were",
+        "it",
+        "this",
+        "that",
+        "to",
+        "of",
+        "in",
+        "for",
+        "on",
+        "with",
+        "at",
+        "by",
+        "from",
+        "and",
+        "or",
+        "but",
+        "not",
+        "be",
+        "has",
+        "have",
+        "had",
+    }
+    words: set[str] = set(re.findall(r"[a-z0-9]+", query.lower())) - stopwords
     qvec: NDArr = np.zeros(DIM)
     for w in words:
         if w in word_vecs:
@@ -143,12 +235,20 @@ def search_hrr(query: str, node_vecs: dict[str, NDArr], word_vecs: dict[str, NDA
         return []
     qvec = qvec / norm
 
-    sims: list[tuple[str, float]] = [(nid, float(np.dot(qvec, vec))) for nid, vec in node_vecs.items()]
+    sims: list[tuple[str, float]] = [
+        (nid, float(np.dot(qvec, vec))) for nid, vec in node_vecs.items()
+    ]
     sims.sort(key=lambda x: x[1], reverse=True)
     return [nid for nid, _ in sims[:top_k]]
 
 
-def search_bfs(query: str, fts_db: sqlite3.Connection, adj: AdjDict, nodes: dict[str, str], top_k: int = 20) -> list[str]:
+def search_bfs(
+    query: str,
+    fts_db: sqlite3.Connection,
+    adj: AdjDict,
+    nodes: dict[str, str],
+    top_k: int = 20,
+) -> list[str]:
     seeds: list[str] = search_fts(query, fts_db, top_k=3)
     if not seeds:
         return []
@@ -172,7 +272,9 @@ def search_bfs(query: str, fts_db: sqlite3.Connection, adj: AdjDict, nodes: dict
             damping = 0.5 if ndeg > 30 else 1.0
             queue.append((neighbor, depth + 1, score * weight * damping * 0.7))
 
-    ranked: list[tuple[str, float]] = sorted(visited.items(), key=lambda x: x[1], reverse=True)
+    ranked: list[tuple[str, float]] = sorted(
+        visited.items(), key=lambda x: x[1], reverse=True
+    )
     return [nid for nid, _ in ranked[:top_k]]
 
 
@@ -194,17 +296,22 @@ def main() -> None:
     nodes, adj = load_data()
     fts_db = build_fts(nodes)
     node_vecs, word_vecs = build_hrr(nodes, rng)
-    print(f"  {len(nodes)} nodes, {sum(len(v) for v in adj.values())//2} edges", file=sys.stderr)
+    print(
+        f"  {len(nodes)} nodes, {sum(len(v) for v in adj.values()) // 2} edges",
+        file=sys.stderr,
+    )
 
     methods: dict[str, Callable[[str], list[str]]] = {
         "fts": lambda q: search_fts(q, fts_db),
         "hrr": lambda q: search_hrr(q, node_vecs, word_vecs),
         "bfs": lambda q: search_bfs(q, fts_db, adj, nodes),
-        "fused": lambda q: reciprocal_rank_fusion([
-            search_fts(q, fts_db),
-            search_hrr(q, node_vecs, word_vecs),
-            search_bfs(q, fts_db, adj, nodes),
-        ]),
+        "fused": lambda q: reciprocal_rank_fusion(
+            [
+                search_fts(q, fts_db),
+                search_hrr(q, node_vecs, word_vecs),
+                search_bfs(q, fts_db, adj, nodes),
+            ]
+        ),
     }
 
     results: dict[str, dict[str, dict[str, Any]]] = {}
@@ -230,11 +337,15 @@ def main() -> None:
         results[topic_id] = topic_results
 
     # Summary
-    print(f"\n{'='*60}", file=sys.stderr)
-    print(f"{'Topic':<18} {'FTS5':>6} {'HRR':>6} {'BFS':>6} {'Fused':>6}", file=sys.stderr)
+    print(f"\n{'=' * 60}", file=sys.stderr)
+    print(
+        f"{'Topic':<18} {'FTS5':>6} {'HRR':>6} {'BFS':>6} {'Fused':>6}", file=sys.stderr
+    )
     print("-" * 45, file=sys.stderr)
 
-    method_totals: defaultdict[str, dict[str, int]] = defaultdict(lambda: {"found": 0, "needed": 0})
+    method_totals: defaultdict[str, dict[str, int]] = defaultdict(
+        lambda: {"found": 0, "needed": 0}
+    )
     for topic_id, topic_results in results.items():
         needed_count = len(CRITICAL[topic_id]["needed"])
         row = f"{topic_id:<18}"
@@ -249,11 +360,14 @@ def main() -> None:
     row = f"{'OVERALL':<18}"
     for method in ["fts", "hrr", "bfs", "fused"]:
         t = method_totals[method]
-        row += f" {t['found']/t['needed']:>5.0%} "
+        row += f" {t['found'] / t['needed']:>5.0%} "
     print(row, file=sys.stderr)
 
     # Unique contributions
-    print(f"\n  Unique contributions (found by this method but NOT by others):", file=sys.stderr)
+    print(
+        "\n  Unique contributions (found by this method but NOT by others):",
+        file=sys.stderr,
+    )
     for topic_id, topic_results in results.items():
         for method in ["fts", "hrr", "bfs"]:
             found_by_method: set[str] = set(topic_results[method]["found"])
@@ -266,7 +380,7 @@ def main() -> None:
                 print(f"    {topic_id}/{method}: {unique}", file=sys.stderr)
 
     # Is any method fully redundant?
-    print(f"\n  Redundancy check:", file=sys.stderr)
+    print("\n  Redundancy check:", file=sys.stderr)
     for method in ["fts", "hrr", "bfs"]:
         total_unique = 0
         for topic_id, topic_results in results.items():
@@ -276,11 +390,14 @@ def main() -> None:
                 if other != method:
                     found_by_others_r.update(topic_results[other]["found"])
             total_unique += len(found_by_method_r - found_by_others_r)
-        print(f"    {method}: {total_unique} unique finds across all topics "
-              f"({'REDUNDANT' if total_unique == 0 else 'CONTRIBUTES'})", file=sys.stderr)
+        print(
+            f"    {method}: {total_unique} unique finds across all topics "
+            f"({'REDUNDANT' if total_unique == 0 else 'CONTRIBUTES'})",
+            file=sys.stderr,
+        )
 
     Path("experiments/exp25_results.json").write_text(json.dumps(results, indent=2))
-    print(f"\nOutput: experiments/exp25_results.json", file=sys.stderr)
+    print("\nOutput: experiments/exp25_results.json", file=sys.stderr)
 
 
 if __name__ == "__main__":

@@ -3,13 +3,13 @@
 **Date:** 2026-04-10
 **Type:** Experimental research
 **Question:** Can corpus-derived PMI maps and pseudo-relevance feedback automatically replicate the coverage of hand-crafted multi-query formulations?
-**Dependencies:** Exp 9 (retrieval baseline), Exp 18 (technique survey), alpha-seek belief corpus (586 nodes)
+**Dependencies:** Exp 9 (retrieval baseline), Exp 18 (technique survey), project-a belief corpus (586 nodes)
 
 ---
 
 ## 1. Background
 
-Exp 9 demonstrated that 3 hand-crafted query formulations per topic achieve 100% critical belief coverage (13/13 decisions across 6 topics) on the alpha-seek corpus. A single query achieves 92% (12/13). The gap is one decision: D157 (async_bash banning), retrievable only via vocabulary that shares no terms with the natural query "agent behavior instructions."
+Exp 9 demonstrated that 3 hand-crafted query formulations per topic achieve 100% critical belief coverage (13/13 decisions across 6 topics) on the project-a corpus. A single query achieves 92% (12/13). The gap is one decision: D157 (async_bash banning), retrievable only via vocabulary that shares no terms with the natural query "agent behavior instructions."
 
 Exp 18 surveyed 6 zero-LLM expansion techniques and recommended two for implementation: corpus PMI and pseudo-relevance feedback (PRF).
 
@@ -41,7 +41,7 @@ Two-pass retrieval extracts distinctive terms from initial results and feeds the
 
 ### 3.1 Corpus
 
-586 active belief nodes from alpha-seek DB (decisions D001-D209, milestones, knowledge nodes). FTS5 index with porter tokenizer.
+586 active belief nodes from project-a DB (decisions D001-D209, milestones, knowledge nodes). FTS5 index with porter tokenizer.
 
 ### 3.2 PMI Map Construction
 
@@ -89,9 +89,9 @@ The PMI associations are domain-accurate:
 | Term | Top Associates | Quality |
 |------|---------------|---------|
 | capital | 100k(5.9), 5k(5.7), vs(3.0), trade(2.9) | Excellent -- exact domain terms |
-| calls | citizens(6.2), equal(5.8), puts(5.4), direction(4.5) | Excellent -- alpha-seek specific |
+| calls | citizens(6.2), equal(5.8), puts(5.4), direction(4.5) | Excellent -- project-a specific |
 | pyright | untyped(5.2), cast(5.2), strict(5.0), type(3.1) | Excellent |
-| deploy | sh(5.4), docker(3.6), gate(3.0), archon(2.9) | Good -- infrastructure context |
+| deploy | sh(5.4), docker(3.6), gate(3.0), server-a(2.9) | Good -- infrastructure context |
 | dispatch | tag(4.1), head(3.8), image(3.7), batch(3.7) | Weak -- Docker image terms dominate |
 | gcp | standard(3.6), extension(3.6), c2d(3.6), vms(3.6) | Good -- GCP-specific |
 

@@ -494,7 +494,7 @@ All beliefs start with Jeffreys prior Beta(0.5, 0.5):
   Exp 2 showed source-informed priors (Beta(9,1) for user-stated) are
   counterproductive. Strong priors resist correction from evidence.
   Source-informed priors produced ECE=0.184 vs uniform's 0.042.
-  
+
   Exp 5b showed Jeffreys Beta(0.5,0.5) outperforms uniform Beta(1,1):
   ECE=0.066 vs 0.097, exploration=0.194 vs 0.127. The wider initial
   distribution produces more diverse Thompson samples, improving both
@@ -985,7 +985,7 @@ Steps 1-4 are under the memory system's control. The guarantee is that
 relevant directives are ALWAYS in context. The LLM's compliance (step 5)
 is a soft constraint addressed by enforcement hooks and violation detection.
 
-This eliminates the alpha-seek failure mode: the dispatch runbook fell off
+This eliminates the project-a failure mode: the dispatch runbook fell off
 the context window, so the LLM didn't know to follow it. With this system,
 the runbook is re-injected every time the user mentions dispatch/deploy/GCP.
 

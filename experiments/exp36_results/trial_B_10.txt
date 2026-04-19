@@ -32,4 +32,4 @@ Here's where things stand:
 - `#35` Information bottleneck for belief compression (Tier 2)
 
 ### Notable gap
-MemPalace has no `agentmemory` wing -- everything lives in local `.md` files. The palace only has `alpha_seek` content.
+MemPalace has no `agentmemory` wing -- everything lives in local `.md` files. The palace only has `project_a` content.

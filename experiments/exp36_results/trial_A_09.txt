@@ -11,7 +11,7 @@ Here's where things stand:
 - Requirements `REQ-001` through `REQ-030` in `REQUIREMENTS.md`
 - 29 approaches tracked in `APPROACHES.md`, key experiments in `EXPERIMENTS.md`
 - Bayesian retrieval validated in simulation (Thompson + Jeffreys ECE=0.066, exploration=0.194)
-- HRR/BFS benchmark on real alpha-seek graph (Exp 26): fuzzy-start queries are where HRR wins; S^2 multi-hop failed at scale
+- HRR/BFS benchmark on real project-a graph (Exp 26): fuzzy-start queries are where HRR wins; S^2 multi-hop failed at scale
 - Privacy threat model, graph construction design, case studies
 
 ---

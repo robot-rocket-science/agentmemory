@@ -58,11 +58,11 @@ Do NOT look at exp3_attribution.json until all labeling is complete.
 | q02_item_007 | ___ | 6 pending results completed on GCS, never collected | knowledge |
 | q02_item_008 | ___ | Whether the kelly union coverage test is needed: Kelly-d10 and kelly-dte45 union | strategy |
 | q02_item_009 | ___ | assemble_r12_folds.py: R12 uses nested fold_YYYY/summary.json, not flat files | knowledge |
-| q02_item_010 | ___ | How to resolve split src/ packages between alpha-seek and optimus-prime: Symlink | architecture |
+| q02_item_010 | ___ | How to resolve split src/ packages between project-a and project-b: Symlink | architecture |
 | q02_item_011 | ___ | Spike research findings must land in KNOWLEDGE.md, DECISIONS.md, or milestone CO | knowledge |
-| q02_item_012 | ___ | Decouple alpha-seek from optimus-prime symlinks: Copy all 5 optimus-prime module | architecture |
+| q02_item_012 | ___ | Decouple project-a from project-b symlinks: Copy all 5 project-b module | architecture |
 | q02_item_013 | ___ | M030 S01: kelly-d10-dte20 ruin year is 2018, not 2016 (confirmed via compound NA | knowledge |
-| q02_item_014 | ___ | D090: optimus-prime modules are now copied into alpha-seek (supersedes symlink e | knowledge |
+| q02_item_014 | ___ | D090: project-b modules are now copied into project-a (supersedes symlink e | knowledge |
 | q02_item_015 | ___ | Whether D097 is sufficient to declare live-trading readiness: D097 with $5K capi | methodology |
 | q02_item_016 | ___ | Whether to implement an adaptive minimum-N floor that relaxes pipeline gates whe | strategy |
 | q02_item_017 | ___ | M034 S01: Kelly failure taxonomy -- 3 classes, only PRICE_BAND_MISMATCH is actio | knowledge |
@@ -148,7 +148,7 @@ Do NOT look at exp3_attribution.json until all labeling is complete.
 | q04_item_021 | ___ | Dispatch-gate HEAD!=image-tag bypass: non-Docker changes only | knowledge |
 | q04_item_022 | ___ | GCP serial port output: fold results are visible before result files upload to G | knowledge |
 | q04_item_023 | ___ | [M002] MCTS Objective Fix + Pipeline Intelligence | milestone |
-| q04_item_024 | ___ | deploy_archon.sh does not sync docker/ directory — Dockerfile changes require ma | knowledge |
+| q04_item_024 | ___ | deploy_server.sh does not sync docker/ directory — Dockerfile changes require ma | knowledge |
 | q04_item_025 | ___ | 4 signal model configs selected for DTE routing: 5d/10% (short), 10d/20% (medium | configuration |
 | q04_item_026 | ___ | Which config to use going forward: R12 (0.03/60d/0.1) or holdout-derived (0.05/9 | configuration |
 | q04_item_027 | ___ | How to report strategy returns in all project artifacts: Always report returns i | reporting |
@@ -246,7 +246,7 @@ Do NOT look at exp3_attribution.json until all labeling is complete.
 | q07_item_014 | ___ | Anti-overfitting as a mandatory design principle for M022 (Learned Contract Sele | methodology |
 | q07_item_015 | ___ | [M025] Milestone M025 | milestone |
 | q07_item_016 | ___ | [M032] Milestone M032 | milestone |
-| q07_item_017 | ___ | Whether D120 (archon is overflow only) applies to M032 S01 2-fold smoke test: Ex | infrastructure |
+| q07_item_017 | ___ | Whether D120 (server-a is overflow only) applies to M032 S01 2-fold smoke test: Ex | infrastructure |
 | q07_item_018 | ___ | GCP serial port output: fold results are visible before result files upload to G | knowledge |
 | q07_item_019 | ___ | 6 pending results completed on GCS, never collected | knowledge |
 | q07_item_020 | ___ | Auto-mode interruption during remote result collection: write INCOMPLETE section | knowledge |
@@ -284,12 +284,12 @@ Do NOT look at exp3_attribution.json until all labeling is complete.
 | q08_item_016 | ___ | gcloud storage ls returns full paths; use fnmatch for client-side glob | knowledge |
 | q08_item_017 | ___ | How to evaluate strategy performance across time: Walk-forward per-year fold eva | backtesting |
 | q08_item_018 | ___ | M006 scope and identity after M008/M009/M010 invalidated all original baselines: | milestone |
-| q08_item_019 | ___ | How to resolve split src/ packages between alpha-seek and optimus-prime: Symlink | architecture |
+| q08_item_019 | ___ | How to resolve split src/ packages between project-a and project-b: Symlink | architecture |
 | q08_item_020 | ___ | Fill model slippage threshold setting (signal_15pct.yaml config): Hold at 20% de | strategy |
 | q08_item_021 | ___ | Alpaca free-tier indicative feed provides full Greeks at 100% coverage (D206) | knowledge |
 | q08_item_022 | ___ | Citation requirement for all project document assertions: All assertions in proj | methodology |
 | q08_item_023 | ___ | [M008] Milestone M008 | milestone |
-| q08_item_024 | ___ | Strict typing enforcement with pyright across entire alpha-seek codebase: Instal | code-quality |
+| q08_item_024 | ___ | Strict typing enforcement with pyright across entire project-a codebase: Instal | code-quality |
 | q08_item_025 | ___ | GCP: VM naming produces double-prefix when run_id already contains a project pre | knowledge |
 | q08_item_026 | ___ | Conformal wrapper: alpha=0.0 means full coverage (all trades admitted), not hard | knowledge |
 | q08_item_027 | ___ | M004 (Put-Buying Engine) milestone status: Superseded. The dual call+put engine  | strategy |
@@ -323,10 +323,10 @@ Do NOT look at exp3_attribution.json until all labeling is complete.
 | q09_item_021 | ___ | LearnedSelector variant architecture for M022: Three variants sharing one Learne | architecture |
 | q09_item_022 | ___ | Volume planner (VolumeSelector) is strictly dominated by kelly at current N -- B | knowledge |
 | q09_item_023 | ___ | GO/NO-GO scorecard: state all criteria and thresholds before any data is visible | knowledge |
-| q09_item_024 | ___ | Dispatch gate enforcement model for remote runs (GCP and archon): Hard-block ext | infrastructure |
+| q09_item_024 | ___ | Dispatch gate enforcement model for remote runs (GCP and server-a): Hard-block ext | infrastructure |
 | q09_item_025 | ___ | Hard constraint: every milestone plan must increase expected trades/year above t | methodology |
 | q09_item_026 | ___ | Seller HJB fires in buyer-losing states (D063) | knowledge |
-| q09_item_027 | ___ | M022: archon-dispatched walk-forward runs survive SSH disconnect, take ~60-90 mi | knowledge |
+| q09_item_027 | ___ | M022: server-a-dispatched walk-forward runs survive SSH disconnect, take ~60-90 mi | knowledge |
 | q09_item_028 | ___ | Living dispatch runbook policy: update after every dispatch session: Create docs | operations |
 | q09_item_029 | ___ | New milestones for survival analysis and Bayesian optimization: Two new mileston | strategy |
 
@@ -361,7 +361,7 @@ Do NOT look at exp3_attribution.json until all labeling is complete.
 | q10_item_023 | ___ | Starting capital as a strategy lever: Starting capital ($5K vs $100K) is a strat | strategy |
 | q10_item_024 | ___ | [M025] Milestone M025 | milestone |
 | q10_item_025 | ___ | All new pipeline components must have integration tests covering happy path + at | knowledge |
-| q10_item_026 | ___ | How to resolve split src/ packages between alpha-seek and optimus-prime: Symlink | architecture |
+| q10_item_026 | ___ | How to resolve split src/ packages between project-a and project-b: Symlink | architecture |
 | q10_item_027 | ___ | Strategic pivot: test no-model mechanical baseline before any further ML develop | strategy |
 
 ## q11: please restore the session context, my pc just crashed and i lost everything
@@ -470,7 +470,7 @@ Do NOT look at exp3_attribution.json until all labeling is complete.
 | q13_item_029 | ___ | M015: Naive delta baseline outperforms trained LGBM second-stage classifier (AUC | knowledge |
 | q13_item_030 | ___ | M015 DEAD END: Contract-level features do not discriminate trade winners from lo | knowledge |
 | q13_item_031 | ___ | All new pipeline components must have integration tests covering happy path + at | knowledge |
-| q13_item_032 | ___ | validate_backtest_output.py on archon requires .venv/bin/python3, not system pyt | knowledge |
+| q13_item_032 | ___ | validate_backtest_output.py on server-a requires .venv/bin/python3, not system pyt | knowledge |
 
 ## q14: tell me about the control flow for the paper trading agents
 *Search terms: control flow paper trading agents execution loop*
@@ -560,7 +560,7 @@ Do NOT look at exp3_attribution.json until all labeling is complete.
 | q16_item_015 | ___ | [M012] Milestone M012 | milestone |
 | q16_item_016 | ___ | Archon: scp fails -- use ssh cat pipe | knowledge |
 | q16_item_017 | ___ | Fill rejections are 100% slippage for argmax (slippage_reject_pct=0.50, 2010-202 | knowledge |
-| q16_item_018 | ___ | Whether D120 (archon is overflow only) applies to M032 S01 2-fold smoke test: Ex | infrastructure |
+| q16_item_018 | ___ | Whether D120 (server-a is overflow only) applies to M032 S01 2-fold smoke test: Ex | infrastructure |
 | q16_item_019 | ___ | M032: High-VIX years have LOWEST fill rates — wider spreads cause more slippage  | knowledge |
 | q16_item_020 | ___ | How to evaluate strategy performance across time: Walk-forward per-year fold eva | backtesting |
 | q16_item_021 | ___ | Strategy objective framing in CLAUDE.md project description: Maximum PnL growth  | strategy |
@@ -575,7 +575,7 @@ Do NOT look at exp3_attribution.json until all labeling is complete.
 
 | # | Label | Content | Category |
 |---|-------|---------|----------|
-| q17_item_000 | ___ | How to resolve split src/ packages between alpha-seek and optimus-prime: Symlink | architecture |
+| q17_item_000 | ___ | How to resolve split src/ packages between project-a and project-b: Symlink | architecture |
 | q17_item_001 | ___ | Spike research findings must land in KNOWLEDGE.md, DECISIONS.md, or milestone CO | knowledge |
 | q17_item_002 | ___ | D097 walk-forward verdict for Thompson Sampling bandit contract selector (M024): | evaluation |
 | q17_item_003 | ___ | Assessment of meta-decision overfitting to walk-forward validation set: Meta-dec | strategy |
@@ -591,8 +591,8 @@ Do NOT look at exp3_attribution.json until all labeling is complete.
 | q17_item_013 | ___ | Whether to train HJB on all 508 trajectories or only the 65 with DTE >= 45 at en | exit-algorithm |
 | q17_item_014 | ___ | M004 (Put-Buying Engine) milestone status: Superseded. The dual call+put engine  | strategy |
 | q17_item_015 | ___ | Revised scope for M024-60hkjc (Contextual Bandit): 4 runs: LinUCB + Thompson Sam | strategy |
-| q17_item_016 | ___ | Decouple alpha-seek from optimus-prime symlinks: Copy all 5 optimus-prime module | architecture |
-| q17_item_017 | ___ | deploy_archon.sh does not sync docker/ directory — Dockerfile changes require ma | knowledge |
+| q17_item_016 | ___ | Decouple project-a from project-b symlinks: Copy all 5 project-b module | architecture |
+| q17_item_017 | ___ | deploy_server.sh does not sync docker/ directory — Dockerfile changes require ma | knowledge |
 | q17_item_018 | ___ | Execution order and gate policy for queued milestones after M023-vyt1ni: Run all | strategy |
 | q17_item_019 | ___ | M026: New planner must be added to the decision_log write condition in run_signa | knowledge |
 | q17_item_020 | ___ | Mean reversion dominates post-decline OTM option outcomes | knowledge |
@@ -601,7 +601,7 @@ Do NOT look at exp3_attribution.json until all labeling is complete.
 | q17_item_023 | ___ | [M033] Milestone M033 | milestone |
 | q17_item_024 | ___ | M024: Bandit logs every decision to decision_log (not every 10th like argmax/MCT | knowledge |
 | q17_item_025 | ___ | New milestones for survival analysis and Bayesian optimization: Two new mileston | strategy |
-| q17_item_026 | ___ | D090: optimus-prime modules are now copied into alpha-seek (supersedes symlink e | knowledge |
+| q17_item_026 | ___ | D090: project-b modules are now copied into project-a (supersedes symlink e | knowledge |
 | q17_item_027 | ___ | Where to insert the game-theoretic decision layer milestone in the M011-M016 roa | architecture |
 | q17_item_028 | ___ | Whether to add volume-dependent market impact to the fill model: No change neede | fill-model |
 | q17_item_029 | ___ | Arm discretization for M024 bandit contract selection: 9 arms: 3 delta buckets x | algorithm |

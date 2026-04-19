@@ -2,8 +2,8 @@
 
 **Date:** 2026-04-10
 **Scope:** T0.1-T0.7 + M1-M2 from TODO_CROSS_PROJECT_TESTING.md
-**Corpus:** 7 pilot repos (smoltcp, adr, boa, debserver, gsd-2, rclcpp, rustls)
-**All data:** archon:~/agentmemory-corpus/extracted/
+**Corpus:** 7 pilot repos (smoltcp, adr, boa, project-d, gsd-2, rclcpp, rustls)
+**All data:** server-a:~/agentmemory-corpus/extracted/
 
 ---
 
@@ -23,7 +23,7 @@ Initial results showed HRR failing on larger repos (boa R@10=0.074). This was no
 | gsd-2 (2,150 commits) | 0.166 | **0.441** | 2.7x |
 | smoltcp (1,577 commits) | 0.378 | **0.641** | 1.7x |
 | rustls (5,024 commits) | -- | **0.711** | new |
-| debserver (526 commits) | 0.880 | **0.900** | 1.0x |
+| project-d (526 commits) | 0.880 | **0.900** | 1.0x |
 
 **2. HRR and FTS5 are genuinely complementary (selective amplifier confirmed).**
 On low-vocabulary-overlap edges (<0.1 Jaccard), HRR outperforms FTS5 by 2.6-3.2x. On high-overlap edges (>0.3), FTS5 outperforms HRR by 2.2-5x. They find different targets with minimal overlap. Neither alone is sufficient.
@@ -47,7 +47,7 @@ Designed 4-tier taxonomy (EDGE_TYPE_TAXONOMY.md):
 - **Tier 3 (Structure-discoverable):** TESTS, CROSS_REFERENCES, CITES, SERVICE_DEPENDS_ON, IMPLEMENTS
 - **Tier 4 (Composite/refined):** CODE_COUPLING, TEST_COUPLING, CONFIG_COUPLING, etc.
 
-**Key revision:** CO_CHANGED was initially classified as Tier 1 universal. Testing showed it fails for doc-only repos (adr: max weight 3) and single-author infra projects (debserver: 26 edges at w>=3). Reclassified as "universal for multi-contributor code repos." COMMIT_BELIEF is the true universal -- every repo produces useful belief nodes.
+**Key revision:** CO_CHANGED was initially classified as Tier 1 universal. Testing showed it fails for doc-only repos (adr: max weight 3) and single-author infra projects (project-d: 26 edges at w>=3). Reclassified as "universal for multi-contributor code repos." COMMIT_BELIEF is the true universal -- every repo produces useful belief nodes.
 
 ---
 
@@ -58,7 +58,7 @@ Designed 4-tier taxonomy (EDGE_TYPE_TAXONOMY.md):
 | smoltcp | 1577 | 12,688 | 1,662 | 68 | 2,127 | 98 |
 | adr | 276 | 7,002 | 1 | 3 | 287 | 2 |
 | boa | 3354 | 249,834 | 11,249 | 567 | 5,506 | 3,207 |
-| debserver | 526 | 10,077 | 26 | 81 | 782 | 6 |
+| project-d | 526 | 10,077 | 26 | 81 | 782 | 6 |
 | gsd-2 | 2150 | 162,931 | 2,126 | 84 | 3,794 | 1,471 |
 | rclcpp | 1997 | - | 2,074* | - | - | - |
 | rustls | 5024 | 56,035 | 7,023 | 230 | 6,448 | 74 |
@@ -76,11 +76,11 @@ Designed 4-tier taxonomy (EDGE_TYPE_TAXONOMY.md):
 | smoltcp | Rust | 275 | 94 | 88 |
 | boa | Rust | 582 | 160 | 580 |
 | gsd-2 | TypeScript | 759 | 451 | 255 |
-| debserver | Python/TS | 28 | 12 | 18 |
+| project-d | Python/TS | 28 | 12 | 18 |
 | rclcpp | C++ | 1,411 | 405 | 194 |
 | rustls | Rust | 96 | 19 | 95 |
 
-**Finding:** Import density varies enormously by language. C++ (rclcpp: 1,411) has dense include graphs. Rust (rustls: 96) has sparse imports due to module system. Python (debserver: 0 resolved) struggled with resolution.
+**Finding:** Import density varies enormously by language. C++ (rclcpp: 1,411) has dense include graphs. Rust (rustls: 96) has sparse imports due to module system. Python (project-d: 0 resolved) struggled with resolution.
 
 ---
 
@@ -91,14 +91,14 @@ Designed 4-tier taxonomy (EDGE_TYPE_TAXONOMY.md):
 | smoltcp | 0 | 0 | 0* | 0 | 0 | 0 |
 | adr | 0 | 0 | 0 | 0 | 0 | 0 |
 | boa | 0 | 8 | 0 | 0 | 47 | 55 |
-| debserver | 0 | 0 | 72 | 0 | 0 | 72 |
+| project-d | 0 | 0 | 72 | 0 | 0 | 72 |
 | gsd-2 | 215 | 262 | 65 | 0 | 2 | 544 |
 | rclcpp | 88 | 8 | 0 | 0 | 0 | 96 |
 | rustls | 0 | 3 | 1* | 0 | 38 | 42 |
 
 *smoltcp and rustls detected RFC patterns but below the 3-unique-ID threshold
 
-**Finding:** TESTS naming convention fails for Rust (inline #[test] in same file). CITES is the critical edge type for planning-heavy projects (debserver: 72 edges from D###/M### citations, more than all code-based methods combined).
+**Finding:** TESTS naming convention fails for Rust (inline #[test] in same file). CITES is the critical edge type for planning-heavy projects (project-d: 72 edges from D###/M### citations, more than all code-based methods combined).
 
 ---
 
@@ -109,12 +109,12 @@ Designed 4-tier taxonomy (EDGE_TYPE_TAXONOMY.md):
 | smoltcp | 147 | 137 | 93% | SOURCE 67%, EXAMPLE 11%, TEST 5% |
 | adr | 670 | 525 | 78% | DOCUMENT 55%, EXAMPLE 23% |
 | boa | 985 | 962 | 98% | SOURCE 59%, TEST 18%, SCRIPT 4% |
-| debserver | 415 | 399 | 96% | PLANNING 60%, INFRASTRUCTURE 14%, SOURCE 9% |
+| project-d | 415 | 399 | 96% | PLANNING 60%, INFRASTRUCTURE 14%, SOURCE 9% |
 | gsd-2 | 3331 | 3181 | 96% | SOURCE 49%, TEST 20%, DOCUMENT 13% |
 | rclcpp | 528 | 513 | 97% | SOURCE 59%, TEST 32% |
 | rustls | 1069 | 290 | 27% | OTHER 73% (524 .bin + 180 cert/key test fixtures), SOURCE 12% |
 
-**Finding:** debserver is 60% PLANNING nodes -- confirms it's a planning-heavy infra project. rclcpp is 32% TEST nodes. rustls low classification rate is correct behavior (test fixture binaries are genuinely OTHER).
+**Finding:** project-d is 60% PLANNING nodes -- confirms it's a planning-heavy infra project. rclcpp is 32% TEST nodes. rustls low classification rate is correct behavior (test fixture binaries are genuinely OTHER).
 
 ---
 
@@ -129,7 +129,7 @@ Designed 4-tier taxonomy (EDGE_TYPE_TAXONOMY.md):
 | rclcpp | 19.9% | 13.5% | More balanced |
 | boa | 12.2% | 0.6% | Almost no overlap |
 | gsd-2 | 5.3% | 1.9% | Very low overlap |
-| debserver | 3.6% | 3.8% | Near zero overlap |
+| project-d | 3.6% | 3.8% | Near zero overlap |
 
 **Key finding:** At w>=3, co-change captures 87-99% edges that have NO corresponding import. These are files coupled by shared assumptions, interface contracts, or hidden dependencies. The methods are genuinely complementary.
 
@@ -167,7 +167,7 @@ For IMPORTS: gsd-2 had 64% TEST_IMPORTS (test files importing source files). Thi
 | smoltcp | 1,587 | 21.7% | 8.6% | Moderate HRR value |
 | adr | 1 | 100% | 0% | (too few edges to conclude) |
 | boa | 1,820 | 17.7% | 20.3% | Moderate HRR value |
-| debserver | 104 | 38.5% | 8.7% | **HRR adds value** |
+| project-d | 104 | 38.5% | 8.7% | **HRR adds value** |
 | gsd-2 | 2,372 | 20.0% | 8.2% | Moderate HRR value |
 | rclcpp | 3,099 | 2.5% | 62.9% | FTS5 sufficient |
 | rustls | 2,416 | 22.6% | 4.1% | Moderate HRR value |
@@ -184,7 +184,7 @@ The most important breakdown. Which edge types have low vocabulary overlap (wher
 | CROSS_REFERENCES | rclcpp | 0.082 | 75% | Docs reference code with different terminology |
 | DOC_CODE_COUPLING | smoltcp | 0.084 | 79% | Documentation uses natural language, code uses identifiers |
 | CO_CHANGED (generic) | boa | 0.075 | 64% | Files coupled by hidden dependencies, no shared words |
-| CITES | debserver | 0.102 | 49% | Decision docs cite each other with minimal vocabulary overlap |
+| CITES | project-d | 0.102 | 49% | Decision docs cite each other with minimal vocabulary overlap |
 | IMPORTS | gsd-2 | 0.093 | 56% | TS modules with different vocabulary importing each other |
 
 **Highest overlap (FTS5 sufficient):**
@@ -211,7 +211,7 @@ The most important breakdown. Which edge types have low vocabulary overlap (wher
    - Same-language IMPORTS: files that import each other share type names
 
 4. **Per-repo, HRR value correlates with project type:**
-   - **Infrastructure/planning projects (debserver):** 38.5% low-overlap edges. HRR adds the most value here.
+   - **Infrastructure/planning projects (project-d):** 38.5% low-overlap edges. HRR adds the most value here.
    - **Single-language code projects (rclcpp):** 2.5% low-overlap edges. FTS5 suffices.
    - **Mixed code+docs projects (gsd-2, boa, rustls, smoltcp):** 18-23% low-overlap edges. Moderate HRR value.
 
@@ -252,7 +252,7 @@ Encoded all 5 pilot graphs in HRR (DIM=2048, capacity=227 per partition). Partit
 
 | Repo | Edges | Partitions | R@5 | R@10 | Best Type (R@10) |
 |------|-------|-----------|-----|------|-----------------|
-| **debserver** | 126 | 3 | **0.813** | **0.880** | CO_CHANGED: 1.000, IMPORTS: 1.000, CITES: 0.824 |
+| **project-d** | 126 | 3 | **0.813** | **0.880** | CO_CHANGED: 1.000, IMPORTS: 1.000, CITES: 0.824 |
 | **smoltcp** | 1,937 | 10 | 0.271 | 0.378 | IMPORTS: 0.487, CO_CHANGED: 0.300 |
 | **rclcpp** | 3,581 | 19 | 0.141 | 0.206 | CO_CHANGED: 0.207, IMPORTS: 0.117 |
 | **gsd-2** | 3,427 | 18 | 0.127 | 0.166 | CO_CHANGED: 0.201, IMPORTS: 0.190 |
@@ -262,7 +262,7 @@ Encoded all 5 pilot graphs in HRR (DIM=2048, capacity=227 per partition). Partit
 
 HRR retrieval quality is **inversely correlated with partition count**, not graph shape or edge type.
 
-- **debserver (3 partitions):** R@10 = 0.880. Every edge type fits in a single partition. The query hits the right partition and finds the answer.
+- **project-d (3 partitions):** R@10 = 0.880. Every edge type fits in a single partition. The query hits the right partition and finds the answer.
 - **smoltcp (10 partitions):** R@10 = 0.378. IMPORTS (275 edges, 2 partitions) works better than CO_CHANGED (1662 edges, 8 partitions).
 - **boa (54 partitions):** R@10 = 0.074. 11K co-change edges split across 50 partitions. A query's target edge is in one of 50 partitions, but the query correlates against all 50, and 49 return noise.
 
@@ -278,7 +278,7 @@ The naive partitioning strategy (chunk by type, then by size) fails at scale. Th
 3. **Hierarchical encoding:** Per-node local superpositions (all edges touching node A in one vector), queried directly. No global superposition needed for single-hop.
 4. **Higher dimensionality:** DIM=4096 or 8192 increases capacity per partition, reducing partition count. But 11K edges still needs ~50 partitions at DIM=2048.
 
-**The debserver result validates HRR's core capability.** When the graph fits within capacity (126 edges, 3 partitions), retrieval is excellent (R@10=0.880). The challenge is making it work at scale, which is an engineering problem (partition routing), not a mathematical limitation.
+**The project-d result validates HRR's core capability.** When the graph fits within capacity (126 edges, 3 partitions), retrieval is excellent (R@10=0.880). The challenge is making it work at scale, which is an engineering problem (partition routing), not a mathematical limitation.
 
 ### P1: Partition Routing Results
 
@@ -289,7 +289,7 @@ Added a partition-to-node index. At query time, only correlate against partition
 | boa | 54 | 4.3 | 0.074 | **0.189** | **2.6x** |
 | gsd-2 | 18 | 1.9 | 0.166 | **0.406** | **2.4x** |
 | smoltcp | 10 | 5.4 | 0.378 | **0.431** | 1.1x |
-| debserver | 3 | 1.1 | 0.880 | **0.900** | 1.0x |
+| project-d | 3 | 1.1 | 0.880 | **0.900** | 1.0x |
 
 Routing helps most where partition count is highest. boa went from 54 noise-contributing partitions to avg 4.3 relevant ones. gsd-2 went from 18 to avg 1.9.
 
@@ -297,7 +297,7 @@ boa's 0.189 is still not ideal. Hub nodes (avg 4.3 partitions) still query too m
 
 ### Root Cause: Fixed Weight Threshold
 
-The partition explosion was not an HRR problem. It was a threshold problem. w>=3 is appropriate for a 526-commit repo (debserver: 0.57% of commits) but generates noise for a 3,354-commit repo (boa: 0.09% of commits). Three co-occurrences across 3,354 commits could be coincidence. Twenty is real coupling.
+The partition explosion was not an HRR problem. It was a threshold problem. w>=3 is appropriate for a 526-commit repo (project-d: 0.57% of commits) but generates noise for a 3,354-commit repo (boa: 0.09% of commits). Three co-occurrences across 3,354 commits could be coincidence. Twenty is real coupling.
 
 Normalizing by commit count: at threshold ~0.5-0.6% of total commits, every repo lands at 1-4 partitions:
 
@@ -308,7 +308,7 @@ Normalizing by commit count: at threshold ~0.5-0.6% of total commits, every repo
 | gsd-2 | 2,150 | w>=10 (0.47%) | 164 | 1 |
 | rclcpp | 1,801 | w>=10 (0.56%) | 215 | 1 |
 | rustls | 5,024 | w>=20 (0.40%) | 423 | 2 |
-| debserver | 526 | w>=3 (0.57%) | 26 | 1 |
+| project-d | 526 | w>=3 (0.57%) | 26 | 1 |
 
 **Adaptive threshold formula:** `w >= max(3, ceil(commits * 0.005))`
 
@@ -365,7 +365,7 @@ Three zero-human-labeling approaches were run on all 5 pilots.
 |------|--------------|-------------|-------------------|---------|
 | smoltcp | 24.3x | 19.0x | 2.2x | SIGNAL |
 | boa | 43.0x | - | 3.1x | SIGNAL |
-| debserver | 73.1x | 38.5x | 3.4x | SIGNAL |
+| project-d | 73.1x | 38.5x | 3.4x | SIGNAL |
 | gsd-2 | 18.5x | - | 2.4x | SIGNAL |
 | rclcpp | 14.7x | 230.0x | 1.8x | SIGNAL |
 
@@ -379,9 +379,9 @@ Co-change edges predict same-directory at 15-73x over random. rclcpp co-change e
 | gsd-2 | 29.6 | 50.0x | HEAVY_TAILED | STRONG_CLUSTERING |
 | rclcpp | 16.8 | 22.3x | HEAVY_TAILED | MODERATE_CLUSTERING |
 | smoltcp | 3.8 | 3.3x | NEAR_UNIFORM | WEAK_CLUSTERING |
-| debserver | 3.0 | 5.3x | NEAR_UNIFORM | WEAK_CLUSTERING |
+| project-d | 3.0 | 5.3x | NEAR_UNIFORM | WEAK_CLUSTERING |
 
-boa and gsd-2 show clustering 50x above random -- a property of real dependency graphs, not random co-occurrence. Smaller repos (smoltcp, debserver) have weaker but still above-random structure.
+boa and gsd-2 show clustering 50x above random -- a property of real dependency graphs, not random co-occurrence. Smaller repos (smoltcp, project-d) have weaker but still above-random structure.
 
 **Approach 2 (Triangulation): Multi-method agreement is low (0.6-10.3%) but this is expected.**
 
@@ -397,11 +397,11 @@ The low agreement is not a weakness -- methods measure genuinely different thing
 
 | Project | MD files | Total lines | Unique decisions referenced | Docs with cross-refs |
 |---|---|---|---|---|
-| alpha-seek | 104 | 21,569 | 143 | 95 |
-| optimus-prime | 969 | 233,282 | 34 | 688 |
-| debserver | 105 | 9,658 | ~12 | 64 |
+| project-a | 104 | 21,569 | 143 | 95 |
+| project-b | 969 | 233,282 | 34 | 688 |
+| project-d | 105 | 9,658 | ~12 | 64 |
 | gsd-2 | 979 | 100,733 | TBD | 88 |
-| code-monkey | 166 | 46,678 | TBD | 132 |
+| project-e | 166 | 46,678 | TBD | 132 |
 
 **Layer 2: Git history as human-authored intent graph.** Every commit is a human decision: "these specific files changed together for this reason." This is not derived structure -- it IS the ground truth for co-change relationships.
 
@@ -425,7 +425,7 @@ The low agreement is not a weakness -- methods measure genuinely different thing
 
 **What this gives us:** Direct edge-level correspondence with human intent. Not structural properties, not statistical lift over random -- actual measurement of whether each extracted edge matches something a human expressed.
 
-**Applicable to:** All personal projects with git history and markdown documentation. alpha-seek (143 decisions, 95 cross-referencing docs) is the strongest candidate. optimus-prime (969 md files, 233K lines) is the largest corpus.
+**Applicable to:** All personal projects with git history and markdown documentation. project-a (143 decisions, 95 cross-referencing docs) is the strongest candidate. project-b (969 md files, 233K lines) is the largest corpus.
 
 ---
 
@@ -522,11 +522,11 @@ For each pilot, edges were split by vocabulary overlap (Jaccard similarity of fi
 | Repo | HRR Recall | FTS5 Recall | HRR-only | FTS-only | Both | Neither | HRR advantage |
 |------|-----------|-------------|----------|----------|------|---------|---------------|
 | smoltcp | **0.238** | 0.090 | 46 | 15 | 4 | 145 | **2.6x** |
-| debserver | **0.853** | 0.265 | 21 | 1 | 8 | 4 | **3.2x** |
+| project-d | **0.853** | 0.265 | 21 | 1 | 8 | 4 | **3.2x** |
 | gsd-2 | **0.193** | 0.072 | 15 | 5 | 1 | 62 | **2.7x** |
 | rclcpp | 0.137 | 0.164 | 8 | 10 | 2 | 53 | even |
 
-On low-overlap edges, HRR outperforms FTS5 by 2.6-3.2x on 3 of 4 repos. debserver is the standout: HRR finds 85% of low-overlap targets vs FTS5's 27%. These are the vocabulary-boundary edges (config-code, doc-code, cross-reference) that FTS5 structurally cannot find.
+On low-overlap edges, HRR outperforms FTS5 by 2.6-3.2x on 3 of 4 repos. project-d is the standout: HRR finds 85% of low-overlap targets vs FTS5's 27%. These are the vocabulary-boundary edges (config-code, doc-code, cross-reference) that FTS5 structurally cannot find.
 
 ### Results: High Overlap (>0.3) -- FTS5 territory
 
@@ -534,7 +534,7 @@ On low-overlap edges, HRR outperforms FTS5 by 2.6-3.2x on 3 of 4 repos. debserve
 |------|-----------|-------------|----------|----------|------|---------|----------------|
 | smoltcp | 0.239 | **0.521** | 20 | 66 | 19 | 58 | **2.2x** |
 | gsd-2 | 0.120 | **0.602** | 2 | 42 | 8 | 31 | **5.0x** |
-| debserver | **1.000** | 0.333 | 2 | 0 | 1 | 0 | HRR wins (small graph) |
+| project-d | **1.000** | 0.333 | 2 | 0 | 1 | 0 | HRR wins (small graph) |
 | rclcpp | **0.205** | 0.012 | 32 | 0 | 2 | 132 | HRR wins (FTS5 anomaly) |
 
 On high-overlap edges, FTS5 outperforms HRR by 2.2-5x on smoltcp and gsd-2 -- as predicted. The rclcpp anomaly (FTS5 recall 0.012 on high-overlap edges) is likely caused by noisy queries: C++ header includes generate many matching terms that drown the specific target in BM25 ranking.
@@ -551,7 +551,7 @@ The data confirms the hypothesis from the corrected architecture assessment:
 
 4. **Neither method alone is sufficient.** Both have high "Neither" counts -- many targets are missed by both. This suggests BFS (the third method in the architecture) is needed for the remaining gap.
 
-5. **HRR's value scales inversely with partition count.** debserver (3 partitions) shows HRR recall 0.853 on low-overlap edges. gsd-2 (18 partitions) shows 0.193. The partition routing problem from H1/H2 is the primary bottleneck, not the vocabulary overlap prediction.
+5. **HRR's value scales inversely with partition count.** project-d (3 partitions) shows HRR recall 0.853 on low-overlap edges. gsd-2 (18 partitions) shows 0.193. The partition routing problem from H1/H2 is the primary bottleneck, not the vocabulary overlap prediction.
 
 ---
 
@@ -588,8 +588,8 @@ Data: `experiments/exp37_results/`
 
 | Project | Doc Direct Recall | Doc Co-Citation Recall |
 |---|---|---|
-| alpha-seek | 36.6% (185/506) | 13.5% (367/2724) |
-| debserver | 19.6% (36/184) | 8.2% (91/1111) |
+| project-a | 36.6% (185/506) | 13.5% (367/2724) |
+| project-d | 19.6% (36/184) | 8.2% (91/1111) |
 | gsd-2 | 18.9% (97/513) | 17.1% (427/2495) |
 
 ### Interpretation
@@ -606,7 +606,7 @@ Data: `experiments/exp37_results/`
 
 4. **Recall is low (19-37%).** The extractors find less than 40% of relationships humans expressed in documentation. The document reference graph contains relationship types the code-based extractors cannot discover -- semantic connections, design rationale, decision justification. This is the gap the memory system needs to fill (possibly via LLM enrichment or the interview loop).
 
-5. **The "both" column is the strongest validation signal.** 101 edges in alpha-seek are confirmed by both doc refs AND commit intent. These are edges where human-authored documentation references align with human-authored commit groupings. This is genuine ground-truth-level validation.
+5. **The "both" column is the strongest validation signal.** 101 edges in project-a are confirmed by both doc refs AND commit intent. These are edges where human-authored documentation references align with human-authored commit groupings. This is genuine ground-truth-level validation.
 
 ### Does This Close the CS-007 Gap?
 
@@ -626,9 +626,9 @@ All 39 repos fully extracted (git edges, imports, structural, node types) and HR
 
 | Tier | Count | Avg Partitions | R@10 Range | Repos |
 |------|-------|---------------|-----------|-------|
-| Excellent (>0.8) | 10 | 2 | 0.80-1.00 | adr, code-monkey, email-secretary, terraform, sports-betting-arbitrage, jose-bully, commonmark-spec, debserver, evolve, quinn |
-| Good (0.4-0.8) | 7 | 10 | 0.42-0.71 | rustls, ludwig, blitz, alpha-seek, babel, optimus-prime, cockroach |
-| Moderate (0.2-0.4) | 16 | 31 | 0.21-0.38 | smoltcp, taichi, openssl, micropython, pulumi, alpha-seek-memtest, bevy, duckdb, nx, su2, airflow, bullet3, dagster, dealii, rclcpp, saleor |
+| Excellent (>0.8) | 10 | 2 | 0.80-1.00 | adr, project-e, project-f, terraform, project-g-arbitrage, project-c, commonmark-spec, project-d, evolve, quinn |
+| Good (0.4-0.8) | 7 | 10 | 0.42-0.71 | rustls, ludwig, blitz, project-a, babel, project-b, cockroach |
+| Moderate (0.2-0.4) | 16 | 31 | 0.21-0.38 | smoltcp, taichi, openssl, micropython, pulumi, project-a-test, bevy, duckdb, nx, su2, airflow, bullet3, dagster, dealii, rclcpp, saleor |
 | Weak (<0.2) | 5 | 85 | 0.07-0.19 | px4-autopilot, gsd-2, esp-idf, mlflow, boa |
 
 **The partition-count correlation holds across the full corpus:**
@@ -663,7 +663,7 @@ All three retrieval methods running together for the first time. FTS5 for keywor
 
 | Repo | FTS5 Alone | HRR Alone | BFS Alone | **Combined** | Neither |
 |------|-----------|----------|----------|-------------|---------|
-| debserver | 0.277 | 0.923 | 0.046 | **1.000** | 0.0% |
+| project-d | 0.277 | 0.923 | 0.046 | **1.000** | 0.0% |
 | smoltcp | 0.312 | 0.523 | 0.253 | **0.949** | 5.1% |
 | gsd-2 | 0.188 | 0.435 | 0.247 | **0.776** | 22.4% |
 | boa | 0.103 | 0.310 | 0.317 | **0.687** | 31.3% |
@@ -674,7 +674,7 @@ No single method dominates. Each finds targets the others miss:
 
 | Repo | HRR-only finds | BFS-only finds | FTS5-only finds |
 |------|---------------|----------------|-----------------|
-| debserver | 44 | 3 | 2 |
+| project-d | 44 | 3 | 2 |
 | smoltcp | 91 | 60 | 41 |
 | gsd-2 | 29 | 21 | 8 |
 | boa | 80 | 95 | 18 |
@@ -687,7 +687,7 @@ No single method dominates. Each finds targets the others miss:
 
 ### The Architecture Is Validated
 
-debserver achieves **perfect recall (1.000)** -- every ground-truth target is found by at least one of the three methods. smoltcp is near-perfect at 0.949. Even boa (the hardest case with dense import graphs) reaches 0.687.
+project-d achieves **perfect recall (1.000)** -- every ground-truth target is found by at least one of the three methods. smoltcp is near-perfect at 0.949. Even boa (the hardest case with dense import graphs) reaches 0.687.
 
 The "Neither" percentage (targets missed by all three) drops from 38-69% (single method) to 0-31% (combined). The remaining gap on boa and gsd-2 is likely addressable with deeper BFS (depth 2 instead of 1) or better import-graph partitioning.
 
@@ -706,9 +706,9 @@ The "Neither" percentage (targets missed by all three) drops from 38-69% (single
 
 ## Open Questions for Next Phase
 
-1. **Sentence-level decomposition.** All experiments used file-level nodes. Sentence-level (as in alpha-seek Exp 29) should increase HRR value by reducing within-edge vocabulary overlap. A sentence about "dispatch gates" vs "flow control" has lower overlap than their parent files.
+1. **Sentence-level decomposition.** All experiments used file-level nodes. Sentence-level (as in project-a Exp 29) should increase HRR value by reducing within-edge vocabulary overlap. A sentence about "dispatch gates" vs "flow control" has lower overlap than their parent files.
 
-2. **Scale to medium/large tier repos.** The adaptive threshold normalizes by commit count, but dealii (66K commits) and cockroach (32K stars) will stress-test both the threshold formula and extraction speed. 20 more repos on archon need processing.
+2. **Scale to medium/large tier repos.** The adaptive threshold normalizes by commit count, but dealii (66K commits) and cockroach (32K stars) will stress-test both the threshold formula and extraction speed. 20 more repos on server-a need processing.
 
 3. **Edge type count vs HRR selectivity.** gsd-2 has 8 active edge types. Does HRR selectivity improve with more types? More orthogonal vectors should give better geometric filtering.
 
@@ -727,7 +727,7 @@ The "Neither" percentage (targets missed by all three) drops from 38-69% (single
 | EDGE_TYPE_TAXONOMY.md | 4-tier type taxonomy with HRR implications, local/remote commit distinction |
 | TODO_CROSS_PROJECT_TESTING.md | Full testing plan: 37-project corpus, 7 phases, success criteria |
 | T0_RESULTS.md | This file: all research results, findings, validation |
-| scripts/corpus_clone.sh | Idempotent corpus clone/sync to archon |
+| scripts/corpus_clone.sh | Idempotent corpus clone/sync to server-a |
 | scripts/corpus_map.py | Repo profiling and manifest generation |
 | scripts/extract_git_edges.py | T0.2: CO_CHANGED + COMMIT_BELIEF + REFERENCES_ISSUE |
 | scripts/extract_import_edges.py | T0.3: IMPORTS (Rust, Python, TS/JS, C/C++) |
@@ -739,4 +739,4 @@ The "Neither" percentage (targets missed by all three) drops from 38-69% (single
 | scripts/hrr_vs_fts5.py | H3: Head-to-head HRR vs FTS5 on low/high overlap edges |
 | scripts/validate_edges.py | V1: Triangulation, negative sampling, self-consistency validation |
 | corpus_manifest.json | 27-repo manifest with languages, markers, methods |
-| archon:~/agentmemory-corpus/extracted/ | All extraction + encoding results (cached by HEAD hash) |
+| server-a:~/agentmemory-corpus/extracted/ | All extraction + encoding results (cached by HEAD hash) |

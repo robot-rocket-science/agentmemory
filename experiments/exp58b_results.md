@@ -35,13 +35,13 @@ Correction prevention improves 4x at top-5 and 5.5x at top-10 with aggressive de
 
 ## What Changes at Scale
 
-1. **EVIDENCE decay is load-bearing.** At 13 days, all decisions are so close in time that decay factors range 0.85-1.0 (minimal separation). At 4 months, "inherited" decisions from optimus-prime (Dec 2025) are 90+ days old -- their decay factor at 14d half-life is 0.01, effectively removing them from competition. This lets recent, relevant decisions rank higher.
+1. **EVIDENCE decay is load-bearing.** At 13 days, all decisions are so close in time that decay factors range 0.85-1.0 (minimal separation). At 4 months, "inherited" decisions from project-b (Dec 2025) are 90+ days old -- their decay factor at 14d half-life is 0.01, effectively removing them from competition. This lets recent, relevant decisions rank higher.
 
 2. **The baseline is harder.** With 218 decisions (vs 173), there's more noise competing for the top-K slots. Baseline top-10 drops from 30% to 13%. Decay is more valuable because there's more to suppress.
 
 3. **Supersession works cleanly.** All 35 archived decisions score 0.01 and rank below their replacements. The flat penalty is sufficient -- no need for chain-aware scoring.
 
-4. **Inherited decisions need decay.** Without decay, the 21 "inherited" decisions from optimus-prime compete equally with recent decisions. With 7-14d half-life, they score 3x lower, which is appropriate since many are stale (e.g., old signal model configs, dead approach parameters).
+4. **Inherited decisions need decay.** Without decay, the 21 "inherited" decisions from project-b compete equally with recent decisions. With 7-14d half-life, they score 3x lower, which is appropriate since many are stale (e.g., old signal model configs, dead approach parameters).
 
 5. **Irreducible failures exist.** 3 corrections reference decisions that hadn't been created yet at correction time (score=0.0). No scoring function can surface a belief that doesn't exist yet. These require the correction detection pipeline (Exp 1 V2: 92%) to capture the correction and create the belief.
 
@@ -49,7 +49,7 @@ Correction prevention improves 4x at top-5 and 5.5x at top-10 with aggressive de
 
 1. **Decay half-lives matter at month+ scale.** The Exp 58 finding ("insensitive") was an artifact of the 13-day window. At realistic project timescales, content-type-specific decay provides meaningful signal.
 
-2. **Recommended defaults:** 
+2. **Recommended defaults:**
    - Constraints: never (locked beliefs are immune)
    - Evidence: 14-30 days (stale experimental results fade)
    - Context: 3-7 days (activities and WIP fade fast)

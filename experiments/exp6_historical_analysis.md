@@ -6,7 +6,7 @@
 
 ## The Insight
 
-The alpha-seek project (~40-50 milestones, hundreds of decisions, full git history,
+The project-a project (~40-50 milestones, hundreds of decisions, full git history,
 documentation, research spikes, and conversation-driven development) is a complete
 temporal record of a real project built with and without memory systems. The evidence
 for what a memory system needs to do -- and whether it's working -- is already encoded
@@ -112,9 +112,9 @@ If the failure patterns didn't decrease, the prototype wasn't solving the real p
 
 | Source | What It Contains | How to Access |
 |--------|-----------------|---------------|
-| GSD decisions database | 173+ decisions with text, rationale, timestamps, D### references | alpha-seek.db mem_nodes table |
-| GSD milestones | ~40-50 milestones with scope, outcomes, dates | alpha-seek.db / .gsd directory |
-| Git history | All commits with messages, diffs, timestamps | `git log` in alpha-seek repo |
+| GSD decisions database | 173+ decisions with text, rationale, timestamps, D### references | project-a.db mem_nodes table |
+| GSD milestones | ~40-50 milestones with scope, outcomes, dates | project-a.db / .gsd directory |
+| Git history | All commits with messages, diffs, timestamps | `git log` in project-a repo |
 | Research spikes | Investigation documents with findings | .gsd/workflows/spikes/ |
 | KNOWLEDGE.md | Accumulated knowledge entries | Project root or .gsd |
 | DECISIONS.md | Decision log with rationale | Project root or .gsd |
@@ -235,7 +235,7 @@ v2 is dramatically better because overrides are ground truth -- the user explici
 ### Limitations of Current Detection
 
 - **Zero-LLM similarity (Jaccard) is coarse.** It catches lexical overlap but misses semantic similarity. "Use PostgreSQL for the backend" and "The database should be Postgres" have low Jaccard but high semantic overlap.
-- **Duplicate commits from shared repo history inflate P3/P5 counts.** Both alpha-seek and alpha-seek-memtest share early commits. Need to deduplicate.
+- **Duplicate commits from shared repo history inflate P3/P5 counts.** Both project-a and project-a-test share early commits. Need to deduplicate.
 - **P2 may undercount because research findings are often expressed very differently.** Two investigations of the same question may produce knowledge entries with completely different wording.
 - **P4 detection depends on keyword matching** ("must", "always", "never", etc.). Procedural instructions that don't use these words are missed.
 
@@ -294,7 +294,7 @@ This is itself a test case for our zero-LLM vs LLM-enriched architecture questio
 
 ## Connection to the General Memory System
 
-The patterns detected in alpha-seek generalize:
+The patterns detected in project-a generalize:
 
 | Alpha-Seek Pattern | General Pattern | Memory System Feature |
 |--------------------|-----------------|----------------------|
@@ -305,6 +305,6 @@ The patterns detected in alpha-seek generalize:
 | Dispatch gate failures | Critical constraint loss | L0/L1 always-loaded context |
 | Post-prototype improvement | Memory system works | Validates the entire approach |
 
-The alpha-seek history is not just test data for alpha-seek. It's a case study
+The project-a history is not just test data for project-a. It's a case study
 for the general problem of agentic memory. Every pattern we find here is a pattern
 that occurs in any long-running project with an AI agent.

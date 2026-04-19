@@ -17,7 +17,7 @@ npm install
 npx wrangler deploy
 ```
 
-The worker name `dry-term-30e8` matches what's configured in Cloudflare Email Routing
+The worker name `worker-name` matches what's configured in Cloudflare Email Routing
 for `data@robotrocketscience.com`.
 
 ## Local dev
@@ -43,7 +43,7 @@ Content-Type: text/plain
 
 ## Infrastructure
 
-- **Worker name**: `dry-term-30e8`
-- **D1 database**: `agentmemory-telemetry` (`4704e38d-1366-4d13-ac03-c1563096d9f3`)
+- **Worker name**: `worker-name`
+- **D1 database**: `agentmemory-telemetry` (`d1-database-id-old`)
 - **Email route**: `data@robotrocketscience.com` -> this worker
-- **Forward**: all emails also forwarded to `jonsobol@gmail.com`
+- **Forward**: all emails also forwarded to `user@example.com`

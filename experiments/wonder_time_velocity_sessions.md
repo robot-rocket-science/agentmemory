@@ -10,7 +10,7 @@
 
 ## Problem Statement
 
-Exp 58c proved that velocity-scaled decay is the strongest mechanism for CS-005 (maturity inflation). Items from fast sprints (>10 items/hour) should decay 10x faster than deep-work items. The experiment validated the math against alpha-seek decision data: fast-sprint outputs score 0.273 vs locked constraints at 0.804 by next morning.
+Exp 58c proved that velocity-scaled decay is the strongest mechanism for CS-005 (maturity inflation). Items from fast sprints (>10 items/hour) should decay 10x faster than deep-work items. The experiment validated the math against project-a decision data: fast-sprint outputs score 0.273 vs locked constraints at 0.804 by next morning.
 
 None of this was built. The `sessions` table exists in the schema with `started_at`, `completed_at`, and metric counters (`beliefs_created`, `corrections_detected`, etc.), but it has zero rows. The server creates sessions on first tool call, but no velocity computation, no velocity-scaled decay, and no cross-session topic linking exists.
 

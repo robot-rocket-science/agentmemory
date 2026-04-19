@@ -26,4 +26,4 @@ Here's where the project stands:
 - `#41` Requirements traceability as graph structure
 - `#33` Automatic query expansion without LLM
 
-MemPalace note: the palace only has `alpha_seek` wing -- this project's memories aren't mined in yet.
+MemPalace note: the palace only has `project_a` wing -- this project's memories aren't mined in yet.

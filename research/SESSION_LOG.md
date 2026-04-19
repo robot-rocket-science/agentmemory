@@ -23,7 +23,7 @@
 - **Exp 2c** (diagnosis): Root cause = IGNORED rate inflating denominator. Oracle test confirmed model works.
 - **Exp 5** (explore/exploit strategies): Thompson sampling best. Phased and decoupled strategies rejected.
 - **Exp 5b** (Thompson + Jeffreys): PASSES BOTH requirements. ECE=0.066, exploration=0.194. Adopted.
-- **Exp 6A** (timeline): 1,790 events extracted from alpha-seek (173 decisions, 84 milestones, 1,154 commits, 775 edges)
+- **Exp 6A** (timeline): 1,790 events extracted from project-a (173 decisions, 84 milestones, 1,154 commits, 775 edges)
 - **Exp 6B** (failure detection): 38 overrides, 79% in 6 repeated clusters (dispatch gate=13, calls/puts=4, typing=4, capital=3, behavior=3, GCP=3)
 - **Exp 6C** (before/after): Override rate dropped 49% after manual CLAUDE.md enforcement. Plateaued at 1.8/day.
 - **Exp 6D** (derive requirements): 3 new requirements from failure patterns.
@@ -117,19 +117,19 @@ Three research threads completed, each producing a research document, experiment
 
 **Experiments run:**
 - **Exp 37a** (feasibility): Python `ast` extractor on agentmemory repo (48 files). 349 callables, 712 resolved CALLS, 248 PASSES_DATA. Resolution rate 24.4%. Extraction time 6.87s.
-- **Exp 37b** (alpha-seek synthesis): Multi-layer extraction on alpha-seek (289 files, 552 commits). Combined AST + git history + D### citation analysis.
+- **Exp 37b** (project-a synthesis): Multi-layer extraction on project-a (289 files, 552 commits). Combined AST + git history + D### citation analysis.
 
 **Key findings:**
 1. **Three extraction layers are genuinely disjoint.** Jaccard similarity 0.000-0.012 across CALLS, CO_CHANGED, and CITES. No file pair appears in all three layers. Each captures fundamentally different relationships.
 2. **CALLS captures design intent invisible to other methods.** 156 cross-file function call relationships not visible in git history or documentation.
-3. **Resolution rate is the bottleneck for Python.** 18.9% on alpha-seek -- method calls (obj.method()) dominate unresolved calls. Rust/static-dispatch languages should be much higher.
+3. **Resolution rate is the bottleneck for Python.** 18.9% on project-a -- method calls (obj.method()) dominate unresolved calls. Rust/static-dispatch languages should be much higher.
 4. **PASSES_DATA produces meaningful density.** 1,154 data flow edges from 289 files (~4/file).
 5. **Extraction is fast.** 4.05 seconds total for all three layers on 289 files + 552 commits.
 
 **Decision:** Adopt CALLS and PASSES_DATA as Tier 2.5 edge types. Mitigate resolution rate with import-table cross-referencing. Validate on Rust repos.
 
 **Approach entry:** A028 (adopted with modifications)
-**Files:** CONTROL_DATA_FLOW_RESEARCH.md, experiments/exp37_control_data_flow.py, experiments/exp37_alpha_seek_synthesis.py, experiments/exp37_alpha_seek_results.json
+**Files:** CONTROL_DATA_FLOW_RESEARCH.md, experiments/exp37_control_data_flow.py, experiments/exp37_project_a_synthesis.py, experiments/exp37_project_a_results.json
 
 ### Research Thread 2: Feedback Loop Scaling (Exp 38)
 
@@ -187,7 +187,7 @@ Three research threads completed, each producing a research document, experiment
 
 | Claim | Evidence | Strength |
 |-------|---------|----------|
-| Code structure, git history, and documentation capture disjoint relationships | Jaccard 0.000-0.012 across three layers on alpha-seek (Exp 37b) | Strong -- measured on 289 files, 552 commits |
+| Code structure, git history, and documentation capture disjoint relationships | Jaccard 0.000-0.012 across three layers on project-a (Exp 37b) | Strong -- measured on 289 files, 552 commits |
 | Source-stratified priors dominate at scale | ECE 0.034 vs 0.076, ranking quality 21x better at 50K (Exp 38) | Strong -- 5 trials, 4 scales, 6 methods compared |
 | Thompson sampling coverage matches uniform random | Actual 21.8% vs expected 22.1% at 10K (Exp 38 analysis) | Strong -- mathematical + empirical |
 | PRF is safe for query expansion | Maintains 92% baseline across 6 topics (Exp 39) | Moderate -- small test set (6 topics, 13 decisions) |
@@ -210,8 +210,8 @@ Three research threads completed, each producing a research document, experiment
 - APPROACHES.md (updated -- A028, A029 added)
 - TODO.md (updated -- 3 findings added to design space table)
 - experiments/exp37_control_data_flow.py (new)
-- experiments/exp37_alpha_seek_synthesis.py (new)
-- experiments/exp37_alpha_seek_results.json (new)
+- experiments/exp37_project_a_synthesis.py (new)
+- experiments/exp37_project_a_results.json (new)
 - experiments/exp38_feedback_scaling.py (new)
 - experiments/exp38_results.json (new)
 - experiments/exp39_query_expansion.py (new)
@@ -314,7 +314,7 @@ Addressed all 7 real gaps identified by Exp 41:
 
 **Why this matters:** Every component had been validated in isolation (FTS5 at 92% coverage in Exp 39, HRR vocabulary bridge at 184x separation in Exp 34). But the integrated pipeline -- FTS5 seeds the HRR walk, HRR neighbors get merged with FTS5 results -- had never been tested. If integration failed, the hybrid architecture in PLAN.md was theoretical.
 
-**Method:** Built `exp40_hybrid_pipeline.py`. Loaded 586 alpha-seek beliefs, built FTS5 index, extracted 43 CITES edges from D### references, scanned for behavioral beliefs using directive patterns (found 7 additional beyond the 4 known: D089, D096, D103, D111, D121, D130, D175), assigned AGENT_CONSTRAINT edges between all 11 behavioral nodes (110 edges), encoded in HRR (DIM=2048, 2 partitions: behavioral + CITES), ran the full pipeline on all 6 Exp 9/39 topics.
+**Method:** Built `exp40_hybrid_pipeline.py`. Loaded 586 project-a beliefs, built FTS5 index, extracted 43 CITES edges from D### references, scanned for behavioral beliefs using directive patterns (found 7 additional beyond the 4 known: D089, D096, D103, D111, D121, D130, D175), assigned AGENT_CONSTRAINT edges between all 11 behavioral nodes (110 edges), encoded in HRR (DIM=2048, 2 partitions: behavioral + CITES), ran the full pipeline on all 6 Exp 9/39 topics.
 
 **Results:**
 
@@ -393,7 +393,7 @@ Three research agents launched in parallel. All completed successfully.
 
 **Research Thread: IB Belief Compression (Exp 42)**
 
-Validated the type-aware compression heuristic from Exp 20 against the real alpha-seek belief corpus. 5 research questions answered:
+Validated the type-aware compression heuristic from Exp 20 against the real project-a belief corpus. 5 research questions answered:
 1. Type-aware compression preserves 100% retrieval coverage (13/13 critical beliefs, 6 topics)
 2. 55% token savings (35.7K -> 15.9K tokens). Context nodes compress harder than predicted (0.23x vs 0.3x target)
 3. Full IB optimization not justified (0-5% marginal gain). Within-type variance is in node length, not importance.
@@ -490,7 +490,7 @@ None of these have been integrated. Every experiment is a standalone script.
 
 3. **Triggered beliefs are untested.** Exp 44 designed 15 TBs but none were simulated. TB-01 (self-check before asking user) and TB-04 (verify task ID) are directly mapped to CS-003 and CS-020 -- both of which happened in this session. Can we simulate these? Run through the case study scenarios and measure: does the TB fire? Does the action prevent the failure? What's the false positive rate (TB fires when it shouldn't)?
 
-4. **Onboarding validation is incomplete.** The parallel session produced H1 (graph connectivity) results but H2/H3 (retrieval utility, HRR value on non-alpha-seek projects) are pending. Without these, we don't know if the onboarding pipeline produces useful graphs or just connected graphs.
+4. **Onboarding validation is incomplete.** The parallel session produced H1 (graph connectivity) results but H2/H3 (retrieval utility, HRR value on non-project-a projects) are pending. Without these, we don't know if the onboarding pipeline produces useful graphs or just connected graphs.
 
 5. **No multi-session test exists.** REQ-001 (cross-session retention) is the core requirement and has never been tested because there's no system. This can't be tested in research -- it needs at minimum a SQLite store + MCP server skeleton. This is the gap that tells you "research is done, build something."
 
@@ -539,13 +539,13 @@ Files: experiments/exp47_baseline_comparison.py, experiments/exp47_baseline_resu
 | FTS5 | 85% | 69% | -16pp |
 | FTS5+HRR | 85% | 69% | -16pp |
 
-Root cause: **type-blind retrieval on a multi-type graph.** Belief nodes are 3.6% of the 16K graph. File nodes (25%), doc sentences (36%), and callables (16%) compete for the same ranking slots and drown the decision signal. 
+Root cause: **type-blind retrieval on a multi-type graph.** Belief nodes are 3.6% of the 16K graph. File nodes (25%), doc sentences (36%), and callables (16%) compete for the same ranking slots and drown the decision signal.
 
 Additional findings:
 - Temporal edges (TEMPORAL_NEXT) provide zero unique signal -- no commits reference D### IDs
 - The spike DB beliefs and extracted multi-layer nodes form two disconnected subgraphs with no cross-type bridges
 - HRR walks from FTS5 hits traverse WITHIN_SECTION and SENTENCE_IN_FILE edges, leading to more doc/file nodes instead of belief nodes
-- Extraction itself is fast and scales: 16K nodes in 1.87s, 71K (optimus-prime) in 4.06s
+- Extraction itself is fast and scales: 16K nodes in 1.87s, 71K (project-b) in 4.06s
 
 **New gap identified (Gap 7):** Cross-layer bridging edges. The graph has commit-to-file and sentence-to-file edges, but no commit-to-decision or file-to-decision edges. Without these, the multi-layer structure can't improve belief retrieval.
 
@@ -625,11 +625,11 @@ Tested 3,321 directives across 5 local projects. **31% have vocabulary gaps** --
 
 | Project | Directives | Gaps | Gap Rate | HRR Bridgeable |
 |---------|-----------|------|----------|----------------|
-| alpha-seek | 174 | 66 | 37.9% | 65/66 |
-| optimus-prime | 2,198 | 718 | 32.7% | 718/718 |
-| debserver | 63 | 31 | 49.2% | 28/31 |
-| jose-bully | 262 | 72 | 27.5% | 72/72 |
-| code-monkey | 624 | 143 | 22.9% | 142/143 |
+| project-a | 174 | 66 | 37.9% | 65/66 |
+| project-b | 2,198 | 718 | 32.7% | 718/718 |
+| project-d | 63 | 31 | 49.2% | 28/31 |
+| project-c | 262 | 72 | 27.5% | 72/72 |
+| project-e | 624 | 143 | 22.9% | 142/143 |
 | **Total** | **3,321** | **1,030** | **31.0%** | **1,025/1,030** |
 
 99.5% of gaps are HRR-bridgeable via co-location edges. Null hypothesis (gap < 3%) decisively rejected.
@@ -662,7 +662,7 @@ This session completed the onboarding validation (#42), established correction b
 
 ### Research Thread: Control Flow and Data Flow Extraction (Exp 37)
 
-AST-based extraction of CALLS and PASSES_DATA edges. Tested on agentmemory (48 files) and alpha-seek (289 files). Key finding: three extraction layers (CALLS, CO_CHANGED, CITES) are genuinely disjoint (Jaccard 0.000-0.012). CALLS captures 156 cross-file design-intent relationships invisible to git and docs. Resolution rate 18.9% for Python (method calls dominate unresolved). Tier 2.5 adopted. A028.
+AST-based extraction of CALLS and PASSES_DATA edges. Tested on agentmemory (48 files) and project-a (289 files). Key finding: three extraction layers (CALLS, CO_CHANGED, CITES) are genuinely disjoint (Jaccard 0.000-0.012). CALLS captures 156 cross-file design-intent relationships invisible to git and docs. Resolution rate 18.9% for Python (method calls dominate unresolved). Tier 2.5 adopted. A028.
 
 ### Research Thread: Feedback Loop Scaling (Exp 38)
 
@@ -682,7 +682,7 @@ End-to-end pipeline: FTS5 finds D188 -> HRR walks AGENT_CONSTRAINT -> D157 recov
 
 **Exp 45b: Retrieval utility.** Graph FTS5 87-93% vs raw file FTS5 100%. H2 PASSES threshold but raw beats graph. Implication: need dual-mode FTS5 (sentence + file level).
 
-**Exp 45c: Entity detection + H3 retest.** Built zero-LLM entity detector (person names, incidents, hosts, dates). jose-bully: 2,734 entity edges, LCC 97%->100%. debserver: 16,547 entity edges, LCC 69%->89%. H3 PARTIAL PASS: HRR adds value on 20% of queries via entity edges. Person name detector has false positives ("Apple Home", "Smart Home" classified as people).
+**Exp 45c: Entity detection + H3 retest.** Built zero-LLM entity detector (person names, incidents, hosts, dates). project-c: 2,734 entity edges, LCC 97%->100%. project-d: 16,547 entity edges, LCC 69%->89%. H3 PARTIAL PASS: HRR adds value on 20% of queries via entity edges. Person name detector has false positives ("Apple Home", "Smart Home" classified as people).
 
 ### Correction Burden Reframe
 
@@ -690,7 +690,7 @@ User challenge: "the purpose is to reduce the human's correction burden, not to 
 
 Key insight: every false positive is a potential future correction. The metric should be "how many wrong things does the system store that the human will have to fix?" not "how many right things did we find?"
 
-**Exp 45d: Precision audit.** Before fix: debserver 17.5 wrong encounters/session (entity FP). After fix (table fragment filter + non-person word filter): all projects < 0.65 wrong/session. 30x improvement on debserver.
+**Exp 45d: Precision audit.** Before fix: project-d 17.5 wrong encounters/session (entity FP). After fix (table fragment filter + non-person word filter): all projects < 0.65 wrong/session. 30x improvement on project-d.
 
 ### LLM-Assisted Classification (A032)
 
@@ -704,7 +704,7 @@ Simulated 15 triggered beliefs against 5 case studies (CS-003, CS-005, CS-006, C
 
 ### Case Study CS-022 Documented
 
-Multi-hop operational query collapse (MemPalace failure on alpha-seek paper trading). Pattern P8: operational knowledge gap. Memory stored analysis but not infrastructure facts (which machine, which path). Validates multi-layer extraction need.
+Multi-hop operational query collapse (MemPalace failure on project-a paper trading). Pattern P8: operational knowledge gap. Memory stored analysis but not infrastructure facts (which machine, which path). Validates multi-layer extraction need.
 
 ### Acceptance Test Suite (ACCEPTANCE_TESTS.md)
 
@@ -744,7 +744,7 @@ Tested whether rule injection alone produces compliant output. Clean isolated Ha
 - ACCEPTANCE_TESTS.md (new)
 - PHASE2_TEST_PLAN.md (new)
 - ONBOARDING_RESEARCH.md (new, updated multiple times with empirical results)
-- experiments/exp37_control_data_flow.py, exp37_alpha_seek_synthesis.py
+- experiments/exp37_control_data_flow.py, exp37_project_a_synthesis.py
 - experiments/exp38_feedback_scaling.py
 - experiments/exp39_query_expansion.py
 - experiments/exp40_hybrid_pipeline.py
@@ -767,7 +767,7 @@ Tested whether rule injection alone produces compliant output. Clean isolated Ha
 | Source priors dominate at scale | 21x ranking quality at 50K (Exp 38) | VALIDATED |
 | FTS5+HRR combined: 100% coverage | 13/13, D157 rescued (Exp 40) | VALIDATED |
 | Onboarding pipeline produces connected graphs | 69-100% LCC on 3 archetypes (Exp 45) | VALIDATED |
-| HRR adds value on non-alpha-seek projects | 20% of queries improved (Exp 45c) | PARTIAL |
+| HRR adds value on non-project-a projects | 20% of queries improved (Exp 45c) | PARTIAL |
 | Correction burden < 1/session after precision gate | 0.58-0.65 wrong/session (Exp 45d) | VALIDATED |
 | LLM-verify at 99% accuracy | 99/100 on Haiku, verified no contamination (Exp 47) | VALIDATED |
 | TB detection prevents 5/5 case study failures | 420 tokens, 83ms (Exp 48) | VALIDATED |
@@ -800,7 +800,7 @@ Revised architecture: decay for scoring, TEMPORAL_NEXT for traversal only. Separ
 ### Decay Calibration (Exp 58, 58b, 58c)
 
 - **Exp 58 (13-day spike DB):** Half-lives insensitive. Locked-belief immunity is the only signal.
-- **Exp 58b (4-month full lineage, 218 decisions):** EVIDENCE decay is load-bearing. top10 jumps 13%->73%. Inherited optimus-prime decisions correctly suppressed. Superseded ordering 7/7 correct.
+- **Exp 58b (4-month full lineage, 218 decisions):** EVIDENCE decay is load-bearing. top10 jumps 13%->73%. Inherited project-b decisions correctly suppressed. Superseded ordering 7/7 correct.
 - **Exp 58c (hour-scale decay):** Solves CS-005 (maturity inflation). Fast-sprint outputs (22 items/hr) score 0.273 vs locked 0.804 by next morning. Velocity-scaled half-lives (0.1x for >10 items/hr) are the strongest mechanism. 73% is the decay ceiling.
 
 ### 27% Failure Root Cause Analysis

@@ -169,7 +169,7 @@ Neither FTS5 nor HRR is sufficient alone. They handle complementary cases:
 ```
 Query: "agent behavior instructions"
   |
-  +---> [FTS5 pass] 
+  +---> [FTS5 pass]
   |       Search FTS5 index with query terms
   |       Result: {D188} (matches "instructions")
   |
@@ -209,7 +209,7 @@ HRR traverses edges. It does not create them. The vocabulary bridge works IF the
 |--------|--------|-----------|---------|
 | Correction detection V2 | Pattern matching: imperative verbs, always/never, negation | Yes | 92% accuracy on real corrections (Exp 1 V2) |
 | `directive` MCP tool | User calls `remember` with `related_concepts` tags | Yes (user provides) | Designed in PLAN.md |
-| Co-change | If D157 and D188 modified in same commit | Yes | Validated in T0 (96 edges w>=3 on alpha-seek) |
+| Co-change | If D157 and D188 modified in same commit | Yes | Validated in T0 (96 edges w>=3 on project-a) |
 | CALLS edges | If enforcement code for D157 and D188 share function calls | Yes | Validated in Exp 37 (3,489 resolved edges) |
 | HRR bootstrap | Encode partial graph, propose candidates, verify | Yes | Exp 33: D097 found at rank 2 via bootstrap |
 | LLM classification | Ask LLM to tag belief as "behavioral" | No | Exp 28: solves vocab mismatch via `related_concepts` |
@@ -256,7 +256,7 @@ The T0 adaptive threshold + partition routing approach (validated on 5 repos, R@
 | Iterative multi-hop finds 2-hop targets | **PROVEN** (Exp 34: D097 rank 1) | -- |
 | FTS5 + HRR combined improves over FTS5 alone | **UNPROVEN** (Exp 34 Test C inconclusive) | Need a test where FTS5 genuinely misses and HRR finds via seeded walk |
 | Automatic edge creation for behavioral beliefs | **UNPROVEN** | Run correction detection V2 on CLAUDE.md directives, verify edges created |
-| HRR vocabulary bridge at full graph scale | **UNPROVEN** | Encode all behavioral beliefs in alpha-seek, test cross-vocabulary retrieval |
+| HRR vocabulary bridge at full graph scale | **UNPROVEN** | Encode all behavioral beliefs in project-a, test cross-vocabulary retrieval |
 | HRR + PRF combined pipeline | **UNPROVEN** | Run PRF for initial FTS5 hits, HRR for graph walk, measure combined coverage |
 
 The most important unproven claim is the combined FTS5+HRR pipeline. The individual components work. The integration has not been tested end-to-end.

@@ -248,7 +248,7 @@ This project pushes to three remotes:
 
 | Remote | URL | Purpose |
 |---|---|---|
-| `origin` | gitea:jso/agentmemory.git | Primary dev (Gitea) |
+| `origin` | gitea:user/agentmemory.git | Primary dev (Gitea) |
 | `github` | git@github.com:yoshi280/agentmemory.git | Public install source |
 | `github-rrs` | git@github-rrs:robotrocketscience/agentmemory.git | Public-facing (when unlocked) |
 

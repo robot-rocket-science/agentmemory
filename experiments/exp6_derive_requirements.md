@@ -89,7 +89,7 @@ No new requirement, but a design note: **memory is not always the right solution
 
 ### F6: GCP Primary Compute (3 overrides, 7 days)
 
-**What happened:** The agent kept trying to use archon for primary compute when GCP was the designated platform.
+**What happened:** The agent kept trying to use server-a for primary compute when GCP was the designated platform.
 
 **What memory needed:** Factual belief at L1 (loaded when compute-related tasks are active).
 

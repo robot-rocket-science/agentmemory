@@ -9,8 +9,8 @@
 
 | Repo | Commits | Files | Languages | Archetype |
 |---|---|---|---|---|
-| debserver | 538 | 189 | Python, YAML, MD | Large personal project with T0 data |
-| email-secretary | 101 | 109 | Python, MD | Medium project with directives |
+| project-d | 538 | 189 | Python, YAML, MD | Large personal project with T0 data |
+| project-f | 101 | 109 | Python, MD | Medium project with directives |
 | bigtime | 14 | 15 | MD, JSON | Tiny doc-heavy project |
 | mud_rust | 5 | 16 | Rust, MD | Minimal cross-language project |
 
@@ -32,16 +32,16 @@
 - **Success:** Monotonic decay for non-locked types, constant 1.0 for locked/correction/requirement
 
 ### H4: Small projects don't over-generate
-- **Method:** Compare belief count for bigtime (14 commits) vs debserver (538 commits)
+- **Method:** Compare belief count for bigtime (14 commits) vs project-d (538 commits)
 - **Measure:** bigtime should produce proportionally fewer beliefs, not a similar volume of noise
-- **Success:** bigtime < 200 beliefs, debserver < 5000 beliefs (proportional to content, not inflated by noise)
+- **Success:** bigtime < 200 beliefs, project-d < 5000 beliefs (proportional to content, not inflated by noise)
 
 ## Execution Steps
 
 ### Phase 1: Quick validation scripts (local, no API cost)
 1. Run scanner on each repo, check node counts and date extraction
 2. Verify commit dates are ISO 8601 and in the past
-3. Dry-run ingest on 10 sentences from debserver with offline classifier
+3. Dry-run ingest on 10 sentences from project-d with offline classifier
 4. Check that created_at survives through to the beliefs table
 
 ### Phase 2: Offline onboarding baseline
@@ -58,11 +58,11 @@
 ### Phase 4: Verification
 1. Compare offline vs LLM belief quality side-by-side
 2. Verify H1-H4
-3. Compare debserver results against T0 extracted data on archon
+3. Compare project-d results against T0 extracted data on server-a
 4. Document findings
 
 ## Infrastructure
 
 - **Run locally on lorax** (has ANTHROPIC_API_KEY, agentmemory installed)
 - **Isolated test DBs** via AGENTMEMORY_DB env var (don't pollute production DB)
-- **Compare against archon T0 data** via SSH for debserver validation
+- **Compare against server-a T0 data** via SSH for project-d validation

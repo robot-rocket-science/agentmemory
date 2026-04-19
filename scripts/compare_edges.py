@@ -14,7 +14,7 @@ Usage:
         --auto-extracted /path/to/git_edges.json \
         --doc-refs /path/to/repo_doc_refs.json \
         --commit-intent /path/to/repo_commit_intent.json \
-        --repo-name alpha-seek
+        --repo-name project-a
 
 Output: JSON to stdout, summary to stderr.
 """
@@ -31,6 +31,7 @@ from typing import Any, cast
 # ---------------------------------------------------------------------------
 # Path normalization
 # ---------------------------------------------------------------------------
+
 
 def normalize_path(p: str) -> str:
     """Normalize a file path for comparison.
@@ -64,6 +65,7 @@ def make_edge_pair(a: str, b: str) -> tuple[str, str]:
 # ---------------------------------------------------------------------------
 # Loaders
 # ---------------------------------------------------------------------------
+
 
 def load_json(path: Path) -> dict[str, Any]:
     """Load a JSON file and return the parsed dict."""
@@ -154,7 +156,9 @@ def load_doc_ref_edges(
         edges_data = {}
 
     direct_edges: set[tuple[str, str]] = set()
-    direct_list: list[dict[str, Any]] = _iter_edge_dicts(edges_data.get("direct_citation", []))
+    direct_list: list[dict[str, Any]] = _iter_edge_dicts(
+        edges_data.get("direct_citation", [])
+    )
     for edge in direct_list:
         src: str | None = _get_str(edge, "source")
         tgt: str | None = _get_str(edge, "target")
@@ -188,6 +192,7 @@ def load_commit_intent_edges(path: Path) -> set[tuple[str, str]]:
 # ---------------------------------------------------------------------------
 # Comparison logic
 # ---------------------------------------------------------------------------
+
 
 def compute_precision(
     auto_edges: dict[str, set[tuple[str, str]]],
@@ -290,7 +295,9 @@ def compute_confidence_stratification(
     confirmed_doc: set[tuple[str, str]] = all_auto & all_doc
     confirmed_intent: set[tuple[str, str]] = all_auto & commit_intent
     confirmed_both: set[tuple[str, str]] = confirmed_doc & confirmed_intent
-    confirmed_one_only: set[tuple[str, str]] = (confirmed_doc | confirmed_intent) - confirmed_both
+    confirmed_one_only: set[tuple[str, str]] = (
+        confirmed_doc | confirmed_intent
+    ) - confirmed_both
     unvalidated: set[tuple[str, str]] = all_auto - confirmed_doc - confirmed_intent
 
     return {
@@ -313,6 +320,7 @@ def compute_confidence_stratification(
 # Main
 # ---------------------------------------------------------------------------
 
+
 def build_parser() -> argparse.ArgumentParser:
     parser: argparse.ArgumentParser = argparse.ArgumentParser(
         description="Compare auto-extracted edges against reference graphs.",
@@ -323,7 +331,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="append",
         default=None,
         help="Path to auto-extracted edge JSON (repeatable for multiple files: "
-             "git_edges.json, import_edges.json, structural_edges.json).",
+        "git_edges.json, import_edges.json, structural_edges.json).",
     )
     parser.add_argument(
         "--doc-refs",
@@ -391,19 +399,34 @@ def main() -> None:
     commit_intent: set[tuple[str, str]] = set()
     if commit_intent_path.exists():
         commit_intent = load_commit_intent_edges(commit_intent_path)
-        print(f"[compare] loaded commit intent: {len(commit_intent)} edges", file=sys.stderr)
+        print(
+            f"[compare] loaded commit intent: {len(commit_intent)} edges",
+            file=sys.stderr,
+        )
     else:
-        print(f"Warning: commit intent file not found: {commit_intent_path}", file=sys.stderr)
+        print(
+            f"Warning: commit intent file not found: {commit_intent_path}",
+            file=sys.stderr,
+        )
 
     # --- Compute metrics ---
     precision: dict[str, dict[str, Any]] = compute_precision(
-        auto_edges, doc_direct, doc_co_cite, commit_intent,
+        auto_edges,
+        doc_direct,
+        doc_co_cite,
+        commit_intent,
     )
     recall: dict[str, dict[str, Any]] = compute_recall(
-        auto_edges, doc_direct, doc_co_cite, commit_intent,
+        auto_edges,
+        doc_direct,
+        doc_co_cite,
+        commit_intent,
     )
     stratification: dict[str, dict[str, Any]] = compute_confidence_stratification(
-        auto_edges, doc_direct, doc_co_cite, commit_intent,
+        auto_edges,
+        doc_direct,
+        doc_co_cite,
+        commit_intent,
     )
 
     # --- Build output ---

@@ -16,7 +16,7 @@ Methods compared:
 Hypothesis: Method E achieves 100% coverage (13/13), surpassing grep's 92%.
 Null hypothesis: Corrections do not improve coverage beyond grep.
 
-Ground truth: 6 topics, 13 critical decisions from alpha-seek.
+Ground truth: 6 topics, 13 critical decisions from project-a.
 """
 
 from __future__ import annotations
@@ -37,9 +37,9 @@ import numpy as np
 # ============================================================
 
 ALPHA_SEEK_DB: Final[Path] = Path(
-    "/Users/thelorax/projects/.gsd/workflows/spikes/"
+    "/home/user/projects/.gsd/workflows/spikes/"
     "260406-1-associative-memory-for-gsd-please-explor/"
-    "sandbox/alpha-seek.db"
+    "sandbox/project-a.db"
 )
 
 TOP_K: Final[int] = 15
@@ -74,21 +74,119 @@ TOPICS: dict[str, dict[str, Any]] = {
 
 KNOWN_BEHAVIORAL: Final[list[str]] = ["D157", "D188", "D100", "D073"]
 
-STOPWORDS: Final[frozenset[str]] = frozenset({
-    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-    "have", "has", "had", "do", "does", "did", "will", "would", "shall",
-    "should", "may", "might", "can", "could", "must", "to", "of", "in",
-    "for", "on", "with", "at", "by", "from", "as", "into", "through",
-    "during", "before", "after", "above", "below", "between", "but",
-    "and", "or", "nor", "not", "no", "so", "if", "then", "than",
-    "too", "very", "just", "about", "up", "out", "off", "over",
-    "under", "again", "further", "once", "here", "there", "when",
-    "where", "why", "how", "all", "each", "every", "both", "few",
-    "more", "most", "other", "some", "such", "only", "own", "same",
-    "that", "this", "these", "those", "what", "which", "who", "whom",
-    "it", "its", "he", "she", "they", "them", "his", "her", "their",
-    "we", "us", "our", "you", "your", "i", "me", "my",
-})
+STOPWORDS: Final[frozenset[str]] = frozenset(
+    {
+        "the",
+        "a",
+        "an",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "shall",
+        "should",
+        "may",
+        "might",
+        "can",
+        "could",
+        "must",
+        "to",
+        "of",
+        "in",
+        "for",
+        "on",
+        "with",
+        "at",
+        "by",
+        "from",
+        "as",
+        "into",
+        "through",
+        "during",
+        "before",
+        "after",
+        "above",
+        "below",
+        "between",
+        "but",
+        "and",
+        "or",
+        "nor",
+        "not",
+        "no",
+        "so",
+        "if",
+        "then",
+        "than",
+        "too",
+        "very",
+        "just",
+        "about",
+        "up",
+        "out",
+        "off",
+        "over",
+        "under",
+        "again",
+        "further",
+        "once",
+        "here",
+        "there",
+        "when",
+        "where",
+        "why",
+        "how",
+        "all",
+        "each",
+        "every",
+        "both",
+        "few",
+        "more",
+        "most",
+        "other",
+        "some",
+        "such",
+        "only",
+        "own",
+        "same",
+        "that",
+        "this",
+        "these",
+        "those",
+        "what",
+        "which",
+        "who",
+        "whom",
+        "it",
+        "its",
+        "he",
+        "she",
+        "they",
+        "them",
+        "his",
+        "her",
+        "their",
+        "we",
+        "us",
+        "our",
+        "you",
+        "your",
+        "i",
+        "me",
+        "my",
+    }
+)
 
 DIRECTIVE_PATTERNS: Final[list[re.Pattern[str]]] = [
     re.compile(r"\bBANNED\b"),
@@ -104,6 +202,7 @@ DIRECTIVE_PATTERNS: Final[list[re.Pattern[str]]] = [
 # ============================================================
 # Data loading
 # ============================================================
+
 
 def load_decision_nodes() -> dict[str, str]:
     """Load decision-level nodes (D### only, no sentence splits)."""
@@ -152,6 +251,7 @@ def estimate_tokens(text: str) -> int:
 # Grep baseline
 # ============================================================
 
+
 def grep_search(
     query: str,
     nodes: dict[str, str],
@@ -164,8 +264,7 @@ def grep_search(
     for nid, content in nodes.items():
         content_lower: str = content.lower()
         match_count: int = sum(
-            len(re.findall(re.escape(term), content_lower))
-            for term in query_terms
+            len(re.findall(re.escape(term), content_lower)) for term in query_terms
         )
         if match_count > 0:
             scores.append((nid, float(match_count)))
@@ -178,12 +277,11 @@ def grep_search(
 # FTS5
 # ============================================================
 
+
 def build_fts(nodes: dict[str, str]) -> sqlite3.Connection:
     """Build in-memory FTS5 index with porter stemming."""
     db: sqlite3.Connection = sqlite3.connect(":memory:")
-    db.execute(
-        "CREATE VIRTUAL TABLE fts USING fts5(id, content, tokenize='porter')"
-    )
+    db.execute("CREATE VIRTUAL TABLE fts USING fts5(id, content, tokenize='porter')")
     for nid, content in nodes.items():
         db.execute("INSERT INTO fts VALUES (?, ?)", (nid, content))
     db.commit()
@@ -217,6 +315,7 @@ def search_fts(
 # ============================================================
 # Graph construction
 # ============================================================
+
 
 def scan_behavioral_beliefs(nodes: dict[str, str]) -> set[str]:
     """Find all behavioral decision IDs via directive patterns."""
@@ -258,12 +357,11 @@ def build_agent_constraint_edges(
 ) -> list[tuple[str, str]]:
     """Fully connect all behavioral belief nodes."""
     behavioral_nodes: list[str] = [
-        nid for nid in nodes
-        if extract_decision_id(nid) in behavioral_ids
+        nid for nid in nodes if extract_decision_id(nid) in behavioral_ids
     ]
     edges: list[tuple[str, str]] = []
     for i, a in enumerate(behavioral_nodes):
-        for b in behavioral_nodes[i + 1:]:
+        for b in behavioral_nodes[i + 1 :]:
             edges.append((a, b))
             edges.append((b, a))
     return edges
@@ -272,6 +370,7 @@ def build_agent_constraint_edges(
 # ============================================================
 # HRR engine with sub-partitioning
 # ============================================================
+
 
 def make_vector(dim: int) -> np.ndarray[Any, np.dtype[np.floating[Any]]]:
     """Random unit vector."""
@@ -331,7 +430,9 @@ class HRRGraph:
             self.node_vecs[nid] = make_vector(self.dim)
         return self.node_vecs[nid]
 
-    def _get_edge_type_vec(self, etype: str) -> np.ndarray[Any, np.dtype[np.floating[Any]]]:
+    def _get_edge_type_vec(
+        self, etype: str
+    ) -> np.ndarray[Any, np.dtype[np.floating[Any]]]:
         if etype not in self.edge_type_vecs:
             self.edge_type_vecs[etype] = make_vector(self.dim)
         return self.edge_type_vecs[etype]
@@ -354,7 +455,9 @@ class HRRGraph:
         total_encoded: int = 0
 
         for i in range(n_parts):
-            chunk: list[tuple[str, str, str]] = edges[i * chunk_size : (i + 1) * chunk_size]
+            chunk: list[tuple[str, str, str]] = edges[
+                i * chunk_size : (i + 1) * chunk_size
+            ]
             sub_id: str = f"{partition_id}_sub{i}"
             self._encode_single_partition(sub_id, chunk)
             total_encoded += len(chunk)
@@ -376,9 +479,15 @@ class HRRGraph:
         nodes_in_partition: set[str] = set()
 
         for src, tgt, etype in edges:
-            src_vec: np.ndarray[Any, np.dtype[np.floating[Any]]] = self._get_node_vec(src)
-            tgt_vec: np.ndarray[Any, np.dtype[np.floating[Any]]] = self._get_node_vec(tgt)
-            etype_vec: np.ndarray[Any, np.dtype[np.floating[Any]]] = self._get_edge_type_vec(etype)
+            src_vec: np.ndarray[Any, np.dtype[np.floating[Any]]] = self._get_node_vec(
+                src
+            )
+            tgt_vec: np.ndarray[Any, np.dtype[np.floating[Any]]] = self._get_node_vec(
+                tgt
+            )
+            etype_vec: np.ndarray[Any, np.dtype[np.floating[Any]]] = (
+                self._get_edge_type_vec(etype)
+            )
             _ = src_vec  # Used for node registration only
             superpos += bind(tgt_vec, etype_vec)
             nodes_in_partition.add(src)
@@ -412,12 +521,18 @@ class HRRGraph:
         if edge_type not in self.edge_type_vecs:
             return []
 
-        etype_vec: np.ndarray[Any, np.dtype[np.floating[Any]]] = self.edge_type_vecs[edge_type]
+        etype_vec: np.ndarray[Any, np.dtype[np.floating[Any]]] = self.edge_type_vecs[
+            edge_type
+        ]
         best_scores: dict[str, float] = {}
 
         for part_id in self.node_to_partitions[node_id]:
-            superpos: np.ndarray[Any, np.dtype[np.floating[Any]]] = self.partitions[part_id]
-            result: np.ndarray[Any, np.dtype[np.floating[Any]]] = unbind(superpos, etype_vec)
+            superpos: np.ndarray[Any, np.dtype[np.floating[Any]]] = self.partitions[
+                part_id
+            ]
+            result: np.ndarray[Any, np.dtype[np.floating[Any]]] = unbind(
+                superpos, etype_vec
+            )
 
             for nid in self.partition_nodes[part_id]:
                 if nid == node_id:
@@ -436,6 +551,7 @@ class HRRGraph:
 # ============================================================
 # Hybrid pipeline
 # ============================================================
+
 
 def search_fts_hrr(
     query: str,
@@ -482,6 +598,7 @@ def search_fts_hrr(
 # Evaluation
 # ============================================================
 
+
 def evaluate_method(
     method_name: str,
     results: list[tuple[str, float]],
@@ -525,6 +642,7 @@ def evaluate_method(
 # Main
 # ============================================================
 
+
 def main() -> None:
     t_start: float = time.monotonic()
     print("=" * 70, file=sys.stderr)
@@ -544,8 +662,7 @@ def main() -> None:
     # Scan behavioral beliefs
     behavioral_ids: set[str] = scan_behavioral_beliefs(sentence_nodes)
     behavioral_node_ids: list[str] = [
-        nid for nid in sentence_nodes
-        if extract_decision_id(nid) in behavioral_ids
+        nid for nid in sentence_nodes if extract_decision_id(nid) in behavioral_ids
     ]
     print(
         f"  Behavioral decisions: {len(behavioral_ids)}, "
@@ -601,9 +718,7 @@ def main() -> None:
         )
 
         # Encode CITES partition
-        ci_typed: list[tuple[str, str, str]] = [
-            (s, t, "CITES") for s, t in cites_edges
-        ]
+        ci_typed: list[tuple[str, str, str]] = [(s, t, "CITES") for s, t in cites_edges]
         ci_meta: dict[str, Any] = graph.encode_partition("cites", ci_typed)
         print(
             f"  CITES: {len(ci_typed)} edges, "
@@ -679,7 +794,7 @@ def main() -> None:
     for topic_name, topic_data in TOPICS.items():
         query: str = topic_data["query"]
         needed: list[str] = topic_data["needed"]
-        print(f"\n--- {topic_name}: \"{query}\" ---", file=sys.stderr)
+        print(f'\n--- {topic_name}: "{query}" ---', file=sys.stderr)
 
         topic_results: dict[str, dict[str, Any]] = {}
 
@@ -688,7 +803,8 @@ def main() -> None:
 
             if spec["type"] == "grep":
                 ns: dict[str, str] = (
-                    decision_nodes if spec.get("node_set") == "decision"
+                    decision_nodes
+                    if spec.get("node_set") == "decision"
                     else sentence_nodes
                 )
                 results: list[tuple[str, float]] = grep_search(query, ns)
@@ -720,8 +836,7 @@ def main() -> None:
             topic_results[mid] = evaluation
 
             status: str = (
-                "OK" if not evaluation["missed"]
-                else f"MISSED: {evaluation['missed']}"
+                "OK" if not evaluation["missed"] else f"MISSED: {evaluation['missed']}"
             )
             print(
                 f"  {spec['label']:40s}: "

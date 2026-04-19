@@ -3,6 +3,7 @@
 Tests whether differentiated Bayesian priors per belief type make Thompson
 sampling scoring meaningful, increasing score variance while preserving MRR.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -24,7 +25,7 @@ from agentmemory.store import MemoryStore
 # Config
 # ---------------------------------------------------------------------------
 
-CWD: Final[str] = "/Users/thelorax/projects/agentmemory"
+CWD: Final[str] = "/home/user/projects/agentmemory"
 DB_HASH: Final[str] = hashlib.sha256(CWD.encode()).hexdigest()[:12]
 LIVE_DB: Final[Path] = Path.home() / ".agentmemory" / "projects" / DB_HASH / "memory.db"
 
@@ -63,6 +64,7 @@ QUERIES: Final[list[str]] = [
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def measure_scores_and_mrr(
     store: MemoryStore,
     queries: list[str],
@@ -98,7 +100,9 @@ def measure_scores_and_mrr(
                 type_ranks[bt] = []
             type_ranks[bt].append(rank)
 
-    mrr: float = sum(reciprocal_ranks) / len(reciprocal_ranks) if reciprocal_ranks else 0.0
+    mrr: float = (
+        sum(reciprocal_ranks) / len(reciprocal_ranks) if reciprocal_ranks else 0.0
+    )
 
     # Compute per-type stats
     type_stats: dict[str, dict[str, float]] = {}
@@ -126,6 +130,7 @@ def measure_scores_and_mrr(
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     if not LIVE_DB.exists():
@@ -184,7 +189,9 @@ def main() -> None:
 
     # Compare
     mrr_delta: float = float(spread_metrics["mrr"]) - float(baseline_metrics["mrr"])  # type: ignore[arg-type]
-    std_delta: float = float(spread_metrics["overall_score_std"]) - float(baseline_metrics["overall_score_std"])  # type: ignore[arg-type]
+    std_delta: float = float(spread_metrics["overall_score_std"]) - float(
+        baseline_metrics["overall_score_std"]
+    )  # type: ignore[arg-type]
 
     variance_increased: bool = std_delta > 0.0
     mrr_preserved: bool = mrr_delta >= -0.05  # Allow 5% tolerance
@@ -198,7 +205,9 @@ def main() -> None:
 
     output: dict[str, object] = {
         "experiment": "exp68_spread_type_priors",
-        "type_priors": {k: {"alpha": v[0], "beta": v[1]} for k, v in TYPE_PRIORS.items()},
+        "type_priors": {
+            k: {"alpha": v[0], "beta": v[1]} for k, v in TYPE_PRIORS.items()
+        },
         "baseline": baseline_metrics,
         "spread": spread_metrics,
         "mrr_delta": mrr_delta,

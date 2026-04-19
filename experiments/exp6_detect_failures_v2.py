@@ -17,7 +17,9 @@ from pathlib import Path
 from typing import Any
 
 
-OVERRIDES_PATH = Path("/Users/thelorax/projects/alpha-seek-memtest/docs/gsd-archive/OVERRIDES.md")
+OVERRIDES_PATH = Path(
+    "/home/user/projects/project-a-test/docs/gsd-archive/OVERRIDES.md"
+)
 TIMELINE_PATH = Path("experiments/exp6_timeline.json")
 OUTPUT_PATH = Path("experiments/exp6_failures_v2.json")
 
@@ -37,17 +39,21 @@ def parse_overrides(path: Path) -> list[Override]:
     overrides: list[Override] = []
 
     # Split on --- delimiters
-    blocks = re.split(r'\n---\n', text)
+    blocks = re.split(r"\n---\n", text)
 
     for block in blocks:
         block = block.strip()
         if not block or block.startswith("# GSD Overrides"):
             continue
 
-        timestamp_match = re.search(r'Override:\s+(\d{4}-\d{2}-\d{2}T[\d:.]+Z)', block)
-        change_match = re.search(r'\*\*Change:\*\*\s*(.*?)(?:\n\*\*Scope|\Z)', block, re.DOTALL)
-        scope_match = re.search(r'\*\*Scope:\*\*\s*(.*?)(?:\n\*\*Applied|\Z)', block, re.DOTALL)
-        applied_match = re.search(r'\*\*Applied-at:\*\*\s*(.*?)(?:\n|\Z)', block)
+        timestamp_match = re.search(r"Override:\s+(\d{4}-\d{2}-\d{2}T[\d:.]+Z)", block)
+        change_match = re.search(
+            r"\*\*Change:\*\*\s*(.*?)(?:\n\*\*Scope|\Z)", block, re.DOTALL
+        )
+        scope_match = re.search(
+            r"\*\*Scope:\*\*\s*(.*?)(?:\n\*\*Applied|\Z)", block, re.DOTALL
+        )
+        applied_match = re.search(r"\*\*Applied-at:\*\*\s*(.*?)(?:\n|\Z)", block)
 
         if not timestamp_match or not change_match:
             continue
@@ -57,16 +63,18 @@ def parse_overrides(path: Path) -> list[Override]:
         applied_text = applied_match.group(1).strip() if applied_match else ""
 
         # Extract decision references from scope
-        decision_refs_raw = re.findall(r'D(\d{2,3})', scope_text)
+        decision_refs_raw = re.findall(r"D(\d{2,3})", scope_text)
         decision_refs: list[str] = [f"D{d}" for d in decision_refs_raw]
 
-        overrides.append({
-            "timestamp": timestamp_match.group(1),
-            "change": change_text,
-            "scope": scope_text,
-            "applied_at": applied_text,
-            "decision_refs": decision_refs,
-        })
+        overrides.append(
+            {
+                "timestamp": timestamp_match.group(1),
+                "change": change_text,
+                "scope": scope_text,
+                "applied_at": applied_text,
+                "decision_refs": decision_refs,
+            }
+        )
 
     return overrides
 
@@ -90,11 +98,28 @@ def cluster_overrides_by_topic(
 
     topics: dict[str, TopicDef] = {
         "calls_puts_equal_citizens": TopicDef(
-            keywords=["calls", "puts", "equal citizens", "call vs put", "d073", "d096", "d100", "d204"],
+            keywords=[
+                "calls",
+                "puts",
+                "equal citizens",
+                "call vs put",
+                "d073",
+                "d096",
+                "d100",
+                "d204",
+            ],
             description="Calls and puts are equal citizens in the strategy",
         ),
         "dispatch_gate": TopicDef(
-            keywords=["dispatch", "deploy gate", "gate", "runbook", "d089", "d106", "d137"],
+            keywords=[
+                "dispatch",
+                "deploy gate",
+                "gate",
+                "runbook",
+                "d089",
+                "d106",
+                "d137",
+            ],
             description="Follow the dispatch/deploy gate protocol",
         ),
         "capital_5k": TopicDef(
@@ -102,9 +127,19 @@ def cluster_overrides_by_topic(
             description="Starting capital is $5K USD",
         ),
         "agent_behavior": TopicDef(
-            keywords=["pontificat", "philosophiz", "elaborate", "putz", "willy nilly",
-                       "hand back control", "do exactly what", "d188", "d157",
-                       "async_bash", "await_job"],
+            keywords=[
+                "pontificat",
+                "philosophiz",
+                "elaborate",
+                "putz",
+                "willy nilly",
+                "hand back control",
+                "do exactly what",
+                "d188",
+                "d157",
+                "async_bash",
+                "await_job",
+            ],
             description="Agent should execute instructions precisely, no unsolicited elaboration",
         ),
         "strict_typing": TopicDef(
@@ -112,11 +147,18 @@ def cluster_overrides_by_topic(
             description="Use strict static typing (pyright)",
         ),
         "gcp_primary": TopicDef(
-            keywords=["gcp", "primary compute", "archon overflow", "d078", "d120"],
-            description="GCP is primary compute, archon is overflow only",
+            keywords=["gcp", "primary compute", "server-a overflow", "d078", "d120"],
+            description="GCP is primary compute, server-a is overflow only",
         ),
         "citation_sources": TopicDef(
-            keywords=["citation", "cite", "sources", "evidence", "college paper", "d136"],
+            keywords=[
+                "citation",
+                "cite",
+                "sources",
+                "evidence",
+                "college paper",
+                "d136",
+            ],
             description="Everything must be cited with evidence",
         ),
         "anti_overfitting": TopicDef(
@@ -124,12 +166,26 @@ def cluster_overrides_by_topic(
             description="Avoid overfitting in all analysis",
         ),
         "no_artificial_filters": TopicDef(
-            keywords=["artificial", "filter", "hard-coded", "rules based", "d118", "d119"],
+            keywords=[
+                "artificial",
+                "filter",
+                "hard-coded",
+                "rules based",
+                "d118",
+                "d119",
+            ],
             description="No artificial contract filters, learning-based only",
         ),
         "research_incorporation": TopicDef(
-            keywords=["research findings", "incorporated", "misinterpreted", "execution time",
-                       "d194", "d195", "checklist"],
+            keywords=[
+                "research findings",
+                "incorporated",
+                "misinterpreted",
+                "execution time",
+                "d194",
+                "d195",
+                "checklist",
+            ],
             description="Research findings must be verified as incorporated during execution",
         ),
     }
@@ -137,7 +193,9 @@ def cluster_overrides_by_topic(
     # Match overrides to topics
     uncategorized: list[Override] = []
     for override in overrides:
-        text: str = (_get_str(override, "change") + " " + _get_str(override, "scope")).lower()
+        text: str = (
+            _get_str(override, "change") + " " + _get_str(override, "scope")
+        ).lower()
         matched = False
         for _topic_id, topic in topics.items():
             if any(kw.lower() in text for kw in topic.keywords):
@@ -159,25 +217,36 @@ def cluster_overrides_by_topic(
                 else timestamps[0][:10]
             )
 
-            all_refs: list[str] = list(set(
-                ref for m in matches for ref in _get_list(m, "decision_refs")
-            ))
+            all_refs: list[str] = list(
+                set(ref for m in matches for ref in _get_list(m, "decision_refs"))
+            )
 
-            clusters.append({
-                "topic_id": topic_id,
-                "description": topic.description,
-                "override_count": len(matches),
-                "date_range": date_range,
-                "span_days": _days_between(min(timestamps), max(timestamps)) if len(timestamps) > 1 else 0,
-                "decision_refs": all_refs,
-                "overrides": [{
-                    "timestamp": _get_str(m, "timestamp"),
-                    "change": _get_str(m, "change")[:200],
-                    "applied_at": _get_str(m, "applied_at"),
-                } for m in matches],
-                "is_memory_failure": len(matches) >= 2,
-                "severity": "high" if len(matches) >= 3 else "medium" if len(matches) >= 2 else "low",
-            })
+            clusters.append(
+                {
+                    "topic_id": topic_id,
+                    "description": topic.description,
+                    "override_count": len(matches),
+                    "date_range": date_range,
+                    "span_days": _days_between(min(timestamps), max(timestamps))
+                    if len(timestamps) > 1
+                    else 0,
+                    "decision_refs": all_refs,
+                    "overrides": [
+                        {
+                            "timestamp": _get_str(m, "timestamp"),
+                            "change": _get_str(m, "change")[:200],
+                            "applied_at": _get_str(m, "applied_at"),
+                        }
+                        for m in matches
+                    ],
+                    "is_memory_failure": len(matches) >= 2,
+                    "severity": "high"
+                    if len(matches) >= 3
+                    else "medium"
+                    if len(matches) >= 2
+                    else "low",
+                }
+            )
 
     clusters.sort(key=lambda x: int(x["override_count"]), reverse=True)
 
@@ -203,11 +272,15 @@ def analyze_override_timeline(overrides: list[Override]) -> dict[str, Any]:
     dates_sorted: list[tuple[str, int]] = sorted(by_date.items())
 
     # Find the busiest days (most user frustration)
-    busiest: list[tuple[str, int]] = sorted(by_date.items(), key=lambda x: x[1], reverse=True)[:5]
+    busiest: list[tuple[str, int]] = sorted(
+        by_date.items(), key=lambda x: x[1], reverse=True
+    )[:5]
 
     return {
         "total_overrides": len(overrides),
-        "date_range": f"{dates_sorted[0][0]} to {dates_sorted[-1][0]}" if dates_sorted else "none",
+        "date_range": f"{dates_sorted[0][0]} to {dates_sorted[-1][0]}"
+        if dates_sorted
+        else "none",
         "overrides_per_day": {d: c for d, c in dates_sorted},
         "busiest_days": busiest,
         "mean_per_day": round(len(overrides) / len(by_date), 1) if by_date else 0,
@@ -229,7 +302,7 @@ def main() -> None:
     temporal = analyze_override_timeline(overrides)
     print(f"    Date range: {temporal['date_range']}", file=sys.stderr)
     print(f"    Mean overrides/day: {temporal['mean_per_day']}", file=sys.stderr)
-    print(f"    Busiest days:", file=sys.stderr)
+    print("    Busiest days:", file=sys.stderr)
     busiest_days: list[tuple[str, int]] = temporal["busiest_days"]
     for date, count in busiest_days:
         print(f"      {date}: {count} overrides", file=sys.stderr)
@@ -241,36 +314,55 @@ def main() -> None:
     print(f"    {len(uncategorized)} uncategorized overrides", file=sys.stderr)
 
     # Memory failure summary
-    memory_failures: list[dict[str, Any]] = [c for c in clusters if c["is_memory_failure"]]
-    print(f"\n{'='*60}", file=sys.stderr)
+    memory_failures: list[dict[str, Any]] = [
+        c for c in clusters if c["is_memory_failure"]
+    ]
+    print(f"\n{'=' * 60}", file=sys.stderr)
     print("MEMORY FAILURE PATTERNS (topics with 2+ overrides)", file=sys.stderr)
-    print(f"{'='*60}", file=sys.stderr)
+    print(f"{'=' * 60}", file=sys.stderr)
 
     total_failure_overrides = 0
     for cluster in memory_failures:
         total_failure_overrides += int(cluster["override_count"])
-        print(f"\n  [{str(cluster['severity']).upper()}] {cluster['description']}", file=sys.stderr)
-        print(f"    Overrides: {cluster['override_count']} over {cluster['span_days']} days "
-              f"({cluster['date_range']})", file=sys.stderr)
+        print(
+            f"\n  [{str(cluster['severity']).upper()}] {cluster['description']}",
+            file=sys.stderr,
+        )
+        print(
+            f"    Overrides: {cluster['override_count']} over {cluster['span_days']} days "
+            f"({cluster['date_range']})",
+            file=sys.stderr,
+        )
         refs: list[str] = cluster["decision_refs"]
         print(f"    Decisions: {', '.join(refs)}", file=sys.stderr)
         cluster_overrides: list[dict[str, str]] = cluster["overrides"]
         for o in cluster_overrides:
-            print(f"    - {o['timestamp'][:10]} ({o['applied_at']}): "
-                  f"{o['change'][:80]}", file=sys.stderr)
+            print(
+                f"    - {o['timestamp'][:10]} ({o['applied_at']}): {o['change'][:80]}",
+                file=sys.stderr,
+            )
 
-    print(f"\n{'='*60}", file=sys.stderr)
+    print(f"\n{'=' * 60}", file=sys.stderr)
     print("SUMMARY", file=sys.stderr)
-    print(f"{'='*60}", file=sys.stderr)
+    print(f"{'=' * 60}", file=sys.stderr)
     print(f"  Total overrides: {len(overrides)}", file=sys.stderr)
-    print(f"  Memory failure topics (2+ overrides): {len(memory_failures)}", file=sys.stderr)
-    print(f"  Overrides in failure topics: {total_failure_overrides}/{len(overrides)} "
-          f"({total_failure_overrides/len(overrides)*100:.0f}%)", file=sys.stderr)
-    print(f"  Single-issue overrides: {len(overrides) - total_failure_overrides}", file=sys.stderr)
+    print(
+        f"  Memory failure topics (2+ overrides): {len(memory_failures)}",
+        file=sys.stderr,
+    )
+    print(
+        f"  Overrides in failure topics: {total_failure_overrides}/{len(overrides)} "
+        f"({total_failure_overrides / len(overrides) * 100:.0f}%)",
+        file=sys.stderr,
+    )
+    print(
+        f"  Single-issue overrides: {len(overrides) - total_failure_overrides}",
+        file=sys.stderr,
+    )
     print(f"  Uncategorized: {len(uncategorized)}", file=sys.stderr)
 
     # What a memory system would need to prevent each failure
-    print(f"\n  What memory would need to provide:", file=sys.stderr)
+    print("\n  What memory would need to provide:", file=sys.stderr)
     for cluster in memory_failures:
         topic_id: str = cluster["topic_id"]
         feature: str = {
@@ -279,7 +371,7 @@ def main() -> None:
             "capital_5k": "Always-loaded factual belief (L0): starting capital = $5K",
             "agent_behavior": "Always-loaded procedural belief (L0): execute precisely, no elaboration",
             "strict_typing": "High-confidence procedural belief: use strict typing",
-            "gcp_primary": "Factual belief: GCP primary, archon overflow only",
+            "gcp_primary": "Factual belief: GCP primary, server-a overflow only",
             "citation_sources": "Procedural belief: cite everything with evidence",
             "research_incorporation": "Procedural belief: verify research incorporated before execution",
         }.get(topic_id, "Unknown")
@@ -291,19 +383,24 @@ def main() -> None:
         "temporal": temporal,
         "topic_clusters": clusters,
         "uncategorized_count": len(uncategorized),
-        "memory_failures": [{
-            "topic": c["topic_id"],
-            "description": c["description"],
-            "count": c["override_count"],
-            "severity": c["severity"],
-            "span_days": c["span_days"],
-            "decisions": c["decision_refs"],
-        } for c in memory_failures],
+        "memory_failures": [
+            {
+                "topic": c["topic_id"],
+                "description": c["description"],
+                "count": c["override_count"],
+                "severity": c["severity"],
+                "span_days": c["span_days"],
+                "decisions": c["decision_refs"],
+            }
+            for c in memory_failures
+        ],
         "summary": {
             "total_overrides": len(overrides),
             "memory_failure_topics": len(memory_failures),
             "overrides_in_failures": total_failure_overrides,
-            "failure_rate": round(total_failure_overrides / len(overrides), 4) if overrides else 0,
+            "failure_rate": round(total_failure_overrides / len(overrides), 4)
+            if overrides
+            else 0,
         },
     }
 

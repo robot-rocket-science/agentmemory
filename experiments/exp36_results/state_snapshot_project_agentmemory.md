@@ -28,7 +28,7 @@ Building an agentic memory system for LLMs -- MCP server backed by SQLite, store
 - Literature survey, architecture design, 9 experiments (Exp 1-9)
 - Exp 2/5b: Thompson + Jeffreys ECE=0.066, exploration=0.194 -- PASSING
 - Exp 6: 38 overrides, ~66% are repeated topics (was 79%, corrected after audit)
-- Exp 26: Real HRR vs BFS on alpha-seek graph (586 nodes, 775 edges, n=8192)
+- Exp 26: Real HRR vs BFS on project-a graph (586 nodes, 775 edges, n=8192)
   - Single-hop forward R@10=0.667, reverse R@10=0.881
   - Two-hop (S^2) failed completely -- near-saturated at 85% capacity
   - Correct two-hop: iterative with cleanup memory (vectorized BFS, no LLM)

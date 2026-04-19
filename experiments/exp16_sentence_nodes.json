@@ -399,7 +399,7 @@
     "id": "D014_s1",
     "parent_decision": "D014",
     "sentence_index": 1,
-    "content": "Rsync direction: archon -> willow/GCP.",
+    "content": "Rsync direction: server-a -> server-b/GCP.",
     "tokens": 9,
     "type": "context",
     "references": []
@@ -417,7 +417,7 @@
     "id": "D015_s0",
     "parent_decision": "D015",
     "sentence_index": 0,
-    "content": "Gitea for git hosting, no CI/CD workflows: Gitea on mintaka for git hosting.",
+    "content": "Gitea for git hosting, no CI/CD workflows: Gitea on server-c for git hosting.",
     "tokens": 19,
     "type": "context",
     "references": []

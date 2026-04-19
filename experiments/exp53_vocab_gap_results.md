@@ -7,11 +7,11 @@
 
 | Project | Directives | Corpus Size | Gaps | Gap Rate | HRR Bridgeable |
 |---------|-----------|-------------|------|----------|----------------|
-| alpha-seek | 174 | 8178 | 66 | 37.9% | 65/66 |
-| optimus-prime | 2198 | 128941 | 718 | 32.7% | 718/718 |
-| debserver | 63 | 4124 | 31 | 49.2% | 28/31 |
-| jose-bully | 262 | 4072 | 72 | 27.5% | 72/72 |
-| code-monkey | 624 | 26938 | 143 | 22.9% | 142/143 |
+| project-a | 174 | 8178 | 66 | 37.9% | 65/66 |
+| project-b | 2198 | 128941 | 718 | 32.7% | 718/718 |
+| project-d | 63 | 4124 | 31 | 49.2% | 28/31 |
+| project-c | 262 | 4072 | 72 | 27.5% | 72/72 |
+| project-e | 624 | 26938 | 143 | 22.9% | 142/143 |
 | **TOTAL** | **3321** | -- | **1030** | **31.0%** | **1025/1030 (100%)** |
 
 ## 2. Gap Categories (across all projects)
@@ -45,7 +45,7 @@ Of the 1030 vocabulary-gap directives, 1025 (100%) are HRR-bridgeable via co-loc
 
 ## 5. Per-Project Gap Details
 
-### alpha-seek
+### project-a
 
 Showing 10 of 66 vocabulary-gap directives:
 
@@ -119,18 +119,18 @@ Showing 10 of 66 vocabulary-gap directives:
   - HRR bridgeable: True
   - Low-confidence query: False
 
-### optimus-prime
+### project-b
 
 Showing 10 of 718 vocabulary-gap directives:
 
-- **Directive:** "IMPORTANT: Always build Docker images from archon (ssh archon bash -c '...'), not from the Mac."
+- **Directive:** "IMPORTANT: Always build Docker images from server-a (ssh server-a bash -c '...'), not from the Mac."
   - Source: `CLAUDE.md`
   - Category: cross_domain_constraint
   - Queries: ['containerize application', 'build deployment image', 'isolate dependencies']
   - HRR bridgeable: True
   - Low-confidence query: False
 
-- **Directive:** "Deploy to willow/archon: Always develop on main. Deploy by running uv run python3 scripts/ops.py deploy [--host archon] "
+- **Directive:** "Deploy to server-b/server-a: Always develop on main. Deploy by running uv run python3 scripts/ops.py deploy [--host server-a] "
   - Source: `CLAUDE.md`
   - Category: tool_ban
   - Queries: ['manage Python packages', 'install dependencies', 'run scripts']
@@ -179,7 +179,7 @@ Showing 10 of 718 vocabulary-gap directives:
   - HRR bridgeable: True
   - Low-confidence query: False
 
-- **Directive:** "deploy/willow and deploy/archon must be derived from the main (development) branch. Always develop on main, then push to"
+- **Directive:** "deploy/server-b and deploy/server-a must be derived from the main (development) branch. Always develop on main, then push to"
   - Source: `archive/historical/key-memories.md`
   - Category: cross_domain_constraint
   - Queries: ['shipping to production', 'releasing code', 'pushing to server']
@@ -193,7 +193,7 @@ Showing 10 of 718 vocabulary-gap directives:
   - HRR bridgeable: True
   - Low-confidence query: True
 
-### debserver
+### project-d
 
 Showing 10 of 31 vocabulary-gap directives:
 
@@ -267,7 +267,7 @@ Showing 10 of 31 vocabulary-gap directives:
   - HRR bridgeable: True
   - Low-confidence query: True
 
-### jose-bully
+### project-c
 
 Showing 10 of 72 vocabulary-gap directives:
 
@@ -341,7 +341,7 @@ Showing 10 of 72 vocabulary-gap directives:
   - HRR bridgeable: True
   - Low-confidence query: False
 
-### code-monkey
+### project-e
 
 Showing 10 of 143 vocabulary-gap directives:
 

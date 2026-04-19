@@ -44,7 +44,7 @@ Use the directive scanner from Exp 49 (always/never/banned/must not/don't patter
 
 ### Step 2: Generate realistic queries
 For each directive belief, generate 3 query formulations that describe the SITUATION where the belief should be retrieved, NOT the belief's own vocabulary. Example:
-- Belief: "Never use async_bash" 
+- Belief: "Never use async_bash"
 - Queries: "run long backtest in background", "execute overnight job", "parallel command execution"
 
 This must be done carefully -- the queries should represent what an agent would actually encounter, not what a human who already knows the belief would type.
@@ -64,11 +64,11 @@ For each vocabulary-gap belief, check: does it share a typed edge (AGENT_CONSTRA
 
 | Project | Path | Archetype | Expected Gap Rate |
 |---------|------|-----------|-------------------|
-| alpha-seek | ~/projects/alpha-seek | Quant trading, rich decisions | Known: 7.7% (1/13). Retest with full directive set. |
-| optimus-prime | ~/projects/optimus-prime | GSD-managed, process rules | High -- many implicit process constraints |
-| debserver | ~/projects/debserver | Infrastructure, service rules | Medium -- service names vs functions |
-| jose-bully | ~/projects/jose-bully | Legal case, narrative docs | Unknown -- legal terminology may create gaps |
-| code-monkey | ~/projects/code-monkey | Dev tooling | Medium -- tool preferences vs task descriptions |
+| project-a | ~/projects/project-a | Quant trading, rich decisions | Known: 7.7% (1/13). Retest with full directive set. |
+| project-b | ~/projects/project-b | GSD-managed, process rules | High -- many implicit process constraints |
+| project-d | ~/projects/project-d | Infrastructure, service rules | Medium -- service names vs functions |
+| project-c | ~/projects/project-c | Legal case, narrative docs | Unknown -- legal terminology may create gaps |
+| project-e | ~/projects/project-e | Dev tooling | Medium -- tool preferences vs task descriptions |
 
 ---
 
@@ -80,7 +80,7 @@ For each vocabulary-gap belief, check: does it share a typed edge (AGENT_CONSTRA
 
 **H3:** >= 80% of vocabulary-gap beliefs are HRR-bridgeable (share a typed edge with a text-reachable belief).
 
-**H4:** Projects with richer decision documentation (alpha-seek, optimus-prime) have lower gap rates than code-heavy/doc-light projects (debserver, code-monkey), because documentation provides more vocabulary overlap.
+**H4:** Projects with richer decision documentation (project-a, project-b) have lower gap rates than code-heavy/doc-light projects (project-d, project-e), because documentation provides more vocabulary overlap.
 
 **Null:** Vocabulary gap prevalence is < 3% and HRR adds negligible value.
 

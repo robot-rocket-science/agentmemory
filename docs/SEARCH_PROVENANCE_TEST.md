@@ -1,10 +1,10 @@
-# Search Provenance Test: alpha-seek-memtest (2026-04-11)
+# Search Provenance Test: project-a-test (2026-04-11)
 
 ## Objective
 Test whether mem:search can reconstruct a project's self-provenance -- its identity, purpose, and lineage to other projects -- purely from onboarded beliefs (git history, docs, code) without being explicitly told.
 
 ## Setup
-- Project: alpha-seek-memtest (619 commits, 1,726 docs, 16 days of history)
+- Project: project-a-test (619 commits, 1,726 docs, 16 days of history)
 - DB: isolated at ~/.agentmemory/projects/4b0f8c37972f/memory.db
 - 65k beliefs, onboarded from project directory only (no conversation data)
 
@@ -21,8 +21,8 @@ Test whether mem:search can reconstruct a project's self-provenance -- its ident
 **Query:** `alpha seek trading strategy options`
 
 **Result:** 28 beliefs. Found concrete operational details:
-- File paths: `/srv/data/alpha-seek/data/options.duckdb`
-- Infrastructure: launchd jobs, paper trading configs, archon working directory
+- File paths: `/srv/data/project-a/data/options.duckdb`
+- Infrastructure: launchd jobs, paper trading configs, server-a working directory
 - "Research: New Approaches to the Alpha-Seek Strategy"
 
 **Verdict:** Domain-specific keywords work well. The system knows this is a trading project with options, paper trading, and specific infrastructure.
@@ -38,31 +38,31 @@ Test whether mem:search can reconstruct a project's self-provenance -- its ident
 
 **Verdict:** Multi-keyword OR matching found the real substance. The system can identify the project's purpose when given enough semantic handles.
 
-## Test 4: "alpha-seek memtest relationship to alpha-seek optimus-prime"
+## Test 4: "project-a memtest relationship to project-a project-b"
 
-**Query:** `alpha-seek memtest relationship to alpha-seek optimus-prime`
+**Query:** `project-a memtest relationship to project-a project-b`
 
 **Result:** 27 beliefs. Reconstructed the full lineage chain:
 
 ### Provenance chain discovered:
-1. **optimus-prime** is the original codebase (backtest, data, signal, portfolio, stats modules -- 61 files, ~15.6K LOC)
-2. **alpha-seek** was created as a separate project but depended on optimus-prime via symlinks
-3. Decision **D090** decoupled them: copied all optimus-prime modules into alpha-seek as real directories
-4. **alpha-seek-memtest** is an iteration of alpha-seek, with imports resolved to alpha-seek-memtest instead of old alpha-seek
+1. **project-b** is the original codebase (backtest, data, signal, portfolio, stats modules -- 61 files, ~15.6K LOC)
+2. **project-a** was created as a separate project but depended on project-b via symlinks
+3. Decision **D090** decoupled them: copied all project-b modules into project-a as real directories
+4. **project-a-test** is an iteration of project-a, with imports resolved to project-a-test instead of old project-a
 
 ### Specific evidence the system found:
-- "Migrated all optimus-prime source modules into alpha-seek as real directories (D090)"
-- "Decouple alpha-seek from optimus-prime symlinks: Copy all 5 optimus-prime modules..."
-- "alpha-seek self-contained: no optimus-prime runtime dependency (D090)"
-- "Fixed sys.path hardcoded path in runsignalbacktest.py and venv editable install finder to resolve imports from alpha-seek-memtest instead of old alpha-seek project"
-- "we need to keep alpha-seek and optimus-prime separate"
-- "If you need code from optimus-prime, copy it into alpha-seek and adapt it"
+- "Migrated all project-b source modules into project-a as real directories (D090)"
+- "Decouple project-a from project-b symlinks: Copy all 5 project-b modules..."
+- "project-a self-contained: no project-b runtime dependency (D090)"
+- "Fixed sys.path hardcoded path in runsignalbacktest.py and venv editable install finder to resolve imports from project-a-test instead of old project-a project"
+- "we need to keep project-a and project-b separate"
+- "If you need code from project-b, copy it into project-a and adapt it"
 
 ### Infrastructure provenance:
-- Runs on archon at `/srv/data/alpha-seek/`
-- DuckDB symlinked from optimus-prime (28GB file)
-- GCP Artifact Registry: `us-central1-docker.pkg.dev/secretary-487605/optimus-training/alpha-seek`
-- Project root: `/Users/thelorax/projects/alpha-seek-memtest`
+- Runs on server-a at `/srv/data/project-a/`
+- DuckDB symlinked from project-b (28GB file)
+- GCP Artifact Registry: `us-central1-docker.pkg.dev/gcp-project-id/optimus-training/project-a`
+- Project root: `/home/user/projects/project-a-test`
 
 **Verdict:** Given all three project names in the query, the system returned detailed evidence of their relationship from commit messages, decision docs, and CLAUDE.md entries. This is retrieval of known relationships, not autonomous discovery -- the user provided the project names, and the system found confirming evidence. Still, it surfaced thorough, actionable detail (D090, migration steps, infrastructure) that would otherwise require reading hundreds of docs.
 
@@ -79,7 +79,7 @@ Test whether mem:search can reconstruct a project's self-provenance -- its ident
 **Query:** `original source code migrated copied modules dependencies`
 
 **Result:** 27 beliefs. Hit the jackpot without naming any project:
-- #1: "Migrated all optimus-prime source modules into alpha-seek as real directories (D090)"
+- #1: "Migrated all project-b source modules into project-a as real directories (D090)"
 - Full D090 story: 5 modules (backtest, data, signal, portfolio, stats), 61 files, ~15.6K LOC
 - Decision rationale, task ID (T03a), infrastructure impact
 - "D090 eliminated an entire class of build/deploy bugs"
@@ -91,13 +91,13 @@ Test whether mem:search can reconstruct a project's self-provenance -- its ident
 **Query:** `predecessor parent project forked inherited symlinks shared code`
 
 **Result:** 30 beliefs. Discovered the full lineage chain without naming any project:
-- "A prerequisite bug was fixed: hardcoded sys.path to predecessor project alpha-seek" -- names the predecessor
+- "A prerequisite bug was fixed: hardcoded sys.path to predecessor project project-a" -- names the predecessor
 - "fixed hardcoded sys.path to predecessor project" -- confirms lineage
-- "If you need code from optimus-prime, copy it into alpha-seek and adapt it -- do not create symlinks" -- surfaces the parent's parent
+- "If you need code from project-b, copy it into project-a and adapt it -- do not create symlinks" -- surfaces the parent's parent
 - "13 decisions recorded (D001, D021-D029 plus inherited D002-D020)" -- decision inheritance
 - "sys.path hardcoded to absolute paths is a silent failure mode after project renames"
 
-**Verdict:** Relationship-pattern queries ("predecessor", "inherited", "forked") successfully discover lineage without project names. The system found **optimus-prime -> alpha-seek -> alpha-seek-memtest** from structural vocabulary alone.
+**Verdict:** Relationship-pattern queries ("predecessor", "inherited", "forked") successfully discover lineage without project names. The system found **project-b -> project-a -> project-a-test** from structural vocabulary alone.
 
 ## Performance
 

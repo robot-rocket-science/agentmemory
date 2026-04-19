@@ -55,7 +55,7 @@ Existing approaches overwhelmingly treat memory as a retrieval problem. Across t
 
 Lin concluded:
 
-> "The biggest differentiator is not vector DB vs SQLite. It is write correctness and governance: provenance, write gates, conflict handling, reversibility." 
+> "The biggest differentiator is not vector DB vs SQLite. It is write correctness and governance: provenance, write gates, conflict handling, reversibility."
 
 Current memory systems are write-only: content goes in, but the system never learns whether what it retrieved was actually helpful. Here is what happens on every turn:
 
@@ -1036,7 +1036,7 @@ The system's onboarding pipeline was benchmarked on two codebases of different s
 ```
   Onboarding Performance
 
-  Metric                 agentmemory      alpha-seek-memtest
+  Metric                 agentmemory      project-a-test
   ──────────────────────────────────────────────────────────────
   Git commits            35               619
   Git date range         2 days           16 days
@@ -1050,7 +1050,7 @@ The system's onboarding pipeline was benchmarked on two codebases of different s
   Time factor            1x               2.3x
 ```
 
-alpha-seek-memtest is 5.4x larger than agentmemory by node count, but onboarding took only 2.3x longer. AST parsing is the bottleneck in both cases (38% and 32% of total time). Citation extraction cost is negligible even at 1,726 documents.
+project-a-test is 5.4x larger than agentmemory by node count, but onboarding took only 2.3x longer. AST parsing is the bottleneck in both cases (38% and 32% of total time). Citation extraction cost is negligible even at 1,726 documents.
 
 Temporal decay validation on the larger codebase confirmed expected behavior: beliefs from 2 days ago score 0.92 (1.0x baseline), beliefs from 18 days ago score 0.43 (0.47x), and simulated 14-month-old beliefs score ~0 (fully decayed).
 

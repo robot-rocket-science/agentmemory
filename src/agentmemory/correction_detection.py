@@ -1,10 +1,11 @@
 """Zero-LLM correction detector (Exp 1 V2).
 
-92% accuracy on real corrections from alpha-seek OVERRIDES.md.
+92% accuracy on real corrections from project-a OVERRIDES.md.
 V1 (26% detection): only looked for negation.
 V2 (87% raw, 92% on actual corrections): adds imperative verbs, always/never,
 declarative overrides, emphasis, prior references, strong directives.
 """
+
 from __future__ import annotations
 
 import re

@@ -4,7 +4,7 @@ from __future__ import annotations
 Experiment 9: Information-Theoretic Retrieval Improvements
 
 Tests whether MinHash, query expansion, or stemming improve retrieval
-over plain FTS5 on the alpha-seek data.
+over plain FTS5 on the project-a data.
 
 Baseline: FTS5 with OR queries (from Exp 4)
 Ground truth: 6 critical belief topics with known needed decisions
@@ -22,9 +22,11 @@ from collections.abc import Callable
 
 from datasketch import MinHash, MinHashLSH  # type: ignore[import-untyped]
 
-ALPHA_SEEK_DB = Path("/Users/thelorax/projects/.gsd/workflows/spikes/"
-                     "260406-1-associative-memory-for-gsd-please-explor/"
-                     "sandbox/alpha-seek.db")
+ALPHA_SEEK_DB = Path(
+    "/home/user/projects/.gsd/workflows/spikes/"
+    "260406-1-associative-memory-for-gsd-please-explor/"
+    "sandbox/project-a.db"
+)
 
 CRITICAL_BELIEFS: dict[str, dict[str, list[str]]] = {
     "dispatch_gate": {
@@ -70,7 +72,7 @@ CRITICAL_BELIEFS: dict[str, dict[str, list[str]]] = {
     "gcp_primary": {
         "queries": [
             "GCP primary compute platform",
-            "archon overflow only",
+            "server-a overflow only",
             "cloud compute infrastructure",
         ],
         "needed": ["D078", "D120"],
@@ -80,18 +82,26 @@ CRITICAL_BELIEFS: dict[str, dict[str, list[str]]] = {
 
 # --- Load Data ---
 
+
 def load_nodes() -> dict[str, dict[str, str | int]]:
     db = sqlite3.connect(str(ALPHA_SEEK_DB))
     nodes: dict[str, dict[str, str | int]] = {}
-    for row in db.execute("SELECT id, content FROM mem_nodes WHERE superseded_by IS NULL"):
+    for row in db.execute(
+        "SELECT id, content FROM mem_nodes WHERE superseded_by IS NULL"
+    ):
         node_id: str = str(row[0])
         content: str = str(row[1])
-        nodes[node_id] = {"id": node_id, "content": content, "tokens": len(content) // 4}
+        nodes[node_id] = {
+            "id": node_id,
+            "content": content,
+            "tokens": len(content) // 4,
+        }
     db.close()
     return nodes
 
 
 # --- Method 1: FTS5 Baseline (from Exp 4) ---
+
 
 def build_fts(nodes: dict[str, dict[str, str | int]]) -> sqlite3.Connection:
     db = sqlite3.connect(":memory:")
@@ -110,7 +120,7 @@ def search_fts(query: str, fts_db: sqlite3.Connection, top_k: int = 30) -> list[
     try:
         results = fts_db.execute(
             "SELECT id FROM fts WHERE fts MATCH ? ORDER BY rank LIMIT ?",
-            (fts_query, top_k)
+            (fts_query, top_k),
         ).fetchall()
         return [str(r[0]) for r in results]
     except Exception:
@@ -145,12 +155,14 @@ def expand_query(query: str) -> str:
     return " OR ".join(t for t in expanded if len(t) > 2)
 
 
-def search_fts_expanded(query: str, fts_db: sqlite3.Connection, top_k: int = 30) -> list[str]:
+def search_fts_expanded(
+    query: str, fts_db: sqlite3.Connection, top_k: int = 30
+) -> list[str]:
     expanded = expand_query(query)
     try:
         results = fts_db.execute(
             "SELECT id FROM fts WHERE fts MATCH ? ORDER BY rank LIMIT ?",
-            (expanded, top_k)
+            (expanded, top_k),
         ).fetchall()
         return [str(r[0]) for r in results]
     except Exception:
@@ -159,13 +171,14 @@ def search_fts_expanded(query: str, fts_db: sqlite3.Connection, top_k: int = 30)
 
 # --- Method 3: MinHash LSH ---
 
+
 def tokenize_for_minhash(text: str) -> set[str]:
     """3-gram shingles for MinHash."""
     text = text.lower()
-    words: list[str] = re.findall(r'[a-z0-9]+', text)
+    words: list[str] = re.findall(r"[a-z0-9]+", text)
     shingles: set[str] = set()
     for i in range(len(words) - 2):
-        shingles.add(f"{words[i]}_{words[i+1]}_{words[i+2]}")
+        shingles.add(f"{words[i]}_{words[i + 1]}_{words[i + 2]}")
     # Also add individual words
     shingles.update(words)
     return shingles
@@ -181,7 +194,7 @@ def build_minhash_index(
         m: MinHash = MinHash(num_perm=num_perm)
         content_val: str = str(node["content"])
         for s in tokenize_for_minhash(content_val):
-            m.update(s.encode('utf8'))  # type: ignore[no-untyped-call]
+            m.update(s.encode("utf8"))  # type: ignore[no-untyped-call]
         minhashes[nid] = m
         try:
             lsh.insert(nid, m)
@@ -194,15 +207,17 @@ def build_minhash_index(
 def search_minhash(query: str, lsh: MinHashLSH, num_perm: int = 128) -> list[str]:
     m: MinHash = MinHash(num_perm=num_perm)
     for s in tokenize_for_minhash(query):
-        m.update(s.encode('utf8'))  # type: ignore[no-untyped-call]
+        m.update(s.encode("utf8"))  # type: ignore[no-untyped-call]
     result: list[Any] = lsh.query(m)  # type: ignore[no-untyped-call]
     return [str(r) for r in result]
 
 
 # --- Method 4: Combined (FTS expanded + MinHash) ---
 
-def search_combined(query: str, fts_db: sqlite3.Connection,
-                    lsh: MinHashLSH, top_k: int = 30) -> list[str]:
+
+def search_combined(
+    query: str, fts_db: sqlite3.Connection, lsh: MinHashLSH, top_k: int = 30
+) -> list[str]:
     fts_results: set[str] = set(search_fts_expanded(query, fts_db, top_k))
     minhash_results: set[str] = set(search_minhash(query, lsh))
     combined: set[str] = fts_results | minhash_results
@@ -210,6 +225,7 @@ def search_combined(query: str, fts_db: sqlite3.Connection,
 
 
 # --- Evaluation ---
+
 
 def evaluate_method(
     method_name: str,
@@ -264,7 +280,7 @@ def main() -> None:
     print("  Built FTS5 index", file=sys.stderr)
 
     lsh, _minhashes = build_minhash_index(nodes)
-    print(f"  Built MinHash LSH index", file=sys.stderr)
+    print("  Built MinHash LSH index", file=sys.stderr)
 
     # Evaluate each method
     methods: dict[str, Callable[[str], list[str]]] = {
@@ -279,22 +295,33 @@ def main() -> None:
         result = evaluate_method(name, fn, nodes)
         results[name] = result
 
-        print(f"\n  {name}: {result['overall_coverage']:.0%} coverage "
-              f"({result['total_found']}/{result['total_needed']})", file=sys.stderr)
+        print(
+            f"\n  {name}: {result['overall_coverage']:.0%} coverage "
+            f"({result['total_found']}/{result['total_needed']})",
+            file=sys.stderr,
+        )
         topic_results: dict[str, Any] = result["per_topic"]
         for topic, tr in topic_results.items():
             status = "OK" if tr["coverage"] == 1.0 else f"MISS {tr['missed']}"
-            print(f"    {topic}: {tr['coverage']:.0%} (retrieved {tr['total_retrieved']}) [{status}]",
-                  file=sys.stderr)
+            print(
+                f"    {topic}: {tr['coverage']:.0%} (retrieved {tr['total_retrieved']}) [{status}]",
+                file=sys.stderr,
+            )
 
     # Summary comparison
-    print(f"\n{'='*60}", file=sys.stderr)
+    print(f"\n{'=' * 60}", file=sys.stderr)
     print("COMPARISON", file=sys.stderr)
-    print(f"{'='*60}", file=sys.stderr)
-    print(f"{'Method':<30} {'Coverage':>10} {'Found':>6}/{results['fts_baseline']['total_needed']}", file=sys.stderr)
+    print(f"{'=' * 60}", file=sys.stderr)
+    print(
+        f"{'Method':<30} {'Coverage':>10} {'Found':>6}/{results['fts_baseline']['total_needed']}",
+        file=sys.stderr,
+    )
     print("-" * 50, file=sys.stderr)
     for name, r in results.items():
-        print(f"{name:<30} {r['overall_coverage']:>10.0%} {r['total_found']:>6}", file=sys.stderr)
+        print(
+            f"{name:<30} {r['overall_coverage']:>10.0%} {r['total_found']:>6}",
+            file=sys.stderr,
+        )
 
     # What did expansion/minhash find that baseline missed?
     baseline_found: set[str] = set()
@@ -311,10 +338,12 @@ def main() -> None:
             method_found.update(found_list)
         new_finds: set[str] = method_found - baseline_found
         if new_finds:
-            print(f"\n  {method} found that baseline missed: {new_finds}", file=sys.stderr)
+            print(
+                f"\n  {method} found that baseline missed: {new_finds}", file=sys.stderr
+            )
 
     Path("experiments/exp9_results.json").write_text(json.dumps(results, indent=2))
-    print(f"\nOutput: experiments/exp9_results.json", file=sys.stderr)
+    print("\nOutput: experiments/exp9_results.json", file=sys.stderr)
 
 
 if __name__ == "__main__":

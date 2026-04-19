@@ -5,8 +5,8 @@ Total events: 1790
   Decisions: 173
   Milestone events: 84
   Knowledge entries: 379
-  Commits (alpha-seek): 544
-  Commits (alpha-seek-memtest): 610
+  Commits (project-a): 544
+  Commits (project-a-test): 610
 
 Events with timestamps: 1743/1790
 Events with D###/M### references: 531/1790

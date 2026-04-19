@@ -27,7 +27,7 @@ First real test of /mem:wonder on a fresh DB with ~15k beliefs from a single bul
 - Statements about the system's architecture that are true but don't answer the question
 
 ### Noise (10/29):
-- "D073: calls and puts are equal citizens" -- from alpha-seek domain, irrelevant
+- "D073: calls and puts are equal citizens" -- from project-a domain, irrelevant
 - "Not all checkmarks are equal" -- generic
 - "Everything is equally soft" -- vague without context
 - Statements about scheduling, schema, other topics that matched keywords but not intent

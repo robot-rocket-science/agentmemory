@@ -446,22 +446,22 @@ We built document reference graphs from 4 projects' markdown files (parsing D###
 
 | Project | Nodes | Edges | 1-hop | 2-hop cum | 3-hop cum | Max useful depth |
 |---|---|---|---|---|---|---|
-| alpha-seek | 101 | 603 | 10.0% | 83.1% | 99.7% | 3 |
-| debserver | 85 | 196 | 6.7% | 46.4% | 77.4% | 5 |
+| project-a | 101 | 603 | 10.0% | 83.1% | 99.7% | 3 |
+| project-d | 85 | 196 | 6.7% | 46.4% | 77.4% | 5 |
 | gsd-2 | 214 | 562 | 2.7% | 26.1% | 66.7% | 5 |
-| optimus-prime | 929 | 6558 | 1.4% | 26.7% | 81.3% | 4 |
+| project-b | 929 | 6558 | 1.4% | 26.7% | 81.3% | 4 |
 
 ### Key Implications for HRR Multi-Hop
 
-1. The earlier conclusion that "multi-hop doesn't matter, just use fuzzy-start" was calibrated on alpha-seek, which has an unusually shallow graph (83% within 2 hops). For sparser projects like gsd-2 and debserver, 2 hops only covers 26-46%. Multi-hop traversal IS needed for these project types.
+1. The earlier conclusion that "multi-hop doesn't matter, just use fuzzy-start" was calibrated on project-a, which has an unusually shallow graph (83% within 2 hops). For sparser projects like gsd-2 and project-d, 2 hops only covers 26-46%. Multi-hop traversal IS needed for these project types.
 
-2. S^2 (2-hop HRR) covers 83% of connections in alpha-seek but only 26-46% in deeper projects. The question "can S^2 work mathematically" is less important than "do we need more than 2 hops" -- and the answer is project-dependent.
+2. S^2 (2-hop HRR) covers 83% of connections in project-a but only 26-46% in deeper projects. The question "can S^2 work mathematically" is less important than "do we need more than 2 hops" -- and the answer is project-dependent.
 
-3. Graph topology predicts required traversal depth. Dense citation graphs (alpha-seek: avg degree ~12) are shallow. Sparse planning graphs (debserver: avg degree ~4.6) are deep. This is measurable at graph construction time.
+3. Graph topology predicts required traversal depth. Dense citation graphs (project-a: avg degree ~12) are shallow. Sparse planning graphs (project-d: avg degree ~4.6) are deep. This is measurable at graph construction time.
 
 4. The recommended architecture: HRR single-hop for fuzzy entry + BFS depth 3-4 from entry points. The memory system should detect topology at construction time and set traversal depth accordingly.
 
-5. This is a correction to the earlier finding. The original HRR research was done on alpha-seek only, which gave a misleadingly optimistic picture of how far single-hop retrieval gets you. Cross-project testing revealed the bias.
+5. This is a correction to the earlier finding. The original HRR research was done on project-a only, which gave a misleadingly optimistic picture of how far single-hop retrieval gets you. Cross-project testing revealed the bias.
 
 ---
 

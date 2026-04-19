@@ -28,4 +28,4 @@ Here's where things stand:
 - **#41** Requirements traceability as graph structure
 - **#33** Automatic query expansion without LLM
 
-MemPalace palace itself only has the `alpha_seek` wing loaded (10K drawers) -- no agentmemory project content mined into it yet.
+MemPalace palace itself only has the `project_a` wing loaded (10K drawers) -- no agentmemory project content mined into it yet.

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# corpus_clone.sh -- Idempotent clone/update of research corpus on archon
+# corpus_clone.sh -- Idempotent clone/update of research corpus on server-a
 #
 # Usage: ./scripts/corpus_clone.sh [--tier small|medium|large|all] [--personal] [--dry-run]
 #
@@ -16,7 +16,7 @@
 #
 set -euo pipefail
 
-ARCHON="archon"
+ARCHON="server-a"
 BASE="~/agentmemory-corpus"
 PROJECTS_DIR="${PROJECTS_DIR:-$HOME/projects}"
 TIER="${1:---tier}"
@@ -73,17 +73,17 @@ REPOS=(
 
 # Personal projects to mirror
 PERSONAL_REPOS=(
-    "alpha-seek"
-    "optimus-prime"
+    "project-a"
+    "project-b"
     "gsd-2"
-    "debserver"
-    "code-monkey"
+    "project-d"
+    "project-e"
     "evolve"
     "bigtime"
-    "email-secretary"
-    "sports-betting-arbitrage"
-    "alpha-seek-memtest"
-    "jose-bully"
+    "project-f"
+    "project-g-arbitrage"
+    "project-a-test"
+    "project-c"
 )
 
 # Filter repos by tier
@@ -149,12 +149,12 @@ mirror_personal() {
     echo "==> personal/${name}"
 
     if $DRY_RUN; then
-        echo "    [dry-run] would rsync ${src} -> archon:~/agentmemory-corpus/personal/${name}"
+        echo "    [dry-run] would rsync ${src} -> server-a:~/agentmemory-corpus/personal/${name}"
         return 0
     fi
 
     # Use rsync with .git included for full history
-    local remote_dest="/home/jso/agentmemory-corpus/personal/${name}"
+    local remote_dest="/home/user/agentmemory-corpus/personal/${name}"
     ssh "$ARCHON" "mkdir -p '${remote_dest}'"
     rsync -az --delete \
         --exclude='.venv' \

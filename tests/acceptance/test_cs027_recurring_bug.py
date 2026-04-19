@@ -27,7 +27,7 @@ def test_cs027_operational_belief_persists_across_sessions(
     s1: MemoryStore = MemoryStore(db_path)
     s1.insert_belief(
         content=(
-            "Migrated 22 paper trading agents from thelorax launchd to archon cronie. "
+            "Migrated 22 paper trading agents from devuser launchd to server-a cronie. "
             "Crontab uses variable references. Dry-run passed in interactive shell."
         ),
         belief_type=BELIEF_PROCEDURAL,

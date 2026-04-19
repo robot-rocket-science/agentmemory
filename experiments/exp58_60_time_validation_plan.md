@@ -23,7 +23,7 @@ Three uncertainties remain:
 ## Experiment 58: Decay Half-Life Calibration on Real Data
 
 ### Research question
-Which decay half-lives per content type maximize correction prevention on the alpha-seek timeline?
+Which decay half-lives per content type maximize correction prevention on the project-a timeline?
 
 ### Data source
 - Alpha-seek spike DB: 173 decisions, 586 sentence nodes
@@ -71,7 +71,7 @@ Do TEMPORAL_NEXT edges enable useful queries that timestamp filtering alone cann
 - Session boundaries: milestone boundaries as proxy for session boundaries
 
 ### Method
-1. Build two temporal indexes from the alpha-seek timeline:
+1. Build two temporal indexes from the project-a timeline:
    a. **Timestamp-only:** each decision has a created_at timestamp. Queries use range filters (created_at > X, created_at BETWEEN X AND Y).
    b. **TEMPORAL_NEXT edges:** decisions linked in creation order. SUPERSEDES edges where applicable. Session boundary markers.
 
@@ -100,7 +100,7 @@ Do TEMPORAL_NEXT edges enable useful queries that timestamp filtering alone cann
 - Clear categorization of query types by which temporal mechanism they need
 
 ### Risks
-- The alpha-seek spike DB may not have SUPERSEDES edges populated. Fallback: infer supersession from Exp 6 correction clusters (if decision B corrects decision A, A is superseded by B).
+- The project-a spike DB may not have SUPERSEDES edges populated. Fallback: infer supersession from Exp 6 correction clusters (if decision B corrects decision A, A is superseded by B).
 - Session boundaries may not be available. Fallback: use milestone boundaries or day boundaries.
 
 ---

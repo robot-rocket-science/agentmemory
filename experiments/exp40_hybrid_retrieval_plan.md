@@ -81,7 +81,7 @@ Tests: does the pipeline work when edges are provided?
 **Data source:** Alpha-seek DB (586 active belief nodes, same as Exp 39).
 
 **What to do:**
-1. Load all 586 nodes from the alpha-seek DB
+1. Load all 586 nodes from the project-a DB
 2. Extract D### citation references from each node's content -> CITES edges
 3. Manually tag known behavioral beliefs as AGENT_CONSTRAINT:
    - D157: "ban async_bash/await_job"

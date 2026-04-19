@@ -1,14 +1,14 @@
 # LLM Failure Mode Survey
 
 **Date:** 2026-04-10
-**Purpose:** Comprehensive catalog of LLM prompting failures that an agentic memory system could prevent. Sourced from local project history (lorax + archon) and public sources (Reddit, HN, academic papers, blog posts).
+**Purpose:** Comprehensive catalog of LLM prompting failures that an agentic memory system could prevent. Sourced from local project history (lorax + server-a) and public sources (Reddit, HN, academic papers, blog posts).
 **Total failure modes cataloged:** 38 (19 from local projects, 19 from public sources)
 
 ---
 
 ## Failure Modes from Local Projects (CS-001 through CS-019)
 
-Documented in CASE_STUDIES.md with full acceptance tests. Source: alpha-seek, optimus-prime, debserver, agentmemory session observations.
+Documented in CASE_STUDIES.md with full acceptance tests. Source: project-a, project-b, project-d, agentmemory session observations.
 
 | CS | Name | Category |
 |----|------|----------|

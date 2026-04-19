@@ -40,7 +40,7 @@ Each approach entry follows this structure:
 
 **Hypothesis:** A graph built from explicit D###/M### citation references in decision text, with BFS retrieval and hub damping, will deliver more relevant context than flat retrieval with lower token cost.
 
-**Method:** Built ~1,900 LOC TypeScript prototype. Loaded 577 nodes (165 decisions + 375 knowledge + 45 milestones) and 742 edges from alpha-seek project data. Compared graph-seeded BFS retrieval (top 15) against flat retrieval (top 15 by confidence * hit_count) across 5 task scenarios. Relevant sets labeled by the agent (not human-labeled).
+**Method:** Built ~1,900 LOC TypeScript prototype. Loaded 577 nodes (165 decisions + 375 knowledge + 45 milestones) and 742 edges from project-a project data. Compared graph-seeded BFS retrieval (top 15) against flat retrieval (top 15 by confidence * hit_count) across 5 task scenarios. Relevant sets labeled by the agent (not human-labeled).
 
 **Results:**
 
@@ -74,7 +74,7 @@ Latency: BFS 2-hop 0.006ms median, text search + BFS 0.159ms median. All sub-ms.
 **Decision:** Carry forward the proven mechanisms (citation parsing, BFS, hub damping, anchor nodes). Do NOT carry forward the performance claims. Re-evaluate against real baselines in Phase 2.
 
 **References:**
-- Spike location: `/Users/thelorax/projects/.gsd/workflows/spikes/260406-1-associative-memory-for-gsd-please-explor/`
+- Spike location: `/home/user/projects/.gsd/workflows/spikes/260406-1-associative-memory-for-gsd-please-explor/`
 - Key files: `sandbox/COMPARISON.md`, `sandbox/VALIDATION.md`, `TESTING-STRATEGY.md`
 
 ---
@@ -514,15 +514,15 @@ The LLM-verify tier is the new addition. It sits between fully automatic and ful
 **Example prompt:**
 
 ```
-Project: debserver (home server infrastructure fleet)
+Project: project-d (home server infrastructure fleet)
 
 Classify each item as PERSON (real human name) or NOT_PERSON (product, service, concept, category):
 
-1. "Darren Lang" -> 
-2. "Apple Home" -> 
-3. "Jonathan Sobol" -> 
-4. "Smart Garage" -> 
-5. "Shelly Plug" -> 
+1. "Darren Lang" ->
+2. "Apple Home" ->
+3. "Jonathan Sobol" ->
+4. "Smart Garage" ->
+5. "Shelly Plug" ->
 
 Respond with just the number and classification, one per line.
 ```
@@ -556,8 +556,8 @@ It also aligns with the source prior model from Exp 38: LLM-verified beliefs get
 
 **What needs testing:**
 
-1. LLM accuracy on entity classification (person vs concept) on a sample of 50 debserver entities
-2. LLM accuracy on directive classification (rule vs description) on a sample of 50 alpha-seek sentences
+1. LLM accuracy on entity classification (person vs concept) on a sample of 50 project-d entities
+2. LLM accuracy on directive classification (rule vs description) on a sample of 50 project-a sentences
 3. Token cost per batch and items per batch sweet spot
 4. Comparison: LLM-verify precision vs heuristic-only precision vs human-verify precision
 
@@ -567,9 +567,9 @@ The heuristic baseline is far worse than the overall 1.2% FP rate suggested. On 
 
 | Task | Heuristic Accuracy | Errors | LLM Tokens Needed |
 |------|------------------:|-------:|------------------:|
-| debserver entity (40 items) | 30% | 28 | ~970 |
-| jose-bully entity (40 items) | 38% | 25 | ~971 |
-| alpha-seek directive (15 items) | 47% | 8 | ~709 |
+| project-d entity (40 items) | 30% | 28 | ~970 |
+| project-c entity (40 items) | 38% | 25 | ~971 |
+| project-a directive (15 items) | 47% | 8 | ~709 |
 
 The heuristic filter catches common patterns (words like "home", "server") but misses project-specific concept names ("Primary Slice", "Fleet Hardening", "From Screenshot"). 61 errors across 95 hard-case items.
 
@@ -586,9 +586,9 @@ Ran the exact classification prompts through Haiku subagents on 100 ground-truth
 
 | Task | Heuristic | Haiku | Haiku Errors |
 |------|----------:|------:|-------------|
-| debserver entities (40) | 30% | **98%** | 1 ("Half Men" -> PERSON; actually TV show fragment) |
-| jose-bully entities (40) | 38% | **100%** | 0 |
-| alpha-seek directives (20) | 47% | **100%** | 0 |
+| project-d entities (40) | 30% | **98%** | 1 ("Half Men" -> PERSON; actually TV show fragment) |
+| project-c entities (40) | 38% | **100%** | 0 |
+| project-a directives (20) | 47% | **100%** | 0 |
 | **Overall (100 items)** | **36%** | **99%** | **1 error** |
 
 63 percentage point accuracy improvement. The heuristic catches common patterns but fails on project-specific concept names. The LLM understands context ("Smart Home" is a category in a home server project, not a person).
@@ -608,7 +608,7 @@ Ran the exact classification prompts through Haiku subagents on 100 ground-truth
 
 **Method:** Surveyed 21 local projects for signal diversity. Designed a manifest-based discovery system that auto-detects available signals (git, languages, docs, citations, directives, tests). 9 extractors in a registry, each firing conditionally based on manifest. Source-type priors (Exp 38) for classification. FTS5+HRR dual encoding (Exp 40) for retrieval. Optional human interview bursts for high-uncertainty items (4-5 questions max, topical, system proposes/human confirms).
 
-**Dry-run validation:** Walked through on alpha-seek (rich: all 9 extractors fire, ~6,000 nodes), jose-bully (doc-only: 4 extractors, ~600 nodes), mud_rust (sparse: 5 extractors, ~70 nodes). All produce usable graphs. No configuration required.
+**Dry-run validation:** Walked through on project-a (rich: all 9 extractors fire, ~6,000 nodes), project-c (doc-only: 4 extractors, ~600 nodes), mud_rust (sparse: 5 extractors, ~70 nodes). All produce usable graphs. No configuration required.
 
 **Key design decisions:**
 1. Automatic first, human optional
@@ -632,7 +632,7 @@ Ran the exact classification prompts through Haiku subagents on 100 ground-truth
 
 **Hypothesis:** An integrated pipeline where FTS5 provides seed nodes and HRR walks typed edges from those seeds achieves 100% critical belief coverage (13/13), bridging the 8% vocabulary gap that no text-based method can reach.
 
-**Method:** Built end-to-end pipeline on 586 alpha-seek beliefs. FTS5 index with porter tokenizer. HRR graph (DIM=2048) with 112 edges across 2 partitions (behavioral + CITES). 11 behavioral beliefs connected via AGENT_CONSTRAINT edges. Ran all 6 Exp 9/39 ground truth topics.
+**Method:** Built end-to-end pipeline on 586 project-a beliefs. FTS5 index with porter tokenizer. HRR graph (DIM=2048) with 112 edges across 2 partitions (behavioral + CITES). 11 behavioral beliefs connected via AGENT_CONSTRAINT edges. Ran all 6 Exp 9/39 ground truth topics.
 
 **Results:**
 
@@ -687,11 +687,11 @@ At 50K beliefs, source-stratified priors produce 21x better ranking quality than
 
 **Hypothesis:** Extracting function-level CALLS and PASSES_DATA edges from AST analysis captures design-intent relationships invisible to existing extractors (CO_CHANGED, IMPORTS, CITES). Predicted: Jaccard < 0.40 against existing edge sets.
 
-**Method:** Built Python ast-based extractor. Tested on agentmemory (48 files) and alpha-seek (289 files, 552 commits). Cross-referenced CALLS edges with CO_CHANGED (w>=3) and CITES (D### patterns) at the file-pair level. Measured Jaccard overlap, resolution rate, fan-in distribution, extraction time.
+**Method:** Built Python ast-based extractor. Tested on agentmemory (48 files) and project-a (289 files, 552 commits). Cross-referenced CALLS edges with CO_CHANGED (w>=3) and CITES (D### patterns) at the file-pair level. Measured Jaccard overlap, resolution rate, fan-in distribution, extraction time.
 
 **Results:**
 
-| Metric | agentmemory (48 files) | alpha-seek (289 files) |
+| Metric | agentmemory (48 files) | project-a (289 files) |
 |--------|----------------------|----------------------|
 | Callable nodes | 349 | 3,864 |
 | CALLS (resolved) | 712 | 3,489 |
@@ -707,7 +707,7 @@ At 50K beliefs, source-stratified priors produce 21x better ranking quality than
 
 **Decision:** Adopt as Tier 2.5 edge type. Mitigate resolution rate with import-table cross-reference. Validate on Rust repos (static dispatch) for higher-resolution baseline.
 
-**References:** CONTROL_DATA_FLOW_RESEARCH.md, experiments/exp37_control_data_flow.py, experiments/exp37_alpha_seek_synthesis.py
+**References:** CONTROL_DATA_FLOW_RESEARCH.md, experiments/exp37_control_data_flow.py, experiments/exp37_project_a_synthesis.py
 
 ---
 

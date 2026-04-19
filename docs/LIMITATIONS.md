@@ -104,7 +104,7 @@ ECE of 0.066 was measured on simulated data (Exp 5b). Real-world calibration has
 
 ### Correction detection accuracy
 
-Correction detection operates at 92% accuracy (zero-LLM, Exp 1 V2). This was measured on alpha-seek project data, not an external benchmark. Accuracy may vary on other projects.
+Correction detection operates at 92% accuracy (zero-LLM, Exp 1 V2). This was measured on project-a project data, not an external benchmark. Accuracy may vary on other projects.
 
 **Impact:** ~8% of corrections may be misclassified.
 

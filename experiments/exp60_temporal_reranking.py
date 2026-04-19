@@ -16,7 +16,7 @@ Key questions:
 
 Evaluated at K=15 and K=30.
 
-Data: alpha-seek.db
+Data: project-a.db
   - Decision timestamps derived from DECIDED_IN -> milestone.created_at
   - Content type classified from decisions.scope
   - Locked status from decisions.revisable
@@ -42,9 +42,9 @@ import numpy as np
 # ============================================================
 
 ALPHA_SEEK_DB: Final[Path] = Path(
-    "/Users/thelorax/projects/.gsd/workflows/spikes/"
+    "/home/user/projects/.gsd/workflows/spikes/"
     "260406-1-associative-memory-for-gsd-please-explor/"
-    "sandbox/alpha-seek.db"
+    "sandbox/project-a.db"
 )
 
 HRR_DIM: Final[int] = 2048
@@ -84,21 +84,119 @@ TOPICS: Final[dict[str, dict[str, Any]]] = {
 
 KNOWN_BEHAVIORAL: Final[list[str]] = ["D157", "D188", "D100", "D073"]
 
-STOPWORDS: Final[frozenset[str]] = frozenset({
-    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-    "have", "has", "had", "do", "does", "did", "will", "would", "shall",
-    "should", "may", "might", "can", "could", "must", "to", "of", "in",
-    "for", "on", "with", "at", "by", "from", "as", "into", "through",
-    "during", "before", "after", "above", "below", "between", "but",
-    "and", "or", "nor", "not", "no", "so", "if", "then", "than",
-    "too", "very", "just", "about", "up", "out", "off", "over",
-    "under", "again", "further", "once", "here", "there", "when",
-    "where", "why", "how", "all", "each", "every", "both", "few",
-    "more", "most", "other", "some", "such", "only", "own", "same",
-    "that", "this", "these", "those", "what", "which", "who", "whom",
-    "it", "its", "he", "she", "they", "them", "his", "her", "their",
-    "we", "us", "our", "you", "your", "i", "me", "my",
-})
+STOPWORDS: Final[frozenset[str]] = frozenset(
+    {
+        "the",
+        "a",
+        "an",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "shall",
+        "should",
+        "may",
+        "might",
+        "can",
+        "could",
+        "must",
+        "to",
+        "of",
+        "in",
+        "for",
+        "on",
+        "with",
+        "at",
+        "by",
+        "from",
+        "as",
+        "into",
+        "through",
+        "during",
+        "before",
+        "after",
+        "above",
+        "below",
+        "between",
+        "but",
+        "and",
+        "or",
+        "nor",
+        "not",
+        "no",
+        "so",
+        "if",
+        "then",
+        "than",
+        "too",
+        "very",
+        "just",
+        "about",
+        "up",
+        "out",
+        "off",
+        "over",
+        "under",
+        "again",
+        "further",
+        "once",
+        "here",
+        "there",
+        "when",
+        "where",
+        "why",
+        "how",
+        "all",
+        "each",
+        "every",
+        "both",
+        "few",
+        "more",
+        "most",
+        "other",
+        "some",
+        "such",
+        "only",
+        "own",
+        "same",
+        "that",
+        "this",
+        "these",
+        "those",
+        "what",
+        "which",
+        "who",
+        "whom",
+        "it",
+        "its",
+        "he",
+        "she",
+        "they",
+        "them",
+        "his",
+        "her",
+        "their",
+        "we",
+        "us",
+        "our",
+        "you",
+        "your",
+        "i",
+        "me",
+        "my",
+    }
+)
 
 DIRECTIVE_PATTERNS: Final[list[re.Pattern[str]]] = [
     re.compile(r"\bBANNED\b"),
@@ -166,26 +264,29 @@ TOPIC_SCOPE_KEYWORDS: Final[dict[str, list[str]]] = {
 # Dataclasses
 # ============================================================
 
+
 @dataclass
 class DecisionMeta:
     """Temporal and classification metadata for a decision."""
+
     decision_id: str
     scope: str
     content_type: str
     revisable: bool
-    locked: bool          # revisable=False means locked
+    locked: bool  # revisable=False means locked
     timestamp_iso: str | None
-    age_days: float       # age relative to current_time
+    age_days: float  # age relative to current_time
 
 
 @dataclass
 class RankedResult:
     """A single result in the pipeline output, with re-ranking metadata."""
+
     node_id: str
     decision_id: str | None
     retrieval_score: float
-    position: int            # 1-based rank from pipeline output
-    position_score: float    # 1.0 at rank 1, decaying to 0.5 at rank N
+    position: int  # 1-based rank from pipeline output
+    position_score: float  # 1.0 at rank 1, decaying to 0.5 at rank N
     content_type: str
     age_days: float
     decay: float
@@ -196,6 +297,7 @@ class RankedResult:
 # ============================================================
 # Data loading
 # ============================================================
+
 
 def load_sentence_nodes() -> dict[str, str]:
     """Load all sentence-level nodes."""
@@ -212,6 +314,7 @@ def load_sentence_nodes() -> dict[str, str]:
 def _parse_iso_to_epoch(iso: str) -> float:
     """Parse ISO 8601 UTC string to Unix timestamp (seconds)."""
     import datetime
+
     # Remove trailing Z, parse
     cleaned: str = iso.rstrip("Z").replace("T", " ")
     dt: datetime.datetime = datetime.datetime.fromisoformat(cleaned)
@@ -290,9 +393,7 @@ def load_decision_metadata(current_time_epoch: float) -> dict[str, DecisionMeta]
 def get_current_time_epoch() -> float:
     """Return Unix epoch for latest milestone + 1 day (simulated 'now')."""
     db: sqlite3.Connection = sqlite3.connect(str(ALPHA_SEEK_DB))
-    row: Any = db.execute(
-        "SELECT MAX(created_at) FROM milestones"
-    ).fetchone()
+    row: Any = db.execute("SELECT MAX(created_at) FROM milestones").fetchone()
     db.close()
     latest_iso: str = str(row[0])
     latest_epoch: float = _parse_iso_to_epoch(latest_iso)
@@ -302,6 +403,7 @@ def get_current_time_epoch() -> float:
 # ============================================================
 # Utility: extract decision ID from node ID
 # ============================================================
+
 
 def extract_decision_id(node_id: str) -> str | None:
     """Extract D### from a node ID like D097_s3."""
@@ -317,6 +419,7 @@ def estimate_tokens(text: str) -> int:
 # ============================================================
 # Behavioral belief detection
 # ============================================================
+
 
 def scan_behavioral_beliefs(nodes: dict[str, str]) -> set[str]:
     """Find all behavioral decision IDs via directive patterns."""
@@ -335,12 +438,11 @@ def scan_behavioral_beliefs(nodes: dict[str, str]) -> set[str]:
 # FTS5
 # ============================================================
 
+
 def build_fts(nodes: dict[str, str]) -> sqlite3.Connection:
     """Build in-memory FTS5 index with porter stemming."""
     db: sqlite3.Connection = sqlite3.connect(":memory:")
-    db.execute(
-        "CREATE VIRTUAL TABLE fts USING fts5(id, content, tokenize='porter')"
-    )
+    db.execute("CREATE VIRTUAL TABLE fts USING fts5(id, content, tokenize='porter')")
     for nid, content in nodes.items():
         db.execute("INSERT INTO fts VALUES (?, ?)", (nid, content))
     db.commit()
@@ -372,6 +474,7 @@ def search_fts(
 # Graph construction
 # ============================================================
 
+
 def extract_cites_edges(nodes: dict[str, str]) -> list[tuple[str, str]]:
     """Extract CITES edges from D### references in content."""
     d_pattern: re.Pattern[str] = re.compile(r"\bD(\d{3})\b")
@@ -399,8 +502,7 @@ def build_agent_constraint_edges(
 ) -> list[tuple[str, str]]:
     """Fully connect all behavioral belief nodes."""
     behavioral_nodes: list[str] = [
-        nid for nid in nodes
-        if extract_decision_id(nid) in behavioral_ids
+        nid for nid in nodes if extract_decision_id(nid) in behavioral_ids
     ]
     edges: list[tuple[str, str]] = []
     for i, a in enumerate(behavioral_nodes):
@@ -413,6 +515,7 @@ def build_agent_constraint_edges(
 # ============================================================
 # HRR engine (from exp56_corrected_baseline.py)
 # ============================================================
+
 
 def make_vector(dim: int) -> np.ndarray[Any, np.dtype[np.floating[Any]]]:
     """Random unit vector."""
@@ -472,7 +575,9 @@ class HRRGraph:
             self.node_vecs[nid] = make_vector(self.dim)
         return self.node_vecs[nid]
 
-    def _get_edge_type_vec(self, etype: str) -> np.ndarray[Any, np.dtype[np.floating[Any]]]:
+    def _get_edge_type_vec(
+        self, etype: str
+    ) -> np.ndarray[Any, np.dtype[np.floating[Any]]]:
         if etype not in self.edge_type_vecs:
             self.edge_type_vecs[etype] = make_vector(self.dim)
         return self.edge_type_vecs[etype]
@@ -491,7 +596,9 @@ class HRRGraph:
         total_encoded: int = 0
 
         for i in range(n_parts):
-            chunk: list[tuple[str, str, str]] = edges[i * chunk_size : (i + 1) * chunk_size]
+            chunk: list[tuple[str, str, str]] = edges[
+                i * chunk_size : (i + 1) * chunk_size
+            ]
             sub_id: str = f"{partition_id}_sub{i}"
             self._encode_single_partition(sub_id, chunk)
             total_encoded += len(chunk)
@@ -513,9 +620,15 @@ class HRRGraph:
         nodes_in_partition: set[str] = set()
 
         for src, tgt, etype in edges:
-            src_vec: np.ndarray[Any, np.dtype[np.floating[Any]]] = self._get_node_vec(src)
-            tgt_vec: np.ndarray[Any, np.dtype[np.floating[Any]]] = self._get_node_vec(tgt)
-            etype_vec: np.ndarray[Any, np.dtype[np.floating[Any]]] = self._get_edge_type_vec(etype)
+            src_vec: np.ndarray[Any, np.dtype[np.floating[Any]]] = self._get_node_vec(
+                src
+            )
+            tgt_vec: np.ndarray[Any, np.dtype[np.floating[Any]]] = self._get_node_vec(
+                tgt
+            )
+            etype_vec: np.ndarray[Any, np.dtype[np.floating[Any]]] = (
+                self._get_edge_type_vec(etype)
+            )
             _ = src_vec  # registered via _get_node_vec
             superpos += bind(tgt_vec, etype_vec)
             nodes_in_partition.add(src)
@@ -549,12 +662,18 @@ class HRRGraph:
         if edge_type not in self.edge_type_vecs:
             return []
 
-        etype_vec: np.ndarray[Any, np.dtype[np.floating[Any]]] = self.edge_type_vecs[edge_type]
+        etype_vec: np.ndarray[Any, np.dtype[np.floating[Any]]] = self.edge_type_vecs[
+            edge_type
+        ]
         best_scores: dict[str, float] = {}
 
         for part_id in self.node_to_partitions[node_id]:
-            superpos: np.ndarray[Any, np.dtype[np.floating[Any]]] = self.partitions[part_id]
-            result: np.ndarray[Any, np.dtype[np.floating[Any]]] = unbind(superpos, etype_vec)
+            superpos: np.ndarray[Any, np.dtype[np.floating[Any]]] = self.partitions[
+                part_id
+            ]
+            result: np.ndarray[Any, np.dtype[np.floating[Any]]] = unbind(
+                superpos, etype_vec
+            )
 
             for nid in self.partition_nodes[part_id]:
                 if nid == node_id:
@@ -573,6 +692,7 @@ class HRRGraph:
 # ============================================================
 # Hybrid pipeline (identical to Exp 56 FTS K=30 + HRR DIM=2048)
 # ============================================================
+
 
 def search_fts_hrr(
     query: str,
@@ -616,6 +736,7 @@ def search_fts_hrr(
 # Temporal scoring
 # ============================================================
 
+
 def compute_decay_factor(
     content_type: str,
     age_days: float,
@@ -657,18 +778,20 @@ def annotate_results(
 
         decay: float = compute_decay_factor(content_type, age_days, locked)
 
-        annotated.append(RankedResult(
-            node_id=nid,
-            decision_id=did,
-            retrieval_score=score,
-            position=position,
-            position_score=position_score,
-            content_type=content_type,
-            age_days=age_days,
-            decay=decay,
-            locked=locked,
-            rerank_score=0.0,
-        ))
+        annotated.append(
+            RankedResult(
+                node_id=nid,
+                decision_id=did,
+                retrieval_score=score,
+                position=position,
+                position_score=position_score,
+                content_type=content_type,
+                age_days=age_days,
+                decay=decay,
+                locked=locked,
+                rerank_score=0.0,
+            )
+        )
 
     return annotated
 
@@ -676,6 +799,7 @@ def annotate_results(
 # ============================================================
 # Re-ranking strategies
 # ============================================================
+
 
 def rerank_no_rerank(annotated: list[RankedResult]) -> list[RankedResult]:
     """Strategy A: identity -- preserve pipeline order."""
@@ -736,9 +860,11 @@ def rerank_lock_boost_typed(
 # Evaluation
 # ============================================================
 
+
 @dataclass
 class TopicEval:
     """Evaluation result for one topic at one K."""
+
     topic: str
     strategy: str
     k: int
@@ -748,7 +874,7 @@ class TopicEval:
     tokens: int
     found: list[str]
     missed: list[str]
-    behavioral_mrr: float    # MRR restricted to KNOWN_BEHAVIORAL decisions
+    behavioral_mrr: float  # MRR restricted to KNOWN_BEHAVIORAL decisions
 
 
 def evaluate_at_k(
@@ -808,6 +934,7 @@ def evaluate_at_k(
 # Aggregate
 # ============================================================
 
+
 def aggregate_evals(
     evals: list[TopicEval],
     strategy_name: str,
@@ -817,17 +944,13 @@ def aggregate_evals(
     topic_evals: list[TopicEval] = [
         e for e in evals if e.strategy == strategy_name and e.k == k
     ]
-    total_needed: int = sum(
-        len(TOPICS[e.topic]["needed"]) for e in topic_evals
-    )
+    total_needed: int = sum(len(TOPICS[e.topic]["needed"]) for e in topic_evals)
     total_found: int = sum(len(e.found) for e in topic_evals)
     all_missed: list[str] = sorted({d for e in topic_evals for d in e.missed})
     mean_mrr: float = sum(e.mrr for e in topic_evals) / len(topic_evals)
     mean_prec: float = sum(e.precision_at_k for e in topic_evals) / len(topic_evals)
     mean_tokens: float = sum(e.tokens for e in topic_evals) / len(topic_evals)
-    mean_beh_mrr: float = (
-        sum(e.behavioral_mrr for e in topic_evals) / len(topic_evals)
-    )
+    mean_beh_mrr: float = sum(e.behavioral_mrr for e in topic_evals) / len(topic_evals)
 
     return {
         "strategy": strategy_name,
@@ -863,10 +986,13 @@ def aggregate_evals(
 # Main
 # ============================================================
 
+
 def main() -> None:
     t_start: float = time.monotonic()
     print("=" * 70, file=sys.stderr)
-    print("Experiment 60: Temporal Re-ranking Integration with FTS5+HRR", file=sys.stderr)
+    print(
+        "Experiment 60: Temporal Re-ranking Integration with FTS5+HRR", file=sys.stderr
+    )
     print("=" * 70, file=sys.stderr)
 
     # --- Load data ---
@@ -877,6 +1003,7 @@ def main() -> None:
     current_time_epoch: float = get_current_time_epoch()
 
     import datetime
+
     current_time_dt: datetime.datetime = datetime.datetime.fromtimestamp(
         current_time_epoch, tz=datetime.timezone.utc
     )
@@ -889,9 +1016,7 @@ def main() -> None:
     decision_meta: dict[str, DecisionMeta] = load_decision_metadata(current_time_epoch)
     print(f"  Decisions with metadata: {len(decision_meta)}", file=sys.stderr)
 
-    decisions_with_ts: int = sum(
-        1 for m in decision_meta.values() if m.age_days > 0.0
-    )
+    decisions_with_ts: int = sum(1 for m in decision_meta.values() if m.age_days > 0.0)
     locked_count: int = sum(1 for m in decision_meta.values() if m.locked)
     print(
         f"  Decisions with timestamp: {decisions_with_ts}, locked: {locked_count}",
@@ -900,9 +1025,7 @@ def main() -> None:
 
     # Print temporal metadata for ground truth decisions
     print("\n  Ground truth decision metadata:", file=sys.stderr)
-    gt_decisions: list[str] = sorted({
-        d for t in TOPICS.values() for d in t["needed"]
-    })
+    gt_decisions: list[str] = sorted({d for t in TOPICS.values() for d in t["needed"]})
     for did in gt_decisions:
         if did in decision_meta:
             m: DecisionMeta = decision_meta[did]
@@ -919,8 +1042,7 @@ def main() -> None:
     # --- Behavioral beliefs ---
     behavioral_ids: set[str] = scan_behavioral_beliefs(sentence_nodes)
     behavioral_node_ids: list[str] = [
-        nid for nid in sentence_nodes
-        if extract_decision_id(nid) in behavioral_ids
+        nid for nid in sentence_nodes if extract_decision_id(nid) in behavioral_ids
     ]
     print(
         f"\n  Behavioral decisions: {len(behavioral_ids)}, "
@@ -946,9 +1068,7 @@ def main() -> None:
     ac_typed: list[tuple[str, str, str]] = [
         (s, t, "AGENT_CONSTRAINT") for s, t in constraint_edges
     ]
-    ci_typed: list[tuple[str, str, str]] = [
-        (s, t, "CITES") for s, t in cites_edges
-    ]
+    ci_typed: list[tuple[str, str, str]] = [(s, t, "CITES") for s, t in cites_edges]
 
     ac_meta: dict[str, Any] = hrr_graph.encode_partition("behavioral", ac_typed)
     ci_meta: dict[str, Any] = hrr_graph.encode_partition("cites", ci_typed)
@@ -959,8 +1079,7 @@ def main() -> None:
         file=sys.stderr,
     )
     print(
-        f"  CITES: {len(ci_typed)} edges, "
-        f"sub_partitions={ci_meta['sub_partitions']}",
+        f"  CITES: {len(ci_typed)} edges, sub_partitions={ci_meta['sub_partitions']}",
         file=sys.stderr,
     )
 
@@ -1079,7 +1198,8 @@ def main() -> None:
         beh_ranks: list[int] = []
         for did, topic_name in behavioral_topic_map.items():
             ev_k15: list[TopicEval] = [
-                e for e in all_evals
+                e
+                for e in all_evals
                 if e.strategy == strategy_name and e.k == 15 and e.topic == topic_name
             ]
             if not ev_k15:
@@ -1090,7 +1210,9 @@ def main() -> None:
                 # Find rank in the ranked list
                 ranked_strat: list[RankedResult] = []
                 topic_data_raw: dict[str, Any] = TOPICS[topic_name]
-                pipeline_out2: list[tuple[str, float]] = pipeline_results_by_topic[topic_name]
+                pipeline_out2: list[tuple[str, float]] = pipeline_results_by_topic[
+                    topic_name
+                ]
                 annotated2: list[RankedResult] = annotate_results(
                     pipeline_out2, decision_meta, behavioral_ids
                 )
@@ -1155,8 +1277,7 @@ def main() -> None:
         },
         "strategies": STRATEGIES,
         "topics": {
-            t: {"query": v["query"], "needed": v["needed"]}
-            for t, v in TOPICS.items()
+            t: {"query": v["query"], "needed": v["needed"]} for t, v in TOPICS.items()
         },
         "ground_truth_metadata": {
             did: {

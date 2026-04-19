@@ -28,7 +28,7 @@ We tested FTS5, HRR, SimHash, and graph BFS independently. How do they combine i
 - Measure: per-method retrieval set, union, intersection
 - Fuse results via reciprocal rank fusion (standard IR technique)
 - Compare fused results to each individual method
-- Metric: precision@15 on alpha-seek data with human labels (or the Exp 6 critical beliefs as proxy ground truth)
+- Metric: precision@15 on project-a data with human labels (or the Exp 6 critical beliefs as proxy ground truth)
 
 **Status:** TESTED (Exp 25). All methods redundant on this dataset. Zero unique contributions from any method. FTS5 alone = fused result. D157 (async_bash) missed by ALL methods -- genuine vocabulary mismatch that keyword-based approaches can't solve. The gap requires semantic encoding, not better keyword matching.
 
@@ -49,7 +49,7 @@ Exp 22 tested hierarchical confidence with artificial subgraphs (every 50th node
 - What propagation weight is right for real topology? (Exp 22 used 0.3)
 
 **Test design:**
-- Load the alpha-seek graph (586 nodes, 775 edges)
+- Load the project-a graph (586 nodes, 775 edges)
 - Identify natural anchors (degree >= 10)
 - Build real subgraphs via BFS from each anchor
 - Run hierarchical confidence simulation on the real topology
@@ -154,7 +154,7 @@ We decomposed GSD decisions. But the memory system needs to handle code, convers
 - Are the same sentence types applicable across content types?
 
 **Test design:**
-- Take 50 git commits, 50 knowledge entries, and 20 conversation turns from the alpha-seek data
+- Take 50 git commits, 50 knowledge entries, and 20 conversation turns from the project-a data
 - Run the sentence splitter on each
 - Classify sentence types
 - Compare: sentence count distribution, type distribution, cross-reference density
@@ -168,7 +168,7 @@ We decomposed GSD decisions. But the memory system needs to handle code, convers
 
 ### D1: How does the graph change shape as a project matures?
 
-Early alpha-seek (milestones 1-10) vs late alpha-seek (milestones 30-36) -- does the graph topology change?
+Early project-a (milestones 1-10) vs late project-a (milestones 30-36) -- does the graph topology change?
 
 **What we know:**
 - 586 nodes, 775 edges total
@@ -202,7 +202,7 @@ We detect contradictions at the decision level (CONTRADICTS edges). But with sen
 
 **What we don't know:**
 - Can we detect sentence-level contradictions automatically (zero-LLM)?
-- How many sentence-level contradictions exist in the alpha-seek data?
+- How many sentence-level contradictions exist in the project-a data?
 - Does sentence-level contradiction detection find things decision-level misses?
 - What's the false positive rate? (Sentences that look contradictory but aren't because of scoping/context)
 
@@ -258,7 +258,7 @@ The guarantee decomposition:
 - Directive survives compression: HARD (hybrid persistence)
 - LLM obeys directive: SOFT (LLM compliance is not our code, addressable via hooks + detection)
 
-The first three eliminate the alpha-seek failure mode (13 dispatch overrides because the runbook wasn't in context). The fourth is a smaller, separate problem.
+The first three eliminate the project-a failure mode (13 dispatch overrides because the runbook wasn't in context). The fourth is a smaller, separate problem.
 
 **Both components need deep research independently:**
 

@@ -3,7 +3,7 @@ Experiment 2: Bayesian Confidence Calibration Simulation
   200 beliefs, 50 sessions, 100 trials
   Exploration weight: 0.05
 ============================================================
-/Users/thelorax/projects/agentmemory/experiments/exp2_bayesian_calibration.py:286: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+/home/user/projects/agentmemory/experiments/exp2_bayesian_calibration.py:286: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
   rho, _ = spearmanr(confs, trues)
   Trial 10/100 complete
   Trial 20/100 complete

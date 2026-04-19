@@ -7,7 +7,7 @@ from Exp 9. Target: match or exceed 100% critical belief coverage on 6 topics,
 using only a single initial query per topic.
 
 Method:
-  1. Build PMI co-occurrence map from alpha-seek belief corpus
+  1. Build PMI co-occurrence map from project-a belief corpus
   2. Implement PRF (two-pass FTS5 with TF-IDF term extraction)
   3. Compare: single-query baseline, PMI expansion, PRF, PMI+PRF combined
   4. Ground truth: 6 topics x 13 critical decisions from Exp 9
@@ -26,9 +26,11 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Callable
 
-ALPHA_SEEK_DB = Path("/Users/thelorax/projects/.gsd/workflows/spikes/"
-                     "260406-1-associative-memory-for-gsd-please-explor/"
-                     "sandbox/alpha-seek.db")
+ALPHA_SEEK_DB = Path(
+    "/home/user/projects/.gsd/workflows/spikes/"
+    "260406-1-associative-memory-for-gsd-please-explor/"
+    "sandbox/project-a.db"
+)
 
 # Ground truth from Exp 9
 CRITICAL_BELIEFS: dict[str, dict[str, Any]] = {
@@ -59,19 +61,115 @@ CRITICAL_BELIEFS: dict[str, dict[str, Any]] = {
 }
 
 STOPWORDS = {
-    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-    "have", "has", "had", "do", "does", "did", "will", "would", "shall",
-    "should", "may", "might", "can", "could", "must", "to", "of", "in",
-    "for", "on", "with", "at", "by", "from", "as", "into", "through",
-    "during", "before", "after", "above", "below", "between", "but",
-    "and", "or", "nor", "not", "no", "so", "if", "then", "than",
-    "too", "very", "just", "about", "up", "out", "off", "over",
-    "under", "again", "further", "once", "here", "there", "when",
-    "where", "why", "how", "all", "each", "every", "both", "few",
-    "more", "most", "other", "some", "such", "only", "own", "same",
-    "that", "this", "these", "those", "what", "which", "who", "whom",
-    "it", "its", "he", "she", "they", "them", "his", "her", "their",
-    "we", "us", "our", "you", "your", "i", "me", "my",
+    "the",
+    "a",
+    "an",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "being",
+    "have",
+    "has",
+    "had",
+    "do",
+    "does",
+    "did",
+    "will",
+    "would",
+    "shall",
+    "should",
+    "may",
+    "might",
+    "can",
+    "could",
+    "must",
+    "to",
+    "of",
+    "in",
+    "for",
+    "on",
+    "with",
+    "at",
+    "by",
+    "from",
+    "as",
+    "into",
+    "through",
+    "during",
+    "before",
+    "after",
+    "above",
+    "below",
+    "between",
+    "but",
+    "and",
+    "or",
+    "nor",
+    "not",
+    "no",
+    "so",
+    "if",
+    "then",
+    "than",
+    "too",
+    "very",
+    "just",
+    "about",
+    "up",
+    "out",
+    "off",
+    "over",
+    "under",
+    "again",
+    "further",
+    "once",
+    "here",
+    "there",
+    "when",
+    "where",
+    "why",
+    "how",
+    "all",
+    "each",
+    "every",
+    "both",
+    "few",
+    "more",
+    "most",
+    "other",
+    "some",
+    "such",
+    "only",
+    "own",
+    "same",
+    "that",
+    "this",
+    "these",
+    "those",
+    "what",
+    "which",
+    "who",
+    "whom",
+    "it",
+    "its",
+    "he",
+    "she",
+    "they",
+    "them",
+    "his",
+    "her",
+    "their",
+    "we",
+    "us",
+    "our",
+    "you",
+    "your",
+    "i",
+    "me",
+    "my",
 }
 
 
@@ -79,11 +177,14 @@ STOPWORDS = {
 # Data loading
 # ============================================================
 
+
 def load_nodes() -> dict[str, str]:
-    """Load all active belief nodes from alpha-seek DB."""
+    """Load all active belief nodes from project-a DB."""
     db = sqlite3.connect(str(ALPHA_SEEK_DB))
     nodes: dict[str, str] = {}
-    for row in db.execute("SELECT id, content FROM mem_nodes WHERE superseded_by IS NULL"):
+    for row in db.execute(
+        "SELECT id, content FROM mem_nodes WHERE superseded_by IS NULL"
+    ):
         nodes[str(row[0])] = str(row[1])
     db.close()
     return nodes
@@ -114,7 +215,7 @@ def search_fts(query: str, fts_db: sqlite3.Connection, top_k: int = 30) -> list[
     try:
         results = fts_db.execute(
             "SELECT id FROM fts WHERE fts MATCH ? ORDER BY rank LIMIT ?",
-            (fts_query, top_k)
+            (fts_query, top_k),
         ).fetchall()
         return [str(r[0]) for r in results]
     except Exception:
@@ -125,7 +226,10 @@ def search_fts(query: str, fts_db: sqlite3.Connection, top_k: int = 30) -> list[
 # PMI Co-occurrence Map
 # ============================================================
 
-def build_pmi_map(nodes: dict[str, str], min_cooccur: int = 3, top_k: int = 5) -> dict[str, list[tuple[str, float]]]:
+
+def build_pmi_map(
+    nodes: dict[str, str], min_cooccur: int = 3, top_k: int = 5
+) -> dict[str, list[tuple[str, float]]]:
     """Build PMI co-occurrence map from belief corpus.
 
     Returns dict mapping each word to its top-k PMI associates.
@@ -145,14 +249,16 @@ def build_pmi_map(nodes: dict[str, str], min_cooccur: int = 3, top_k: int = 5) -
             df[t] += 1
 
     # Filter: only words appearing in >= 3 docs and <= 50% of docs
-    vocab = {w for w, count in df.items() if count >= min_cooccur and count <= n_docs * 0.5}
+    vocab = {
+        w for w, count in df.items() if count >= min_cooccur and count <= n_docs * 0.5
+    }
 
     # Co-occurrence frequency
     cooccur: Counter[tuple[str, str]] = Counter()
     for tokens in doc_tokens:
         filtered = sorted(tokens & vocab)
         for i, a in enumerate(filtered):
-            for b in filtered[i+1:]:
+            for b in filtered[i + 1 :]:
                 cooccur[(a, b)] += 1
 
     # Compute PMI
@@ -178,7 +284,9 @@ def build_pmi_map(nodes: dict[str, str], min_cooccur: int = 3, top_k: int = 5) -
     return result
 
 
-def expand_with_pmi(query: str, pmi_map: dict[str, list[tuple[str, float]]], max_expand: int = 10) -> str:
+def expand_with_pmi(
+    query: str, pmi_map: dict[str, list[tuple[str, float]]], max_expand: int = 10
+) -> str:
     """Expand query terms using PMI co-occurrence map."""
     original_terms = tokenize(query)
     expansion_terms: list[str] = []
@@ -198,8 +306,14 @@ def expand_with_pmi(query: str, pmi_map: dict[str, list[tuple[str, float]]], max
 # Pseudo-Relevance Feedback (PRF)
 # ============================================================
 
-def prf_expand(query: str, fts_db: sqlite3.Connection, nodes: dict[str, str],
-               initial_k: int = 5, expand_terms: int = 10) -> str:
+
+def prf_expand(
+    query: str,
+    fts_db: sqlite3.Connection,
+    nodes: dict[str, str],
+    initial_k: int = 5,
+    expand_terms: int = 10,
+) -> str:
     """Two-pass PRF: retrieve top-k, extract distinctive terms, re-query."""
     # First pass
     initial_results = search_fts(query, fts_db, top_k=initial_k)
@@ -247,7 +361,12 @@ def prf_expand(query: str, fts_db: sqlite3.Connection, nodes: dict[str, str],
 # Evaluation
 # ============================================================
 
-def evaluate_method(method_name: str, search_fn: Callable[[str], list[str]], topics: dict[str, dict[str, Any]]) -> dict[str, Any]:
+
+def evaluate_method(
+    method_name: str,
+    search_fn: Callable[[str], list[str]],
+    topics: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
     """Evaluate a search method against ground truth topics."""
     results: dict[str, Any] = {"method": method_name, "per_topic": {}}
     total_needed = 0
@@ -277,7 +396,9 @@ def evaluate_method(method_name: str, search_fn: Callable[[str], list[str]], top
             "total_retrieved": len(retrieved),
         }
 
-    results["overall_coverage"] = round(total_found / total_needed, 3) if total_needed else 1.0
+    results["overall_coverage"] = (
+        round(total_found / total_needed, 3) if total_needed else 1.0
+    )
     results["total_needed"] = total_needed
     results["total_found"] = total_found
     return results
@@ -286,6 +407,7 @@ def evaluate_method(method_name: str, search_fn: Callable[[str], list[str]], top
 # ============================================================
 # Main
 # ============================================================
+
 
 def main() -> None:
     print("=== Experiment 39: Automatic Query Expansion ===", file=sys.stderr)
@@ -304,8 +426,20 @@ def main() -> None:
 
     # Show sample PMI associations for key terms
     print("\n--- PMI Sample Associations ---", file=sys.stderr)
-    for term in ["dispatch", "gate", "capital", "typing", "gcp", "agent", "deploy",
-                 "puts", "calls", "archon", "pyright", "strict"]:
+    for term in [
+        "dispatch",
+        "gate",
+        "capital",
+        "typing",
+        "gcp",
+        "agent",
+        "deploy",
+        "puts",
+        "calls",
+        "server-a",
+        "pyright",
+        "strict",
+    ]:
         if term in pmi_map:
             assoc = pmi_map[term][:5]
             assoc_str = ", ".join(f"{w}({s:.1f})" for w, s in assoc)
@@ -346,8 +480,11 @@ def main() -> None:
         result = evaluate_method(method_name, search_fn, CRITICAL_BELIEFS)
         all_results[method_name] = result
 
-        print(f"\n{method_name}: overall coverage = {result['overall_coverage']:.0%} "
-              f"({result['total_found']}/{result['total_needed']})", file=sys.stderr)
+        print(
+            f"\n{method_name}: overall coverage = {result['overall_coverage']:.0%} "
+            f"({result['total_found']}/{result['total_needed']})",
+            file=sys.stderr,
+        )
         for topic, data in result["per_topic"].items():
             status = "OK" if not data["missed"] else f"MISSED: {data['missed']}"
             print(f"  {topic:<20} {data['coverage']:.0%}  {status}", file=sys.stderr)
@@ -366,12 +503,15 @@ def main() -> None:
         print(f"    combined: {combined_q}", file=sys.stderr)
 
     # Summary table
-    print(f"\n{'='*60}", file=sys.stderr)
+    print(f"\n{'=' * 60}", file=sys.stderr)
     print(f"{'Method':<30} {'Coverage':>10} {'Found':>8}", file=sys.stderr)
     print("-" * 50, file=sys.stderr)
     for method_name, result in all_results.items():
-        print(f"{method_name:<30} {result['overall_coverage']:>10.0%} "
-              f"{result['total_found']:>5}/{result['total_needed']}", file=sys.stderr)
+        print(
+            f"{method_name:<30} {result['overall_coverage']:>10.0%} "
+            f"{result['total_found']:>5}/{result['total_needed']}",
+            file=sys.stderr,
+        )
 
     # Method 5: PMI-generated multi-query (auto-generate 3 queries per topic)
     def search_multi_pmi(query: str) -> list[str]:
@@ -398,10 +538,15 @@ def main() -> None:
 
         return list(all_results_set)
 
-    multi_result = evaluate_method("multi_pmi_3query", search_multi_pmi, CRITICAL_BELIEFS)
+    multi_result = evaluate_method(
+        "multi_pmi_3query", search_multi_pmi, CRITICAL_BELIEFS
+    )
     all_results["multi_pmi_3query"] = multi_result
-    print(f"\nmulti_pmi_3query: overall coverage = {multi_result['overall_coverage']:.0%} "
-          f"({multi_result['total_found']}/{multi_result['total_needed']})", file=sys.stderr)
+    print(
+        f"\nmulti_pmi_3query: overall coverage = {multi_result['overall_coverage']:.0%} "
+        f"({multi_result['total_found']}/{multi_result['total_needed']})",
+        file=sys.stderr,
+    )
     for topic, data in multi_result["per_topic"].items():
         status = "OK" if not data["missed"] else f"MISSED: {data['missed']}"
         print(f"  {topic:<20} {data['coverage']:.0%}  {status}", file=sys.stderr)
@@ -413,25 +558,48 @@ def main() -> None:
         results.update(search_fts(query, fts_db, top_k=30))
         results.update(search_fts(expand_with_pmi(query, pmi_map), fts_db, top_k=30))
         results.update(search_fts(prf_expand(query, fts_db, nodes), fts_db, top_k=30))
-        results.update(search_fts(prf_expand(expand_with_pmi(query, pmi_map), fts_db, nodes), fts_db, top_k=30))
+        results.update(
+            search_fts(
+                prf_expand(expand_with_pmi(query, pmi_map), fts_db, nodes),
+                fts_db,
+                top_k=30,
+            )
+        )
         return list(results)
 
-    union_result = evaluate_method("union_all_methods", search_union_all, CRITICAL_BELIEFS)
+    union_result = evaluate_method(
+        "union_all_methods", search_union_all, CRITICAL_BELIEFS
+    )
     all_results["union_all_methods"] = union_result
-    print(f"\nunion_all_methods: overall coverage = {union_result['overall_coverage']:.0%} "
-          f"({union_result['total_found']}/{union_result['total_needed']})", file=sys.stderr)
+    print(
+        f"\nunion_all_methods: overall coverage = {union_result['overall_coverage']:.0%} "
+        f"({union_result['total_found']}/{union_result['total_needed']})",
+        file=sys.stderr,
+    )
     for topic, data in union_result["per_topic"].items():
         status = "OK" if not data["missed"] else f"MISSED: {data['missed']}"
         print(f"  {topic:<20} {data['coverage']:.0%}  {status}", file=sys.stderr)
 
     # Compare to Exp 9 hand-crafted 3-query (100% coverage)
-    print(f"\n{'Exp 9 hand-crafted 3-query':<30} {'100%':>10} {'13':>5}/13", file=sys.stderr)
+    print(
+        f"\n{'Exp 9 hand-crafted 3-query':<30} {'100%':>10} {'13':>5}/13",
+        file=sys.stderr,
+    )
 
     # Save results
     out = Path("experiments/exp39_results.json")
     # Include PMI map sample for documentation
     pmi_sample: dict[str, list[tuple[str, float]]] = {}
-    for term in ["dispatch", "gate", "capital", "typing", "gcp", "deploy", "calls", "puts"]:
+    for term in [
+        "dispatch",
+        "gate",
+        "capital",
+        "typing",
+        "gcp",
+        "deploy",
+        "calls",
+        "puts",
+    ]:
         if term in pmi_map:
             pmi_sample[term] = pmi_map[term][:5]
 

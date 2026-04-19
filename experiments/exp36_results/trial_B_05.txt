@@ -1,6 +1,6 @@
 Here's where you are:
 
-**MemPalace:** One wing (`alpha_seek`, 10K drawers) -- no `agentmemory` wing mined yet.
+**MemPalace:** One wing (`project_a`, 10K drawers) -- no `agentmemory` wing mined yet.
 
 ---
 

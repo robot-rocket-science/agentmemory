@@ -28,23 +28,67 @@ from pathlib import Path
 from typing import Any
 
 
-ALPHA_SEEK_ROOT = Path("/Users/thelorax/projects/alpha-seek")
+ALPHA_SEEK_ROOT = Path("/home/user/projects/project-a")
 
 # ============================================================
 # Layer 1: Control Flow / Data Flow (AST)
 # ============================================================
 
 BUILTINS = {
-    "print", "len", "range", "enumerate", "zip", "map", "filter",
-    "sorted", "reversed", "isinstance", "issubclass", "hasattr",
-    "getattr", "setattr", "delattr", "type", "super", "property",
-    "staticmethod", "classmethod", "str", "int", "float", "bool",
-    "list", "dict", "set", "tuple", "bytes", "bytearray",
-    "open", "input", "id", "hash", "repr", "format", "abs",
-    "min", "max", "sum", "any", "all", "next", "iter",
-    "ValueError", "TypeError", "KeyError", "RuntimeError",
-    "Exception", "NotImplementedError", "AttributeError",
-    "IndexError", "FileNotFoundError", "OSError",
+    "print",
+    "len",
+    "range",
+    "enumerate",
+    "zip",
+    "map",
+    "filter",
+    "sorted",
+    "reversed",
+    "isinstance",
+    "issubclass",
+    "hasattr",
+    "getattr",
+    "setattr",
+    "delattr",
+    "type",
+    "super",
+    "property",
+    "staticmethod",
+    "classmethod",
+    "str",
+    "int",
+    "float",
+    "bool",
+    "list",
+    "dict",
+    "set",
+    "tuple",
+    "bytes",
+    "bytearray",
+    "open",
+    "input",
+    "id",
+    "hash",
+    "repr",
+    "format",
+    "abs",
+    "min",
+    "max",
+    "sum",
+    "any",
+    "all",
+    "next",
+    "iter",
+    "ValueError",
+    "TypeError",
+    "KeyError",
+    "RuntimeError",
+    "Exception",
+    "NotImplementedError",
+    "AttributeError",
+    "IndexError",
+    "FileNotFoundError",
+    "OSError",
 }
 
 
@@ -68,7 +112,9 @@ class ASTEdge:
     resolved: bool = True
 
 
-def extract_ast_layer(repo_root: Path) -> tuple[dict[str, ASTNode], list[ASTEdge], list[tuple[str, str, str, int]]]:
+def extract_ast_layer(
+    repo_root: Path,
+) -> tuple[dict[str, ASTNode], list[ASTEdge], list[tuple[str, str, str, int]]]:
     """Extract control flow and data flow from Python AST."""
     nodes: dict[str, ASTNode] = {}
     edges: list[ASTEdge] = []
@@ -76,7 +122,10 @@ def extract_ast_layer(repo_root: Path) -> tuple[dict[str, ASTNode], list[ASTEdge
 
     py_files: list[Path] = []
     for root, _dirs, files in os.walk(repo_root):
-        if any(skip in root for skip in [".venv", "__pycache__", ".git", "node_modules", ".egg-info"]):
+        if any(
+            skip in root
+            for skip in [".venv", "__pycache__", ".git", "node_modules", ".egg-info"]
+        ):
             continue
         for f in files:
             if f.endswith(".py"):
@@ -100,7 +149,8 @@ def extract_ast_layer(repo_root: Path) -> tuple[dict[str, ASTNode], list[ASTEdge
             if isinstance(node, ast.ClassDef):
                 qname = f"{module}.{node.name}"
                 nodes[qname] = ASTNode(
-                    name=qname, file_path=rel_path,
+                    name=qname,
+                    file_path=rel_path,
                     line_start=node.lineno,
                     line_end=node.end_lineno or node.lineno,
                     node_type="class",
@@ -109,29 +159,40 @@ def extract_ast_layer(repo_root: Path) -> tuple[dict[str, ASTNode], list[ASTEdge
                     if isinstance(item, ast.FunctionDef | ast.AsyncFunctionDef):
                         mname = f"{qname}.{item.name}"
                         nodes[mname] = ASTNode(
-                            name=mname, file_path=rel_path,
+                            name=mname,
+                            file_path=rel_path,
                             line_start=item.lineno,
                             line_end=item.end_lineno or item.lineno,
-                            node_type="method", containing_class=qname,
+                            node_type="method",
+                            containing_class=qname,
                         )
-                        edges.append(ASTEdge(
-                            source=qname, target=mname,
-                            edge_type="CONTAINS", file_path=rel_path,
-                            line=item.lineno,
-                        ))
-                        callable_ranges.append((item.lineno, item.end_lineno or item.lineno, mname))
+                        edges.append(
+                            ASTEdge(
+                                source=qname,
+                                target=mname,
+                                edge_type="CONTAINS",
+                                file_path=rel_path,
+                                line=item.lineno,
+                            )
+                        )
+                        callable_ranges.append(
+                            (item.lineno, item.end_lineno or item.lineno, mname)
+                        )
 
             elif isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
                 # Module-level function (not inside a class)
                 qname = f"{module}.{node.name}"
                 if qname not in nodes:  # Don't overwrite class methods
                     nodes[qname] = ASTNode(
-                        name=qname, file_path=rel_path,
+                        name=qname,
+                        file_path=rel_path,
                         line_start=node.lineno,
                         line_end=node.end_lineno or node.lineno,
                         node_type="function",
                     )
-                    callable_ranges.append((node.lineno, node.end_lineno or node.lineno, qname))
+                    callable_ranges.append(
+                        (node.lineno, node.end_lineno or node.lineno, qname)
+                    )
 
         def find_enclosing(line: int) -> str | None:
             best = None
@@ -176,11 +237,16 @@ def extract_ast_layer(repo_root: Path) -> tuple[dict[str, ASTNode], list[ASTEdge
                         break
 
             if resolved:
-                edges.append(ASTEdge(
-                    source=caller, target=callee_qname,
-                    edge_type="CALLS", file_path=rel_path,
-                    line=node.lineno, resolved=True,
-                ))
+                edges.append(
+                    ASTEdge(
+                        source=caller,
+                        target=callee_qname,
+                        edge_type="CALLS",
+                        file_path=rel_path,
+                        line=node.lineno,
+                        resolved=True,
+                    )
+                )
             else:
                 unresolved.append((caller, callee_name, rel_path, node.lineno))
 
@@ -213,11 +279,16 @@ def extract_ast_layer(repo_root: Path) -> tuple[dict[str, ASTNode], list[ASTEdge
                 for arg in stmt.args:
                     if isinstance(arg, ast.Name) and arg.id in call_assignments:
                         producer = call_assignments[arg.id]
-                        edges.append(ASTEdge(
-                            source=f"?{producer}", target=f"?{consumer}",
-                            edge_type="PASSES_DATA", file_path=rel_path,
-                            line=stmt.lineno, resolved=False,
-                        ))
+                        edges.append(
+                            ASTEdge(
+                                source=f"?{producer}",
+                                target=f"?{consumer}",
+                                edge_type="PASSES_DATA",
+                                file_path=rel_path,
+                                line=stmt.lineno,
+                                resolved=False,
+                            )
+                        )
 
     return nodes, edges, unresolved
 
@@ -226,11 +297,14 @@ def extract_ast_layer(repo_root: Path) -> tuple[dict[str, ASTNode], list[ASTEdge
 # Layer 2: Git History (CO_CHANGED, COMMIT_BELIEF)
 # ============================================================
 
+
 def extract_git_layer(repo_root: Path) -> dict[str, Any]:
     """Extract co-change edges and commit beliefs from git history."""
     result = subprocess.run(
         ["git", "log", "--name-only", "--format=COMMIT:%H|%s", "--no-merges"],
-        capture_output=True, text=True, cwd=repo_root,
+        capture_output=True,
+        text=True,
+        cwd=repo_root,
     )
 
     co_change: Counter[tuple[str, str]] = Counter()
@@ -245,16 +319,18 @@ def extract_git_layer(repo_root: Path) -> dict[str, Any]:
             if current_files:
                 py_files = [f for f in current_files if f.endswith(".py")]
                 for i, a in enumerate(py_files):
-                    for b in py_files[i+1:]:
+                    for b in py_files[i + 1 :]:
                         pair: tuple[str, str] = (min(a, b), max(a, b))
                         co_change[pair] += 1
 
                 if current_msg and not current_msg.lower().startswith(("merge", "wip")):
-                    commit_beliefs.append({
-                        "hash": current_hash,
-                        "message": current_msg,
-                        "files": py_files,
-                    })
+                    commit_beliefs.append(
+                        {
+                            "hash": current_hash,
+                            "message": current_msg,
+                            "files": py_files,
+                        }
+                    )
 
             parts = line[7:].split("|", 1)
             current_hash = parts[0]
@@ -267,15 +343,17 @@ def extract_git_layer(repo_root: Path) -> dict[str, Any]:
     if current_files:
         py_files = [f for f in current_files if f.endswith(".py")]
         for i, a in enumerate(py_files):
-            for b in py_files[i+1:]:
+            for b in py_files[i + 1 :]:
                 pair: tuple[str, str] = (min(a, b), max(a, b))
                 co_change[pair] += 1
         if current_msg:
-            commit_beliefs.append({
-                "hash": current_hash,
-                "message": current_msg,
-                "files": py_files,
-            })
+            commit_beliefs.append(
+                {
+                    "hash": current_hash,
+                    "message": current_msg,
+                    "files": py_files,
+                }
+            )
 
     return {
         "co_change_edges_raw": len(co_change),
@@ -290,6 +368,7 @@ def extract_git_layer(repo_root: Path) -> dict[str, Any]:
 # ============================================================
 # Layer 3: Documentation References (CITES via D### pattern)
 # ============================================================
+
 
 def extract_citation_layer(repo_root: Path) -> dict[str, Any]:
     """Extract D### decision references from code comments and docstrings."""
@@ -312,12 +391,14 @@ def extract_citation_layer(repo_root: Path) -> dict[str, Any]:
             for i, line in enumerate(text.split("\n"), 1):
                 matches = d_pattern.findall(line)
                 for m in matches:
-                    citations.append({
-                        "file": rel,
-                        "line": i,
-                        "decision": f"D{m}",
-                        "context": line.strip()[:120],
-                    })
+                    citations.append(
+                        {
+                            "file": rel,
+                            "line": i,
+                            "decision": f"D{m}",
+                            "context": line.strip()[:120],
+                        }
+                    )
 
     # Group by file -> decisions referenced
     file_decisions: dict[str, set[str]] = defaultdict(set)
@@ -328,7 +409,7 @@ def extract_citation_layer(repo_root: Path) -> dict[str, Any]:
     cites_edges: Counter[tuple[str, str]] = Counter()
     files_list = list(file_decisions.keys())
     for i, a in enumerate(files_list):
-        for b in files_list[i+1:]:
+        for b in files_list[i + 1 :]:
             shared = file_decisions[a] & file_decisions[b]
             if shared:
                 cites_edges[(min(a, b), max(a, b))] = len(shared)
@@ -348,6 +429,7 @@ def extract_citation_layer(repo_root: Path) -> dict[str, Any]:
 # Synthesis: Cross-Layer Analysis
 # ============================================================
 
+
 def synthesize(
     ast_nodes: dict[str, ASTNode],
     ast_edges: list[ASTEdge],
@@ -364,12 +446,17 @@ def synthesize(
             src_file = ast_nodes.get(e.source, None)
             tgt_file = ast_nodes.get(e.target, None)
             if src_file and tgt_file and src_file.file_path != tgt_file.file_path:
-                pair: tuple[str, str] = (min(src_file.file_path, tgt_file.file_path), max(src_file.file_path, tgt_file.file_path))
+                pair: tuple[str, str] = (
+                    min(src_file.file_path, tgt_file.file_path),
+                    max(src_file.file_path, tgt_file.file_path),
+                )
                 calls_file_pairs.add(pair)
 
     # CO_CHANGED file pairs (w>=3)
     co_change_counter: Counter[tuple[str, str]] = git_data["co_change_pairs"]
-    co_change_pairs: set[tuple[str, str]] = {k for k, v in co_change_counter.items() if v >= 3}
+    co_change_pairs: set[tuple[str, str]] = {
+        k for k, v in co_change_counter.items() if v >= 3
+    }
 
     # CITES file pairs
     cites_counter: Counter[tuple[str, str]] = cite_data["cites_pairs"]
@@ -412,8 +499,12 @@ def synthesize(
     return {
         "layer_summary": {
             "AST": {
-                "callable_nodes": len([n for n in ast_nodes.values() if n.node_type != "class"]),
-                "class_nodes": len([n for n in ast_nodes.values() if n.node_type == "class"]),
+                "callable_nodes": len(
+                    [n for n in ast_nodes.values() if n.node_type != "class"]
+                ),
+                "class_nodes": len(
+                    [n for n in ast_nodes.values() if n.node_type == "class"]
+                ),
                 "CALLS_resolved": len(calls_edges),
                 "CALLS_unresolved": len(unresolved),
                 "PASSES_DATA": len(data_edges),
@@ -449,9 +540,13 @@ def synthesize(
             "CALLS_and_CITES": len(calls_and_cites),
             "CO_CHANGED_and_CITES": len(cochange_and_cites),
             "all_three": len(all_three),
-            "jaccard_CALLS_vs_CO_CHANGED": round(jaccard(calls_file_pairs, co_change_pairs), 3),
+            "jaccard_CALLS_vs_CO_CHANGED": round(
+                jaccard(calls_file_pairs, co_change_pairs), 3
+            ),
             "jaccard_CALLS_vs_CITES": round(jaccard(calls_file_pairs, cites_pairs), 3),
-            "jaccard_CO_CHANGED_vs_CITES": round(jaccard(co_change_pairs, cites_pairs), 3),
+            "jaccard_CO_CHANGED_vs_CITES": round(
+                jaccard(co_change_pairs, cites_pairs), 3
+            ),
         },
         "fan_in_top_15": fan_in.most_common(15),
         "infrastructure_callees": sorted(infrastructure),
@@ -491,7 +586,7 @@ def main() -> None:
     }
 
     # Save full results
-    out_path = Path(__file__).parent / "exp37_alpha_seek_results.json"
+    out_path = Path(__file__).parent / "exp37_project_a_results.json"
     with open(out_path, "w") as f:
         json.dump(results, f, indent=2, default=str)
     print(f"\nFull results saved to {out_path}")
@@ -502,28 +597,30 @@ def main() -> None:
     print("=" * 60)
 
     ls = results["layer_summary"]
-    print(f"\nAST Layer:")
-    print(f"  Callables: {ls['AST']['callable_nodes']}, Classes: {ls['AST']['class_nodes']}")
+    print("\nAST Layer:")
+    print(
+        f"  Callables: {ls['AST']['callable_nodes']}, Classes: {ls['AST']['class_nodes']}"
+    )
     print(f"  CALLS (resolved): {ls['AST']['CALLS_resolved']}")
     print(f"  CALLS (unresolved): {ls['AST']['CALLS_unresolved']}")
     print(f"  PASSES_DATA: {ls['AST']['PASSES_DATA']}")
     print(f"  Resolution rate: {ls['AST']['resolution_rate']}")
 
-    print(f"\nGit Layer:")
+    print("\nGit Layer:")
     print(f"  CO_CHANGED edges (w>=3): {ls['GIT']['co_change_w3']}")
     print(f"  Commit beliefs: {ls['GIT']['commit_beliefs']}")
 
-    print(f"\nCITES Layer:")
+    print("\nCITES Layer:")
     print(f"  D### citations found: {ls['CITES']['total_citations']}")
     print(f"  Unique decisions: {ls['CITES']['unique_decisions']}")
     print(f"  Files with citations: {ls['CITES']['files_with_citations']}")
 
     cl = results["cross_layer_overlap"]
-    print(f"\nCross-Layer Overlap (file-pair level):")
+    print("\nCross-Layer Overlap (file-pair level):")
     print(f"  CALLS file pairs: {cl['CALLS_file_pairs']}")
     print(f"  CO_CHANGED file pairs (w>=3): {cl['CO_CHANGED_file_pairs_w3']}")
     print(f"  CITES file pairs: {cl['CITES_file_pairs']}")
-    print(f"  ---")
+    print("  ---")
     print(f"  CALLS only (not in git or docs): {cl['CALLS_only']}")
     print(f"  CO_CHANGED only (not in code or docs): {cl['CO_CHANGED_only']}")
     print(f"  CITES only (not in code or git): {cl['CITES_only']}")
@@ -531,29 +628,37 @@ def main() -> None:
     print(f"  CALLS + CITES (both): {cl['CALLS_and_CITES']}")
     print(f"  CO_CHANGED + CITES (both): {cl['CO_CHANGED_and_CITES']}")
     print(f"  All three layers: {cl['all_three']}")
-    print(f"  ---")
+    print("  ---")
     print(f"  Jaccard CALLS vs CO_CHANGED: {cl['jaccard_CALLS_vs_CO_CHANGED']}")
     print(f"  Jaccard CALLS vs CITES: {cl['jaccard_CALLS_vs_CITES']}")
     print(f"  Jaccard CO_CHANGED vs CITES: {cl['jaccard_CO_CHANGED_vs_CITES']}")
 
-    print(f"\nExtraction times: AST={results['extraction_times']['AST']}s, "
-          f"GIT={results['extraction_times']['GIT']}s, "
-          f"CITES={results['extraction_times']['CITES']}s, "
-          f"Total={results['extraction_times']['total']}s")
+    print(
+        f"\nExtraction times: AST={results['extraction_times']['AST']}s, "
+        f"GIT={results['extraction_times']['GIT']}s, "
+        f"CITES={results['extraction_times']['CITES']}s, "
+        f"Total={results['extraction_times']['total']}s"
+    )
 
     # Interpretation
     print("\n" + "=" * 60)
     print("HYPOTHESIS CHECK")
     print("=" * 60)
-    j_cc = cl['jaccard_CALLS_vs_CO_CHANGED']
+    j_cc = cl["jaccard_CALLS_vs_CO_CHANGED"]
     print(f"\nH1 (Structural Novelty): Jaccard CALLS vs CO_CHANGED = {j_cc}")
     print(f"  Prediction: < 0.40. {'PASS' if j_cc < 0.40 else 'FAIL'}")
-    print(f"  CALLS-only pairs: {cl['CALLS_only']} (relationships visible only in code structure)")
+    print(
+        f"  CALLS-only pairs: {cl['CALLS_only']} (relationships visible only in code structure)"
+    )
 
-    res_rate = ls['AST']['resolution_rate']
-    print(f"\nH5 (Extraction Feasibility): {results['extraction_times']['AST']}s for {ls['AST']['callable_nodes'] + ls['AST']['class_nodes']} nodes")
+    res_rate = ls["AST"]["resolution_rate"]
+    print(
+        f"\nH5 (Extraction Feasibility): {results['extraction_times']['AST']}s for {ls['AST']['callable_nodes'] + ls['AST']['class_nodes']} nodes"
+    )
     print(f"  Resolution rate: {res_rate}")
-    print(f"  Prediction: > 50% resolution. {'PASS' if res_rate > 0.50 else 'FAIL -- method calls dominate unresolved'}")
+    print(
+        f"  Prediction: > 50% resolution. {'PASS' if res_rate > 0.50 else 'FAIL -- method calls dominate unresolved'}"
+    )
 
 
 if __name__ == "__main__":

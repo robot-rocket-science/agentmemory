@@ -1,7 +1,7 @@
 # Experiment 45: HRR Belief Prototype Results
 
 **Date:** 2026-04-10
-**Input:** 1,195 sentence nodes from 173 decisions, 1,485 edges (alpha-seek)
+**Input:** 1,195 sentence nodes from 173 decisions, 1,485 edges (project-a)
 **Builds on:** Exp 31 (sentence HRR), 34 (vocabulary bridge), 35 (multi-hop), 40 (hybrid pipeline), 42 (IB)
 **Method:** Full prototype with partition strategies, DIM comparison, integrated pipeline, vocabulary-gap test, capacity analysis
 **Rigor tier:** Empirically tested (real data, single dataset)
@@ -34,7 +34,7 @@
 
 **Decision-neighborhood** groups edges by the parent decision of the source sentence, then merges small groups until each partition has 50+ edges. This keeps related edges together and maintains locality. At 50-65 edges per partition vs capacity ~227 (DIM=2048) or ~455 (DIM=4096), headroom is 3.5-7x. This is well within the reliable regime.
 
-**Edge-type partitioning** puts all CITES edges in one partition (223 edges), all NEXT_IN_DECISION in another (1,022 edges), and all SAME_TOPIC in a third (240 edges). The NEXT_IN_DECISION partition is 4.5x over capacity at DIM=2048. Even at DIM=4096, it exceeds capacity (1,022 > 455). This strategy is fundamentally unworkable for the alpha-seek graph because NEXT_IN_DECISION edges dominate.
+**Edge-type partitioning** puts all CITES edges in one partition (223 edges), all NEXT_IN_DECISION in another (1,022 edges), and all SAME_TOPIC in a third (240 edges). The NEXT_IN_DECISION partition is 4.5x over capacity at DIM=2048. Even at DIM=4096, it exceeds capacity (1,022 > 455). This strategy is fundamentally unworkable for the project-a graph because NEXT_IN_DECISION edges dominate.
 
 **Fixed-size partitioning** splits edges into chunks of 100. This works better than edge-type (staying within capacity) but splits decision neighborhoods across partition boundaries. A CITES edge from D195_s1 to D174_s0 may land in a different partition than D195_s1's other CITES edges, breaking the routing logic. DIM=4096 partially compensates with higher SNR (0.958 recall).
 
@@ -112,7 +112,7 @@ FTS5 at sentence level covers more than the 92% reported at decision level. The 
 
 1. **Queries that share zero vocabulary with any sentence in the target.** The "agent" match in D157_s6 is a lucky overlap. A different query -- say, "tool restrictions" -- would miss D157 entirely at any granularity.
 2. **Structural retrieval.** "What is connected to D188 via AGENT_CONSTRAINT?" is a question FTS5 cannot answer regardless of vocabulary overlap.
-3. **Cross-vocabulary clusters.** As the belief graph grows beyond one project (alpha-seek), vocabulary gaps between projects will dominate.
+3. **Cross-vocabulary clusters.** As the belief graph grows beyond one project (project-a), vocabulary gaps between projects will dominate.
 
 ### Pipeline Architecture (Validated)
 

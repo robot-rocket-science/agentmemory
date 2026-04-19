@@ -20,7 +20,9 @@ from experiments.exp1_extraction_pipeline import extract_beliefs, classify_text
 from experiments.exp6_detect_failures_v2 import parse_overrides
 
 
-OVERRIDES_PATH = Path("/Users/thelorax/projects/alpha-seek-memtest/docs/gsd-archive/OVERRIDES.md")
+OVERRIDES_PATH = Path(
+    "/home/user/projects/project-a-test/docs/gsd-archive/OVERRIDES.md"
+)
 
 
 def main() -> None:
@@ -46,7 +48,8 @@ def main() -> None:
             "do not" in text_lower or "don't" in text_lower or "dont" in text_lower,
             "stop" in text_lower,
             "must" in text_lower,
-            "not" in text_lower and any(w in text_lower for w in ["use", "do", "implement", "run"]),
+            "not" in text_lower
+            and any(w in text_lower for w in ["use", "do", "implement", "run"]),
             "rule" in text_lower or "require" in text_lower,
             text_lower.startswith("use "),
             "wrong" in text_lower or "incorrect" in text_lower or "not " in text_lower,
@@ -77,45 +80,63 @@ def main() -> None:
 
         status = "CORR" if detected_as_correction else "miss"
         beliefs_str = f"{len(beliefs)} beliefs" if beliefs else "NO beliefs"
-        print(f"  [{status}] {override['timestamp'][:10]}: {beliefs_str}, "
-              f"class={btype}({conf:.2f}), corr={correction_score:.2f}", file=sys.stderr)
+        print(
+            f"  [{status}] {override['timestamp'][:10]}: {beliefs_str}, "
+            f"class={btype}({conf:.2f}), corr={correction_score:.2f}",
+            file=sys.stderr,
+        )
         if beliefs:
             for b in beliefs[:2]:
                 print(f"         [{b.belief_type}] {b.content[:70]}", file=sys.stderr)
         print(f"         text: {text[:80]}", file=sys.stderr)
 
     # Summary
-    print(f"\n{'='*60}", file=sys.stderr)
-    print(f"EXTRACTION SUMMARY", file=sys.stderr)
-    print(f"{'='*60}", file=sys.stderr)
+    print(f"\n{'=' * 60}", file=sys.stderr)
+    print("EXTRACTION SUMMARY", file=sys.stderr)
+    print(f"{'=' * 60}", file=sys.stderr)
     print(f"  Total overrides: {len(overrides)}", file=sys.stderr)
-    print(f"  Overrides with extracted beliefs: {sum(1 for r in results if r['extracted_beliefs'] > 0)}/{len(overrides)} "
-          f"({sum(1 for r in results if r['extracted_beliefs'] > 0)/len(overrides):.0%})", file=sys.stderr)
+    print(
+        f"  Overrides with extracted beliefs: {sum(1 for r in results if r['extracted_beliefs'] > 0)}/{len(overrides)} "
+        f"({sum(1 for r in results if r['extracted_beliefs'] > 0) / len(overrides):.0%})",
+        file=sys.stderr,
+    )
     print(f"  Total beliefs extracted: {total_beliefs}", file=sys.stderr)
-    print(f"  Avg beliefs per override: {total_beliefs/len(overrides):.1f}", file=sys.stderr)
-    print(f"  Detected as correction: {correction_detected}/{len(overrides)} "
-          f"({correction_detected/len(overrides):.0%})", file=sys.stderr)
+    print(
+        f"  Avg beliefs per override: {total_beliefs / len(overrides):.1f}",
+        file=sys.stderr,
+    )
+    print(
+        f"  Detected as correction: {correction_detected}/{len(overrides)} "
+        f"({correction_detected / len(overrides):.0%})",
+        file=sys.stderr,
+    )
 
     # Breakdown by whether correction was detected
     with_beliefs_and_correction = sum(
         1 for r in results if r["extracted_beliefs"] > 0 and r["detected_as_correction"]
     )
-    print(f"  Beliefs + correction detected: {with_beliefs_and_correction}/{len(overrides)} "
-          f"({with_beliefs_and_correction/len(overrides):.0%})", file=sys.stderr)
+    print(
+        f"  Beliefs + correction detected: {with_beliefs_and_correction}/{len(overrides)} "
+        f"({with_beliefs_and_correction / len(overrides):.0%})",
+        file=sys.stderr,
+    )
 
     # Classification distribution
     class_counts: dict[str, int] = {}
     for r in results:
         c: str = r["classification"]
         class_counts[c] = class_counts.get(c, 0) + 1
-    print(f"\n  Classification distribution:", file=sys.stderr)
+    print("\n  Classification distribution:", file=sys.stderr)
     for c, count in sorted(class_counts.items(), key=lambda x: x[1], reverse=True):
         print(f"    {c}: {count}", file=sys.stderr)
 
     # What did the pipeline miss entirely?
     missed = [r for r in results if r["extracted_beliefs"] == 0]
     if missed:
-        print(f"\n  Overrides with ZERO extracted beliefs ({len(missed)}):", file=sys.stderr)
+        print(
+            f"\n  Overrides with ZERO extracted beliefs ({len(missed)}):",
+            file=sys.stderr,
+        )
         for r in missed[:5]:
             print(f"    {r['timestamp']}: {r['text'][:80]}", file=sys.stderr)
 

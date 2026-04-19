@@ -2,7 +2,7 @@
 Experiment 49c: Entity Detection for CROSS_DOC_ENTITY Edges + H3 Retest
 
 Builds typed semantic edges by detecting shared entities across document sentences.
-Then retests HRR vocabulary bridge on jose-bully and debserver (H3).
+Then retests HRR vocabulary bridge on project-c and project-d (H3).
 
 Entity types detected (zero-LLM):
   - Person names: capitalized bigrams appearing >= 3 times in corpus
@@ -30,17 +30,25 @@ from typing import Any
 import numpy as np
 
 # Reuse Exp 45 infrastructure
-PYTHONPATH_SET = True  # Run with PYTHONPATH=/Users/thelorax/projects/agentmemory
+PYTHONPATH_SET = True  # Run with PYTHONPATH=/home/user/projects/agentmemory
 from experiments.exp49_onboarding_validation import (
-    PROJECTS, discover, extract_file_tree, extract_git_history,
-    extract_document_sentences, extract_ast_calls,
-    extract_directives, analyze_graph, build_fts_from_nodes, search_fts,
+    PROJECTS,
+    discover,
+    extract_file_tree,
+    extract_git_history,
+    extract_document_sentences,
+    extract_ast_calls,
+    extract_directives,
+    analyze_graph,
+    build_fts_from_nodes,
+    search_fts,
 )
 
 
 # ============================================================
 # Entity detection
 # ============================================================
+
 
 def detect_entities(nodes: list[dict[str, Any]]) -> dict[str, list[tuple[str, str]]]:
     """Detect entities in sentence nodes. Returns {entity_type: [(node_id, entity_value)]}."""
@@ -52,32 +60,100 @@ def detect_entities(nodes: list[dict[str, Any]]) -> dict[str, list[tuple[str, st
     date_counter: Counter[str] = Counter()
 
     name_pattern = re.compile(r"\b([A-Z][a-z]{2,})\s+([A-Z][a-z]{2,})\b")
-    incident_pattern = re.compile(r"\b(incident[-_ ]?\d{1,2}|EXH[-_ ]?\d{1,3}|Exhibit\s+\d{1,3})\b", re.IGNORECASE)
-    date_pattern = re.compile(r"\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2})\b")
+    incident_pattern = re.compile(
+        r"\b(incident[-_ ]?\d{1,2}|EXH[-_ ]?\d{1,3}|Exhibit\s+\d{1,3})\b", re.IGNORECASE
+    )
+    date_pattern = re.compile(
+        r"\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2})\b"
+    )
 
     # Common false positive names to exclude
     name_stopwords = {
-        "What It", "File Path", "Model Compare", "How To", "If The",
-        "On March", "In The", "For The", "When The", "This Is",
-        "The Following", "Not The", "Senior Engineering", "Pull Request",
-        "Microsoft Teams", "Continuous Integration", "Code Review",
+        "What It",
+        "File Path",
+        "Model Compare",
+        "How To",
+        "If The",
+        "On March",
+        "In The",
+        "For The",
+        "When The",
+        "This Is",
+        "The Following",
+        "Not The",
+        "Senior Engineering",
+        "Pull Request",
+        "Microsoft Teams",
+        "Continuous Integration",
+        "Code Review",
     }
 
     # Words that indicate a capitalized bigram is a concept/product, not a person
     non_person_words = {
-        "home", "assistant", "environment", "server", "service", "system",
-        "plug", "smart", "dev", "integration", "engineering", "review",
-        "request", "model", "compare", "action", "pipeline", "test",
-        "config", "network", "module", "component", "manager", "controller",
-        "video", "garage", "door", "sensor", "camera", "bridge", "hub",
-        "steps", "plan", "task", "check", "setup", "install", "update",
-        "build", "release", "deploy", "monitor", "alert", "status",
-        "chat", "support", "takeover", "smoke", "fill", "neural",
-        "best", "code", "data", "file", "path", "run", "agent",
+        "home",
+        "assistant",
+        "environment",
+        "server",
+        "service",
+        "system",
+        "plug",
+        "smart",
+        "dev",
+        "integration",
+        "engineering",
+        "review",
+        "request",
+        "model",
+        "compare",
+        "action",
+        "pipeline",
+        "test",
+        "config",
+        "network",
+        "module",
+        "component",
+        "manager",
+        "controller",
+        "video",
+        "garage",
+        "door",
+        "sensor",
+        "camera",
+        "bridge",
+        "hub",
+        "steps",
+        "plan",
+        "task",
+        "check",
+        "setup",
+        "install",
+        "update",
+        "build",
+        "release",
+        "deploy",
+        "monitor",
+        "alert",
+        "status",
+        "chat",
+        "support",
+        "takeover",
+        "smoke",
+        "fill",
+        "neural",
+        "best",
+        "code",
+        "data",
+        "file",
+        "path",
+        "run",
+        "agent",
     }
 
     # Infrastructure hostnames (detect from corpus frequency)
-    infra_pattern = re.compile(r"\b(willow|archon|alnitak|mintaka|lorax|jellyfin|grafana|prometheus|radarr|sonarr|prowlarr|gluetun|frigate|homeassistant|gitea|qbittorrent|raspberry|pi)\b", re.IGNORECASE)
+    infra_pattern = re.compile(
+        r"\b(server-b|server-a|alnitak|server-c|lorax|jellyfin|grafana|prometheus|radarr|sonarr|prowlarr|gluetun|frigate|homeassistant|gitea|qbittorrent|raspberry|pi)\b",
+        re.IGNORECASE,
+    )
 
     for n in nodes:
         content = n.get("content", "")
@@ -146,7 +222,9 @@ def detect_entities(nodes: list[dict[str, Any]]) -> dict[str, list[tuple[str, st
     return mentions
 
 
-def build_entity_edges(mentions: dict[str, list[tuple[str, str]]]) -> list[dict[str, Any]]:
+def build_entity_edges(
+    mentions: dict[str, list[tuple[str, str]]],
+) -> list[dict[str, Any]]:
     """Build edges between nodes that share entity mentions."""
     edges: list[dict[str, Any]] = []
 
@@ -170,15 +248,18 @@ def build_entity_edges(mentions: dict[str, list[tuple[str, str]]]) -> list[dict[
             # Cross-file edges only (within-file is already covered by WITHIN_SECTION)
             files = list(file_groups.keys())
             for i, fa in enumerate(files):
-                for fb in files[i+1:]:
+                for fb in files[i + 1 :]:
                     # One edge per file pair per entity (not per sentence pair)
                     src = file_groups[fa][0]  # representative node from file A
                     tgt = file_groups[fb][0]  # representative node from file B
-                    edges.append({
-                        "src": src, "tgt": tgt,
-                        "type": edge_type,
-                        "entity": entity_val,
-                    })
+                    edges.append(
+                        {
+                            "src": src,
+                            "tgt": tgt,
+                            "type": edge_type,
+                            "entity": entity_val,
+                        }
+                    )
 
     return edges
 
@@ -288,15 +369,21 @@ def test_hrr_bridge(
                     combined_found_terms.append(term)
                     break
 
-        results.append({
-            "query": q["query"],
-            "fts_hits": len(fts_hits),
-            "hrr_only": len(hrr_only),
-            "combined": len(combined),
-            "fts_precision": round(len(fts_found_terms) / max(1, len(q.get("must_find", []))), 3),
-            "combined_precision": round(len(combined_found_terms) / max(1, len(q.get("must_find", []))), 3),
-            "hrr_added_value": len(combined_found_terms) > len(fts_found_terms),
-        })
+        results.append(
+            {
+                "query": q["query"],
+                "fts_hits": len(fts_hits),
+                "hrr_only": len(hrr_only),
+                "combined": len(combined),
+                "fts_precision": round(
+                    len(fts_found_terms) / max(1, len(q.get("must_find", []))), 3
+                ),
+                "combined_precision": round(
+                    len(combined_found_terms) / max(1, len(q.get("must_find", []))), 3
+                ),
+                "hrr_added_value": len(combined_found_terms) > len(fts_found_terms),
+            }
+        )
 
     return {
         "project": project_name,
@@ -313,7 +400,7 @@ def test_hrr_bridge(
 # ============================================================
 
 H3_QUERIES: dict[str, list[dict[str, Any]]] = {
-    "jose-bully": [
+    "project-c": [
         {
             "query": "PR blocked merge gatekeeping",
             "must_find": ["pull request", "merge", "PR", "block"],
@@ -340,10 +427,10 @@ H3_QUERIES: dict[str, list[dict[str, Any]]] = {
             "description": "Work distribution grievance",
         },
     ],
-    "debserver": [
+    "project-d": [
         {
             "query": "server fleet management debian",
-            "must_find": ["willow", "debian", "server"],
+            "must_find": ["server-b", "debian", "server"],
             "description": "Primary server (hostname entity bridge)",
         },
         {
@@ -363,7 +450,7 @@ H3_QUERIES: dict[str, list[dict[str, Any]]] = {
         },
         {
             "query": "git server code hosting",
-            "must_find": ["gitea", "mintaka"],
+            "must_find": ["gitea", "server-c"],
             "description": "Git server (host entity bridge)",
         },
     ],
@@ -374,6 +461,7 @@ H3_QUERIES: dict[str, list[dict[str, Any]]] = {
 # Main
 # ============================================================
 
+
 def main() -> None:
     print("=" * 70, file=sys.stderr)
     print("Experiment 49c: Entity Detection + H3 Retest", file=sys.stderr)
@@ -381,11 +469,11 @@ def main() -> None:
 
     all_results: dict[str, Any] = {}
 
-    for name in ["jose-bully", "debserver"]:
+    for name in ["project-c", "project-d"]:
         root = PROJECTS[name]
-        print(f"\n{'='*50}", file=sys.stderr)
+        print(f"\n{'=' * 50}", file=sys.stderr)
         print(f"Project: {name}", file=sys.stderr)
-        print(f"{'='*50}", file=sys.stderr)
+        print(f"{'=' * 50}", file=sys.stderr)
 
         # Extract (reuse pipeline)
         manifest = discover(root)
@@ -402,7 +490,9 @@ def main() -> None:
             all_edges.extend(git_edges)
 
         if manifest["doc_count"] > 0:
-            doc_nodes, doc_edges = extract_document_sentences(root, manifest["doc_files"])
+            doc_nodes, doc_edges = extract_document_sentences(
+                root, manifest["doc_files"]
+            )
             all_nodes.extend(doc_nodes)
             all_edges.extend(doc_edges)
 
@@ -423,7 +513,10 @@ def main() -> None:
         for etype, mention_list in mentions.items():
             entities = set(v for _, v in mention_list)
             nodes_with = len(set(n for n, _ in mention_list))
-            print(f"    {etype}: {len(entities)} unique entities, {nodes_with} nodes tagged", file=sys.stderr)
+            print(
+                f"    {etype}: {len(entities)} unique entities, {nodes_with} nodes tagged",
+                file=sys.stderr,
+            )
             # Show top entities
             entity_counts = Counter(v for _, v in mention_list)
             for ent, count in entity_counts.most_common(5):
@@ -437,9 +530,15 @@ def main() -> None:
         # Add entity edges to graph and re-analyze
         all_edges.extend(entity_edges)
         graph_props = analyze_graph(all_nodes, all_edges)
-        print(f"\n    Graph after entity edges:", file=sys.stderr)
-        print(f"      Nodes: {graph_props['total_nodes']}, Edges: {graph_props['total_edges']}", file=sys.stderr)
-        print(f"      LCC: {graph_props['largest_component']} ({graph_props['largest_component_frac']:.0%})", file=sys.stderr)
+        print("\n    Graph after entity edges:", file=sys.stderr)
+        print(
+            f"      Nodes: {graph_props['total_nodes']}, Edges: {graph_props['total_edges']}",
+            file=sys.stderr,
+        )
+        print(
+            f"      LCC: {graph_props['largest_component']} ({graph_props['largest_component_frac']:.0%})",
+            file=sys.stderr,
+        )
         print(f"      Components: {graph_props['num_components']}", file=sys.stderr)
 
         # Build FTS5 and test HRR
@@ -447,22 +546,32 @@ def main() -> None:
         queries: list[dict[str, Any]] = H3_QUERIES.get(name, [])
         hrr_result = test_hrr_bridge(all_nodes, entity_edges, fts_db, queries, name)
 
-        print(f"\n    HRR bridge test:", file=sys.stderr)
+        print("\n    HRR bridge test:", file=sys.stderr)
         if hrr_result.get("skipped"):
             print(f"      SKIPPED: {hrr_result['reason']}", file=sys.stderr)
         else:
-            print(f"      Entity edges: {hrr_result['entity_edge_count']}", file=sys.stderr)
+            print(
+                f"      Entity edges: {hrr_result['entity_edge_count']}",
+                file=sys.stderr,
+            )
             print(f"      HRR nodes: {hrr_result['hrr_node_count']}", file=sys.stderr)
-            print(f"\n      {'Query':<45} {'FTS5':>6} {'Comb':>6} {'HRR+?':>6}", file=sys.stderr)
-            print(f"      {'-'*65}", file=sys.stderr)
+            print(
+                f"\n      {'Query':<45} {'FTS5':>6} {'Comb':>6} {'HRR+?':>6}",
+                file=sys.stderr,
+            )
+            print(f"      {'-' * 65}", file=sys.stderr)
             for qr in hrr_result["query_results"]:
                 marker = " <--" if qr["hrr_added_value"] else ""
-                print(f"      {qr['query'][:44]:<45} {qr['fts_precision']:>6.0%} "
-                      f"{qr['combined_precision']:>6.0%} {'YES' if qr['hrr_added_value'] else 'no':>6}{marker}",
-                      file=sys.stderr)
+                print(
+                    f"      {qr['query'][:44]:<45} {qr['fts_precision']:>6.0%} "
+                    f"{qr['combined_precision']:>6.0%} {'YES' if qr['hrr_added_value'] else 'no':>6}{marker}",
+                    file=sys.stderr,
+                )
 
-            print(f"\n      HRR added value on {hrr_result['hrr_added_value_count']}/{len(queries)} queries",
-                  file=sys.stderr)
+            print(
+                f"\n      HRR added value on {hrr_result['hrr_added_value_count']}/{len(queries)} queries",
+                file=sys.stderr,
+            )
 
         all_results[name] = {
             "entity_mentions": {k: len(v) for k, v in mentions.items()},
@@ -473,9 +582,11 @@ def main() -> None:
         }
 
     # H3 verdict
-    print(f"\n{'='*70}", file=sys.stderr)
-    print("H3 VERDICT: Does HRR add value on non-alpha-seek topologies?", file=sys.stderr)
-    print(f"{'='*70}", file=sys.stderr)
+    print(f"\n{'=' * 70}", file=sys.stderr)
+    print(
+        "H3 VERDICT: Does HRR add value on non-project-a topologies?", file=sys.stderr
+    )
+    print(f"{'=' * 70}", file=sys.stderr)
 
     for name, r in all_results.items():
         hrr = r["hrr_test"]
@@ -484,8 +595,11 @@ def main() -> None:
         else:
             added = hrr["hrr_added_value_count"]
             total = len(hrr["query_results"])
-            print(f"  {name}: HRR added value on {added}/{total} queries "
-                  f"({added/total:.0%})", file=sys.stderr)
+            print(
+                f"  {name}: HRR added value on {added}/{total} queries "
+                f"({added / total:.0%})",
+                file=sys.stderr,
+            )
 
     # Save
     out = Path("experiments/exp49c_results.json")

@@ -1,7 +1,7 @@
 Sweeping 6 prior strengths x 7 exploration weights x 20 trials
-/Users/thelorax/projects/agentmemory/experiments/exp2_bayesian_calibration.py:286: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+/home/user/projects/agentmemory/experiments/exp2_bayesian_calibration.py:286: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
   rho, _ = spearmanr(confs, trues)
-/Users/thelorax/projects/agentmemory/experiments/exp2b_parameter_sweep.py:154: RuntimeWarning: Mean of empty slice
+/home/user/projects/agentmemory/experiments/exp2b_parameter_sweep.py:154: RuntimeWarning: Mean of empty slice
   "rank_corr_mean": round(float(np.nanmean(ranks)), 4),
   ps= 1.0 ew=0.00 -> ECE=0.2496 expl=0.0000 conv=0.7273 [----]
   ps= 1.0 ew=0.05 -> ECE=0.2498 expl=0.0000 conv=0.7164 [----]

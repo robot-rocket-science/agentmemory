@@ -52,7 +52,7 @@ The question: does keeping observations immutable and deriving beliefs from them
 
 This is testable but requires implementation:
 1. Build both models on the same SQLite schema
-2. Ingest the same alpha-seek data
+2. Ingest the same project-a data
 3. Introduce contradictions (simulating the calls/puts and capital overrides)
 4. Measure: which model detects contradictions faster? Which produces better provenance chains? Which is easier to correct?
 

@@ -14,7 +14,7 @@ Methods tested:
   - Type-filtered grep (belief+sentence+heading+behavioral_belief only)
   - Type-filtered FTS5 (belief+sentence+heading+behavioral_belief only)
 
-Ground truth: 6-topic alpha-seek benchmark, K=15.
+Ground truth: 6-topic project-a benchmark, K=15.
 """
 
 from __future__ import annotations
@@ -44,16 +44,24 @@ EdgeList: TypeAlias = list[dict[str, Any]]
 TOP_K: Final[int] = 15
 
 ALPHA_SEEK_DB: Final[Path] = Path(
-    "/Users/thelorax/projects/.gsd/workflows/spikes/"
+    "/home/user/projects/.gsd/workflows/spikes/"
     "260406-1-associative-memory-for-gsd-please-explor/"
-    "sandbox/alpha-seek.db"
+    "sandbox/project-a.db"
 )
 
-ALPHA_SEEK_ROOT: Final[Path] = Path("/Users/thelorax/projects/alpha-seek")
+ALPHA_SEEK_ROOT: Final[Path] = Path("/home/user/projects/project-a")
 
 SKIP_DIRS: Final[set[str]] = {
-    ".venv", "__pycache__", ".git", "node_modules", ".egg-info",
-    "target", ".mypy_cache", ".pytest_cache", "dist", "build",
+    ".venv",
+    "__pycache__",
+    ".git",
+    "node_modules",
+    ".egg-info",
+    "target",
+    ".mypy_cache",
+    ".pytest_cache",
+    "dist",
+    "build",
 }
 
 # Types to KEEP in filtered index
@@ -106,30 +114,33 @@ EXP48_BASELINES: Final[dict[str, dict[str, float]]] = {
 # Spike DB loader
 # ===================================================================
 
+
 def load_spike_nodes() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Load all active nodes and edges from the alpha-seek spike DB."""
+    """Load all active nodes and edges from the project-a spike DB."""
     db: sqlite3.Connection = sqlite3.connect(str(ALPHA_SEEK_DB))
     nodes: list[dict[str, Any]] = []
     for row in db.execute(
         "SELECT id, content, category FROM mem_nodes WHERE superseded_by IS NULL"
     ):
-        nodes.append({
-            "id": str(row[0]),
-            "content": str(row[1]),
-            "type": "belief",
-            "category": str(row[2]),
-        })
+        nodes.append(
+            {
+                "id": str(row[0]),
+                "content": str(row[1]),
+                "type": "belief",
+                "category": str(row[2]),
+            }
+        )
 
     edges: list[dict[str, Any]] = []
-    for row in db.execute(
-        "SELECT from_id, to_id, edge_type, weight FROM mem_edges"
-    ):
-        edges.append({
-            "src": str(row[0]),
-            "tgt": str(row[1]),
-            "type": str(row[2]),
-            "weight": float(row[3]),
-        })
+    for row in db.execute("SELECT from_id, to_id, edge_type, weight FROM mem_edges"):
+        edges.append(
+            {
+                "src": str(row[0]),
+                "tgt": str(row[1]),
+                "type": str(row[2]),
+                "weight": float(row[3]),
+            }
+        )
     db.close()
     return nodes, edges
 
@@ -137,6 +148,7 @@ def load_spike_nodes() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
 # ===================================================================
 # Extractors (from exp48)
 # ===================================================================
+
 
 def extract_file_tree(project_root: Path) -> list[dict[str, Any]]:
     """Extract file tree nodes (no edges needed for this experiment)."""
@@ -154,7 +166,9 @@ def extract_git_history(project_root: Path) -> list[dict[str, Any]]:
     """Extract commit nodes."""
     r: subprocess.CompletedProcess[str] = subprocess.run(
         ["git", "log", "--name-only", "--format=COMMIT:%H|%s|%aI", "--no-merges"],
-        capture_output=True, text=True, cwd=project_root,
+        capture_output=True,
+        text=True,
+        cwd=project_root,
     )
 
     nodes: list[dict[str, Any]] = []
@@ -168,12 +182,14 @@ def extract_git_history(project_root: Path) -> list[dict[str, Any]]:
         if current_files and current_msg:
             if not current_msg.lower().startswith(("merge", "wip")):
                 commit_id: str = f"commit:{current_hash[:8]}"
-                nodes.append({
-                    "id": commit_id,
-                    "content": current_msg,
-                    "type": "commit",
-                    "date": current_date,
-                })
+                nodes.append(
+                    {
+                        "id": commit_id,
+                        "content": current_msg,
+                        "type": "commit",
+                        "date": current_date,
+                    }
+                )
         current_msg = ""
         current_date = ""
         current_hash = ""
@@ -228,12 +244,14 @@ def extract_document_sentences(
 
             if para.startswith("#"):
                 nid: str = f"doc:{rel_path}:h:{sent_idx}"
-                nodes.append({
-                    "id": nid,
-                    "content": para.lstrip("#").strip(),
-                    "type": "heading",
-                    "file": rel_path,
-                })
+                nodes.append(
+                    {
+                        "id": nid,
+                        "content": para.lstrip("#").strip(),
+                        "type": "heading",
+                        "file": rel_path,
+                    }
+                )
                 sent_idx += 1
                 continue
 
@@ -242,12 +260,14 @@ def extract_document_sentences(
                 sent = sent.strip()
                 if len(sent) > 20:
                     nid = f"doc:{rel_path}:s:{sent_idx}"
-                    nodes.append({
-                        "id": nid,
-                        "content": sent,
-                        "type": "sentence",
-                        "file": rel_path,
-                    })
+                    nodes.append(
+                        {
+                            "id": nid,
+                            "content": sent,
+                            "type": "sentence",
+                            "file": rel_path,
+                        }
+                    )
                     sent_idx += 1
 
     return nodes
@@ -274,15 +294,19 @@ def extract_ast_calls(project_root: Path) -> list[dict[str, Any]]:
             module: str = rel.replace("/", ".").replace(".py", "")
 
             for node in python_ast.walk(tree):
-                if isinstance(node, (python_ast.FunctionDef, python_ast.AsyncFunctionDef)):
+                if isinstance(
+                    node, (python_ast.FunctionDef, python_ast.AsyncFunctionDef)
+                ):
                     qname: str = f"{module}.{node.name}"
-                    nodes.append({
-                        "id": f"func:{qname}",
-                        "content": f"def {node.name}",
-                        "type": "callable",
-                        "file": rel,
-                        "line": node.lineno,
-                    })
+                    nodes.append(
+                        {
+                            "id": f"func:{qname}",
+                            "content": f"def {node.name}",
+                            "type": "callable",
+                            "file": rel,
+                            "line": node.lineno,
+                        }
+                    )
     return nodes
 
 
@@ -314,12 +338,14 @@ def extract_directives(project_root: Path) -> list[dict[str, Any]]:
                 continue
             for pat in directive_patterns:
                 if pat.search(line):
-                    nodes.append({
-                        "id": f"directive:{df}:{i_l}",
-                        "content": line,
-                        "type": "behavioral_belief",
-                        "file": df,
-                    })
+                    nodes.append(
+                        {
+                            "id": f"directive:{df}:{i_l}",
+                            "content": line,
+                            "type": "behavioral_belief",
+                            "file": df,
+                        }
+                    )
                     break
 
     return nodes
@@ -329,12 +355,11 @@ def extract_directives(project_root: Path) -> list[dict[str, Any]]:
 # Retrieval methods
 # ===================================================================
 
+
 def build_fts(nodes: list[dict[str, Any]]) -> sqlite3.Connection:
     """Build in-memory FTS5 index with porter stemming from node list."""
     db: sqlite3.Connection = sqlite3.connect(":memory:")
-    db.execute(
-        "CREATE VIRTUAL TABLE fts USING fts5(id, content, tokenize='porter')"
-    )
+    db.execute("CREATE VIRTUAL TABLE fts USING fts5(id, content, tokenize='porter')")
     for n in nodes:
         content: str = str(n.get("content", ""))
         if len(content) > 10:
@@ -344,7 +369,9 @@ def build_fts(nodes: list[dict[str, Any]]) -> sqlite3.Connection:
 
 
 def search_fts(
-    query: str, fts_db: sqlite3.Connection, top_k: int = TOP_K,
+    query: str,
+    fts_db: sqlite3.Connection,
+    top_k: int = TOP_K,
 ) -> list[tuple[str, float]]:
     """FTS5 search with OR terms + BM25 ranking."""
     terms: list[str] = [t.strip() for t in query.split() if len(t.strip()) > 2]
@@ -366,7 +393,9 @@ def search_fts(
 
 
 def grep_search(
-    query: str, nodes: dict[str, str], top_k: int = TOP_K,
+    query: str,
+    nodes: dict[str, str],
+    top_k: int = TOP_K,
 ) -> list[tuple[str, float]]:
     """Case-insensitive grep ranked by term frequency."""
     query_terms: list[str] = [t.lower() for t in query.split() if len(t) >= 2]
@@ -398,6 +427,7 @@ def estimate_tokens(text: str) -> int:
 # ===================================================================
 # Evaluation
 # ===================================================================
+
 
 def evaluate_method(
     method_name: str,
@@ -443,6 +473,7 @@ def evaluate_method(
 # Main pipeline
 # ===================================================================
 
+
 def main() -> None:
     """Run type-filtered retrieval experiment."""
     print("=" * 60, file=sys.stderr)
@@ -459,7 +490,7 @@ def main() -> None:
     print(f"  Loaded {len(spike_nodes)} belief nodes", file=sys.stderr)
 
     # ------------------------------------------------------------------
-    # Stage 2: Extract multi-layer nodes from alpha-seek
+    # Stage 2: Extract multi-layer nodes from project-a
     # ------------------------------------------------------------------
     print("\n[2/5] Extracting multi-layer nodes...", file=sys.stderr)
 
@@ -472,7 +503,10 @@ def main() -> None:
     doc_nodes: list[dict[str, Any]] = extract_document_sentences(ALPHA_SEEK_ROOT)
     heading_count: int = sum(1 for n in doc_nodes if n["type"] == "heading")
     sentence_count: int = sum(1 for n in doc_nodes if n["type"] == "sentence")
-    print(f"  Doc nodes: {len(doc_nodes)} ({heading_count} headings, {sentence_count} sentences)", file=sys.stderr)
+    print(
+        f"  Doc nodes: {len(doc_nodes)} ({heading_count} headings, {sentence_count} sentences)",
+        file=sys.stderr,
+    )
 
     callable_nodes: list[dict[str, Any]] = extract_ast_calls(ALPHA_SEEK_ROOT)
     print(f"  Callable nodes: {len(callable_nodes)}", file=sys.stderr)
@@ -482,8 +516,12 @@ def main() -> None:
 
     # Combine all nodes
     all_nodes: list[dict[str, Any]] = (
-        spike_nodes + file_nodes + commit_nodes + doc_nodes
-        + callable_nodes + directive_nodes
+        spike_nodes
+        + file_nodes
+        + commit_nodes
+        + doc_nodes
+        + callable_nodes
+        + directive_nodes
     )
     print(f"\n  TOTAL nodes: {len(all_nodes)}", file=sys.stderr)
 
@@ -534,8 +572,10 @@ def main() -> None:
 
     per_topic: dict[str, dict[str, Any]] = {}
     method_names: list[str] = [
-        "grep_unfiltered", "fts5_unfiltered",
-        "grep_filtered", "fts5_filtered",
+        "grep_unfiltered",
+        "fts5_unfiltered",
+        "grep_filtered",
+        "fts5_filtered",
     ]
 
     for topic_name, topic_data in TOPICS.items():
@@ -545,34 +585,54 @@ def main() -> None:
 
         # Unfiltered grep
         grep_unf_results: list[tuple[str, float]] = grep_search(
-            query, all_content, TOP_K,
+            query,
+            all_content,
+            TOP_K,
         )
         grep_unf_eval: dict[str, Any] = evaluate_method(
-            "grep_unfiltered", grep_unf_results, needed, all_content,
+            "grep_unfiltered",
+            grep_unf_results,
+            needed,
+            all_content,
         )
 
         # Unfiltered FTS5
         fts_unf_results: list[tuple[str, float]] = search_fts(
-            query, fts_unfiltered, TOP_K,
+            query,
+            fts_unfiltered,
+            TOP_K,
         )
         fts_unf_eval: dict[str, Any] = evaluate_method(
-            "fts5_unfiltered", fts_unf_results, needed, all_content,
+            "fts5_unfiltered",
+            fts_unf_results,
+            needed,
+            all_content,
         )
 
         # Filtered grep
         grep_filt_results: list[tuple[str, float]] = grep_search(
-            query, filtered_content, TOP_K,
+            query,
+            filtered_content,
+            TOP_K,
         )
         grep_filt_eval: dict[str, Any] = evaluate_method(
-            "grep_filtered", grep_filt_results, needed, filtered_content,
+            "grep_filtered",
+            grep_filt_results,
+            needed,
+            filtered_content,
         )
 
         # Filtered FTS5
         fts_filt_results: list[tuple[str, float]] = search_fts(
-            query, fts_filtered, TOP_K,
+            query,
+            fts_filtered,
+            TOP_K,
         )
         fts_filt_eval: dict[str, Any] = evaluate_method(
-            "fts5_filtered", fts_filt_results, needed, filtered_content,
+            "fts5_filtered",
+            fts_filt_results,
+            needed,
+            filtered_content,
         )
 
         per_topic[topic_name] = {
@@ -659,11 +719,17 @@ def main() -> None:
     print("\n" + "=" * 60, file=sys.stderr)
     print("AGGREGATE RESULTS", file=sys.stderr)
     print("=" * 60, file=sys.stderr)
-    print(f"{'Method':<22s} {'Cov@15':>8s} {'Tokens':>8s} {'Prec':>8s} {'MRR':>8s}", file=sys.stderr)
+    print(
+        f"{'Method':<22s} {'Cov@15':>8s} {'Tokens':>8s} {'Prec':>8s} {'MRR':>8s}",
+        file=sys.stderr,
+    )
     print("-" * 60, file=sys.stderr)
 
     # Show baselines
-    for bl_name, bl_methods in [("Exp47 (586n)", EXP47_BASELINES), ("Exp48 (16Kn)", EXP48_BASELINES)]:
+    for bl_name, bl_methods in [
+        ("Exp47 (586n)", EXP47_BASELINES),
+        ("Exp48 (16Kn)", EXP48_BASELINES),
+    ]:
         for m_name, m_vals in bl_methods.items():
             label: str = f"{bl_name} {m_name}"
             print(

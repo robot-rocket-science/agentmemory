@@ -13,9 +13,9 @@ Hypotheses:
   H6: Grep precision degrades at scale while FTS5 holds
 
 Projects:
-  - alpha-seek: 552 commits, 393 files, 6-topic ground truth
-  - optimus-prime: 1,714 commits, 1,786 files
-  - debserver: 538 commits, 183 files (Rust)
+  - project-a: 552 commits, 393 files, 6-topic ground truth
+  - project-b: 1,714 commits, 1,786 files
+  - project-d: 538 commits, 183 files (Rust)
 """
 
 from __future__ import annotations
@@ -53,36 +53,140 @@ TOP_K: Final[int] = 15
 RNG: Final[np.random.Generator] = np.random.default_rng(42)
 
 ALPHA_SEEK_DB: Final[Path] = Path(
-    "/Users/thelorax/projects/.gsd/workflows/spikes/"
+    "/home/user/projects/.gsd/workflows/spikes/"
     "260406-1-associative-memory-for-gsd-please-explor/"
-    "sandbox/alpha-seek.db"
+    "sandbox/project-a.db"
 )
 
 PROJECTS: Final[dict[str, Path]] = {
-    "alpha-seek": Path("/Users/thelorax/projects/alpha-seek"),
-    "optimus-prime": Path("/Users/thelorax/projects/optimus-prime"),
-    "debserver": Path("/Users/thelorax/projects/debserver"),
+    "project-a": Path("/home/user/projects/project-a"),
+    "project-b": Path("/home/user/projects/project-b"),
+    "project-d": Path("/home/user/projects/project-d"),
 }
 
 SKIP_DIRS: Final[set[str]] = {
-    ".venv", "__pycache__", ".git", "node_modules", ".egg-info",
-    "target", ".mypy_cache", ".pytest_cache", "dist", "build",
+    ".venv",
+    "__pycache__",
+    ".git",
+    "node_modules",
+    ".egg-info",
+    "target",
+    ".mypy_cache",
+    ".pytest_cache",
+    "dist",
+    "build",
 }
 
 STOPWORDS: Final[set[str]] = {
-    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-    "have", "has", "had", "do", "does", "did", "will", "would", "shall",
-    "should", "may", "might", "can", "could", "must", "to", "of", "in",
-    "for", "on", "with", "at", "by", "from", "as", "into", "through",
-    "during", "before", "after", "above", "below", "between", "but",
-    "and", "or", "nor", "not", "no", "so", "if", "then", "than",
-    "too", "very", "just", "about", "up", "out", "off", "over",
-    "under", "again", "further", "once", "here", "there", "when",
-    "where", "why", "how", "all", "each", "every", "both", "few",
-    "more", "most", "other", "some", "such", "only", "own", "same",
-    "that", "this", "these", "those", "what", "which", "who", "whom",
-    "it", "its", "he", "she", "they", "them", "his", "her", "their",
-    "we", "us", "our", "you", "your", "i", "me", "my",
+    "the",
+    "a",
+    "an",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "being",
+    "have",
+    "has",
+    "had",
+    "do",
+    "does",
+    "did",
+    "will",
+    "would",
+    "shall",
+    "should",
+    "may",
+    "might",
+    "can",
+    "could",
+    "must",
+    "to",
+    "of",
+    "in",
+    "for",
+    "on",
+    "with",
+    "at",
+    "by",
+    "from",
+    "as",
+    "into",
+    "through",
+    "during",
+    "before",
+    "after",
+    "above",
+    "below",
+    "between",
+    "but",
+    "and",
+    "or",
+    "nor",
+    "not",
+    "no",
+    "so",
+    "if",
+    "then",
+    "than",
+    "too",
+    "very",
+    "just",
+    "about",
+    "up",
+    "out",
+    "off",
+    "over",
+    "under",
+    "again",
+    "further",
+    "once",
+    "here",
+    "there",
+    "when",
+    "where",
+    "why",
+    "how",
+    "all",
+    "each",
+    "every",
+    "both",
+    "few",
+    "more",
+    "most",
+    "other",
+    "some",
+    "such",
+    "only",
+    "own",
+    "same",
+    "that",
+    "this",
+    "these",
+    "those",
+    "what",
+    "which",
+    "who",
+    "whom",
+    "it",
+    "its",
+    "he",
+    "she",
+    "they",
+    "them",
+    "his",
+    "her",
+    "their",
+    "we",
+    "us",
+    "our",
+    "you",
+    "your",
+    "i",
+    "me",
+    "my",
 }
 
 BEHAVIORAL_DECISIONS: Final[list[str]] = ["D157", "D188", "D100", "D073"]
@@ -119,6 +223,7 @@ TOPICS: Final[dict[str, dict[str, Any]]] = {
 # HRR Core
 # ===================================================================
 
+
 def make_vec(dim: int) -> NDArr:
     """Unit-norm random vector in R^dim."""
     v: NDArr = RNG.standard_normal(dim).astype(np.float64)
@@ -153,6 +258,7 @@ def cos_sim(a: NDArr, b: NDArr) -> float:
 # ===================================================================
 # HRR Graph with decision-neighborhood partitioning
 # ===================================================================
+
 
 class HRRGraph:
     """HRR-encoded partitioned graph for multi-layer edges."""
@@ -231,33 +337,36 @@ class HRRGraph:
 
 
 # ===================================================================
-# Spike DB loader (alpha-seek 586 belief nodes)
+# Spike DB loader (project-a 586 belief nodes)
 # ===================================================================
 
+
 def load_spike_nodes() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Load all active nodes and edges from the alpha-seek spike DB."""
+    """Load all active nodes and edges from the project-a spike DB."""
     db: sqlite3.Connection = sqlite3.connect(str(ALPHA_SEEK_DB))
     nodes: list[dict[str, Any]] = []
     for row in db.execute(
         "SELECT id, content, category FROM mem_nodes WHERE superseded_by IS NULL"
     ):
-        nodes.append({
-            "id": str(row[0]),
-            "content": str(row[1]),
-            "type": "belief",
-            "category": str(row[2]),
-        })
+        nodes.append(
+            {
+                "id": str(row[0]),
+                "content": str(row[1]),
+                "type": "belief",
+                "category": str(row[2]),
+            }
+        )
 
     edges: list[dict[str, Any]] = []
-    for row in db.execute(
-        "SELECT from_id, to_id, edge_type, weight FROM mem_edges"
-    ):
-        edges.append({
-            "src": str(row[0]),
-            "tgt": str(row[1]),
-            "type": str(row[2]),
-            "weight": float(row[3]),
-        })
+    for row in db.execute("SELECT from_id, to_id, edge_type, weight FROM mem_edges"):
+        edges.append(
+            {
+                "src": str(row[0]),
+                "tgt": str(row[1]),
+                "type": str(row[2]),
+                "weight": float(row[3]),
+            }
+        )
     db.close()
     return nodes, edges
 
@@ -265,6 +374,7 @@ def load_spike_nodes() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
 # ===================================================================
 # Extractors (adapted from Exp 45)
 # ===================================================================
+
 
 def discover(project_root: Path) -> dict[str, Any]:
     """Auto-detect available signals in a project directory."""
@@ -274,7 +384,9 @@ def discover(project_root: Path) -> dict[str, Any]:
     if manifest["has_git"]:
         r: subprocess.CompletedProcess[str] = subprocess.run(
             ["git", "rev-list", "--count", "HEAD"],
-            capture_output=True, text=True, cwd=project_root,
+            capture_output=True,
+            text=True,
+            cwd=project_root,
         )
         manifest["commit_count"] = int(r.stdout.strip()) if r.returncode == 0 else 0
     else:
@@ -307,7 +419,8 @@ def discover(project_root: Path) -> dict[str, Any]:
     doc_exts: set[str] = {".md", ".rst", ".txt", ".adoc"}
     manifest["doc_files"] = [
         str(f.relative_to(project_root))
-        for f in all_files if f.suffix.lower() in doc_exts
+        for f in all_files
+        if f.suffix.lower() in doc_exts
     ]
     manifest["doc_count"] = len(manifest["doc_files"])
 
@@ -337,7 +450,9 @@ def discover(project_root: Path) -> dict[str, Any]:
     return manifest
 
 
-def extract_file_tree(project_root: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def extract_file_tree(
+    project_root: Path,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Extract file tree nodes and CONTAINS edges."""
     nodes: list[dict[str, Any]] = []
     edges: list[dict[str, Any]] = []
@@ -350,9 +465,13 @@ def extract_file_tree(project_root: Path) -> tuple[list[dict[str, Any]], list[di
             fp: Path = Path(root) / f
             rel: str = str(fp.relative_to(project_root))
             nodes.append({"id": f"file:{rel}", "content": f, "type": "file"})
-            edges.append({
-                "src": f"dir:{rel_dir}", "tgt": f"file:{rel}", "type": "CONTAINS",
-            })
+            edges.append(
+                {
+                    "src": f"dir:{rel_dir}",
+                    "tgt": f"file:{rel}",
+                    "type": "CONTAINS",
+                }
+            )
 
     return nodes, edges
 
@@ -363,7 +482,9 @@ def extract_git_history(
     """Extract commit nodes + COMMIT_TOUCHES + CO_CHANGED + TEMPORAL_NEXT edges."""
     r: subprocess.CompletedProcess[str] = subprocess.run(
         ["git", "log", "--name-only", "--format=COMMIT:%H|%s|%aI", "--no-merges"],
-        capture_output=True, text=True, cwd=project_root,
+        capture_output=True,
+        text=True,
+        cwd=project_root,
     )
 
     nodes: list[dict[str, Any]] = []
@@ -384,22 +505,27 @@ def extract_git_history(
         if current_files and current_msg:
             if not current_msg.lower().startswith(("merge", "wip")):
                 commit_id: str = f"commit:{current_hash[:8]}"
-                nodes.append({
-                    "id": commit_id,
-                    "content": current_msg,
-                    "type": "commit",
-                    "date": current_date,
-                })
+                nodes.append(
+                    {
+                        "id": commit_id,
+                        "content": current_msg,
+                        "type": "commit",
+                        "date": current_date,
+                    }
+                )
                 commit_order.append(commit_id)
                 commit_dates[commit_id] = current_date
                 for cf in current_files:
-                    edges.append({
-                        "src": commit_id, "tgt": f"file:{cf}",
-                        "type": "COMMIT_TOUCHES",
-                    })
+                    edges.append(
+                        {
+                            "src": commit_id,
+                            "tgt": f"file:{cf}",
+                            "type": "COMMIT_TOUCHES",
+                        }
+                    )
             # Co-change regardless of merge/wip
             for i_f, a in enumerate(current_files):
-                for b in current_files[i_f + 1:]:
+                for b in current_files[i_f + 1 :]:
                     pair: tuple[str, str] = tuple(sorted([a, b]))  # type: ignore[assignment]
                     co_change_raw[pair] += 1
         current_msg = ""
@@ -423,24 +549,32 @@ def extract_git_history(
     # CO_CHANGED edges (weight >= 3)
     for (a, b), weight in co_change_raw.items():
         if weight >= 3:
-            edges.append({
-                "src": f"file:{a}", "tgt": f"file:{b}",
-                "type": "CO_CHANGED", "weight": weight,
-            })
+            edges.append(
+                {
+                    "src": f"file:{a}",
+                    "tgt": f"file:{b}",
+                    "type": "CO_CHANGED",
+                    "weight": weight,
+                }
+            )
 
     # TEMPORAL_NEXT edges: git log returns newest first, so reverse
     commit_order.reverse()
     for i_c in range(len(commit_order) - 1):
-        edges.append({
-            "src": commit_order[i_c], "tgt": commit_order[i_c + 1],
-            "type": "TEMPORAL_NEXT",
-        })
+        edges.append(
+            {
+                "src": commit_order[i_c],
+                "tgt": commit_order[i_c + 1],
+                "type": "TEMPORAL_NEXT",
+            }
+        )
 
     return nodes, edges
 
 
 def extract_document_sentences(
-    project_root: Path, doc_files: list[str],
+    project_root: Path,
+    doc_files: list[str],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Split markdown docs into sentence-level nodes + cross-level edges."""
     nodes: list[dict[str, Any]] = []
@@ -469,23 +603,31 @@ def extract_document_sentences(
             if para.startswith("#"):
                 if len(current_section_ids) > 1:
                     for i_s in range(len(current_section_ids) - 1):
-                        edges.append({
-                            "src": current_section_ids[i_s],
-                            "tgt": current_section_ids[i_s + 1],
-                            "type": "WITHIN_SECTION",
-                        })
+                        edges.append(
+                            {
+                                "src": current_section_ids[i_s],
+                                "tgt": current_section_ids[i_s + 1],
+                                "type": "WITHIN_SECTION",
+                            }
+                        )
                 current_section_ids = []
 
                 nid: str = f"doc:{rel_path}:h:{sent_idx}"
-                nodes.append({
-                    "id": nid,
-                    "content": para.lstrip("#").strip(),
-                    "type": "heading",
-                    "file": rel_path,
-                })
-                edges.append({
-                    "src": nid, "tgt": file_node_id, "type": "SENTENCE_IN_FILE",
-                })
+                nodes.append(
+                    {
+                        "id": nid,
+                        "content": para.lstrip("#").strip(),
+                        "type": "heading",
+                        "file": rel_path,
+                    }
+                )
+                edges.append(
+                    {
+                        "src": nid,
+                        "tgt": file_node_id,
+                        "type": "SENTENCE_IN_FILE",
+                    }
+                )
                 current_section_ids.append(nid)
                 sent_idx += 1
                 continue
@@ -495,32 +637,40 @@ def extract_document_sentences(
                 sent = sent.strip()
                 if len(sent) > 20:
                     nid = f"doc:{rel_path}:s:{sent_idx}"
-                    nodes.append({
-                        "id": nid,
-                        "content": sent,
-                        "type": "sentence",
-                        "file": rel_path,
-                    })
-                    edges.append({
-                        "src": nid, "tgt": file_node_id,
-                        "type": "SENTENCE_IN_FILE",
-                    })
+                    nodes.append(
+                        {
+                            "id": nid,
+                            "content": sent,
+                            "type": "sentence",
+                            "file": rel_path,
+                        }
+                    )
+                    edges.append(
+                        {
+                            "src": nid,
+                            "tgt": file_node_id,
+                            "type": "SENTENCE_IN_FILE",
+                        }
+                    )
                     current_section_ids.append(nid)
                     sent_idx += 1
 
         if len(current_section_ids) > 1:
             for i_s in range(len(current_section_ids) - 1):
-                edges.append({
-                    "src": current_section_ids[i_s],
-                    "tgt": current_section_ids[i_s + 1],
-                    "type": "WITHIN_SECTION",
-                })
+                edges.append(
+                    {
+                        "src": current_section_ids[i_s],
+                        "tgt": current_section_ids[i_s + 1],
+                        "type": "WITHIN_SECTION",
+                    }
+                )
 
     return nodes, edges
 
 
 def extract_ast_calls(
-    project_root: Path, languages: list[str],
+    project_root: Path,
+    languages: list[str],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Extract callable nodes and CALLS edges from Python AST."""
     import ast as python_ast
@@ -529,12 +679,44 @@ def extract_ast_calls(
         return [], []
 
     builtins: set[str] = {
-        "print", "len", "range", "enumerate", "zip", "map", "filter",
-        "sorted", "reversed", "isinstance", "issubclass", "hasattr",
-        "getattr", "setattr", "type", "super", "str", "int", "float",
-        "bool", "list", "dict", "set", "tuple", "open", "abs", "min",
-        "max", "sum", "any", "all", "next", "iter", "ValueError",
-        "TypeError", "KeyError", "RuntimeError", "Exception",
+        "print",
+        "len",
+        "range",
+        "enumerate",
+        "zip",
+        "map",
+        "filter",
+        "sorted",
+        "reversed",
+        "isinstance",
+        "issubclass",
+        "hasattr",
+        "getattr",
+        "setattr",
+        "type",
+        "super",
+        "str",
+        "int",
+        "float",
+        "bool",
+        "list",
+        "dict",
+        "set",
+        "tuple",
+        "open",
+        "abs",
+        "min",
+        "max",
+        "sum",
+        "any",
+        "all",
+        "next",
+        "iter",
+        "ValueError",
+        "TypeError",
+        "KeyError",
+        "RuntimeError",
+        "Exception",
     }
 
     nodes: list[dict[str, Any]] = []
@@ -557,16 +739,20 @@ def extract_ast_calls(
 
             func_names: set[str] = set()
             for node in python_ast.walk(tree):
-                if isinstance(node, (python_ast.FunctionDef, python_ast.AsyncFunctionDef)):
+                if isinstance(
+                    node, (python_ast.FunctionDef, python_ast.AsyncFunctionDef)
+                ):
                     qname: str = f"{module}.{node.name}"
                     func_names.add(node.name)
-                    nodes.append({
-                        "id": f"func:{qname}",
-                        "content": f"def {node.name}",
-                        "type": "callable",
-                        "file": rel,
-                        "line": node.lineno,
-                    })
+                    nodes.append(
+                        {
+                            "id": f"func:{qname}",
+                            "content": f"def {node.name}",
+                            "type": "callable",
+                            "file": rel,
+                            "line": node.lineno,
+                        }
+                    )
 
             for node in python_ast.walk(tree):
                 if not isinstance(node, python_ast.Call):
@@ -578,17 +764,21 @@ def extract_ast_calls(
                     callee = node.func.attr
 
                 if callee and callee in func_names and callee not in builtins:
-                    edges.append({
-                        "src": f"file:{rel}",
-                        "tgt": f"func:{module}.{callee}",
-                        "type": "CALLS",
-                    })
+                    edges.append(
+                        {
+                            "src": f"file:{rel}",
+                            "tgt": f"func:{module}.{callee}",
+                            "type": "CALLS",
+                        }
+                    )
 
     return nodes, edges
 
 
 def extract_citations(
-    project_root: Path, doc_files: list[str], citation_regex: str | None,
+    project_root: Path,
+    doc_files: list[str],
+    citation_regex: str | None,
 ) -> list[dict[str, Any]]:
     """Extract CITES edges from citation patterns in documents."""
     if not citation_regex:
@@ -610,19 +800,24 @@ def extract_citations(
 
     files_list: list[str] = list(file_citations.keys())
     for i_f, a in enumerate(files_list):
-        for b in files_list[i_f + 1:]:
+        for b in files_list[i_f + 1 :]:
             shared: set[str] = file_citations[a] & file_citations[b]
             if shared:
-                edges.append({
-                    "src": f"file:{a}", "tgt": f"file:{b}",
-                    "type": "CITES", "shared": sorted(shared),
-                })
+                edges.append(
+                    {
+                        "src": f"file:{a}",
+                        "tgt": f"file:{b}",
+                        "type": "CITES",
+                        "shared": sorted(shared),
+                    }
+                )
 
     return edges
 
 
 def extract_directives(
-    project_root: Path, directive_files: list[str],
+    project_root: Path,
+    directive_files: list[str],
 ) -> list[dict[str, Any]]:
     """Extract behavioral belief nodes from directive files."""
     nodes: list[dict[str, Any]] = []
@@ -650,12 +845,14 @@ def extract_directives(
                 continue
             for pat in directive_patterns:
                 if pat.search(line):
-                    nodes.append({
-                        "id": f"directive:{df}:{i_l}",
-                        "content": line,
-                        "type": "behavioral_belief",
-                        "file": df,
-                    })
+                    nodes.append(
+                        {
+                            "id": f"directive:{df}:{i_l}",
+                            "content": line,
+                            "type": "behavioral_belief",
+                            "file": df,
+                        }
+                    )
                     break
 
     return nodes
@@ -665,8 +862,10 @@ def extract_directives(
 # Graph analysis
 # ===================================================================
 
+
 def analyze_graph(
-    all_nodes: list[dict[str, Any]], all_edges: list[dict[str, Any]],
+    all_nodes: list[dict[str, Any]],
+    all_edges: list[dict[str, Any]],
 ) -> dict[str, Any]:
     """Compute graph connectivity, degree distribution, type counts."""
     node_ids: set[str] = {n["id"] for n in all_nodes}
@@ -725,12 +924,11 @@ def analyze_graph(
 # Retrieval methods
 # ===================================================================
 
+
 def build_fts(nodes: list[dict[str, Any]]) -> sqlite3.Connection:
     """Build in-memory FTS5 index with porter stemming from node list."""
     db: sqlite3.Connection = sqlite3.connect(":memory:")
-    db.execute(
-        "CREATE VIRTUAL TABLE fts USING fts5(id, content, tokenize='porter')"
-    )
+    db.execute("CREATE VIRTUAL TABLE fts USING fts5(id, content, tokenize='porter')")
     for n in nodes:
         content: str = str(n.get("content", ""))
         if len(content) > 10:
@@ -740,7 +938,9 @@ def build_fts(nodes: list[dict[str, Any]]) -> sqlite3.Connection:
 
 
 def search_fts(
-    query: str, fts_db: sqlite3.Connection, top_k: int = TOP_K,
+    query: str,
+    fts_db: sqlite3.Connection,
+    top_k: int = TOP_K,
 ) -> list[tuple[str, float]]:
     """FTS5 search with OR terms. Returns (node_id, bm25_score)."""
     terms: list[str] = [t.strip() for t in query.split() if len(t.strip()) > 2]
@@ -762,7 +962,9 @@ def search_fts(
 
 
 def grep_search(
-    query: str, nodes: dict[str, str], top_k: int = TOP_K,
+    query: str,
+    nodes: dict[str, str],
+    top_k: int = TOP_K,
 ) -> list[tuple[str, float]]:
     """Case-insensitive grep ranked by term frequency."""
     query_terms: list[str] = [t.lower() for t in query.split() if len(t) >= 2]
@@ -794,6 +996,7 @@ def estimate_tokens(text: str) -> int:
 # ===================================================================
 # Partition builder for multi-layer HRR
 # ===================================================================
+
 
 def assign_node_to_decision(
     node_id: str,
@@ -873,7 +1076,7 @@ def build_partitions(
         if len(edges_for_d) > 200:
             # Too large for one partition -- chunk it
             for chunk_start in range(0, len(edges_for_d), 150):
-                chunk: list[EdgeTriple] = edges_for_d[chunk_start:chunk_start + 150]
+                chunk: list[EdgeTriple] = edges_for_d[chunk_start : chunk_start + 150]
                 partitions[f"dec_{did}_{chunk_start}"] = chunk
         elif len(edges_for_d) < 10:
             # Too small -- merge with buffer
@@ -890,7 +1093,7 @@ def build_partitions(
 
     # Unassigned edges in chunks
     for chunk_start in range(0, len(unassigned), 150):
-        chunk = unassigned[chunk_start:chunk_start + 150]
+        chunk = unassigned[chunk_start : chunk_start + 150]
         partitions[f"misc_{chunk_start}"] = chunk
 
     return partitions
@@ -899,6 +1102,7 @@ def build_partitions(
 # ===================================================================
 # Evaluation
 # ===================================================================
+
 
 def evaluate_method(
     method_name: str,
@@ -944,6 +1148,7 @@ def evaluate_method(
 # Temporal edge analysis (H3)
 # ===================================================================
 
+
 def find_temporal_unique_paths(
     all_edges: list[dict[str, Any]],
     node_content: dict[str, str],
@@ -972,7 +1177,9 @@ def find_temporal_unique_paths(
             non_temporal_adj[tgt].add(src)
 
     # Build set of nodes reachable via CITES/CALLS/CO_CHANGED (non-temporal)
-    def bfs_reachable(start_nodes: set[str], adj: dict[str, set[str]], max_hops: int) -> set[str]:
+    def bfs_reachable(
+        start_nodes: set[str], adj: dict[str, set[str]], max_hops: int
+    ) -> set[str]:
         visited: set[str] = set()
         frontier: set[str] = set(start_nodes)
         for _hop in range(max_hops):
@@ -988,7 +1195,9 @@ def find_temporal_unique_paths(
         return visited
 
     # For temporal reachability: follow TEMPORAL_NEXT then COMMIT_TOUCHES
-    def temporal_reachable(start_commits: set[str], max_temporal_hops: int = 5) -> set[str]:
+    def temporal_reachable(
+        start_commits: set[str], max_temporal_hops: int = 5
+    ) -> set[str]:
         """From commit nodes, walk TEMPORAL_NEXT then COMMIT_TOUCHES."""
         reachable: set[str] = set()
         # Walk temporal edges from start commits
@@ -1074,6 +1283,7 @@ def find_temporal_unique_paths(
 # Full pipeline for one project
 # ===================================================================
 
+
 def run_project(
     name: str,
     project_root: Path,
@@ -1087,16 +1297,14 @@ def run_project(
 
     # Stage 1: Discover
     manifest: dict[str, Any] = discover(project_root)
-    result["manifest"] = {
-        k: v for k, v in manifest.items() if k != "doc_files"
-    }
+    result["manifest"] = {k: v for k, v in manifest.items() if k != "doc_files"}
     result["manifest"]["doc_count"] = manifest["doc_count"]
 
     # Stage 2: Extract all layers
     all_nodes: list[dict[str, Any]] = []
     all_edges: list[dict[str, Any]] = []
 
-    # Preloaded spike DB nodes (alpha-seek only)
+    # Preloaded spike DB nodes (project-a only)
     if preloaded_nodes:
         all_nodes.extend(preloaded_nodes)
         result["preloaded_nodes"] = len(preloaded_nodes)
@@ -1121,7 +1329,8 @@ def run_project(
     # Document sentences
     if manifest["doc_count"] > 0:
         doc_nodes, doc_edges = extract_document_sentences(
-            project_root, manifest["doc_files"],
+            project_root,
+            manifest["doc_files"],
         )
         all_nodes.extend(doc_nodes)
         all_edges.extend(doc_edges)
@@ -1138,7 +1347,9 @@ def run_project(
     # Citations
     if manifest["citation_regex"]:
         cite_edges: list[dict[str, Any]] = extract_citations(
-            project_root, manifest["doc_files"], manifest["citation_regex"],
+            project_root,
+            manifest["doc_files"],
+            manifest["citation_regex"],
         )
         all_edges.extend(cite_edges)
         result["citation_edges"] = len(cite_edges)
@@ -1146,7 +1357,8 @@ def run_project(
     # Directives
     if manifest["directives"]:
         dir_nodes: list[dict[str, Any]] = extract_directives(
-            project_root, manifest["directives"],
+            project_root,
+            manifest["directives"],
         )
         all_nodes.extend(dir_nodes)
         result["directive_nodes"] = len(dir_nodes)
@@ -1169,13 +1381,16 @@ def run_project(
 # Alpha-seek retrieval comparison
 # ===================================================================
 
-def run_alpha_seek_retrieval(
+
+def run_project_a_retrieval(
     all_nodes: list[dict[str, Any]],
     all_edges: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    """Run grep vs FTS5 vs FTS5+HRR on alpha-seek 6-topic ground truth."""
+    """Run grep vs FTS5 vs FTS5+HRR on project-a 6-topic ground truth."""
     # Build node content dict
-    node_content: dict[str, str] = {n["id"]: str(n.get("content", "")) for n in all_nodes}
+    node_content: dict[str, str] = {
+        n["id"]: str(n.get("content", "")) for n in all_nodes
+    }
 
     # Build FTS5 index
     fts_db: sqlite3.Connection = build_fts(all_nodes)
@@ -1195,11 +1410,18 @@ def run_alpha_seek_retrieval(
     partition_stats["over_capacity_count"] = over_capacity
     partition_stats["over_capacity_frac"] = round(over_capacity / max(1, len(sizes)), 3)
     partition_stats["max_partition_size"] = max(sizes) if sizes else 0
-    partition_stats["mean_partition_size"] = round(float(np.mean(sizes)), 1) if sizes else 0.0
-    partition_stats["median_partition_size"] = round(float(np.median(sizes)), 1) if sizes else 0.0
+    partition_stats["mean_partition_size"] = (
+        round(float(np.mean(sizes)), 1) if sizes else 0.0
+    )
+    partition_stats["median_partition_size"] = (
+        round(float(np.median(sizes)), 1) if sizes else 0.0
+    )
 
-    print(f"  Partitions: {len(partitions)}, max={max(sizes) if sizes else 0}, "
-          f"over capacity: {over_capacity}/{len(sizes)}", file=sys.stderr)
+    print(
+        f"  Partitions: {len(partitions)}, max={max(sizes) if sizes else 0}, "
+        f"over capacity: {over_capacity}/{len(sizes)}",
+        file=sys.stderr,
+    )
 
     # Encode HRR graph
     print("  Encoding HRR graph...", file=sys.stderr)
@@ -1223,13 +1445,19 @@ def run_alpha_seek_retrieval(
         # Method A: Grep
         grep_results: list[tuple[str, float]] = grep_search(query, node_content, TOP_K)
         grep_eval: dict[str, Any] = evaluate_method(
-            "grep", grep_results, needed, node_content,
+            "grep",
+            grep_results,
+            needed,
+            node_content,
         )
 
         # Method B: FTS5
         fts_results: list[tuple[str, float]] = search_fts(query, fts_db, TOP_K)
         fts_eval: dict[str, Any] = evaluate_method(
-            "fts5", fts_results, needed, node_content,
+            "fts5",
+            fts_results,
+            needed,
+            node_content,
         )
 
         # Method C: FTS5 + HRR
@@ -1240,7 +1468,10 @@ def run_alpha_seek_retrieval(
         for seed_id, _bm25 in fts_seeds:
             for etype in edge_types_to_walk:
                 neighbors: list[tuple[str, float]] = hrr.query_single_hop(
-                    seed_id, etype, top_k=10, threshold=HRR_THRESHOLD,
+                    seed_id,
+                    etype,
+                    top_k=10,
+                    threshold=HRR_THRESHOLD,
                 )
                 for neighbor_id, sim in neighbors:
                     if neighbor_id not in fts_ids:
@@ -1260,7 +1491,10 @@ def run_alpha_seek_retrieval(
         combined = combined[:TOP_K]
 
         hrr_eval: dict[str, Any] = evaluate_method(
-            "fts5_hrr", combined, needed, node_content,
+            "fts5_hrr",
+            combined,
+            needed,
+            node_content,
         )
 
         per_topic[topic_name] = {
@@ -1328,6 +1562,7 @@ def run_alpha_seek_retrieval(
 # Main
 # ===================================================================
 
+
 def main() -> None:
     print("=" * 70, file=sys.stderr)
     print("Experiment 48: Multi-Layer Extraction + Retrieval at Scale", file=sys.stderr)
@@ -1336,40 +1571,53 @@ def main() -> None:
     all_results: dict[str, Any] = {}
 
     for name, project_root in PROJECTS.items():
-        print(f"\n{'='*60}", file=sys.stderr)
+        print(f"\n{'=' * 60}", file=sys.stderr)
         print(f"Project: {name} ({project_root})", file=sys.stderr)
-        print(f"{'='*60}", file=sys.stderr)
+        print(f"{'=' * 60}", file=sys.stderr)
 
-        # For alpha-seek, preload spike DB nodes
+        # For project-a, preload spike DB nodes
         preloaded_nodes: list[dict[str, Any]] | None = None
         preloaded_edges: list[dict[str, Any]] | None = None
-        if name == "alpha-seek":
+        if name == "project-a":
             print("  Loading spike DB (586 belief nodes)...", file=sys.stderr)
             preloaded_nodes, preloaded_edges = load_spike_nodes()
-            print(f"  Loaded {len(preloaded_nodes)} nodes, {len(preloaded_edges)} edges", file=sys.stderr)
+            print(
+                f"  Loaded {len(preloaded_nodes)} nodes, {len(preloaded_edges)} edges",
+                file=sys.stderr,
+            )
 
         result: dict[str, Any] = run_project(
-            name, project_root, preloaded_nodes, preloaded_edges,
+            name,
+            project_root,
+            preloaded_nodes,
+            preloaded_edges,
         )
 
         # Summary
         g: dict[str, Any] = result["graph"]
-        print(f"\n  Graph: {g['total_nodes']} nodes, {g['total_edges']} edges", file=sys.stderr)
-        print(f"  LCC: {g['largest_component']} ({g['largest_component_frac']:.0%})", file=sys.stderr)
+        print(
+            f"\n  Graph: {g['total_nodes']} nodes, {g['total_edges']} edges",
+            file=sys.stderr,
+        )
+        print(
+            f"  LCC: {g['largest_component']} ({g['largest_component_frac']:.0%})",
+            file=sys.stderr,
+        )
         print(f"  Components: {g['num_components']}", file=sys.stderr)
         print(f"  Node types: {g['node_types']}", file=sys.stderr)
         print(f"  Edge types: {g['edge_types']}", file=sys.stderr)
         print(f"  Extraction time: {result['extraction_time_s']}s", file=sys.stderr)
 
-        # Retrieval comparison (alpha-seek only)
-        if name == "alpha-seek":
+        # Retrieval comparison (project-a only)
+        if name == "project-a":
             print(f"\n  --- Retrieval Comparison (K={TOP_K}) ---", file=sys.stderr)
-            retrieval_result: dict[str, Any] = run_alpha_seek_retrieval(
-                result["_nodes"], result["_edges"],
+            retrieval_result: dict[str, Any] = run_project_a_retrieval(
+                result["_nodes"],
+                result["_edges"],
             )
             result["retrieval"] = retrieval_result
 
-            print(f"\n  --- Aggregates ---", file=sys.stderr)
+            print("\n  --- Aggregates ---", file=sys.stderr)
             for method, agg in retrieval_result["aggregates"].items():
                 print(
                     f"    {method:10s}: cov={agg['micro_coverage']:.0%} "
@@ -1381,12 +1629,14 @@ def main() -> None:
                 )
 
             # Temporal edge analysis (H3)
-            print(f"\n  --- Temporal Edge Analysis (H3) ---", file=sys.stderr)
+            print("\n  --- Temporal Edge Analysis (H3) ---", file=sys.stderr)
             node_content: dict[str, str] = {
                 n["id"]: str(n.get("content", "")) for n in result["_nodes"]
             }
             temporal_results: dict[str, dict[str, Any]] = find_temporal_unique_paths(
-                result["_edges"], node_content, TOPICS,
+                result["_edges"],
+                node_content,
+                TOPICS,
             )
             result["temporal_analysis"] = temporal_results
 
@@ -1402,8 +1652,11 @@ def main() -> None:
                     f"unique={'YES' if unique else 'no'}",
                     file=sys.stderr,
                 )
-            print(f"\n  H3 result: Temporal edges provide unique signal: "
-                  f"{'YES' if any_unique_temporal else 'NO'}", file=sys.stderr)
+            print(
+                f"\n  H3 result: Temporal edges provide unique signal: "
+                f"{'YES' if any_unique_temporal else 'NO'}",
+                file=sys.stderr,
+            )
 
         # Strip internal data before saving
         result.pop("_nodes", None)
@@ -1414,11 +1667,11 @@ def main() -> None:
     # Hypothesis summary
     # ===================================================================
 
-    print(f"\n{'='*70}", file=sys.stderr)
+    print(f"\n{'=' * 70}", file=sys.stderr)
     print("HYPOTHESIS SUMMARY", file=sys.stderr)
-    print(f"{'='*70}", file=sys.stderr)
+    print(f"{'=' * 70}", file=sys.stderr)
 
-    as_result: dict[str, Any] = all_results.get("alpha-seek", {})
+    as_result: dict[str, Any] = all_results.get("project-a", {})
     retrieval: dict[str, Any] = as_result.get("retrieval", {})
     aggs: dict[str, dict[str, Any]] = retrieval.get("aggregates", {})
 
@@ -1433,51 +1686,65 @@ def main() -> None:
         h2: bool = hrr_cov > fts_cov
         h6: bool = fts_prec > grep_prec
 
-        print(f"\n  H1 (FTS5 > grep at scale):", file=sys.stderr)
+        print("\n  H1 (FTS5 > grep at scale):", file=sys.stderr)
         print(f"    grep coverage: {grep_cov:.0%}", file=sys.stderr)
         print(f"    FTS5 coverage: {fts_cov:.0%}", file=sys.stderr)
         print(f"    Result: {'PASS' if h1 else 'FAIL'}", file=sys.stderr)
 
-        print(f"\n  H2 (FTS5+HRR > FTS5):", file=sys.stderr)
+        print("\n  H2 (FTS5+HRR > FTS5):", file=sys.stderr)
         print(f"    FTS5 coverage: {fts_cov:.0%}", file=sys.stderr)
         print(f"    FTS5+HRR coverage: {hrr_cov:.0%}", file=sys.stderr)
         print(f"    Result: {'PASS' if h2 else 'FAIL'}", file=sys.stderr)
 
         temporal: dict[str, dict[str, Any]] = as_result.get("temporal_analysis", {})
         h3: bool = any(bool(v.get("unique_temporal_signal")) for v in temporal.values())
-        print(f"\n  H3 (Temporal unique signal): {'PASS' if h3 else 'FAIL'}", file=sys.stderr)
+        print(
+            f"\n  H3 (Temporal unique signal): {'PASS' if h3 else 'FAIL'}",
+            file=sys.stderr,
+        )
 
         ps: dict[str, Any] = retrieval.get("partition_stats", {})
         if ps:
             over_frac: float = ps.get("over_capacity_frac", 1.0)
             h4_pass: bool = over_frac <= 0.10
-            print(f"\n  H4 (90%+ partitions within capacity):", file=sys.stderr)
-            print(f"    Over-capacity: {ps.get('over_capacity_count', 0)}/{ps.get('total_partitions', 0)}"
-                  f" ({over_frac:.0%})", file=sys.stderr)
+            print("\n  H4 (90%+ partitions within capacity):", file=sys.stderr)
+            print(
+                f"    Over-capacity: {ps.get('over_capacity_count', 0)}/{ps.get('total_partitions', 0)}"
+                f" ({over_frac:.0%})",
+                file=sys.stderr,
+            )
             print(f"    Result: {'PASS' if h4_pass else 'FAIL'}", file=sys.stderr)
 
         # H5: extraction time
-        print(f"\n  H5 (Extraction scales linearly):", file=sys.stderr)
+        print("\n  H5 (Extraction scales linearly):", file=sys.stderr)
         for proj_name, proj_result in all_results.items():
             t_ext: float = proj_result.get("extraction_time_s", 0.0)
             nodes_count: int = proj_result.get("graph", {}).get("total_nodes", 0)
-            print(f"    {proj_name:15s}: {t_ext:.2f}s, {nodes_count} nodes", file=sys.stderr)
+            print(
+                f"    {proj_name:15s}: {t_ext:.2f}s, {nodes_count} nodes",
+                file=sys.stderr,
+            )
 
-        print(f"\n  H6 (Grep precision degrades):", file=sys.stderr)
+        print("\n  H6 (Grep precision degrades):", file=sys.stderr)
         print(f"    grep precision: {grep_prec:.0%}", file=sys.stderr)
         print(f"    FTS5 precision: {fts_prec:.0%}", file=sys.stderr)
         print(f"    Result: {'PASS' if h6 else 'FAIL'}", file=sys.stderr)
 
         # Comparison to Exp 47 baseline (586 nodes)
-        print(f"\n  --- Comparison to Exp 47 (586 nodes) ---", file=sys.stderr)
-        print(f"  Exp 47: grep=92%, FTS5=85%, FTS5+HRR=85%", file=sys.stderr)
+        print("\n  --- Comparison to Exp 47 (586 nodes) ---", file=sys.stderr)
+        print("  Exp 47: grep=92%, FTS5=85%, FTS5+HRR=85%", file=sys.stderr)
         n_nodes: int = as_result.get("graph", {}).get("total_nodes", 0)
-        print(f"  Exp 48 ({n_nodes} nodes): grep={grep_cov:.0%}, "
-              f"FTS5={fts_cov:.0%}, FTS5+HRR={hrr_cov:.0%}", file=sys.stderr)
+        print(
+            f"  Exp 48 ({n_nodes} nodes): grep={grep_cov:.0%}, "
+            f"FTS5={fts_cov:.0%}, FTS5+HRR={hrr_cov:.0%}",
+            file=sys.stderr,
+        )
 
     # Save results
     results_path: Path = Path(__file__).parent / "exp48_results.json"
-    results_path.write_text(json.dumps(all_results, indent=2, default=str), encoding="utf-8")
+    results_path.write_text(
+        json.dumps(all_results, indent=2, default=str), encoding="utf-8"
+    )
     print(f"\nResults saved to {results_path}", file=sys.stderr)
 
 

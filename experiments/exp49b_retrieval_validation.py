@@ -2,7 +2,7 @@
 Experiment 49b: Retrieval Utility on Extracted Graphs (H2) + HRR Value (H3)
 
 H2: Does graph-based FTS5 retrieval outperform raw-file FTS5?
-H3: Does HRR add value on non-alpha-seek topologies?
+H3: Does HRR add value on non-project-a topologies?
 
 For each project, we:
 1. Build FTS5 index from extracted graph nodes (sentence-level)
@@ -24,9 +24,16 @@ from typing import Any
 
 # Reuse the Exp 45 pipeline
 from experiments.exp49_onboarding_validation import (
-    PROJECTS, discover, extract_file_tree, extract_git_history,
-    extract_document_sentences, extract_ast_calls, extract_citations,
-    extract_directives, build_fts_from_nodes, build_fts_from_raw_files,
+    PROJECTS,
+    discover,
+    extract_file_tree,
+    extract_git_history,
+    extract_document_sentences,
+    extract_ast_calls,
+    extract_citations,
+    extract_directives,
+    build_fts_from_nodes,
+    build_fts_from_raw_files,
     search_fts,
 )
 
@@ -41,7 +48,7 @@ from experiments.exp49_onboarding_validation import (
 # - description: what this tests
 
 TEST_QUERIES: dict[str, list[dict[str, Any]]] = {
-    "alpha-seek": [
+    "project-a": [
         {
             "query": "dispatch gate deploy protocol",
             "must_find": ["dispatch", "gate"],
@@ -68,7 +75,7 @@ TEST_QUERIES: dict[str, list[dict[str, Any]]] = {
             "description": "Core trading domain",
         },
     ],
-    "jose-bully": [
+    "project-c": [
         {
             "query": "pull request merge blocked",
             "must_find": ["pull request", "merge", "PR"],
@@ -95,7 +102,7 @@ TEST_QUERIES: dict[str, list[dict[str, Any]]] = {
             "description": "Public shaming incidents",
         },
     ],
-    "debserver": [
+    "project-d": [
         {
             "query": "raspberry pi satellite fleet",
             "must_find": ["raspberry", "pi", "satellite"],
@@ -136,7 +143,9 @@ def evaluate_retrieval(
     results = search_fts(query, fts_db, top_k=top_k)
 
     # Build content lookup
-    node_content: dict[str, str] = {str(n["id"]): str(n.get("content", "")) for n in all_nodes}
+    node_content: dict[str, str] = {
+        str(n["id"]): str(n.get("content", "")) for n in all_nodes
+    }
 
     # Check each must_find term
     found_terms: list[str] = []
@@ -181,7 +190,9 @@ def evaluate_raw_retrieval(
             # rid is a file path -- read the file content
             fp = project_root / rid
             try:
-                content = fp.read_text(encoding="utf-8", errors="ignore")[:10000].lower()
+                content = fp.read_text(encoding="utf-8", errors="ignore")[
+                    :10000
+                ].lower()
             except Exception:
                 content = ""
             if term_lower in content:
@@ -204,6 +215,7 @@ def evaluate_raw_retrieval(
 # Main
 # ============================================================
 
+
 def main() -> None:
     print("=" * 70, file=sys.stderr)
     print("Experiment 49b: Retrieval Utility (H2) + HRR Value (H3)", file=sys.stderr)
@@ -212,9 +224,9 @@ def main() -> None:
     all_results: dict[str, Any] = {}
 
     for name, root in PROJECTS.items():
-        print(f"\n{'='*50}", file=sys.stderr)
+        print(f"\n{'=' * 50}", file=sys.stderr)
         print(f"Project: {name}", file=sys.stderr)
-        print(f"{'='*50}", file=sys.stderr)
+        print(f"{'=' * 50}", file=sys.stderr)
 
         # Run extractors (reuse Exp 45 pipeline)
         manifest = discover(root)
@@ -237,7 +249,9 @@ def main() -> None:
         if manifest["doc_count"] > 0:
             doc_nodes: list[dict[str, Any]]
             doc_edges: list[dict[str, Any]]
-            doc_nodes, doc_edges = extract_document_sentences(root, manifest["doc_files"])
+            doc_nodes, doc_edges = extract_document_sentences(
+                root, manifest["doc_files"]
+            )
             all_nodes.extend(doc_nodes)
             all_edges.extend(doc_edges)
 
@@ -249,11 +263,15 @@ def main() -> None:
             all_edges.extend(ast_edges)
 
         if manifest["citation_regex"]:
-            cite_edges: list[dict[str, Any]] = extract_citations(root, manifest["doc_files"], manifest["citation_regex"])
+            cite_edges: list[dict[str, Any]] = extract_citations(
+                root, manifest["doc_files"], manifest["citation_regex"]
+            )
             all_edges.extend(cite_edges)
 
         if manifest["directives"]:
-            dir_nodes: list[dict[str, Any]] = extract_directives(root, manifest["directives"])
+            dir_nodes: list[dict[str, Any]] = extract_directives(
+                root, manifest["directives"]
+            )
             all_nodes.extend(dir_nodes)
 
         # Build both FTS5 indexes
@@ -268,13 +286,15 @@ def main() -> None:
         }
 
         print(f"\n  {'Query':<45} {'Graph':>8} {'Raw':>8}", file=sys.stderr)
-        print(f"  {'-'*65}", file=sys.stderr)
+        print(f"  {'-' * 65}", file=sys.stderr)
 
         graph_precisions: list[float] = []
         raw_precisions: list[float] = []
 
         for q in queries:
-            graph_eval = evaluate_retrieval(q["query"], q["must_find"], graph_fts, all_nodes)
+            graph_eval = evaluate_retrieval(
+                q["query"], q["must_find"], graph_fts, all_nodes
+            )
             raw_eval = evaluate_raw_retrieval(q["query"], q["must_find"], raw_fts, root)
 
             project_results["graph_results"].append(graph_eval)
@@ -285,42 +305,81 @@ def main() -> None:
 
             g_status = f"{graph_eval['precision']:.0%}"
             r_status = f"{raw_eval['precision']:.0%}"
-            g_missed = f" miss:{graph_eval['missed_terms']}" if graph_eval["missed_terms"] else ""
-            r_missed = f" miss:{raw_eval['missed_terms']}" if raw_eval["missed_terms"] else ""
+            g_missed = (
+                f" miss:{graph_eval['missed_terms']}"
+                if graph_eval["missed_terms"]
+                else ""
+            )
+            r_missed = (
+                f" miss:{raw_eval['missed_terms']}" if raw_eval["missed_terms"] else ""
+            )
 
-            print(f"  {q['query'][:44]:<45} {g_status:>6}{g_missed:<20} {r_status:>6}{r_missed}", file=sys.stderr)
+            print(
+                f"  {q['query'][:44]:<45} {g_status:>6}{g_missed:<20} {r_status:>6}{r_missed}",
+                file=sys.stderr,
+            )
 
         # Summary
-        avg_graph = sum(graph_precisions) / len(graph_precisions) if graph_precisions else 0
+        avg_graph = (
+            sum(graph_precisions) / len(graph_precisions) if graph_precisions else 0
+        )
         avg_raw = sum(raw_precisions) / len(raw_precisions) if raw_precisions else 0
 
         project_results["avg_graph_precision"] = round(avg_graph, 3)
         project_results["avg_raw_precision"] = round(avg_raw, 3)
-        project_results["graph_wins"] = sum(1 for g, r in zip(graph_precisions, raw_precisions) if g > r)
-        project_results["raw_wins"] = sum(1 for g, r in zip(graph_precisions, raw_precisions) if r > g)
-        project_results["ties"] = sum(1 for g, r in zip(graph_precisions, raw_precisions) if g == r)
+        project_results["graph_wins"] = sum(
+            1 for g, r in zip(graph_precisions, raw_precisions) if g > r
+        )
+        project_results["raw_wins"] = sum(
+            1 for g, r in zip(graph_precisions, raw_precisions) if r > g
+        )
+        project_results["ties"] = sum(
+            1 for g, r in zip(graph_precisions, raw_precisions) if g == r
+        )
 
-        print(f"\n  Avg precision -- Graph: {avg_graph:.0%}  Raw: {avg_raw:.0%}", file=sys.stderr)
-        print(f"  Graph wins: {project_results['graph_wins']}  Raw wins: {project_results['raw_wins']}  Ties: {project_results['ties']}", file=sys.stderr)
+        print(
+            f"\n  Avg precision -- Graph: {avg_graph:.0%}  Raw: {avg_raw:.0%}",
+            file=sys.stderr,
+        )
+        print(
+            f"  Graph wins: {project_results['graph_wins']}  Raw wins: {project_results['raw_wins']}  Ties: {project_results['ties']}",
+            file=sys.stderr,
+        )
 
         all_results[name] = project_results
 
     # H2 summary
-    print(f"\n{'='*70}", file=sys.stderr)
+    print(f"\n{'=' * 70}", file=sys.stderr)
     print("H2 SUMMARY: Does graph FTS5 outperform raw file FTS5?", file=sys.stderr)
-    print(f"{'='*70}", file=sys.stderr)
-    print(f"\n  {'Project':<15} {'Graph Avg':>12} {'Raw Avg':>12} {'Winner':>10}", file=sys.stderr)
-    print(f"  {'-'*50}", file=sys.stderr)
+    print(f"{'=' * 70}", file=sys.stderr)
+    print(
+        f"\n  {'Project':<15} {'Graph Avg':>12} {'Raw Avg':>12} {'Winner':>10}",
+        file=sys.stderr,
+    )
+    print(f"  {'-' * 50}", file=sys.stderr)
 
     for name, r in all_results.items():
-        winner = "Graph" if r["avg_graph_precision"] > r["avg_raw_precision"] else (
-            "Raw" if r["avg_raw_precision"] > r["avg_graph_precision"] else "Tie")
-        print(f"  {name:<15} {r['avg_graph_precision']:>12.0%} {r['avg_raw_precision']:>12.0%} {winner:>10}", file=sys.stderr)
+        winner = (
+            "Graph"
+            if r["avg_graph_precision"] > r["avg_raw_precision"]
+            else ("Raw" if r["avg_raw_precision"] > r["avg_graph_precision"] else "Tie")
+        )
+        print(
+            f"  {name:<15} {r['avg_graph_precision']:>12.0%} {r['avg_raw_precision']:>12.0%} {winner:>10}",
+            file=sys.stderr,
+        )
 
-    overall_graph = sum(r["avg_graph_precision"] for r in all_results.values()) / len(all_results)
-    overall_raw = sum(r["avg_raw_precision"] for r in all_results.values()) / len(all_results)
-    print(f"\n  {'OVERALL':<15} {overall_graph:>12.0%} {overall_raw:>12.0%}", file=sys.stderr)
-    print(f"\n  H2 threshold: graph >= 80% across all archetypes", file=sys.stderr)
+    overall_graph = sum(r["avg_graph_precision"] for r in all_results.values()) / len(
+        all_results
+    )
+    overall_raw = sum(r["avg_raw_precision"] for r in all_results.values()) / len(
+        all_results
+    )
+    print(
+        f"\n  {'OVERALL':<15} {overall_graph:>12.0%} {overall_raw:>12.0%}",
+        file=sys.stderr,
+    )
+    print("\n  H2 threshold: graph >= 80% across all archetypes", file=sys.stderr)
     all_pass = all(r["avg_graph_precision"] >= 0.8 for r in all_results.values())
     print(f"  H2 verdict: {'PASS' if all_pass else 'FAIL'}", file=sys.stderr)
 

@@ -21,9 +21,11 @@ from typing import Any
 import numpy as np
 
 
-ALPHA_SEEK_DB = Path("/Users/thelorax/projects/.gsd/workflows/spikes/"
-                     "260406-1-associative-memory-for-gsd-please-explor/"
-                     "sandbox/alpha-seek.db")
+ALPHA_SEEK_DB = Path(
+    "/home/user/projects/.gsd/workflows/spikes/"
+    "260406-1-associative-memory-for-gsd-please-explor/"
+    "sandbox/project-a.db"
+)
 
 # Critical beliefs derived from Exp 6 Phase D failure analysis
 # These are the beliefs that SHOULD have been in context to prevent the observed failures
@@ -56,9 +58,9 @@ CRITICAL_BELIEFS: dict[str, dict[str, Any]] = {
         "description": "Use strict static typing -- 4 corrections over 4 days",
     },
     "gcp_primary": {
-        "query": "GCP primary compute archon overflow platform",
+        "query": "GCP primary compute server-a overflow platform",
         "needed_decisions": ["D078", "D120"],
-        "description": "GCP is primary, archon overflow only -- 3 corrections over 7 days",
+        "description": "GCP is primary, server-a overflow only -- 3 corrections over 7 days",
     },
 }
 
@@ -70,7 +72,9 @@ def load_nodes_and_fts() -> tuple[dict[str, dict[str, Any]], sqlite3.Connection]
     db.row_factory = sqlite3.Row
 
     nodes: dict[str, dict[str, Any]] = {}
-    for row in db.execute("SELECT id, content, category, confidence FROM mem_nodes WHERE superseded_by IS NULL"):
+    for row in db.execute(
+        "SELECT id, content, category, confidence FROM mem_nodes WHERE superseded_by IS NULL"
+    ):
         # Estimate token count as chars / 4
         token_est = len(row["content"]) // 4
         nodes[row["id"]] = {
@@ -84,7 +88,9 @@ def load_nodes_and_fts() -> tuple[dict[str, dict[str, Any]], sqlite3.Connection]
 
     # Build in-memory FTS
     fts_db = sqlite3.connect(":memory:")
-    fts_db.execute("CREATE VIRTUAL TABLE fts USING fts5(id, content, tokenize='porter')")
+    fts_db.execute(
+        "CREATE VIRTUAL TABLE fts USING fts5(id, content, tokenize='porter')"
+    )
     for nid, node in nodes.items():
         fts_db.execute("INSERT INTO fts VALUES (?, ?)", (nid, node["content"]))
     fts_db.commit()
@@ -92,7 +98,12 @@ def load_nodes_and_fts() -> tuple[dict[str, dict[str, Any]], sqlite3.Connection]
     return nodes, fts_db
 
 
-def retrieve_at_budget(query: str, nodes: dict[str, dict[str, Any]], fts_db: sqlite3.Connection, budget: int) -> list[str]:
+def retrieve_at_budget(
+    query: str,
+    nodes: dict[str, dict[str, Any]],
+    fts_db: sqlite3.Connection,
+    budget: int,
+) -> list[str]:
     """Retrieve beliefs up to token budget using FTS5 + OR query."""
     terms = [t.strip() for t in query.split() if len(t.strip()) > 2]
     if not terms:
@@ -102,7 +113,7 @@ def retrieve_at_budget(query: str, nodes: dict[str, dict[str, Any]], fts_db: sql
     try:
         results = fts_db.execute(
             "SELECT id, rank FROM fts WHERE fts MATCH ? ORDER BY rank LIMIT 50",
-            (fts_query,)
+            (fts_query,),
         ).fetchall()
     except Exception:
         return []
@@ -125,7 +136,10 @@ def retrieve_at_budget(query: str, nodes: dict[str, dict[str, Any]], fts_db: sql
 
 def main() -> None:
     print("=" * 60, file=sys.stderr)
-    print("Experiment 4 (retrieval-only): Token Budget vs Critical Belief Coverage", file=sys.stderr)
+    print(
+        "Experiment 4 (retrieval-only): Token Budget vs Critical Belief Coverage",
+        file=sys.stderr,
+    )
     print("=" * 60, file=sys.stderr)
 
     nodes, fts_db = load_nodes_and_fts()
@@ -164,26 +178,40 @@ def main() -> None:
             "per_topic": budget_results,
         }
 
-        print(f"\n  Budget: {budget:,} tokens -> {overall_coverage:.0%} critical belief coverage "
-              f"({total_found}/{total_needed})", file=sys.stderr)
+        print(
+            f"\n  Budget: {budget:,} tokens -> {overall_coverage:.0%} critical belief coverage "
+            f"({total_found}/{total_needed})",
+            file=sys.stderr,
+        )
         for topic_id2, tr in budget_results.items():
             status = "FOUND" if tr["coverage"] == 1.0 else f"MISSING {tr['missed']}"
-            print(f"    {topic_id2}: {tr['coverage']:.0%} ({tr['retrieved_count']} beliefs retrieved) "
-                  f"[{status}]", file=sys.stderr)
+            print(
+                f"    {topic_id2}: {tr['coverage']:.0%} ({tr['retrieved_count']} beliefs retrieved) "
+                f"[{status}]",
+                file=sys.stderr,
+            )
 
     # Summary table
-    print(f"\n{'='*60}", file=sys.stderr)
+    print(f"\n{'=' * 60}", file=sys.stderr)
     print("TOKEN BUDGET vs CRITICAL BELIEF COVERAGE", file=sys.stderr)
-    print(f"{'='*60}", file=sys.stderr)
-    print(f"{'Budget':>8} {'Coverage':>10} {'Found':>6} {'Needed':>7} {'Beliefs Retrieved':>18}", file=sys.stderr)
+    print(f"{'=' * 60}", file=sys.stderr)
+    print(
+        f"{'Budget':>8} {'Coverage':>10} {'Found':>6} {'Needed':>7} {'Beliefs Retrieved':>18}",
+        file=sys.stderr,
+    )
     print("-" * 55, file=sys.stderr)
 
     for budget in TOKEN_BUDGETS:
         r: dict[str, Any] = results[budget]
         per_topic_vals: dict[str, dict[str, Any]] = r["per_topic"]
-        avg_retrieved = float(np.mean([t["retrieved_count"] for t in per_topic_vals.values()]))
-        print(f"{budget:>8,} {r['overall_coverage']:>10.0%} {r['total_found']:>6} "
-              f"{r['total_needed']:>7} {avg_retrieved:>18.1f}", file=sys.stderr)
+        avg_retrieved = float(
+            np.mean([t["retrieved_count"] for t in per_topic_vals.values()])
+        )
+        print(
+            f"{budget:>8,} {r['overall_coverage']:>10.0%} {r['total_found']:>6} "
+            f"{r['total_needed']:>7} {avg_retrieved:>18.1f}",
+            file=sys.stderr,
+        )
 
     # Find minimum budget for 100% coverage
     full_coverage_budget: int | None = None
@@ -192,14 +220,23 @@ def main() -> None:
             full_coverage_budget = budget
             break
 
-    print(f"\nMinimum budget for 100% critical coverage: "
-          f"{full_coverage_budget if full_coverage_budget else 'NOT ACHIEVED'}", file=sys.stderr)
+    print(
+        f"\nMinimum budget for 100% critical coverage: "
+        f"{full_coverage_budget if full_coverage_budget else 'NOT ACHIEVED'}",
+        file=sys.stderr,
+    )
 
     # REQ-003 check
     req003_coverage: float = results[2000]["overall_coverage"]
-    print(f"Coverage at REQ-003 budget (2,000 tokens): {req003_coverage:.0%}", file=sys.stderr)
-    print(f"REQ-003 status: {'SUFFICIENT' if req003_coverage >= 0.90 else 'INSUFFICIENT'} "
-          f"(need >= 90% of critical beliefs at 2K budget)", file=sys.stderr)
+    print(
+        f"Coverage at REQ-003 budget (2,000 tokens): {req003_coverage:.0%}",
+        file=sys.stderr,
+    )
+    print(
+        f"REQ-003 status: {'SUFFICIENT' if req003_coverage >= 0.90 else 'INSUFFICIENT'} "
+        f"(need >= 90% of critical beliefs at 2K budget)",
+        file=sys.stderr,
+    )
 
     output_path = Path("experiments/exp4_results.json")
     output_path.write_text(json.dumps(results, indent=2, default=str))

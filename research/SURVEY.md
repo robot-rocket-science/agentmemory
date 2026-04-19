@@ -198,7 +198,7 @@ The field has a serious problem with benchmark integrity:
 
 ### 5.1 What Was Built
 
-A prototype graph memory system using SQLite with in-memory adjacency list. ~1,900 lines of TypeScript across 8 modules. Tested on alpha-seek project data (577 nodes, 742 edges).
+A prototype graph memory system using SQLite with in-memory adjacency list. ~1,900 lines of TypeScript across 8 modules. Tested on project-a project data (577 nodes, 742 edges).
 
 **Architecture:**
 - Nodes: decisions, knowledge entries, milestones from GSD database
@@ -207,7 +207,7 @@ A prototype graph memory system using SQLite with in-memory adjacency list. ~1,9
 - Retrieval: text search seeding + BFS 2-hop with hub damping + cluster diversity filtering
 - Pruning: edge decay, hub damping, node cap, supersession
 
-**Source:** `/Users/thelorax/projects/.gsd/workflows/spikes/260406-1-associative-memory-for-gsd-please-explor/`
+**Source:** `/home/user/projects/.gsd/workflows/spikes/260406-1-associative-memory-for-gsd-please-explor/`
 
 ### 5.2 What Was Claimed vs What Was Measured
 

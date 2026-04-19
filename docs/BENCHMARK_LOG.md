@@ -82,7 +82,7 @@ Two earlier runs had answer leakage (the `answer` field was present in the agent
 
 | Metric | Value |
 |---|---|
-| Project | /Users/thelorax/projects/agentmemory |
+| Project | /home/user/projects/agentmemory |
 | DB | ~/.agentmemory/projects/2e7ed55e017a/memory.db |
 | Git commits | 35 |
 | Git date range | 2026-04-09 to 2026-04-11 (2 days) |
@@ -132,11 +132,11 @@ Two earlier runs had answer leakage (the `answer` field was present in the agent
 
 ---
 
-## alpha-seek-memtest (2026-04-11)
+## project-a-test (2026-04-11)
 
 | Metric | Value |
 |---|---|
-| Project | /Users/thelorax/projects/alpha-seek-memtest |
+| Project | /home/user/projects/project-a-test |
 | DB | ~/.agentmemory/projects/4b0f8c37972f/memory.db |
 | Git commits | 619 |
 | Git date range | 2026-03-24 to 2026-04-09 (16 days) |
@@ -170,7 +170,7 @@ Two earlier runs had answer leakage (the `answer` field was present in the agent
 | Simulated 14 months old | 0.00 | ~0x |
 
 ### Scaling observations
-- alpha-seek-memtest is ~5x larger than agentmemory (90k vs 17k nodes)
+- project-a-test is ~5x larger than agentmemory (90k vs 17k nodes)
 - Scan time scaled linearly: 5.8s vs 2.5s (2.3x for 5x data)
 - AST parsing is the bottleneck in both (38% and 32% of scan time)
 - Full pipeline (scan + ingest + edges + vault) measured at 6.5s for 10,872-node repo after v1.2.1 perf fixes

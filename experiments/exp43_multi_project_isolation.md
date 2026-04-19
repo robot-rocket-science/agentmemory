@@ -2,14 +2,14 @@
 
 **Date:** 2026-04-10
 **Status:** Research complete
-**Depends on:** Exp 21 (multi-project design), Exp 6 (alpha-seek belief corpus), PRIVACY_THREAT_MODEL.md
+**Depends on:** Exp 21 (multi-project design), Exp 6 (project-a belief corpus), PRIVACY_THREAT_MODEL.md
 **Provenance:** empirically_tested on 552 beliefs from single project; scope taxonomy is hypothesis-tier (reasoning only)
 
 ---
 
 ## Summary
 
-This experiment validates the behavioral vs domain classification heuristic from Exp 21 against the real alpha-seek belief corpus, designs retrieval-time filtering options, stress-tests the F4 privacy leak scenario, proposes a scope taxonomy for semi-cross-cutting beliefs, and analyzes graph topology implications of multi-project isolation.
+This experiment validates the behavioral vs domain classification heuristic from Exp 21 against the real project-a belief corpus, designs retrieval-time filtering options, stress-tests the F4 privacy leak scenario, proposes a scope taxonomy for semi-cross-cutting beliefs, and analyzes graph topology implications of multi-project isolation.
 
 Key findings:
 
@@ -25,7 +25,7 @@ Key findings:
 
 ### Method
 
-Applied the keyword heuristics from Exp 21 Section 4 to all 552 belief-like items (173 decisions + 379 knowledge entries) from the alpha-seek timeline (Exp 6). Classification rules:
+Applied the keyword heuristics from Exp 21 Section 4 to all 552 belief-like items (173 decisions + 379 knowledge entries) from the project-a timeline (Exp 6). Classification rules:
 
 - **Behavioral signals:** "always", "never", "don't ever", "stop doing", "from now on", "all projects/milestones", "strict typing", "async_bash", "pyright strict", "uv package", "cite sources"
 - **Domain signals:** file paths, ticker symbols (`[A-Z]{2,5}`), dollar amounts, milestone IDs (M###), decision IDs (D###), DTE references, options terminology, backtest, GCP/infra, ML model names, trading verbs, project names
@@ -187,12 +187,12 @@ Options B and C should not be pursued. The marginal benefit (slightly better ran
 ### Scenario Setup
 
 **User profile:**
-- Project A (alpha-seek): 552 beliefs about options trading strategy. Includes capital amounts ($5K), specific tickers (SPY, AAPL, GE), trading rules, ML model configs, GCP infrastructure decisions.
-- Project B (web-app): 50 beliefs about a React/PostgreSQL web application. (Hypothetical -- we only have alpha-seek data.)
+- Project A (project-a): 552 beliefs about options trading strategy. Includes capital amounts ($5K), specific tickers (SPY, AAPL, GE), trading rules, ML model configs, GCP infrastructure decisions.
+- Project B (web-app): 50 beliefs about a React/PostgreSQL web application. (Hypothetical -- we only have project-a data.)
 - Alpha-seek uses local Ollama (no cloud leak).
 - Web-app uses Claude API (cloud -- F4 leak vector active).
 
-**Question:** Which alpha-seek beliefs could leak into web-app context sent to Anthropic's API?
+**Question:** Which project-a beliefs could leak into web-app context sent to Anthropic's API?
 
 ### Walk-through by Filtering Option
 
@@ -203,12 +203,12 @@ Options B and C should not be pursued. The marginal benefit (slightly better ran
 3. Agent issues a search: "how should I structure the database schema?"
 4. FTS5 query: `SELECT ... WHERE fts MATCH 'database schema' AND (project_id = 'webapp' OR project_id IS NULL)`.
 5. Results: web-app beliefs about PostgreSQL + global behavioral beliefs ("use strict typing").
-6. **No alpha-seek beliefs returned.** The WHERE clause excludes them at the SQL level.
+6. **No project-a beliefs returned.** The WHERE clause excludes them at the SQL level.
 7. Behavioral beliefs that leak: "use strict typing", "don't use async_bash", etc. These are safe to send to Claude API -- they contain no proprietary trading data.
 
 **Leak count: 0 domain beliefs. ~14 behavioral beliefs (all safe).**
 
-**But:** 5 of those 14 behavioral beliefs are pyright tips (FP behavioral). These contain no sensitive alpha-seek data -- they are generic Python type-checking tips. The privacy impact is negligible, but it is still incorrect classification.
+**But:** 5 of those 14 behavioral beliefs are pyright tips (FP behavioral). These contain no sensitive project-a data -- they are generic Python type-checking tips. The privacy impact is negligible, but it is still incorrect classification.
 
 **Corrected leak count after fixing pyright_strict pattern: 0 domain, ~9 true behavioral, 0 sensitive.**
 
@@ -217,12 +217,12 @@ Options B and C should not be pursued. The marginal benefit (slightly better ran
 Same scenario, but FTS5 searches the full corpus:
 
 1. FTS5 query returns top 100 results across all projects.
-2. If the term "database" appears in alpha-seek beliefs (it does -- "DuckDB for backtesting"), those results compete for top-100 slots.
-3. Application filter removes alpha-seek results from the top 100.
+2. If the term "database" appears in project-a beliefs (it does -- "DuckDB for backtesting"), those results compete for top-100 slots.
+3. Application filter removes project-a results from the top 100.
 4. If filter is correctly applied: same result as Option A.
-5. If filter has a bug (missing filter on one code path, wrong project_id comparison, null handling error): alpha-seek beliefs about DuckDB backtesting, capital amounts, and trading strategies are included in the web-app context and sent to Claude API.
+5. If filter has a bug (missing filter on one code path, wrong project_id comparison, null handling error): project-a beliefs about DuckDB backtesting, capital amounts, and trading strategies are included in the web-app context and sent to Claude API.
 
-**Risk scenario:** A new developer adds a `search_all` function for cross-project search (a reasonable feature request) and forgets to re-add the project filter when adapting the code. Or a refactor changes the filter from `project_id == current` to `project_id != None` (subtle logical error). Either bug silently exposes all alpha-seek beliefs.
+**Risk scenario:** A new developer adds a `search_all` function for cross-project search (a reasonable feature request) and forgets to re-add the project filter when adapting the code. Or a refactor changes the filter from `project_id == current` to `project_id != None` (subtle logical error). Either bug silently exposes all project-a beliefs.
 
 **Leak count under bug: up to 552 beliefs including "$5K capital", "sell puts on SPY", specific ticker universe, ML model hyperparameters.**
 
@@ -230,11 +230,11 @@ Same scenario, but FTS5 searches the full corpus:
 
 1. All beliefs scored with Thompson sampling.
 2. Alpha-seek domain beliefs get 0.1x penalty.
-3. High-confidence alpha-seek beliefs: "Capital is $5K" has Beta(20, 1) after multiple user corrections. Thompson draw: ~0.95. After penalty: ~0.095. This is below typical web-app beliefs.
+3. High-confidence project-a beliefs: "Capital is $5K" has Beta(20, 1) after multiple user corrections. Thompson draw: ~0.95. After penalty: ~0.095. This is below typical web-app beliefs.
 4. But: "Capital is $5K" has been stated 3 times by the user -- it has very high alpha. A Thompson draw from Beta(20, 1) will exceed 0.99 about 18% of the time. 0.99 * 0.1 = 0.099. Still below 0.5 (typical uncertain belief).
 5. However, if the penalty is 0.5x instead of 0.1x (a "softer" configuration): 0.99 * 0.5 = 0.495. This competes with uncertain web-app beliefs.
 
-**Risk quantification:** With 0.1x penalty and 1,000 retrievals of 15 beliefs each, the expected number of alpha-seek domain belief appearances is:
+**Risk quantification:** With 0.1x penalty and 1,000 retrievals of 15 beliefs each, the expected number of project-a domain belief appearances is:
 
 For a Beta(20,1) belief: P(draw > threshold) where threshold is the 15th-best project B score. Assuming project B has ~50 beliefs with typical Beta(2,2) priors, the 15th score is approximately 0.25. P(Beta(20,1) * 0.1 > 0.25) = P(Beta(20,1) > 2.5) = 0 (impossible, Beta is bounded by 1). So the 0.1x penalty is actually safe for typical parameters.
 
@@ -277,7 +277,7 @@ From the corpus classification:
 | Framework-scoped | 0 | (none in corpus -- no Django/React/etc. beliefs) |
 | Project-scoped | 500 | "Capital is $5K", "32-ticker universe", "GCP dispatch gate" |
 
-**Finding:** In this corpus, language-scoped and framework-scoped beliefs are nearly absent. This makes sense -- alpha-seek is a single-language (Python), single-framework project. A multi-project user with diverse tech stacks would have more.
+**Finding:** In this corpus, language-scoped and framework-scoped beliefs are nearly absent. This makes sense -- project-a is a single-language (Python), single-framework project. A multi-project user with diverse tech stacks would have more.
 
 ### Proposed Taxonomy: Three Levels
 
@@ -290,7 +290,7 @@ global              -- applies to ALL projects regardless of tech stack
   +-- language:rust     -- applies to all Rust projects
   +-- language:*        -- etc.
   |
-project:alpha-seek  -- applies only to alpha-seek
+project:project-a  -- applies only to project-a
 project:webapp      -- applies only to webapp
 ```
 
@@ -357,7 +357,7 @@ Under-scoping is the more practical concern. The user has already expressed extr
 Single graph with project-partitioned nodes:
 
 ```
-[global partition]          [alpha-seek partition]     [webapp partition]
+[global partition]          [project-a partition]     [webapp partition]
   "use strict typing"         "capital=$5K"              "use React"
   "don't use async_bash"      "sell puts on SPY"         "PostgreSQL"
   "cite sources"              "GCP dispatch gate"        "REST API"
@@ -366,14 +366,14 @@ Single graph with project-partitioned nodes:
 
 ### Cross-Project Edges
 
-If alpha-seek and webapp both use Python with strict typing, the graph has:
+If project-a and webapp both use Python with strict typing, the graph has:
 
 ```
-global:"use strict typing" --APPLIED_IN--> alpha-seek:"pyproject.toml [pyright]"
+global:"use strict typing" --APPLIED_IN--> project-a:"pyproject.toml [pyright]"
 global:"use strict typing" --APPLIED_IN--> webapp:"tsconfig.json [strict]"
 ```
 
-The global node bridges two project partitions. The question: can BFS traversal from webapp's "tsconfig.json" reach alpha-seek's "capital=$5K" through the bridge?
+The global node bridges two project partitions. The question: can BFS traversal from webapp's "tsconfig.json" reach project-a's "capital=$5K" through the bridge?
 
 ### Traversal Rules
 
@@ -389,7 +389,7 @@ Implementation: BFS maintains a project_id context. When traversing an edge:
 webapp context: BFS from "REST API"
   -> "use React" (webapp) -- OK
   -> "use strict typing" (global) -- OK (global is always traversable)
-  -> "pyproject.toml [pyright]" (alpha-seek) -- BLOCKED (different project)
+  -> "pyproject.toml [pyright]" (project-a) -- BLOCKED (different project)
   -> "PostgreSQL" (webapp) -- OK
 ```
 
@@ -401,7 +401,7 @@ HRR (Holographic Reduced Representation) encodes the graph as superposed vector 
 
 **Option 1: Separate HRR vectors per project + one global vector.**
 
-- alpha-seek HRR: encodes alpha-seek subgraph + global nodes
+- project-a HRR: encodes project-a subgraph + global nodes
 - webapp HRR: encodes webapp subgraph + global nodes
 - Retrieval: decode from project-specific HRR vector. Global nodes appear in both.
 
@@ -458,7 +458,7 @@ HRR (Holographic Reduced Representation) encodes the graph as superposed vector 
 
 2. **Should ambiguous beliefs default to domain or prompt the user?** Conservative default (domain) prevents leaks but increases re-correction risk. Prompting the user is better but adds friction to the observe pipeline.
 
-3. **How should the system handle project migration?** If a user renames alpha-seek to trading-bot, all 500+ domain beliefs need `project_id` updated. This is a simple UPDATE but needs to be surfaced as a tool, not an internal migration.
+3. **How should the system handle project migration?** If a user renames project-a to trading-bot, all 500+ domain beliefs need `project_id` updated. This is a simple UPDATE but needs to be surfaced as a tool, not an internal migration.
 
 4. **Cross-project search (opt-in).** Users will want to search across all projects sometimes ("what's that pyright trick I used?"). This requires an explicit opt-in flag on the search tool that bypasses the project filter. The flag should be prominently documented as exposing all beliefs to the current LLM context.
 
@@ -477,9 +477,9 @@ From `exp43_multi_project_isolation.py` run on 552 beliefs:
 | never_directive | 16 | High overlap with domain (trading: "never exit before...") |
 | always_directive | 15 | High overlap with domain ("always satisfy deploy gate") |
 | pyright_strict | 14 | **All 14 are FP** -- knowledge tips, not directives |
-| all_projects | 8 | Mixed: some are genuine scope markers, some are domain ("all future milestones" in alpha-seek context) |
+| all_projects | 8 | Mixed: some are genuine scope markers, some are domain ("all future milestones" in project-a context) |
 | strict_typing | 3 | Genuine behavioral |
-| use_uv | 2 | 1 genuine behavioral, 1 domain (alpha-seek specific uv config) |
+| use_uv | 2 | 1 genuine behavioral, 1 domain (project-a specific uv config) |
 | async_bash_ban | 1 | Genuine behavioral |
 | citation_required | 1 | Genuine behavioral |
 

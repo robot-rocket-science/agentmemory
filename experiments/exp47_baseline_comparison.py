@@ -1,6 +1,6 @@
 """Exp 47: Baseline Comparison -- Can We Beat Grep?
 
-Compares 5 retrieval methods on the 6-topic alpha-seek ground truth:
+Compares 5 retrieval methods on the 6-topic project-a ground truth:
   A. Grep on decision-level nodes (173 decisions)
   B. Grep on sentence-level nodes (1,195 sentences)
   C. FTS5 (BM25 + porter stemming)
@@ -27,9 +27,9 @@ import numpy as np
 # ============================================================
 
 ALPHA_SEEK_DB: Path = Path(
-    "/Users/thelorax/projects/.gsd/workflows/spikes/"
+    "/home/user/projects/.gsd/workflows/spikes/"
     "260406-1-associative-memory-for-gsd-please-explor/"
-    "sandbox/alpha-seek.db"
+    "sandbox/project-a.db"
 )
 
 TOP_K: int = 15
@@ -67,25 +67,122 @@ TOPICS: dict[str, dict[str, Any]] = {
 BEHAVIORAL_BELIEFS: list[str] = ["D157", "D188", "D100", "D073"]
 
 STOPWORDS: set[str] = {
-    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-    "have", "has", "had", "do", "does", "did", "will", "would", "shall",
-    "should", "may", "might", "can", "could", "must", "to", "of", "in",
-    "for", "on", "with", "at", "by", "from", "as", "into", "through",
-    "during", "before", "after", "above", "below", "between", "but",
-    "and", "or", "nor", "not", "no", "so", "if", "then", "than",
-    "too", "very", "just", "about", "up", "out", "off", "over",
-    "under", "again", "further", "once", "here", "there", "when",
-    "where", "why", "how", "all", "each", "every", "both", "few",
-    "more", "most", "other", "some", "such", "only", "own", "same",
-    "that", "this", "these", "those", "what", "which", "who", "whom",
-    "it", "its", "he", "she", "they", "them", "his", "her", "their",
-    "we", "us", "our", "you", "your", "i", "me", "my",
+    "the",
+    "a",
+    "an",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "being",
+    "have",
+    "has",
+    "had",
+    "do",
+    "does",
+    "did",
+    "will",
+    "would",
+    "shall",
+    "should",
+    "may",
+    "might",
+    "can",
+    "could",
+    "must",
+    "to",
+    "of",
+    "in",
+    "for",
+    "on",
+    "with",
+    "at",
+    "by",
+    "from",
+    "as",
+    "into",
+    "through",
+    "during",
+    "before",
+    "after",
+    "above",
+    "below",
+    "between",
+    "but",
+    "and",
+    "or",
+    "nor",
+    "not",
+    "no",
+    "so",
+    "if",
+    "then",
+    "than",
+    "too",
+    "very",
+    "just",
+    "about",
+    "up",
+    "out",
+    "off",
+    "over",
+    "under",
+    "again",
+    "further",
+    "once",
+    "here",
+    "there",
+    "when",
+    "where",
+    "why",
+    "how",
+    "all",
+    "each",
+    "every",
+    "both",
+    "few",
+    "more",
+    "most",
+    "other",
+    "some",
+    "such",
+    "only",
+    "own",
+    "same",
+    "that",
+    "this",
+    "these",
+    "those",
+    "what",
+    "which",
+    "who",
+    "whom",
+    "it",
+    "its",
+    "he",
+    "she",
+    "they",
+    "them",
+    "his",
+    "her",
+    "their",
+    "we",
+    "us",
+    "our",
+    "you",
+    "your",
+    "i",
+    "me",
+    "my",
 }
 
 
 # ============================================================
 # Data loading
 # ============================================================
+
 
 def load_decision_nodes() -> dict[str, str]:
     """Load decision-level nodes (173 decisions, not sentence-split)."""
@@ -135,6 +232,7 @@ def estimate_tokens(text: str) -> int:
 # Method A & B: Grep baseline
 # ============================================================
 
+
 def grep_search(
     query: str,
     nodes: dict[str, str],
@@ -163,12 +261,11 @@ def grep_search(
 # Method C: FTS5
 # ============================================================
 
+
 def build_fts(nodes: dict[str, str]) -> sqlite3.Connection:
     """Build in-memory FTS5 index with porter stemming."""
     db: sqlite3.Connection = sqlite3.connect(":memory:")
-    db.execute(
-        "CREATE VIRTUAL TABLE fts USING fts5(id, content, tokenize='porter')"
-    )
+    db.execute("CREATE VIRTUAL TABLE fts USING fts5(id, content, tokenize='porter')")
     for nid, content in nodes.items():
         db.execute("INSERT INTO fts VALUES (?, ?)", (nid, content))
     db.commit()
@@ -202,6 +299,7 @@ def search_fts(
 # ============================================================
 # Method D: FTS5 + PRF
 # ============================================================
+
 
 def search_fts_prf(
     query: str,
@@ -254,6 +352,7 @@ def search_fts_prf(
 # ============================================================
 # Method E: FTS5 + HRR
 # ============================================================
+
 
 def make_vector(dim: int) -> np.ndarray[Any, np.dtype[np.floating[Any]]]:
     """Random unit vector."""
@@ -435,6 +534,7 @@ def search_fts_hrr(
 # Evaluation
 # ============================================================
 
+
 def evaluate_method(
     method_name: str,
     results: list[tuple[str, float]],
@@ -481,6 +581,7 @@ def evaluate_method(
 # Main
 # ============================================================
 
+
 def main() -> None:
     print("=" * 60, file=sys.stderr)
     print("Experiment 47: Baseline Comparison -- Can We Beat Grep?", file=sys.stderr)
@@ -515,7 +616,7 @@ def main() -> None:
     for topic_name, topic_data in TOPICS.items():
         query: str = topic_data["query"]
         needed: list[str] = topic_data["needed"]
-        print(f"\n--- {topic_name}: \"{query}\" ---", file=sys.stderr)
+        print(f'\n--- {topic_name}: "{query}" ---', file=sys.stderr)
 
         topic_results: dict[str, dict[str, Any]] = {}
 

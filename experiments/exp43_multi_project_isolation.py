@@ -6,7 +6,7 @@ as behavioral (cross-project) vs domain (project-scoped)? What's the ambiguity
 rate and false-positive rate for behavioral classification?
 
 Method:
-  1. Load the 552 decision+knowledge items from the alpha-seek timeline (Exp 6).
+  1. Load the 552 decision+knowledge items from the project-a timeline (Exp 6).
   2. Apply keyword heuristics from Exp 21:
      - Behavioral signals: "always", "never", "don't ever", "stop doing",
        "every time", "from now on", universal process rules.
@@ -42,6 +42,7 @@ ScopeLabel = Literal["behavioral", "domain", "ambiguous"]
 @dataclass
 class ClassifiedBelief:
     """A belief with its classification and the signals that triggered it."""
+
     content: str
     event_type: str
     context: str
@@ -63,16 +64,20 @@ BEHAVIORAL_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("every_time", re.compile(r"\bevery\s+time\b", re.IGNORECASE)),
     ("from_now_on", re.compile(r"\bfrom\s+now\s+on\b", re.IGNORECASE)),
     ("do_not_ever", re.compile(r"\bdo\s+not\s+ever\b", re.IGNORECASE)),
-    ("all_projects", re.compile(r"\ball\s+(projects|future|milestones)\b", re.IGNORECASE)),
+    (
+        "all_projects",
+        re.compile(r"\ball\s+(projects|future|milestones)\b", re.IGNORECASE),
+    ),
     ("strict_typing", re.compile(r"\bstrict\s+(static\s+)?typing\b", re.IGNORECASE)),
     ("async_bash_ban", re.compile(r"\basync_bash\b", re.IGNORECASE)),
     ("dont_pontificate", re.compile(r"\bpontificate\b", re.IGNORECASE)),
     ("dont_elaborate", re.compile(r"\bdon'?t\s+elaborate\b", re.IGNORECASE)),
     ("pyright_strict", re.compile(r"\bpyright\s+strict\b", re.IGNORECASE)),
     ("use_uv", re.compile(r"\buv\b.*\bpackage\b|\buse\s+uv\b", re.IGNORECASE)),
-    ("citation_required", re.compile(
-        r"\bcit(ation|e)\b.*\b(source|evidence|back)\b", re.IGNORECASE
-    )),
+    (
+        "citation_required",
+        re.compile(r"\bcit(ation|e)\b.*\b(source|evidence|back)\b", re.IGNORECASE),
+    ),
 ]
 
 # Domain keyword patterns -- suggest project-specific scope
@@ -84,24 +89,34 @@ DOMAIN_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("decision_id", re.compile(r"\bD\d{3}\b")),
     ("dte_reference", re.compile(r"\b\d+[dD](?:/|\b)")),
     ("strike_pct", re.compile(r"\b\d+%\b")),
-    ("options_term", re.compile(
-        r"\b(put|call|strike|expiry|premium|convexity|ITM|OTM|ATM|DTE|delta)\b",
-        re.IGNORECASE,
-    )),
+    (
+        "options_term",
+        re.compile(
+            r"\b(put|call|strike|expiry|premium|convexity|ITM|OTM|ATM|DTE|delta)\b",
+            re.IGNORECASE,
+        ),
+    ),
     ("backtest", re.compile(r"\bbacktest\b", re.IGNORECASE)),
     ("signal_config", re.compile(r"\bsignal_\w+\.yaml\b")),
-    ("gcp_infra", re.compile(r"\b(GCP|archon|VM|dispatch gate)\b", re.IGNORECASE)),
-    ("model_specific", re.compile(
-        r"\b(LightGBM|XGBoost|LGBM|GBM|random\s+forest)\b", re.IGNORECASE
-    )),
+    ("gcp_infra", re.compile(r"\b(GCP|server-a|VM|dispatch gate)\b", re.IGNORECASE)),
+    (
+        "model_specific",
+        re.compile(r"\b(LightGBM|XGBoost|LGBM|GBM|random\s+forest)\b", re.IGNORECASE),
+    ),
     ("capital_specific", re.compile(r"\b(bankroll|capital|5k|5K)\b")),
-    ("trading_verb", re.compile(
-        r"\b(sell|buy|hold|exit|entry|position|contract|hedge)\b", re.IGNORECASE
-    )),
-    ("project_name", re.compile(
-        r"\b(alpha-seek|debserver|optimus-prime|code-monkey|evolve)\b",
-        re.IGNORECASE,
-    )),
+    (
+        "trading_verb",
+        re.compile(
+            r"\b(sell|buy|hold|exit|entry|position|contract|hedge)\b", re.IGNORECASE
+        ),
+    ),
+    (
+        "project_name",
+        re.compile(
+            r"\b(project-a|project-d|project-b|project-e|evolve)\b",
+            re.IGNORECASE,
+        ),
+    ),
 ]
 
 # Semi-cross-cutting: behavioral but with scope limiter
@@ -116,6 +131,7 @@ SEMI_CROSSCUT_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
 # ============================================================
 # Classification logic
 # ============================================================
+
 
 def classify_belief(content: str, event_type: str, context: str) -> ClassifiedBelief:
     """Classify a belief as behavioral, domain, or ambiguous using keyword heuristics."""
@@ -175,9 +191,11 @@ GROUND_TRUTH: list[tuple[str, ScopeLabel]] = [
     ("pyright strict: type: ignore", "domain"),  # pyright TIP, not a directive
     ("pyright strict: venvPath", "domain"),  # pyright TIP, not a directive
     ("pyright strict: functools.partial", "domain"),  # pyright TIP, not a directive
-    ("pyright strict: empty list initializer", "domain"),  # pyright TIP, not a directive
-
-    # Clearly domain -- alpha-seek specific
+    (
+        "pyright strict: empty list initializer",
+        "domain",
+    ),  # pyright TIP, not a directive
+    # Clearly domain -- project-a specific
     ("capital needs to be 5k, not 100k", "domain"),
     ("5k is the hard cap, do not ask about it again", "domain"),
     ("calls and puts both need to be in the strategy", "domain"),
@@ -185,15 +203,13 @@ GROUND_TRUTH: list[tuple[str, ScopeLabel]] = [
     ("Hold to expiry is baseline exit", "domain"),
     ("32-ticker ex-GE universe", "domain"),
     ("GBM drift calibration target", "domain"),
-    ("archon for overflow, GCP is primary compute", "domain"),
+    ("server-a for overflow, GCP is primary compute", "domain"),
     ("always satisfy the deploy gate", "domain"),  # "always" but project-specific
-
     # Ambiguous -- behavioral signal + domain context
     ("always satisfy the deploy gate", "domain"),
     ("all future milestones", "behavioral"),  # scope marker, not domain-specific
     ("please report returns in annualized terms", "behavioral"),  # reporting style
     ("do not implement artificial contract filters", "domain"),
-
     # Knowledge items that look behavioral but are domain
     ("Backtest runner writes output atomically at end", "domain"),
     ("StrEnum for bounded string parameters", "domain"),
@@ -209,9 +225,11 @@ def find_match(content: str, ground_truth_key: str) -> bool:
 # Leak scenario simulation
 # ============================================================
 
+
 @dataclass
 class LeakSimResult:
     """Results of a cross-project leak simulation."""
+
     total_beliefs: int
     project_a_domain: int
     project_a_behavioral: int
@@ -227,9 +245,9 @@ def simulate_f4_leak(
     beliefs: list[ClassifiedBelief],
     ground_truth: list[tuple[str, ScopeLabel]],
 ) -> LeakSimResult:
-    """Simulate F4 leak scenario: user switches from alpha-seek to web-app project.
+    """Simulate F4 leak scenario: user switches from project-a to web-app project.
 
-    Under each filtering option, count how many alpha-seek beliefs would leak
+    Under each filtering option, count how many project-a beliefs would leak
     into the web-app context sent to a cloud LLM.
 
     Options:
@@ -269,7 +287,9 @@ def simulate_f4_leak(
                 break  # first match only
 
     # Option A: Pre-filter -- only behavioral + ambiguous could leak
-    leaked_pre_filter: int = behavioral_count  # ambiguous defaults to domain in pre-filter
+    leaked_pre_filter: int = (
+        behavioral_count  # ambiguous defaults to domain in pre-filter
+    )
 
     # Option B: Post-filter -- same as pre-filter if filter works correctly
     # But if filter has a bug, ALL beliefs leak. Model as: behavioral + 5% of domain
@@ -297,9 +317,11 @@ def simulate_f4_leak(
 # Scope taxonomy analysis
 # ============================================================
 
+
 @dataclass
 class ScopeTaxonomyResult:
     """Analysis of scope levels needed for semi-cross-cutting beliefs."""
+
     global_count: int
     language_scoped_count: int
     framework_scoped_count: int
@@ -325,7 +347,9 @@ def analyze_scope_taxonomy(beliefs: list[ClassifiedBelief]) -> ScopeTaxonomyResu
 
         for name, pattern in SEMI_CROSSCUT_PATTERNS:
             if pattern.search(belief.content):
-                if name.endswith("_scoped") and name.startswith(("python", "typescript")):
+                if name.endswith("_scoped") and name.startswith(
+                    ("python", "typescript")
+                ):
                     has_language_scope = True
                 elif name.endswith("_scoped"):
                     has_framework_scope = True
@@ -355,6 +379,7 @@ def analyze_scope_taxonomy(beliefs: list[ClassifiedBelief]) -> ScopeTaxonomyResu
 # Main
 # ============================================================
 
+
 def main() -> None:
     # Load timeline
     timeline_path: Path = Path("experiments/exp6_timeline.json")
@@ -371,8 +396,12 @@ def main() -> None:
     ]
 
     print(f"Loaded {len(beliefs_raw)} belief-like items from timeline")
-    print(f"  Decisions: {sum(1 for b in beliefs_raw if b['event_type'] == 'decision')}")
-    print(f"  Knowledge: {sum(1 for b in beliefs_raw if b['event_type'] == 'knowledge')}")
+    print(
+        f"  Decisions: {sum(1 for b in beliefs_raw if b['event_type'] == 'decision')}"
+    )
+    print(
+        f"  Knowledge: {sum(1 for b in beliefs_raw if b['event_type'] == 'knowledge')}"
+    )
     print()
 
     # ---- Phase 1: Classify all beliefs ----
@@ -391,19 +420,25 @@ def main() -> None:
     print("=" * 60)
     print("CLASSIFICATION RESULTS")
     print("=" * 60)
-    print(f"  Behavioral (cross-project): {label_counts['behavioral']:>4} "
-          f"({label_counts['behavioral']/total*100:.1f}%)")
-    print(f"  Domain (project-scoped):    {label_counts['domain']:>4} "
-          f"({label_counts['domain']/total*100:.1f}%)")
-    print(f"  Ambiguous (needs judgment):  {label_counts['ambiguous']:>4} "
-          f"({label_counts['ambiguous']/total*100:.1f}%)")
+    print(
+        f"  Behavioral (cross-project): {label_counts['behavioral']:>4} "
+        f"({label_counts['behavioral'] / total * 100:.1f}%)"
+    )
+    print(
+        f"  Domain (project-scoped):    {label_counts['domain']:>4} "
+        f"({label_counts['domain'] / total * 100:.1f}%)"
+    )
+    print(
+        f"  Ambiguous (needs judgment):  {label_counts['ambiguous']:>4} "
+        f"({label_counts['ambiguous'] / total * 100:.1f}%)"
+    )
     print(f"  Total:                       {total:>4}")
     print()
 
     # Unambiguous fraction
     unambiguous: int = label_counts["behavioral"] + label_counts["domain"]
-    print(f"  Unambiguous rate: {unambiguous/total*100:.1f}%")
-    print(f"  LLM judgment needed: {label_counts['ambiguous']/total*100:.1f}%")
+    print(f"  Unambiguous rate: {unambiguous / total * 100:.1f}%")
+    print(f"  LLM judgment needed: {label_counts['ambiguous'] / total * 100:.1f}%")
     print()
 
     # ---- Phase 2: Validate against ground truth ----
@@ -428,13 +463,17 @@ def main() -> None:
                     # Ambiguous is not wrong per se, but not correct either
                     incorrect += 1
                     status: str = "AMBIGUOUS"
-                    print(f"  {status}: '{gt_key[:60]}' -> {belief.label} (expected {gt_label})")
+                    print(
+                        f"  {status}: '{gt_key[:60]}' -> {belief.label} (expected {gt_label})"
+                    )
                     print(f"    B-signals: {belief.behavioral_signals}")
                     print(f"    D-signals: {belief.domain_signals}")
                 else:
                     incorrect += 1
                     status = "WRONG"
-                    print(f"  {status}: '{gt_key[:60]}' -> {belief.label} (expected {gt_label})")
+                    print(
+                        f"  {status}: '{gt_key[:60]}' -> {belief.label} (expected {gt_label})"
+                    )
                     print(f"    B-signals: {belief.behavioral_signals}")
                     print(f"    D-signals: {belief.domain_signals}")
                     if belief.label == "behavioral" and gt_label == "domain":
@@ -447,11 +486,17 @@ def main() -> None:
 
     evaluated: int = correct + incorrect
     print()
-    print(f"  Evaluated:     {evaluated}/{len(GROUND_TRUTH)} "
-          f"({not_found} not found in corpus)")
+    print(
+        f"  Evaluated:     {evaluated}/{len(GROUND_TRUTH)} "
+        f"({not_found} not found in corpus)"
+    )
     if evaluated > 0:
-        print(f"  Correct:       {correct}/{evaluated} ({correct/evaluated*100:.1f}%)")
-        print(f"  Incorrect:     {incorrect}/{evaluated} ({incorrect/evaluated*100:.1f}%)")
+        print(
+            f"  Correct:       {correct}/{evaluated} ({correct / evaluated * 100:.1f}%)"
+        )
+        print(
+            f"  Incorrect:     {incorrect}/{evaluated} ({incorrect / evaluated * 100:.1f}%)"
+        )
         print(f"  FP behavioral: {fp_behavioral} (domain misclassified as behavioral)")
         print(f"  FN behavioral: {fn_behavioral} (behavioral misclassified as domain)")
     print()
@@ -511,23 +556,33 @@ def main() -> None:
     print("F4 LEAK SCENARIO SIMULATION")
     print("=" * 60)
     leak: LeakSimResult = simulate_f4_leak(classified, GROUND_TRUTH)
-    print(f"  Total alpha-seek beliefs: {leak.total_beliefs}")
+    print(f"  Total project-a beliefs: {leak.total_beliefs}")
     print(f"  Domain (should NOT leak): {leak.project_a_domain}")
     print(f"  Behavioral (OK to leak):  {leak.project_a_behavioral}")
     print(f"  Ambiguous:                {leak.project_a_ambiguous}")
     print()
     print("  Leak risk by filtering option:")
-    print(f"    A. Pre-filter (WHERE clause):  {leak.leaked_under_pre_filter} beliefs "
-          f"({leak.leaked_under_pre_filter/leak.total_beliefs*100:.1f}%)")
-    print(f"    B. Post-filter (rank then cut): {leak.leaked_under_post_filter} beliefs "
-          f"({leak.leaked_under_post_filter/leak.total_beliefs*100:.1f}%)")
-    print(f"    C. Penalty (0.1x score):       {leak.leaked_under_penalty} beliefs "
-          f"({leak.leaked_under_penalty/leak.total_beliefs*100:.1f}%)")
+    print(
+        f"    A. Pre-filter (WHERE clause):  {leak.leaked_under_pre_filter} beliefs "
+        f"({leak.leaked_under_pre_filter / leak.total_beliefs * 100:.1f}%)"
+    )
+    print(
+        f"    B. Post-filter (rank then cut): {leak.leaked_under_post_filter} beliefs "
+        f"({leak.leaked_under_post_filter / leak.total_beliefs * 100:.1f}%)"
+    )
+    print(
+        f"    C. Penalty (0.1x score):       {leak.leaked_under_penalty} beliefs "
+        f"({leak.leaked_under_penalty / leak.total_beliefs * 100:.1f}%)"
+    )
     print()
-    print(f"  FP in behavioral (domain that would leak incorrectly): "
-          f"{leak.leaked_behavioral_false_positive}")
-    print(f"  TP in behavioral (correctly cross-project): "
-          f"{leak.leaked_behavioral_correct}")
+    print(
+        f"  FP in behavioral (domain that would leak incorrectly): "
+        f"{leak.leaked_behavioral_false_positive}"
+    )
+    print(
+        f"  TP in behavioral (correctly cross-project): "
+        f"{leak.leaked_behavioral_correct}"
+    )
 
     # ---- Phase 7: Scope taxonomy ----
     print()

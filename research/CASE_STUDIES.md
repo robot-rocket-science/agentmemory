@@ -40,7 +40,7 @@ Real incidents from this session where the LLM (me) exhibited exactly the behavi
 
 **Pattern:** Context drift -- the LLM forgets that a state document exists and recreates state from scratch instead of reading it. This is the exact problem the memory system solves.
 
-**What memory should do:** 
+**What memory should do:**
 - The existence of TODO.md as the authoritative task list should be an always-loaded belief (L0)
 - Before asking "what's next?", the system should consult its own state documents
 - Before overwriting a section of a state document, the system should read the current content
@@ -198,7 +198,7 @@ This is CS-002 recurring across a session boundary. The agent read the correctio
 
 **What happened:** The T0 cross-project testing campaign ran 4 extractors on 7 repos and produced a results document (T0_RESULTS.md). The document reported extraction counts (edge volumes per method), cross-method overlap percentages, and vocabulary overlap distributions. It then made claims like "the extractors are genuinely complementary" and "HRR earns its cost on boundary edges."
 
-When the user asked "by what specific metrics and evidence are you making these claims? cite your sources. show me numbers," the agent traced each number to raw JSON on archon and confirmed the numbers were accurate.
+When the user asked "by what specific metrics and evidence are you making these claims? cite your sources. show me numbers," the agent traced each number to raw JSON on server-a and confirmed the numbers were accurate.
 
 When the user then asked "is everything getting discovered and mapped correctly?", the agent realized the fundamental gap: **no precision validation had been performed.** Every metric in the document measures output volume or distinctness between methods. None measures whether the outputs are correct.
 
@@ -234,7 +234,7 @@ When the user then asked "is everything getting discovered and mapped correctly?
 
 **What happened:** After CS-007 identified the precision gap, three automated validation approaches were run (negative sampling, self-consistency checks, triangulation). The results looked strong: 15-73x lift on directory prediction, 50x clustering above random, heavy-tailed degree distributions. The T0_RESULTS.md was updated with a "Validation Results" section concluding "The evidence now shows the edges are meaningful."
 
-When the user asked "are we in the same hole now? the numbers are big and impressive but are they valid?", the agent initially presented the validation results at face value, tracing each number to raw JSON on archon and confirming they were accurate. The agent verified the numbers were correct but did not spontaneously question whether the metrics themselves validate what they claim to validate.
+When the user asked "are we in the same hole now? the numbers are big and impressive but are they valid?", the agent initially presented the validation results at face value, tracing each number to raw JSON on server-a and confirming they were accurate. The agent verified the numbers were correct but did not spontaneously question whether the metrics themselves validate what they claim to validate.
 
 On further push, the agent acknowledged the problem:
 
@@ -379,7 +379,7 @@ This is the same fundamental failure as CS-002 (premature implementation push de
 
 ## CS-010: Happy-Path Testing Bias
 
-**Source:** alpha-seek exit pricing bug (DAMAGE-ASSESSMENT-exit-pricing-bug.md, KNOWLEDGE.md line 1037)
+**Source:** project-a exit pricing bug (DAMAGE-ASSESSMENT-exit-pricing-bug.md, KNOWLEDGE.md line 1037)
 **Agent:** Claude (via GSD auto-mode)
 
 ### The Problem
@@ -402,14 +402,14 @@ Agents test what is interesting to write tests for, not what is most likely to f
 
 ## CS-011: Scale Before Validate
 
-**Source:** alpha-seek GCP dispatch (KNOWLEDGE.md line 901), archon saturation (KNOWLEDGE.md line 1029)
+**Source:** project-a GCP dispatch (KNOWLEDGE.md line 901), server-a saturation (KNOWLEDGE.md line 1029)
 **Agent:** Claude (via GSD auto-mode)
 
 ### The Problem
 
 Two incidents:
 1. M018-S02 dispatched 16 GCP VMs without running one config locally first. 14 never started (missing dirs), 2 failed with CLI argument errors, 0 completed.
-2. 12 parallel `scan_universe.py` processes (~1.3GB RAM each) saturated archon, making SSH unresponsive. The machine had to be manually recovered.
+2. 12 parallel `scan_universe.py` processes (~1.3GB RAM each) saturated server-a, making SSH unresponsive. The machine had to be manually recovered.
 
 ### Root Cause
 
@@ -419,7 +419,7 @@ The agent's default behavior is to parallelize and dispatch for throughput. It d
 
 - **COMMIT_BELIEF** from the fix: "Before dispatching any multi-run sweep, always run one config end-to-end locally" is a behavioral constraint that should be loaded before any dispatch operation.
 - **SUPERSEDES** edge: the "dispatch 16" approach was superseded by "validate 1, then dispatch."
-- **Resource constraints as beliefs:** "archon: never run more than 4 concurrent DuckDB-heavy processes" is a machine-specific constraint that should be retrieved when planning work on archon.
+- **Resource constraints as beliefs:** "server-a: never run more than 4 concurrent DuckDB-heavy processes" is a machine-specific constraint that should be retrieved when planning work on server-a.
 
 **Acceptance test:** Agent is asked to run a parameter sweep. It must first run a single configuration locally before dispatching the full sweep.
 
@@ -427,7 +427,7 @@ The agent's default behavior is to parallelize and dispatch for throughput. It d
 
 ## CS-012: Duplicate Code Corruption by Auto-Mode Agent
 
-**Source:** alpha-seek (KNOWLEDGE.md line 1430)
+**Source:** project-a (KNOWLEDGE.md line 1430)
 **Agent:** Claude (via GSD auto-mode)
 
 ### The Problem
@@ -450,7 +450,7 @@ Auto-mode agents operate without human review. When an agent's edit fails partwa
 
 ## CS-013: Plausible-But-Wrong Syntax from Training Data
 
-**Source:** alpha-seek gcloud filter (KNOWLEDGE.md line 915)
+**Source:** project-a gcloud filter (KNOWLEDGE.md line 915)
 **Agent:** Claude
 
 ### The Problem
@@ -473,7 +473,7 @@ The agent's training data contains far more examples of pipe-OR (`|`) than gclou
 
 ## CS-014: Research-Execution Divergence Within Same Milestone
 
-**Source:** alpha-seek M031 (KNOWLEDGE.md line 1642-1646)
+**Source:** project-a M031 (KNOWLEDGE.md line 1642-1646)
 **Agent:** Claude (via GSD auto-mode)
 
 ### The Problem
@@ -496,7 +496,7 @@ The research and execution phases run in different sessions or different context
 
 ## CS-015: Dead Approaches Re-Proposed Across Sessions
 
-**Source:** alpha-seek CLAUDE.md line 26-27, optimus-prime CLAUDE.md
+**Source:** project-a CLAUDE.md line 26-27, project-b CLAUDE.md
 **Agent:** Claude
 
 ### The Problem
@@ -519,7 +519,7 @@ Same as CS-009. The agent's training data contains these as "reasonable" approac
 
 ## CS-016: Settled Decision Repeatedly Questioned
 
-**Source:** alpha-seek CLAUDE.md lines 108-114 (calls and puts rule)
+**Source:** project-a CLAUDE.md lines 108-114 (calls and puts rule)
 **Agent:** Claude
 
 ### The Problem
@@ -546,7 +546,7 @@ CS-015 is about re-proposing dead approaches (things that were tried and failed)
 
 ## CS-017: Configuration Drift from Implicit Defaults
 
-**Source:** alpha-seek CAPITAL-CORRECTION-AUDIT.md
+**Source:** project-a CAPITAL-CORRECTION-AUDIT.md
 **Agent:** Claude (via GSD auto-mode)
 
 ### The Problem
@@ -569,7 +569,7 @@ The agent changed a default value without auditing all call sites. The system re
 
 ## CS-018: Dual-Source-of-Truth State Machine Bug
 
-**Source:** alpha-seek DEBUG-M005-dispatch-skip-S02-S03.md, DEBUG-M008-M006-dispatch-guard-conflict.md
+**Source:** project-a DEBUG-M005-dispatch-skip-S02-S03.md, DEBUG-M008-M006-dispatch-guard-conflict.md
 **Agent:** GSD framework (agent orchestration)
 
 ### The Problem
@@ -596,7 +596,7 @@ Two representations of state (DB tables and markdown files) that diverge. The sy
 
 ## CS-019: Death by a Thousand Cuts in Agent-Built Pipeline
 
-**Source:** optimus-prime .planning/debug/overnight-training-run.md
+**Source:** project-b .planning/debug/overnight-training-run.md
 **Agent:** Claude (via GSD auto-mode)
 
 ### The Problem
@@ -662,17 +662,17 @@ A pre-existing `exp40_hybrid_retrieval_plan.md` already claimed the Exp 40 numbe
 
 ## CS-022: Multi-Hop Operational Query Collapse
 
-**Source:** alpha-seek session, 2026-04-10
+**Source:** project-a session, 2026-04-10
 **Agent:** Claude (via Claude Code with MemPalace)
 
 ### The Problem
 
 User asked about paper trading agent positions. MemPalace correctly retrieved the agent configurations (4-agent factorial: baseline, stallion, firehose, sniper) and historical analysis (phantom agent verdict, dt_ day-trade rejection). But when the user said "get current positions," the system:
 
-1. Tried SSH to willow (wrong machine) -- failed
+1. Tried SSH to server-b (wrong machine) -- failed
 2. Tried alternate SSH path -- failed
-3. Tried find command on willow -- failed
-4. Finally discovered the data was local, not on willow
+3. Tried find command on server-b -- failed
+4. Finally discovered the data was local, not on server-b
 5. Found ONE agent's state (default), not the 4 factorial agents
 6. User ran out of context before getting the complete answer
 
@@ -688,17 +688,17 @@ Agent (after MemPalace retrieval):
 > - firehose -- overlap, BEP bypass
 > - sniper -- no overlap, BEP bypass
 > [...]
-> Want me to check those on willow, or is this enough?
+> Want me to check those on server-b, or is this enough?
 
 User: "yeah get current positions"
 
-Agent: ssh willow "find ~/projects/alpha-seek/data/paper_trading ..."
+Agent: ssh server-b "find ~/projects/project-a/data/paper_trading ..."
   -> No output
-Agent: ssh willow "ls -la ~/projects/alpha-seek/data/paper_trading/"
+Agent: ssh server-b "ls -la ~/projects/project-a/data/paper_trading/"
   -> Error: No such file or directory
-Agent: ssh willow "find ~/projects/alpha-seek -maxdepth 3 -type d -name '*paper*'"
+Agent: ssh server-b "find ~/projects/project-a -maxdepth 3 -type d -name '*paper*'"
   -> No output
-Agent: "It's local, not on willow."
+Agent: "It's local, not on server-b."
 Agent: [finds local path, reads single agent state]
   -> Cash: $5,000.00, Open positions: none, Cumulative P&L: $0.00
   -> "This looks like a single default agent."
@@ -708,7 +708,7 @@ Agent: [finds local path, reads single agent state]
 
 1. **Location ignorance.** MemPalace stored the agent analysis (what the agents are, what they found) but not where the data lives (which machine, which path). The "what" without the "where" forced blind exploration.
 
-2. **Machine confusion.** The system assumed data was on willow (the Debian server) when it was local on lorax (the workstation). This is an infrastructure fact that should have been a behavioral belief: "alpha-seek development and data are on lorax; willow is for services."
+2. **Machine confusion.** The system assumed data was on server-b (the Debian server) when it was local on lorax (the workstation). This is an infrastructure fact that should have been a behavioral belief: "project-a development and data are on lorax; server-b is for services."
 
 3. **Multi-hop failure.** The query "get current positions" decomposes into:
    - Hop 1: Which agents exist? (MemPalace answered: baseline, stallion, firehose, sniper)
@@ -716,7 +716,7 @@ Agent: [finds local path, reads single agent state]
    - Hop 3: On which machine? (MemPalace guessed wrong)
    - Hop 4: Read each agent's current state (partially done for wrong agent)
    - Hop 5: Aggregate across all agents (never reached)
-   
+
    MemPalace resolved hop 1 and failed on hops 2-5. Each failed hop burned a turn and ~200 tokens of context.
 
 4. **Incomplete aggregation.** Even after finding the local path, the system reported one agent's state, not all four. The user would need 1-2 more turns to get the full picture. The query should have returned a table of all agents' positions in a single response.
@@ -732,13 +732,13 @@ The graph-based memory system would resolve this in 1 turn via multi-layer retri
 | COMMIT_BELIEF | "M038 paper trading setup" -> touched data/paper_trading/ | git log |
 | CONTAINS (file_tree) | data/paper_trading/ -> agent_baseline/, agent_stallion/, agent_firehose/, agent_sniper/ | directory scan |
 | CALLS (AST) | paper_trading_runner.py -> reads from data/paper_trading/{agent}/ | AST extraction |
-| BEHAVIORAL_BELIEF | "alpha-seek data is on lorax, compute dispatches to archon/GCP" | CLAUDE.md or user correction |
+| BEHAVIORAL_BELIEF | "project-a data is on lorax, compute dispatches to server-a/GCP" | CLAUDE.md or user correction |
 | CO_CHANGED | paper_trading_runner.py co-changes with configs/*.yaml | git co-change |
 
 Query: "paper trading current positions"
 - FTS5 matches COMMIT_BELIEF about M038 setup + CONTAINS edges to data directory
 - HRR walks from data/paper_trading/ via CONTAINS to the 4 agent subdirectories
-- Behavioral belief provides machine location (lorax, not willow)
+- Behavioral belief provides machine location (lorax, not server-b)
 - Result: "Paper trading data is at /local/path/data/paper_trading/ on lorax. 4 agents: baseline, stallion, firehose, sniper. Reading all state files..."
 
 One turn. Zero failed SSH attempts. All agents covered.
@@ -763,7 +763,7 @@ This case study validates:
 
 Ask "what are my paper trading agents' current positions?" with only the memory graph (no MemPalace, no SSH exploration). The system must:
 1. Identify all 4 factorial agents by name
-2. Provide the correct local path (not willow)
+2. Provide the correct local path (not server-b)
 3. Read all 4 agents' state in a single turn
 4. Return an aggregated table of positions/P&L
 
@@ -793,7 +793,7 @@ The agent's initial summary:
 > - 7-stage pipeline: Discover -> Extract -> Classify -> Encode -> Verify -> Index -> Maintain
 > - 9 extractors in a conditional registry
 > - Hard cases: zero-docs, doc-only, multi-language, fresh repo, major restructure
-> - Dry-run validation on alpha-seek (~6K nodes), jose-bully (~600 nodes), mud_rust (~70 nodes)
+> - Dry-run validation on project-a (~6K nodes), project-c (~600 nodes), mud_rust (~70 nodes)
 > - 5 open questions documented for implementation phase
 >
 > The Tier 3 research queue is now complete (#42 done). The remaining Tier 2 items are independent research threads that inform refinements but don't block the core architecture. The system is ready for implementation planning.
@@ -808,11 +808,11 @@ The agent then identified 5 specific untested questions:
 
 1. **What graph do you actually get from different project types?** The estimates (~600 nodes, ~70 nodes) are guesses. Are those graphs useful? A 70-node graph where every query returns the same 5 results is worthless.
 
-2. **Does HRR add value on non-alpha-seek topologies?** The 8% vocabulary gap (D157) was found on alpha-seek. Does jose-bully even have vocabulary-gap scenarios? HRR might be essential for some topologies and useless for others.
+2. **Does HRR add value on non-project-a topologies?** The 8% vocabulary gap (D157) was found on project-a. Does project-c even have vocabulary-gap scenarios? HRR might be essential for some topologies and useless for others.
 
 3. **Do the extractors produce meaningful edges on projects without explicit citations?** Alpha-seek has D### references. Jose-bully has evidence documents referencing timeline events. The citation regex won't find those. What edges do emerge from doc-only projects?
 
-4. **Are source priors correct across project types?** A commit from jose-bully ("added meeting notes from April 3") has different epistemological weight than one from alpha-seek ("implement D097 walk-forward protocol"). Same prior, different actual reliability.
+4. **Are source priors correct across project types?** A commit from project-c ("added meeting notes from April 3") has different epistemological weight than one from project-a ("implement D097 walk-forward protocol"). Same prior, different actual reliability.
 
 5. **What's the minimum viable graph?** At what point is a graph too thin to be useful? We've never measured this.
 
@@ -1147,17 +1147,17 @@ A SessionStart hook could detect the permission mode (`--dangerously-skip-permis
 
 ## CS-027: Recurring Bug Re-Debugged From Scratch (Paper Trading Agents)
 
-**What happened:** On 2026-04-14, the user reported "the paper trading agents did not fire this morning" (session 6631429e, 34 turns). Root cause: agents were running as launchd jobs on the user's laptop (thelorax), which was closed while traveling. The session spent its full duration migrating 22 agents from thelorax launchd to archon cron -- rsyncing the repo, building the venv, installing cronie, writing crontab entries, fixing Tailscale auth, and removing old launchd jobs. A dry-run test passed in interactive shell.
+**What happened:** On 2026-04-14, the user reported "the paper trading agents did not fire this morning" (session 6631429e, 34 turns). Root cause: agents were running as launchd jobs on the user's laptop (devuser), which was closed while traveling. The session spent its full duration migrating 22 agents from devuser launchd to server-a cron -- rsyncing the repo, building the venv, installing cronie, writing crontab entries, fixing Tailscale auth, and removing old launchd jobs. A dry-run test passed in interactive shell.
 
 15 hours later, the same user reported "the paper trading agents are not firing in the morning" (session 4b91a6aa, 45 turns). Same symptom. New root cause: cronie does not expand shell variable references in crontab environment definitions. The crontab set `CRON_SH=${PROJECT}/scripts/paper_trade_cron.sh`, which was stored literally as the string `${PROJECT}/scripts/...` rather than being expanded. Every job silently failed. The session also dealt with cascading damage: `git reset --hard` wiped hold_tracker.json state, requiring position reconstruction and cash back-calculation.
 
 **The memory failure:** Session 1's resolution was never ingested into agentmemory. No belief recorded the migration, the crontab contents, or the dry-run result. When session 2 started, the agent had zero context about what was done 15 hours earlier. The memory system contained 7,990 active beliefs -- almost all about agentmemory's own research. Zero beliefs about infrastructure operations, cron configuration, or the session 1 migration.
 
-**agentmemory search results (counterfactual):** Searching "paper trading agents not firing" returned 71 beliefs, none about paper trading. The results were dominated by locked corrections about agentmemory internals -- "not multi-hop", "not a product" -- because FTS5 matched on the word "not" in negation patterns. Searching "cron job schedule alpha-seek" returned 92 beliefs, also irrelevant. The negation pattern contamination was the dominant noise source.
+**agentmemory search results (counterfactual):** Searching "paper trading agents not firing" returned 71 beliefs, none about paper trading. The results were dominated by locked corrections about agentmemory internals -- "not multi-hop", "not a product" -- because FTS5 matched on the word "not" in negation patterns. Searching "cron job schedule project-a" returned 92 beliefs, also irrelevant. The negation pattern contamination was the dominant noise source.
 
 **What /mem:reason would have needed to prevent session 2:**
-1. A belief from session 1: "Migrated 22 paper trading agents from thelorax launchd to archon cronie. Crontab uses CRON_SH=${PROJECT}/scripts/paper_trade_cron.sh. Dry-run passed in interactive shell."
-2. Temporal context: "14 hours ago, you migrated cron jobs to archon. The dry-run passed in an interactive shell but cron environments don't expand variables the same way."
+1. A belief from session 1: "Migrated 22 paper trading agents from devuser launchd to server-a cronie. Crontab uses CRON_SH=${PROJECT}/scripts/paper_trade_cron.sh. Dry-run passed in interactive shell."
+2. Temporal context: "14 hours ago, you migrated cron jobs to server-a. The dry-run passed in an interactive shell but cron environments don't expand variables the same way."
 3. Consequence path: "If crontab uses ${PROJECT} -&gt; cronie stores literal string -&gt; every job fails silently -&gt; agents don't fire"
 
 **Pattern:** P12 (new: **cross-session operational amnesia**). The agent completes complex infrastructure work but stores nothing about it. The next session re-debugs from zero. This differs from CS-009 (looping on failed approach) because the first session succeeded -- the resolution was correct but incomplete, and neither the success nor the incompleteness was recorded.
@@ -1171,7 +1171,7 @@ A SessionStart hook could detect the permission mode (`--dangerously-skip-permis
 **What memory should do:**
 1. **Session-end operational summaries.** When a session involves infrastructure changes (migrations, config changes, deployments), automatically extract and store what was done, what was tested, and what assumptions were made. The crontab variable expansion assumption was the latent bug.
 2. **Incomplete-fix detection.** The dry-run passed in interactive shell but not in cron environment. A belief like "tested in interactive shell only, not in cron environment" would have flagged the gap.
-3. **Cross-project ingestion.** The alpha-seek-memtest project was not actively using agentmemory for ops-level events. Infrastructure changes need to be stored regardless of which project they affect.
+3. **Cross-project ingestion.** The project-a-test project was not actively using agentmemory for ops-level events. Infrastructure changes need to be stored regardless of which project they affect.
 
 **REQ mapping:** REQ-001 (cross-session decision retention), REQ-019 (single-correction learning -- the resolution should persist). New requirement candidate:
 - REQ-NEW-L: Operational event ingestion -- infrastructure changes, deployments, and migrations must be automatically captured as beliefs with timestamps and test coverage notes.
@@ -1276,11 +1276,11 @@ The fix from session 504ccc1b was correct but incomplete. The agent fixed `remem
 
 ## CS-030: Cross-Project Knowledge Isolation (Stash Debugging)
 
-**What happened:** In session 14995e1c (2026-04-14, 57 turns), the user reported "stash is having major performance/streaming issues." The agent immediately misdiagnosed: "Willow is completely unreachable -- 100% packet loss." The user corrected: "willow is not down entirely, you are on tailscale trying to access it from another LAN." The session spent 57 turns debugging network topology (DERP relay, symmetric NAT, subnet routing, SSH tunnels), proposing dead-end solutions (phone hotspot, Jellyfin migration), and eventually discovering that 39 of 42 Stash plugins were causing slow page loads.
+**What happened:** In session 14995e1c (2026-04-14, 57 turns), the user reported "stash is having major performance/streaming issues." The agent immediately misdiagnosed: "Willow is completely unreachable -- 100% packet loss." The user corrected: "server-b is not down entirely, you are on tailscale trying to access it from another LAN." The session spent 57 turns debugging network topology (DERP relay, symmetric NAT, subnet routing, SSH tunnels), proposing dead-end solutions (phone hotspot, Jellyfin migration), and eventually discovering that 39 of 42 Stash plugins were causing slow page loads.
 
-**The memory failure:** The belief store contained 7,990 active beliefs, almost all about agentmemory's own research. Zero beliefs about: the user's network topology (Tailscale, DERP, gl-mt2500, symmetric NAT), Stash's configuration, prior debugging of willow/stash, or the relationship between the user's travel setup and LAN access.
+**The memory failure:** The belief store contained 7,990 active beliefs, almost all about agentmemory's own research. Zero beliefs about: the user's network topology (Tailscale, DERP, gl-mt2500, symmetric NAT), Stash's configuration, prior debugging of server-b/stash, or the relationship between the user's travel setup and LAN access.
 
-**agentmemory search results (counterfactual):** Searching "stash streaming performance" returned 82 beliefs, all about agentmemory internals. The word "stash" does not appear in any belief. Searching "willow server media" found 2 tangential beliefs -- one acknowledging willow exists, one recording prior confusion about data location. Neither would have prevented any wrong turns.
+**agentmemory search results (counterfactual):** Searching "stash streaming performance" returned 82 beliefs, all about agentmemory internals. The word "stash" does not appear in any belief. Searching "server-b server media" found 2 tangential beliefs -- one acknowledging server-b exists, one recording prior confusion about data location. Neither would have prevented any wrong turns.
 
 **Wrong turns identified:**
 1. Turn 1: "Willow completely unreachable" -- didn't consider Tailscale context (2 turns)
@@ -1292,7 +1292,7 @@ The fix from session 504ccc1b was correct but incomplete. The agent fixed `remem
 **Total: ~22 wrong-turn turns out of 57 (39%)**
 
 **What /mem:reason would have needed (but couldn't have):**
-1. "You are on Tailscale, not the same LAN as willow" -- would have prevented the 'server down' misdiagnosis
+1. "You are on Tailscale, not the same LAN as server-b" -- would have prevented the 'server down' misdiagnosis
 2. "gl-mt2500 is a low-power travel router with limited throughput" -- would have avoided the subnet routing dead end
 3. "Stash has 42 plugins that cause slow page loads" -- would have jumped to plugin optimization
 
@@ -1326,7 +1326,7 @@ None of this is in agentmemory because: (a) it's a different project entirely, (
 
 ## CS-031: Decision Never Stored as Belief (MemPalace Uninstall)
 
-**What happened:** In session 314f06e1 (2026-04-14, 27 turns), the user asked for project status on alpha-seek-memtest. The agent used MemPalace tools instead of agentmemory tools. The user corrected: "i thought we turned off and uninstalled mempalace." The agent couldn't confirm whether this decision had been executed because the decision was never stored as a belief.
+**What happened:** In session 314f06e1 (2026-04-14, 27 turns), the user asked for project status on project-a-test. The agent used MemPalace tools instead of agentmemory tools. The user corrected: "i thought we turned off and uninstalled mempalace." The agent couldn't confirm whether this decision had been executed because the decision was never stored as a belief.
 
 **The memory failure:** At some point in a prior session, the user decided to uninstall MemPalace and use only agentmemory. This decision was either never stored or stored without enough specificity to be retrieved. The closest beliefs in the store: "The correction 'mempalace is already an MCP tool, don't pip install it' was lost across sessions" (meta-ironic -- records that a MemPalace correction was itself lost) and "lhl verdict on MemPalace: NOT promoted to main comparison table due to claims-vs-code gap" (evaluation, not decision).
 
@@ -1598,7 +1598,7 @@ Anthropic generated a usage report across 2,143 messages, 176 sessions, 530 tota
 
 The report identifies friction modes we haven't formally cataloged:
 
-1. **Environment confusion (checking wrong host).** Claude checked local machine instead of remote server `willow`. This is a spatial context failure -- the agent lost track of which machine it was operating on. Maps to multi-project isolation (Exp 43): if project context includes "infra = willow," that should be a loaded belief.
+1. **Environment confusion (checking wrong host).** Claude checked local machine instead of remote server `server-b`. This is a spatial context failure -- the agent lost track of which machine it was operating on. Maps to multi-project isolation (Exp 43): if project context includes "infra = server-b," that should be a loaded belief.
 
 2. **Duplicate process spawning.** Claude launched duplicate remote processes, creating resource contention. This is an action-memory failure: the agent didn't check whether a process was already running before starting another. Maps to FOK check: before spawning, query recent actions for existing processes on the same target.
 

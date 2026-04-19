@@ -126,7 +126,7 @@
 ### REQ-019: Single-Correction Learning
 - **Code:** `server.py::correct()` creates locked beliefs with `source_type='user_corrected'`, alpha=9.0. `ingest.py::ingest_turn()` detects corrections via `detect_correction()` and creates locked beliefs with SUPERSEDES edges.
 - **Tests:** `test_extraction.py::test_correction_creates_locked_belief`, `test_correction_detection_count`. Acceptance tests: `test_cs002_locked_correction.py` (5 tests), `test_cs009_supersession.py` (4 tests).
-- **Status:** Core mechanism implemented and tested. The 90% prevention threshold is not measured via the alpha-seek replay specified in the requirement.
+- **Status:** Core mechanism implemented and tested. The 90% prevention threshold is not measured via the project-a replay specified in the requirement.
 
 ### REQ-020: Locked Beliefs
 - **Code:** `store.py::lock_belief()` sets locked flag. `update_confidence()` blocks beta_param increase on locked beliefs (confidence floor preserved). `supersede_belief()` checks locked flag at store.py:641-644 and returns early without superseding if target is locked.

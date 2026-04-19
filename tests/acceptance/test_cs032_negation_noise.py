@@ -24,7 +24,7 @@ def test_cs032_negation_corrections_dont_dominate(store: MemoryStore) -> None:
     completely exclude the topical target from results."""
     # Target belief -- give it user_stated source for higher weight
     target: Belief = store.insert_belief(
-        content="Paper trading agents are not firing in the morning on archon server",
+        content="Paper trading agents are not firing in the morning on server-a server",
         belief_type=BELIEF_FACTUAL,
         source_type=BSRC_USER_STATED,
     )

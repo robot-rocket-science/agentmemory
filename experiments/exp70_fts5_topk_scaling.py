@@ -5,6 +5,7 @@ coverage, and identifies the point of diminishing returns.
 
 Read-only against live DB. No writes.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -21,7 +22,7 @@ from agentmemory.store import MemoryStore
 # Config
 # ---------------------------------------------------------------------------
 
-CWD: Final[str] = "/Users/thelorax/projects/agentmemory"
+CWD: Final[str] = "/home/user/projects/agentmemory"
 DB_HASH: Final[str] = hashlib.sha256(CWD.encode()).hexdigest()[:12]
 LIVE_DB: Final[Path] = Path.home() / ".agentmemory" / "projects" / DB_HASH / "memory.db"
 
@@ -51,6 +52,7 @@ QUERIES: Final[list[str]] = [
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def measure_at_topk(
     store: MemoryStore,
@@ -101,9 +103,13 @@ def measure_at_topk(
         t1: float = time.perf_counter()
         latencies_ms.append((t1 - t0) * 1000.0)
 
-    mrr: float = sum(reciprocal_ranks) / len(reciprocal_ranks) if reciprocal_ranks else 0.0
+    mrr: float = (
+        sum(reciprocal_ranks) / len(reciprocal_ranks) if reciprocal_ranks else 0.0
+    )
     coverage: float = total_hits / total_expected if total_expected > 0 else 0.0
-    avg_latency_ms: float = sum(latencies_ms) / len(latencies_ms) if latencies_ms else 0.0
+    avg_latency_ms: float = (
+        sum(latencies_ms) / len(latencies_ms) if latencies_ms else 0.0
+    )
     avg_tokens: float = total_tokens / len(queries) if queries else 0.0
 
     return {
@@ -121,6 +127,7 @@ def measure_at_topk(
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     if not LIVE_DB.exists():
@@ -143,7 +150,9 @@ def main() -> None:
     results_per_k: list[dict[str, object]] = []
     for top_k in TOP_K_VALUES:
         print(f"\nMeasuring top_k={top_k}...")
-        metrics: dict[str, object] = measure_at_topk(store, QUERIES, ground_truth, top_k)
+        metrics: dict[str, object] = measure_at_topk(
+            store, QUERIES, ground_truth, top_k
+        )
         results_per_k.append(metrics)
         print(f"  Coverage:  {metrics['coverage']:.4f}")
         print(f"  MRR@{MRR_K}:   {metrics['mrr']:.4f}")
@@ -162,19 +171,25 @@ def main() -> None:
         delta_cov: float = curr_cov - prev_cov
         delta_k: int = curr_k - prev_k
         marginal: float = delta_cov / delta_k if delta_k > 0 else 0.0
-        marginal_gains.append({
-            "from_k": prev_k,
-            "to_k": curr_k,
-            "coverage_delta": delta_cov,
-            "marginal_per_k": marginal,
-        })
-        print(f"  {prev_k} -> {curr_k}: coverage delta = {delta_cov:+.4f}, marginal = {marginal:.6f}/k")
+        marginal_gains.append(
+            {
+                "from_k": prev_k,
+                "to_k": curr_k,
+                "coverage_delta": delta_cov,
+                "marginal_per_k": marginal,
+            }
+        )
+        print(
+            f"  {prev_k} -> {curr_k}: coverage delta = {delta_cov:+.4f}, marginal = {marginal:.6f}/k"
+        )
 
     # Find best top_k within budget
     best_within_budget: dict[str, object] | None = None
     for m in results_per_k:
         if m["within_budget"]:
-            if best_within_budget is None or float(m["coverage"]) > float(best_within_budget["coverage"]):  # type: ignore[arg-type]
+            if best_within_budget is None or float(m["coverage"]) > float(
+                best_within_budget["coverage"]
+            ):  # type: ignore[arg-type]
                 best_within_budget = m
 
     output: dict[str, object] = {

@@ -17,14 +17,14 @@ For each override in each cluster, judge: does this override actually belong to 
 | # | Date | Override | Verdict | Correct Topic |
 |---|------|---------|---------|---------------|
 | 1 | 03-26 | "make sure GCP build is fully up to date before dispatching" | YES | dispatch_gate |
-| 2 | 03-26 | "archon for overflow, GCP is primary compute" | NO | gcp_primary |
+| 2 | 03-26 | "server-a for overflow, GCP is primary compute" | NO | gcp_primary |
 | 3 | 03-27 | "always satisfy the deploy gate" | YES | dispatch_gate |
-| 4 | 03-27 | "copy from optimus-prime directly into alpha-seek" | NO | code_organization (new topic) |
+| 4 | 03-27 | "copy from project-b directly into project-a" | NO | code_organization (new topic) |
 | 5 | 03-27 | "please report returns in annualized terms" | NO | reporting_format (new topic) |
 | 6 | 03-27 | "follow exactly what the dispatch gate requires" | YES | dispatch_gate |
 | 7 | 03-29 | "do not implement artificial contract filters" | NO | no_artificial_filters |
 | 8 | 03-29 | "illiquid option filter is fine" | NO | no_artificial_filters |
-| 9 | 03-29 | "archon is overflow only, do not run tests directly" | PARTIAL | gcp_primary / dispatch_gate overlap |
+| 9 | 03-29 | "server-a is overflow only, do not run tests directly" | PARTIAL | gcp_primary / dispatch_gate overlap |
 | 10 | 03-30 | "leave enough headroom when dispatching" | YES | dispatch_gate |
 | 11 | 03-30 | "update the runbook" (first) | YES | dispatch_gate |
 | 12 | 03-30 | "update the runbook" (duplicate, same minute) | YES | dispatch_gate (duplicate) |
@@ -79,13 +79,13 @@ For each override in each cluster, judge: does this override actually belong to 
 
 | # | Date | Override | Verdict |
 |---|------|---------|---------|
-| 1 | 03-26 | "use GCP, archon is overflow only" | YES |
+| 1 | 03-26 | "use GCP, server-a is overflow only" | YES |
 | 2 | 03-28 | "use gcp as often as you like" | YES |
 | 3 | 04-02 | "$219 credit remaining on gcp" | PARTIAL -- informational, not a correction |
 
 Plus the false matches from dispatch_gate that belong here:
-| 2 | 03-26 | "archon for overflow, GCP is primary" | YES (moved from dispatch_gate) |
-| 9 | 03-29 | "archon is overflow only, do not run tests directly" | YES (moved from dispatch_gate) |
+| 2 | 03-26 | "server-a for overflow, GCP is primary" | YES (moved from dispatch_gate) |
+| 9 | 03-29 | "server-a is overflow only, do not run tests directly" | YES (moved from dispatch_gate) |
 
 **Corrected count:** 4-5
 
@@ -93,7 +93,7 @@ Plus the false matches from dispatch_gate that belong here:
 
 | Topic | Overrides | Content |
 |-------|-----------|---------|
-| code_organization | 1 | "copy from optimus-prime directly" (D090) |
+| code_organization | 1 | "copy from project-b directly" (D090) |
 | reporting_format | 1 | "report returns in annualized terms" (D103) |
 | no_artificial_filters | 2 | D118 (no hard filters) + D119 (illiquidity gate ok) |
 | backtesting_protocol | 1 | D097/D098 backtesting rules |

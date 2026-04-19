@@ -93,17 +93,26 @@ class ProjectResult:
 # ---------------------------------------------------------------------------
 
 SKIP_DIRS: Final[set[str]] = {
-    ".venv", "__pycache__", ".git", "node_modules", ".egg-info",
-    "target", ".mypy_cache", ".pytest_cache", "dist", "build",
-    ".tox", ".ruff_cache",
+    ".venv",
+    "__pycache__",
+    ".git",
+    "node_modules",
+    ".egg-info",
+    "target",
+    ".mypy_cache",
+    ".pytest_cache",
+    "dist",
+    "build",
+    ".tox",
+    ".ruff_cache",
 }
 
 PROJECTS: Final[dict[str, Path]] = {
-    "alpha-seek": Path("/Users/thelorax/projects/alpha-seek"),
-    "optimus-prime": Path("/Users/thelorax/projects/optimus-prime"),
-    "debserver": Path("/Users/thelorax/projects/debserver"),
-    "jose-bully": Path("/Users/thelorax/projects/jose-bully"),
-    "code-monkey": Path("/Users/thelorax/projects/code-monkey"),
+    "project-a": Path("/home/user/projects/project-a"),
+    "project-b": Path("/home/user/projects/project-b"),
+    "project-d": Path("/home/user/projects/project-d"),
+    "project-c": Path("/home/user/projects/project-c"),
+    "project-e": Path("/home/user/projects/project-e"),
 }
 
 # Patterns that indicate directive/behavioral beliefs
@@ -145,7 +154,11 @@ TOOL_PURPOSE_MAP: Final[dict[str, list[str]]] = {
     "async_bash": ["background execution", "long running task", "parallel command"],
     "await_job": ["wait for completion", "check job status", "poll results"],
     "pyright": ["type checking Python code", "static analysis", "type errors"],
-    "docker": ["containerize application", "build deployment image", "isolate dependencies"],
+    "docker": [
+        "containerize application",
+        "build deployment image",
+        "isolate dependencies",
+    ],
     "git push --force": ["overwrite remote history", "rewrite branch", "force update"],
     "git rebase -i": ["squash commits", "edit commit history", "clean up branch"],
     "ssh": ["remote machine access", "connect to server", "run command remotely"],
@@ -167,87 +180,128 @@ TOOL_PURPOSE_MAP: Final[dict[str, list[str]]] = {
 
 # Domain-specific term mappings: jargon -> plain description
 DOMAIN_TERM_MAP: Final[dict[str, list[str]]] = {
-    "walk-forward": ["evaluate strategy over time", "test on rolling periods",
-                     "sequential validation"],
+    "walk-forward": [
+        "evaluate strategy over time",
+        "test on rolling periods",
+        "sequential validation",
+    ],
     "kelly": ["optimal bet sizing", "how much to wager", "position sizing"],
-    "sharpe": ["risk-adjusted performance", "return per unit risk",
-               "portfolio quality metric"],
+    "sharpe": [
+        "risk-adjusted performance",
+        "return per unit risk",
+        "portfolio quality metric",
+    ],
     "otm": ["cheap option contract", "out of money option", "low probability bet"],
-    "dte": ["time until option expires", "days remaining on contract",
-            "option expiration window"],
+    "dte": [
+        "time until option expires",
+        "days remaining on contract",
+        "option expiration window",
+    ],
     "pnl": ["profit and loss", "trading results", "money made or lost"],
-    "backtest": ["test strategy on historical data", "simulate past trades",
-                 "validate approach"],
+    "backtest": [
+        "test strategy on historical data",
+        "simulate past trades",
+        "validate approach",
+    ],
     "dispatch": ["send job to compute", "deploy to server", "run remotely"],
-    "embargo": ["waiting period between data", "buffer zone in time",
-                "separation between train and test"],
-    "holdout": ["reserved test data", "data not used for training",
-                "validation set"],
+    "embargo": [
+        "waiting period between data",
+        "buffer zone in time",
+        "separation between train and test",
+    ],
+    "holdout": ["reserved test data", "data not used for training", "validation set"],
     "gcp": ["Google cloud computing", "cloud server", "remote compute"],
-    "nfs": ["shared network storage", "mounted drive across machines",
-            "file sharing between servers"],
-    "dhcp": ["automatic IP assignment", "network address configuration",
-             "device gets IP address"],
-    "poe": ["power over ethernet", "power network device through cable",
-            "ethernet powered device"],
+    "nfs": [
+        "shared network storage",
+        "mounted drive across machines",
+        "file sharing between servers",
+    ],
+    "dhcp": [
+        "automatic IP assignment",
+        "network address configuration",
+        "device gets IP address",
+    ],
+    "poe": [
+        "power over ethernet",
+        "power network device through cable",
+        "ethernet powered device",
+    ],
     "vlan": ["virtual network segment", "network isolation", "traffic separation"],
-    "ci": ["automated testing on push", "continuous integration",
-           "build verification"],
+    "ci": ["automated testing on push", "continuous integration", "build verification"],
     "cd": ["automated deployment", "continuous delivery", "auto-deploy"],
-    "hr": ["human resources department", "workplace complaint",
-           "employment issue"],
-    "uat": ["user acceptance testing", "verify feature works for user",
-            "manual testing"],
+    "hr": ["human resources department", "workplace complaint", "employment issue"],
+    "uat": [
+        "user acceptance testing",
+        "verify feature works for user",
+        "manual testing",
+    ],
 }
 
 # Behavioral verb -> situation mapping
 BEHAVIOR_SITUATION_MAP: Final[dict[str, list[str]]] = {
-    "cite": ["presenting research findings", "writing project document",
-             "making factual claim"],
-    "verify": ["about to ship code", "completing a task",
-               "checking work before submission"],
-    "test": ["ready to deploy code", "finished implementing feature",
-             "preparing release"],
-    "review": ["merging pull request", "approving code change",
-               "evaluating contribution"],
-    "document": ["finishing feature implementation", "completing milestone",
-                 "recording decision"],
-    "update": ["after completing work", "state changed",
-               "new information available"],
-    "deploy": ["shipping to production", "releasing code",
-               "pushing to server"],
-    "commit": ["saving code changes", "recording progress",
-               "checkpointing work"],
-    "build": ["compiling project", "creating artifact",
-              "preparing release"],
-    "report": ["summarizing findings", "presenting results",
-               "communicating status"],
-    "type": ["writing new Python code", "modifying function signature",
-             "adding new module"],
-    "annotate": ["defining function interface", "declaring variable",
-                 "creating data structure"],
-    "format": ["cleaning up code", "preparing for review",
-               "standardizing style"],
-    "lint": ["checking code quality", "finding style issues",
-             "pre-commit check"],
-    "rebalance": ["adjusting portfolio weights", "changing position mix",
-                  "strategy allocation change"],
-    "elaborate": ["explaining code to user", "providing details",
-                  "expanding on topic"],
-    "suggest": ["proposing approach", "recommending solution",
-                "offering alternative"],
-    "recommend": ["advising on approach", "proposing strategy",
-                  "suggesting direction"],
-    "consider": ["evaluating options", "weighing alternatives",
-                 "thinking about approach"],
-    "propose": ["pitching new idea", "suggesting change",
-                "recommending modification"],
+    "cite": [
+        "presenting research findings",
+        "writing project document",
+        "making factual claim",
+    ],
+    "verify": [
+        "about to ship code",
+        "completing a task",
+        "checking work before submission",
+    ],
+    "test": [
+        "ready to deploy code",
+        "finished implementing feature",
+        "preparing release",
+    ],
+    "review": [
+        "merging pull request",
+        "approving code change",
+        "evaluating contribution",
+    ],
+    "document": [
+        "finishing feature implementation",
+        "completing milestone",
+        "recording decision",
+    ],
+    "update": ["after completing work", "state changed", "new information available"],
+    "deploy": ["shipping to production", "releasing code", "pushing to server"],
+    "commit": ["saving code changes", "recording progress", "checkpointing work"],
+    "build": ["compiling project", "creating artifact", "preparing release"],
+    "report": ["summarizing findings", "presenting results", "communicating status"],
+    "type": [
+        "writing new Python code",
+        "modifying function signature",
+        "adding new module",
+    ],
+    "annotate": [
+        "defining function interface",
+        "declaring variable",
+        "creating data structure",
+    ],
+    "format": ["cleaning up code", "preparing for review", "standardizing style"],
+    "lint": ["checking code quality", "finding style issues", "pre-commit check"],
+    "rebalance": [
+        "adjusting portfolio weights",
+        "changing position mix",
+        "strategy allocation change",
+    ],
+    "elaborate": ["explaining code to user", "providing details", "expanding on topic"],
+    "suggest": ["proposing approach", "recommending solution", "offering alternative"],
+    "recommend": ["advising on approach", "proposing strategy", "suggesting direction"],
+    "consider": [
+        "evaluating options",
+        "weighing alternatives",
+        "thinking about approach",
+    ],
+    "propose": ["pitching new idea", "suggesting change", "recommending modification"],
 }
 
 
 # ---------------------------------------------------------------------------
 # Step 1: Extract directives from a project
 # ---------------------------------------------------------------------------
+
 
 def find_md_files(project_root: Path) -> list[Path]:
     """Find all .md files in a project, respecting skip dirs."""
@@ -309,8 +363,11 @@ def _is_directive_sentence(sentence: str, source_file: str) -> bool:
 
     # High-priority source files: always treat as directives
     priority_files: list[str] = [
-        "claude.md", "requirements.md", "decisions.md",
-        "knowledge.md", "overrides.md",
+        "claude.md",
+        "requirements.md",
+        "decisions.md",
+        "knowledge.md",
+        "overrides.md",
     ]
     src_lower: str = source_file.lower()
     if any(pf in src_lower for pf in priority_files):
@@ -325,9 +382,7 @@ def _is_directive_sentence(sentence: str, source_file: str) -> bool:
         re.compile(r"\b\d+\.\d+%"),  # percentage data
         re.compile(r"\b(m\d{3}|s\d{2}|t\d{2}|r\d+)\b", re.I),  # milestone/task IDs
     ]
-    narrative_score: int = sum(
-        1 for p in narrative_patterns if p.search(lower)
-    )
+    narrative_score: int = sum(1 for p in narrative_patterns if p.search(lower))
 
     # Directive indicators: imperative mood, second person, prescriptive
     directive_patterns: list[re.Pattern[str]] = [
@@ -337,9 +392,7 @@ def _is_directive_sentence(sentence: str, source_file: str) -> bool:
         re.compile(r"^(do not|never|always|must)\b", re.I),
         re.compile(r"\b(before|after|when|whenever|if you)\b", re.I),
     ]
-    directive_score: int = sum(
-        1 for p in directive_patterns if p.search(lower)
-    )
+    directive_score: int = sum(1 for p in directive_patterns if p.search(lower))
 
     # If clearly narrative, reject
     if narrative_score >= 2 and directive_score == 0:
@@ -380,12 +433,14 @@ def extract_directives(project_name: str, project_root: Path) -> list[Directive]
                     norm: str = sentence.lower().strip()
                     if norm not in seen_texts:
                         seen_texts.add(norm)
-                        directives.append(Directive(
-                            text=sentence,
-                            source_file=rel_path,
-                            pattern_matched=match.group(0),
-                            project=project_name,
-                        ))
+                        directives.append(
+                            Directive(
+                                text=sentence,
+                                source_file=rel_path,
+                                pattern_matched=match.group(0),
+                                project=project_name,
+                            )
+                        )
                     break  # one match per sentence is enough
 
     return directives
@@ -410,6 +465,7 @@ def extract_all_sentences(project_root: Path) -> list[str]:
 # Step 2: Generate situation-based queries (rule-based, no LLM)
 # ---------------------------------------------------------------------------
 
+
 def _extract_tool_names(text: str) -> list[str]:
     """Extract tool/command names from directive text."""
     # Look for backtick-quoted terms
@@ -419,7 +475,8 @@ def _extract_tool_names(text: str) -> list[str]:
         r"\b(async_bash|await_job|pyright|docker|git\s+\w+|ssh|scp|rsync|"
         r"gcloud|pip|conda|uv|make|curl|wget|npm|pytest|mypy|ruff|black|"
         r"sftp|apt|brew|cargo|go|rustc|gcc|javac|mvn|gradle)\b",
-        text, re.IGNORECASE,
+        text,
+        re.IGNORECASE,
     )
     return backtick_terms + cmd_patterns
 
@@ -458,21 +515,130 @@ def _extract_behavior_verbs(text: str) -> list[str]:
 def _get_content_words(text: str) -> set[str]:
     """Get content words (non-stopword, non-punctuation) from text."""
     stop_words: set[str] = {
-        "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-        "have", "has", "had", "do", "does", "did", "will", "would", "shall",
-        "should", "may", "might", "can", "could", "must", "ought", "need",
-        "dare", "to", "of", "in", "for", "on", "with", "at", "by", "from",
-        "as", "into", "through", "during", "before", "after", "above",
-        "below", "between", "out", "off", "over", "under", "again",
-        "further", "then", "once", "here", "there", "when", "where", "why",
-        "how", "all", "both", "each", "few", "more", "most", "other",
-        "some", "such", "no", "nor", "not", "only", "own", "same", "so",
-        "than", "too", "very", "just", "because", "but", "and", "or", "if",
-        "while", "that", "this", "it", "its", "which", "who", "whom",
-        "what", "these", "those", "i", "me", "my", "we", "our", "you",
-        "your", "he", "him", "his", "she", "her", "they", "them", "their",
-        "always", "never", "don't", "must", "banned", "stop", "mandatory",
-        "required", "important", "shall", "forbidden", "every", "any",
+        "the",
+        "a",
+        "an",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "shall",
+        "should",
+        "may",
+        "might",
+        "can",
+        "could",
+        "must",
+        "ought",
+        "need",
+        "dare",
+        "to",
+        "of",
+        "in",
+        "for",
+        "on",
+        "with",
+        "at",
+        "by",
+        "from",
+        "as",
+        "into",
+        "through",
+        "during",
+        "before",
+        "after",
+        "above",
+        "below",
+        "between",
+        "out",
+        "off",
+        "over",
+        "under",
+        "again",
+        "further",
+        "then",
+        "once",
+        "here",
+        "there",
+        "when",
+        "where",
+        "why",
+        "how",
+        "all",
+        "both",
+        "each",
+        "few",
+        "more",
+        "most",
+        "other",
+        "some",
+        "such",
+        "no",
+        "nor",
+        "not",
+        "only",
+        "own",
+        "same",
+        "so",
+        "than",
+        "too",
+        "very",
+        "just",
+        "because",
+        "but",
+        "and",
+        "or",
+        "if",
+        "while",
+        "that",
+        "this",
+        "it",
+        "its",
+        "which",
+        "who",
+        "whom",
+        "what",
+        "these",
+        "those",
+        "i",
+        "me",
+        "my",
+        "we",
+        "our",
+        "you",
+        "your",
+        "he",
+        "him",
+        "his",
+        "she",
+        "her",
+        "they",
+        "them",
+        "their",
+        "always",
+        "never",
+        "don't",
+        "must",
+        "banned",
+        "stop",
+        "mandatory",
+        "required",
+        "important",
+        "shall",
+        "forbidden",
+        "every",
+        "any",
     }
     words: list[str] = re.findall(r"[a-z][a-z0-9_-]+", text.lower())
     return {w for w in words if w not in stop_words and len(w) > 2}
@@ -536,7 +702,7 @@ def generate_queries(directive: Directive) -> QuerySet:
 
     # Ensure we always have exactly 3
     while len(queries) < 3:
-        queries.append(f"general project task context")
+        queries.append("general project task context")
         low_confidence = True
 
     return QuerySet(queries=queries[:3], low_confidence=low_confidence)
@@ -546,12 +712,11 @@ def generate_queries(directive: Directive) -> QuerySet:
 # Step 3: FTS5 retrieval testing
 # ---------------------------------------------------------------------------
 
+
 def build_fts5_index(sentences: list[str]) -> sqlite3.Connection:
     """Build an in-memory FTS5 index over all sentences."""
     conn: sqlite3.Connection = sqlite3.connect(":memory:")
-    conn.execute(
-        "CREATE VIRTUAL TABLE corpus USING fts5(content, tokenize='porter')"
-    )
+    conn.execute("CREATE VIRTUAL TABLE corpus USING fts5(content, tokenize='porter')")
     for sent in sentences:
         conn.execute("INSERT INTO corpus(content) VALUES (?)", (sent,))
     conn.commit()
@@ -571,8 +736,7 @@ def fts5_search(
     fts_query: str = " OR ".join(words)
     try:
         rows: list[tuple[str]] = conn.execute(
-            "SELECT content FROM corpus WHERE corpus MATCH ? "
-            "ORDER BY rank LIMIT ?",
+            "SELECT content FROM corpus WHERE corpus MATCH ? ORDER BY rank LIMIT ?",
             (fts_query, top_k),
         ).fetchall()
         return [str(r[0]) for r in rows]
@@ -633,6 +797,7 @@ def _texts_match(a: str, b: str) -> bool:
 # Step 4: Classify gap category
 # ---------------------------------------------------------------------------
 
+
 def classify_gap(directive: Directive) -> str:
     """Classify a vocabulary-gap directive into a category."""
     text_lower: str = directive.text.lower()
@@ -640,8 +805,17 @@ def classify_gap(directive: Directive) -> str:
     # Tool ban: mentions specific tools/commands with negative language
     tools: list[str] = _extract_tool_names(directive.text)
     negative_words: list[str] = [
-        "banned", "never", "don't", "do not", "must not", "shall not",
-        "forbidden", "stop", "not use", "avoid", "prohibit",
+        "banned",
+        "never",
+        "don't",
+        "do not",
+        "must not",
+        "shall not",
+        "forbidden",
+        "stop",
+        "not use",
+        "avoid",
+        "prohibit",
     ]
     has_negative: bool = any(w in text_lower for w in negative_words)
     if tools and has_negative:
@@ -660,16 +834,31 @@ def classify_gap(directive: Directive) -> str:
 
     # Cross-domain constraint: mentions specific platform/service names
     platform_terms: list[str] = [
-        "gcp", "aws", "azure", "docker", "kubernetes", "willow",
-        "archon", "mintaka", "alnilam", "alnitak",
+        "gcp",
+        "aws",
+        "azure",
+        "docker",
+        "kubernetes",
+        "server-b",
+        "server-a",
+        "server-c",
+        "alnilam",
+        "alnitak",
     ]
     if any(t in text_lower for t in platform_terms):
         return "cross_domain_constraint"
 
     # Implicit rule: process/behavioral rules without specific tool mention
     process_words: list[str] = [
-        "before", "after", "whenever", "every time", "each time",
-        "when you", "if you", "make sure", "ensure",
+        "before",
+        "after",
+        "whenever",
+        "every time",
+        "each time",
+        "when you",
+        "if you",
+        "make sure",
+        "ensure",
     ]
     if any(w in text_lower for w in process_words):
         return "implicit_rule"
@@ -684,6 +873,7 @@ def classify_gap(directive: Directive) -> str:
 # ---------------------------------------------------------------------------
 # Step 5: Assess HRR bridgeability
 # ---------------------------------------------------------------------------
+
 
 def assess_hrr_bridgeability(
     directive: Directive,
@@ -730,11 +920,12 @@ def assess_hrr_bridgeability(
 # Main analysis pipeline
 # ---------------------------------------------------------------------------
 
+
 def analyze_project(project_name: str, project_path: Path) -> ProjectResult:
     """Run the full vocab-gap analysis on a single project."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Analyzing: {project_name} ({project_path})")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     # Step 1: Extract directives
     directives: list[Directive] = extract_directives(project_name, project_path)
@@ -769,7 +960,8 @@ def analyze_project(project_name: str, project_path: Path) -> ProjectResult:
             bridgeable: bool
             colocated: list[str]
             bridgeable, colocated = assess_hrr_bridgeability(
-                directive, directives,
+                directive,
+                directives,
             )
             result.hrr_bridgeable = bridgeable
             result.colocated_directives = colocated
@@ -833,8 +1025,7 @@ def _gap_result_to_dict(result: GapResult) -> dict[str, Any]:
         "hrr_bridgeable": result.hrr_bridgeable,
         "colocated_directives": result.colocated_directives,
         "fts5_top_hits": {
-            q: [h[:80] for h in hits[:2]]
-            for q, hits in result.fts5_hits.items()
+            q: [h[:80] for h in hits[:2]] for q, hits in result.fts5_hits.items()
         },
     }
 
@@ -842,6 +1033,7 @@ def _gap_result_to_dict(result: GapResult) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Report generation
 # ---------------------------------------------------------------------------
+
 
 def generate_report(
     results: list[ProjectResult],
@@ -859,12 +1051,10 @@ def generate_report(
     lines.append("## 1. Prevalence Summary")
     lines.append("")
     lines.append(
-        "| Project | Directives | Corpus Size | Gaps | Gap Rate | "
-        "HRR Bridgeable |"
+        "| Project | Directives | Corpus Size | Gaps | Gap Rate | HRR Bridgeable |"
     )
     lines.append(
-        "|---------|-----------|-------------|------|----------|"
-        "----------------|"
+        "|---------|-----------|-------------|------|----------|----------------|"
     )
 
     total_directives: int = 0
@@ -882,9 +1072,7 @@ def generate_report(
         )
 
     overall_rate: float = total_gaps / total_directives if total_directives > 0 else 0.0
-    overall_bridge: float = (
-        total_bridgeable / total_gaps if total_gaps > 0 else 0.0
-    )
+    overall_bridge: float = total_bridgeable / total_gaps if total_gaps > 0 else 0.0
     lines.append(
         f"| **TOTAL** | **{total_directives}** | -- | **{total_gaps}** | "
         f"**{overall_rate:.1%}** | "
@@ -911,12 +1099,8 @@ def generate_report(
     lines.append("")
 
     # Tool ban + domain jargon share
-    tool_domain: int = all_cats.get("tool_ban", 0) + all_cats.get(
-        "domain_jargon", 0
-    )
-    tool_domain_pct: float = (
-        tool_domain / total_gaps if total_gaps > 0 else 0.0
-    )
+    tool_domain: int = all_cats.get("tool_ban", 0) + all_cats.get("domain_jargon", 0)
+    tool_domain_pct: float = tool_domain / total_gaps if total_gaps > 0 else 0.0
 
     # Hypothesis evaluation
     lines.append("## 3. Hypothesis Evaluation")
@@ -946,20 +1130,18 @@ def generate_report(
     )
     lines.append("")
 
-    # H4: doc-rich (alpha-seek, optimus-prime) vs doc-light (debserver, code-monkey)
+    # H4: doc-rich (project-a, project-b) vs doc-light (project-d, project-e)
     doc_rich: list[ProjectResult] = [
-        r for r in results if r.project in ("alpha-seek", "optimus-prime")
+        r for r in results if r.project in ("project-a", "project-b")
     ]
     doc_light: list[ProjectResult] = [
-        r for r in results if r.project in ("debserver", "code-monkey")
+        r for r in results if r.project in ("project-d", "project-e")
     ]
-    rich_rate: float = (
-        sum(r.gap_count for r in doc_rich)
-        / max(sum(r.total_directives for r in doc_rich), 1)
+    rich_rate: float = sum(r.gap_count for r in doc_rich) / max(
+        sum(r.total_directives for r in doc_rich), 1
     )
-    light_rate: float = (
-        sum(r.gap_count for r in doc_light)
-        / max(sum(r.total_directives for r in doc_light), 1)
+    light_rate: float = sum(r.gap_count for r in doc_light) / max(
+        sum(r.total_directives for r in doc_light), 1
     )
     h4_pass: bool = rich_rate < light_rate
     lines.append(
@@ -1040,14 +1222,12 @@ def generate_report(
                 break
             shown += 1
             text_preview: str = d["text"][:120]
-            lines.append(f"- **Directive:** \"{text_preview}\"")
+            lines.append(f'- **Directive:** "{text_preview}"')
             lines.append(f"  - Source: `{d['source_file']}`")
             lines.append(f"  - Category: {d['gap_category']}")
             lines.append(f"  - Queries: {d['queries']}")
             lines.append(f"  - HRR bridgeable: {d['hrr_bridgeable']}")
-            lines.append(
-                f"  - Low-confidence query: {d['low_confidence_query']}"
-            )
+            lines.append(f"  - Low-confidence query: {d['low_confidence_query']}")
             lines.append("")
 
     # Methodology note
@@ -1061,15 +1241,9 @@ def generate_report(
         "- Queries generated rule-based: tool purpose mappings, domain term "
         "translations, behavioral verb situation mappings"
     )
-    lines.append(
-        "- FTS5 with porter stemming, OR-query, top-30 retrieval"
-    )
-    lines.append(
-        "- Text match: exact, substring, or >= 70% Jaccard word overlap"
-    )
-    lines.append(
-        "- No LLM calls used in any part of the pipeline"
-    )
+    lines.append("- FTS5 with porter stemming, OR-query, top-30 retrieval")
+    lines.append("- Text match: exact, substring, or >= 70% Jaccard word overlap")
+    lines.append("- No LLM calls used in any part of the pipeline")
     lines.append("")
 
     output_path.write_text("\n".join(lines), encoding="utf-8")
@@ -1079,6 +1253,7 @@ def generate_report(
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     """Run Experiment 53."""

@@ -4,6 +4,7 @@ These tests run against the live DB and filesystem to verify that our
 design assumptions hold. They are not unit tests -- they validate the
 environment and data we will operate on.
 """
+
 from __future__ import annotations
 
 import os
@@ -19,10 +20,12 @@ import pytest
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _find_project_db() -> Path:
     """Find the agentmemory DB for this project."""
     import hashlib
-    cwd: str = str(Path("/Users/thelorax/projects/agentmemory").resolve())
+
+    cwd: str = str(Path("/home/user/projects/agentmemory").resolve())
     path_hash: str = hashlib.sha256(cwd.encode()).hexdigest()[:12]
     db_path: Path = Path.home() / ".agentmemory" / "projects" / path_hash / "memory.db"
     return db_path
@@ -43,15 +46,17 @@ def live_conn() -> sqlite3.Connection:
 # 1. Vault already exists
 # ---------------------------------------------------------------------------
 
+
 def test_obsidian_vault_exists() -> None:
     """The agentmemory project root has .obsidian/ -- it is already a vault."""
-    vault_marker: Path = Path("/Users/thelorax/projects/agentmemory/.obsidian")
+    vault_marker: Path = Path("/home/user/projects/agentmemory/.obsidian")
     assert vault_marker.is_dir(), ".obsidian/ directory missing at project root"
 
 
 # ---------------------------------------------------------------------------
 # 2. Belief IDs are filesystem-safe
 # ---------------------------------------------------------------------------
+
 
 def test_belief_ids_are_hex(live_conn: sqlite3.Connection) -> None:
     """All active belief IDs are 12-char hex strings (safe as filenames)."""
@@ -68,6 +73,7 @@ def test_belief_ids_are_hex(live_conn: sqlite3.Connection) -> None:
 # 3. Content hashes exist and are populated
 # ---------------------------------------------------------------------------
 
+
 def test_content_hashes_populated(live_conn: sqlite3.Connection) -> None:
     """Every active belief has a non-empty content_hash."""
     rows: list[sqlite3.Row] = live_conn.execute(
@@ -81,6 +87,7 @@ def test_content_hashes_populated(live_conn: sqlite3.Connection) -> None:
 # 4. Active belief count is in expected range
 # ---------------------------------------------------------------------------
 
+
 def test_active_belief_count(live_conn: sqlite3.Connection) -> None:
     """We expect 10K+ active beliefs based on prior observation (16,810)."""
     count: int = live_conn.execute(
@@ -92,6 +99,7 @@ def test_active_belief_count(live_conn: sqlite3.Connection) -> None:
 # ---------------------------------------------------------------------------
 # 5. Edges reference valid belief IDs
 # ---------------------------------------------------------------------------
+
 
 def test_edges_reference_valid_beliefs(live_conn: sqlite3.Connection) -> None:
     """Edge from_id and to_id should point to existing beliefs (not dangling)."""
@@ -111,6 +119,7 @@ def test_edges_reference_valid_beliefs(live_conn: sqlite3.Connection) -> None:
 # ---------------------------------------------------------------------------
 # 6. YAML frontmatter roundtrip (format correctness)
 # ---------------------------------------------------------------------------
+
 
 def test_yaml_frontmatter_format() -> None:
     """A simple frontmatter block can be written and parsed back."""
@@ -146,6 +155,7 @@ def test_yaml_frontmatter_format() -> None:
 # 7. Atomic rename works on this OS
 # ---------------------------------------------------------------------------
 
+
 def test_atomic_rename() -> None:
     """os.rename is atomic on macOS/Linux (POSIX guarantee)."""
     with tempfile.TemporaryDirectory() as tmp:
@@ -162,11 +172,18 @@ def test_atomic_rename() -> None:
 # 8. Belief types match expected set
 # ---------------------------------------------------------------------------
 
+
 def test_belief_types_known(live_conn: sqlite3.Connection) -> None:
     """All active belief types are in our known set."""
     known_types: set[str] = {
-        "factual", "preference", "relational", "procedural",
-        "causal", "correction", "requirement", "speculative",
+        "factual",
+        "preference",
+        "relational",
+        "procedural",
+        "causal",
+        "correction",
+        "requirement",
+        "speculative",
     }
     rows: list[sqlite3.Row] = live_conn.execute(
         "SELECT DISTINCT belief_type FROM beliefs WHERE valid_to IS NULL"
@@ -180,12 +197,22 @@ def test_belief_types_known(live_conn: sqlite3.Connection) -> None:
 # 9. Edge types match expected set
 # ---------------------------------------------------------------------------
 
+
 def test_edge_types_known(live_conn: sqlite3.Connection) -> None:
     """All edge types are in our known set."""
     known_types: set[str] = {
-        "CITES", "RELATES_TO", "SUPERSEDES", "CONTRADICTS",
-        "SUPPORTS", "TESTS", "IMPLEMENTS", "TEMPORAL_NEXT",
-        "SPECULATES", "DEPENDS_ON", "RESOLVES", "HIBERNATED",
+        "CITES",
+        "RELATES_TO",
+        "SUPERSEDES",
+        "CONTRADICTS",
+        "SUPPORTS",
+        "TESTS",
+        "IMPLEMENTS",
+        "TEMPORAL_NEXT",
+        "SPECULATES",
+        "DEPENDS_ON",
+        "RESOLVES",
+        "HIBERNATED",
     }
     rows: list[sqlite3.Row] = live_conn.execute(
         "SELECT DISTINCT edge_type FROM edges"
@@ -199,9 +226,11 @@ def test_edge_types_known(live_conn: sqlite3.Connection) -> None:
 # 10. Bulk query performance is acceptable
 # ---------------------------------------------------------------------------
 
+
 def test_bulk_query_performance(live_conn: sqlite3.Connection) -> None:
     """Fetching all active beliefs completes in under 2 seconds."""
     import time
+
     start: float = time.monotonic()
     rows: list[sqlite3.Row] = live_conn.execute(
         "SELECT * FROM beliefs WHERE valid_to IS NULL"

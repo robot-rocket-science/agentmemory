@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-10
 **Status:** Complete
-**Rigor tier:** Empirically tested (real alpha-seek corpus, 586 nodes, 6 topics, 13 decisions)
+**Rigor tier:** Empirically tested (real project-a corpus, 586 nodes, 6 topics, 13 decisions)
 **Depends on:** Exp 9/39 (ground truth), Exp 40 (hybrid pipeline)
 
 ---

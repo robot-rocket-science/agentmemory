@@ -7,7 +7,7 @@ Research-phase agentic memory system for LLMs -- MCP server, SQLite, Bayesian re
 
 **Completed last session (2026-04-09):**
 - Full literature survey + architecture design
-- 9+ experiments -- key results: Thompson sampling + Jeffreys prior ECE=0.066 (passing), HRR real-world test on alpha-seek graph (586 nodes, 775 edges)
+- 9+ experiments -- key results: Thompson sampling + Jeffreys prior ECE=0.066 (passing), HRR real-world test on project-a graph (586 nodes, 775 edges)
 - HRR finding: fuzzy-start traversal is the real value, two-hop S^2 doesn't scale
 - Documents: PLAN.md, REQUIREMENTS.md (REQ-001 through REQ-030), APPROACHES.md (29 approaches), CASE_STUDIES.md (CS-001 through CS-005), privacy threat model, graph construction research, Bayesian/info theory research
 

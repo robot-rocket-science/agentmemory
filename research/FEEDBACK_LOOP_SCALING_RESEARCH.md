@@ -343,13 +343,13 @@ This is a significant architectural reframe: from "the feedback loop calibrates 
 
 ### Defer: Real Graph Topology
 
-Hierarchical priors and graph propagation underperformed because the synthetic topology doesn't encode belief similarity. The next experiment should use the real alpha-seek topology (from Exp 37b CALLS/CO_CHANGED graph) to test whether propagation works better when neighbors are genuinely related.
+Hierarchical priors and graph propagation underperformed because the synthetic topology doesn't encode belief similarity. The next experiment should use the real project-a topology (from Exp 37b CALLS/CO_CHANGED graph) to test whether propagation works better when neighbors are genuinely related.
 
 ### Next Steps
 
 1. Update PLAN.md storage schema to include source-type-to-prior mapping
 2. Update REQUIREMENTS.md: REQ-009 (calibration) now has scaling evidence
-3. Test hierarchical priors with real graph topology (alpha-seek)
+3. Test hierarchical priors with real graph topology (project-a)
 4. Add ranking_quality as a standard metric alongside ECE
 
 ---

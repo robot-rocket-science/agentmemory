@@ -41,7 +41,7 @@ Add handling for PreCompact and PostCompact hook events:
     "hooks": [
       {
         "type": "command",
-        "command": "/Users/thelorax/.claude/hooks/conversation-logger.sh"
+        "command": "/home/user/.claude/hooks/conversation-logger.sh"
       }
     ]
   }
@@ -51,7 +51,7 @@ Add handling for PreCompact and PostCompact hook events:
     "hooks": [
       {
         "type": "command",
-        "command": "/Users/thelorax/.claude/hooks/conversation-logger.sh"
+        "command": "/home/user/.claude/hooks/conversation-logger.sh"
       }
     ]
   }

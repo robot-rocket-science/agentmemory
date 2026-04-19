@@ -32,9 +32,9 @@ from scipy import stats as scipy_stats  # type: ignore[import-untyped]
 from scipy.optimize import minimize as scipy_minimize  # type: ignore[import-untyped]
 
 ALPHA_SEEK_DB = Path(
-    "/Users/thelorax/projects/.gsd/workflows/spikes/"
+    "/home/user/projects/.gsd/workflows/spikes/"
     "260406-1-associative-memory-for-gsd-please-explor/"
-    "sandbox/alpha-seek.db"
+    "sandbox/project-a.db"
 )
 
 CRITICAL_BELIEFS: dict[str, dict[str, list[str] | str]] = {
@@ -81,7 +81,7 @@ CRITICAL_BELIEFS: dict[str, dict[str, list[str] | str]] = {
     "gcp_primary": {
         "queries": [
             "GCP primary compute platform",
-            "archon overflow only",
+            "server-a overflow only",
             "cloud compute infrastructure",
         ],
         "needed": ["D078", "D120"],
@@ -101,19 +101,115 @@ SUPERSESSION_TARGET_TOKENS: int = 8
 BUDGET_LEVELS: list[int] = [500, 1000, 1500, 2000, 3000]
 
 STOPWORDS: set[str] = {
-    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-    "have", "has", "had", "do", "does", "did", "will", "would", "shall",
-    "should", "may", "might", "can", "could", "must", "to", "of", "in",
-    "for", "on", "with", "at", "by", "from", "as", "into", "through",
-    "during", "before", "after", "above", "below", "between", "but",
-    "and", "or", "nor", "not", "no", "so", "if", "then", "than",
-    "too", "very", "just", "about", "up", "out", "off", "over",
-    "under", "again", "further", "once", "here", "there", "when",
-    "where", "why", "how", "all", "each", "every", "both", "few",
-    "more", "most", "other", "some", "such", "only", "own", "same",
-    "that", "this", "these", "those", "what", "which", "who", "whom",
-    "it", "its", "he", "she", "they", "them", "his", "her", "their",
-    "we", "us", "our", "you", "your", "i", "me", "my",
+    "the",
+    "a",
+    "an",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "being",
+    "have",
+    "has",
+    "had",
+    "do",
+    "does",
+    "did",
+    "will",
+    "would",
+    "shall",
+    "should",
+    "may",
+    "might",
+    "can",
+    "could",
+    "must",
+    "to",
+    "of",
+    "in",
+    "for",
+    "on",
+    "with",
+    "at",
+    "by",
+    "from",
+    "as",
+    "into",
+    "through",
+    "during",
+    "before",
+    "after",
+    "above",
+    "below",
+    "between",
+    "but",
+    "and",
+    "or",
+    "nor",
+    "not",
+    "no",
+    "so",
+    "if",
+    "then",
+    "than",
+    "too",
+    "very",
+    "just",
+    "about",
+    "up",
+    "out",
+    "off",
+    "over",
+    "under",
+    "again",
+    "further",
+    "once",
+    "here",
+    "there",
+    "when",
+    "where",
+    "why",
+    "how",
+    "all",
+    "each",
+    "every",
+    "both",
+    "few",
+    "more",
+    "most",
+    "other",
+    "some",
+    "such",
+    "only",
+    "own",
+    "same",
+    "that",
+    "this",
+    "these",
+    "those",
+    "what",
+    "which",
+    "who",
+    "whom",
+    "it",
+    "its",
+    "he",
+    "she",
+    "they",
+    "them",
+    "his",
+    "her",
+    "their",
+    "we",
+    "us",
+    "our",
+    "you",
+    "your",
+    "i",
+    "me",
+    "my",
 }
 
 
@@ -125,10 +221,10 @@ SentenceNode = dict[str, Any]
 
 
 def split_into_sentences(text: str) -> list[str]:
-    parts: list[str] = re.split(r'(?<=[.!?])\s+(?=[A-Z])', text)
+    parts: list[str] = re.split(r"(?<=[.!?])\s+(?=[A-Z])", text)
     sentences: list[str] = []
     for part in parts:
-        subparts: list[str] = part.split(' | ')
+        subparts: list[str] = part.split(" | ")
         for sp in subparts:
             sp = sp.strip()
             if len(sp) > 10:
@@ -138,17 +234,21 @@ def split_into_sentences(text: str) -> list[str]:
 
 def classify_sentence(sentence: str) -> str:
     s: str = sentence.lower()
-    if any(w in s for w in ['because', 'rationale', 'reason', 'driven by', 'root cause']):
-        return 'rationale'
-    if any(w in s for w in ['supersede', 'replace', 'retire', 'override']):
-        return 'supersession'
-    if any(w in s for w in ['must', 'always', 'never', 'mandatory', 'require', 'rule']):
-        return 'constraint'
-    if any(w in s for w in ['data', 'showed', 'result', 'found', 'measured', '%', 'x ']):
-        return 'evidence'
-    if any(w in s for w in ['script', 'implement', 'code', '.py', 'function']):
-        return 'implementation'
-    return 'context'
+    if any(
+        w in s for w in ["because", "rationale", "reason", "driven by", "root cause"]
+    ):
+        return "rationale"
+    if any(w in s for w in ["supersede", "replace", "retire", "override"]):
+        return "supersession"
+    if any(w in s for w in ["must", "always", "never", "mandatory", "require", "rule"]):
+        return "constraint"
+    if any(
+        w in s for w in ["data", "showed", "result", "found", "measured", "%", "x "]
+    ):
+        return "evidence"
+    if any(w in s for w in ["script", "implement", "code", ".py", "function"]):
+        return "implementation"
+    return "context"
 
 
 def count_tokens(text: str) -> int:
@@ -162,15 +262,16 @@ def compress_truncate(text: str, target_tokens: int) -> str:
     if target_chars >= len(text):
         return text
     truncated: str = text[:target_chars]
-    last_space: int = truncated.rfind(' ')
+    last_space: int = truncated.rfind(" ")
     if last_space > target_chars // 2:
         truncated = truncated[:last_space]
-    return truncated.rstrip('.,;:- ')
+    return truncated.rstrip(".,;:- ")
 
 
 # ============================================================
 # Fidelity functions
 # ============================================================
+
 
 def fidelity_power(c: float, exponent: float) -> float:
     """Power-law fidelity: f(c) = c^exponent.
@@ -192,18 +293,19 @@ def fidelity_log(c: float) -> float:
 
 # Type-specific fidelity exponents (estimated from Exp 42)
 FIDELITY_EXPONENTS: dict[str, float] = {
-    "constraint": 0.3,       # very front-loaded
-    "evidence": 0.5,         # moderate
-    "context": 0.7,          # more linear
-    "rationale": 0.5,        # moderate
-    "supersession": 0.2,     # pointer: all or nothing
-    "implementation": 0.7,   # more linear
+    "constraint": 0.3,  # very front-loaded
+    "evidence": 0.5,  # moderate
+    "context": 0.7,  # more linear
+    "rationale": 0.5,  # moderate
+    "supersession": 0.2,  # pointer: all or nothing
+    "implementation": 0.7,  # more linear
 }
 
 
 # ============================================================
 # FTS5 search
 # ============================================================
+
 
 def build_fts_index(nodes: list[SentenceNode]) -> sqlite3.Connection:
     db: sqlite3.Connection = sqlite3.connect(":memory:")
@@ -214,8 +316,12 @@ def build_fts_index(nodes: list[SentenceNode]) -> sqlite3.Connection:
     for node in nodes:
         db.execute(
             "INSERT INTO fts VALUES (?, ?, ?, ?)",
-            (str(node["id"]), str(node["parent_decision"]),
-             str(node["type"]), str(node["content"])),
+            (
+                str(node["id"]),
+                str(node["parent_decision"]),
+                str(node["type"]),
+                str(node["content"]),
+            ),
         )
     return db
 
@@ -240,19 +346,22 @@ def fts_search_ranked(
 
     results: list[dict[str, Any]] = []
     for i, row in enumerate(rows):
-        results.append({
-            "node_id": str(row[0]),
-            "parent_decision": str(row[1]),
-            "stype": str(row[2]),
-            "bm25_score": float(row[3]),
-            "bm25_rank": i,
-        })
+        results.append(
+            {
+                "node_id": str(row[0]),
+                "parent_decision": str(row[1]),
+                "stype": str(row[2]),
+                "bm25_score": float(row[3]),
+                "bm25_rank": i,
+            }
+        )
     return results
 
 
 # ============================================================
 # Allocation strategies
 # ============================================================
+
 
 def strategy_fixed_ratio(
     candidates: list[dict[str, Any]],
@@ -279,15 +388,19 @@ def strategy_fixed_ratio(
             continue
 
         tokens_used += compressed_tokens
-        allocated.append({
-            **c,
-            "allocated_tokens": compressed_tokens,
-            "compression_ratio": compressed_tokens / full_tokens if full_tokens > 0 else 0.0,
-            "fidelity": fidelity_power(
-                compressed_tokens / full_tokens if full_tokens > 0 else 0.0,
-                FIDELITY_EXPONENTS.get(stype, 0.5),
-            ),
-        })
+        allocated.append(
+            {
+                **c,
+                "allocated_tokens": compressed_tokens,
+                "compression_ratio": compressed_tokens / full_tokens
+                if full_tokens > 0
+                else 0.0,
+                "fidelity": fidelity_power(
+                    compressed_tokens / full_tokens if full_tokens > 0 else 0.0,
+                    FIDELITY_EXPONENTS.get(stype, 0.5),
+                ),
+            }
+        )
 
     return allocated
 
@@ -305,12 +418,14 @@ def strategy_topk_full(
         if tokens_used + full_tokens > budget:
             continue
         tokens_used += full_tokens
-        allocated.append({
-            **c,
-            "allocated_tokens": full_tokens,
-            "compression_ratio": 1.0,
-            "fidelity": 1.0,
-        })
+        allocated.append(
+            {
+                **c,
+                "allocated_tokens": full_tokens,
+                "compression_ratio": 1.0,
+                "fidelity": 1.0,
+            }
+        )
 
     return allocated
 
@@ -354,12 +469,14 @@ def strategy_rd_optimal(
         # Everything fits -- allocate fully
         allocated: list[dict[str, Any]] = []
         for i, c in enumerate(candidates):
-            allocated.append({
-                **c,
-                "allocated_tokens": c["tokens"],
-                "compression_ratio": 1.0,
-                "fidelity": 1.0,
-            })
+            allocated.append(
+                {
+                    **c,
+                    "allocated_tokens": c["tokens"],
+                    "compression_ratio": 1.0,
+                    "fidelity": 1.0,
+                }
+            )
         return allocated
 
     # Solve via scipy SLSQP
@@ -406,12 +523,14 @@ def strategy_rd_optimal(
             continue
 
         tokens_used += alloc_tokens
-        allocated.append({
-            **c,
-            "allocated_tokens": alloc_tokens,
-            "compression_ratio": round(ci, 3),
-            "fidelity": fidelity_power(ci, float(alphas[i])),
-        })
+        allocated.append(
+            {
+                **c,
+                "allocated_tokens": alloc_tokens,
+                "compression_ratio": round(ci, 3),
+                "fidelity": fidelity_power(ci, float(alphas[i])),
+            }
+        )
 
     return allocated
 
@@ -419,6 +538,7 @@ def strategy_rd_optimal(
 # ============================================================
 # Ranking quality metrics (at token-budget level, not k-level)
 # ============================================================
+
 
 def ndcg_budget(
     allocated: list[dict[str, Any]],
@@ -465,8 +585,7 @@ def token_efficiency(
     if total == 0:
         return 0.0
     relevant_tokens: int = sum(
-        a["allocated_tokens"] for a in allocated
-        if a["parent_decision"] in relevant
+        a["allocated_tokens"] for a in allocated if a["parent_decision"] in relevant
     )
     return relevant_tokens / total
 
@@ -485,13 +604,16 @@ def recall_budget(
     """Fraction of relevant decisions included in allocation."""
     if not relevant:
         return 1.0
-    found: set[str] = {a["parent_decision"] for a in allocated if a["parent_decision"] in relevant}
+    found: set[str] = {
+        a["parent_decision"] for a in allocated if a["parent_decision"] in relevant
+    }
     return len(found) / len(relevant)
 
 
 # ============================================================
 # Main experiment
 # ============================================================
+
 
 def main() -> None:
     # Load and decompose
@@ -568,17 +690,23 @@ def main() -> None:
 
                 if not fts_results:
                     empty_metrics: dict[str, float] = {
-                        "ndcg": 0.0, "precision": 0.0,
-                        "token_efficiency": 0.0, "recall": 0.0,
-                        "mean_fidelity": 0.0, "beliefs_included": 0,
+                        "ndcg": 0.0,
+                        "precision": 0.0,
+                        "token_efficiency": 0.0,
+                        "recall": 0.0,
+                        "mean_fidelity": 0.0,
+                        "beliefs_included": 0,
                         "tokens_used": 0,
                     }
-                    budget_queries.append({
-                        "topic": topic, "query": query,
-                        "fixed_ratio": empty_metrics,
-                        "rd_optimal": empty_metrics,
-                        "topk_full": empty_metrics,
-                    })
+                    budget_queries.append(
+                        {
+                            "topic": topic,
+                            "query": query,
+                            "fixed_ratio": empty_metrics,
+                            "rd_optimal": empty_metrics,
+                            "topk_full": empty_metrics,
+                        }
+                    )
                     fixed_ndcgs.append(0.0)
                     rd_ndcgs.append(0.0)
                     topk_ndcgs.append(0.0)
@@ -590,11 +718,13 @@ def main() -> None:
                     matched_node: SentenceNode | None = node_by_id.get(r["node_id"])
                     if matched_node is None:
                         continue
-                    candidates.append({
-                        **r,
-                        "tokens": int(matched_node["tokens"]),
-                        "stype": str(matched_node["type"]),
-                    })
+                    candidates.append(
+                        {
+                            **r,
+                            "tokens": int(matched_node["tokens"]),
+                            "stype": str(matched_node["type"]),
+                        }
+                    )
 
                 # Apply three strategies
                 fixed: list[dict[str, Any]] = strategy_fixed_ratio(candidates, budget)
@@ -623,14 +753,16 @@ def main() -> None:
                 rd_ndcgs.append(rd_m["ndcg"])
                 topk_ndcgs.append(topk_m["ndcg"])
 
-                budget_queries.append({
-                    "topic": topic,
-                    "query": query,
-                    "candidates": len(candidates),
-                    "fixed_ratio": fixed_m,
-                    "rd_optimal": rd_m,
-                    "topk_full": topk_m,
-                })
+                budget_queries.append(
+                    {
+                        "topic": topic,
+                        "query": query,
+                        "candidates": len(candidates),
+                        "fixed_ratio": fixed_m,
+                        "rd_optimal": rd_m,
+                        "topk_full": topk_m,
+                    }
+                )
 
         # Aggregate for this budget level
         f_arr: np.ndarray = np.array(fixed_ndcgs)
@@ -649,30 +781,44 @@ def main() -> None:
         nonzero: np.ndarray = diffs[diffs != 0]
         if len(nonzero) >= 5:
             w_result: Any = scipy_stats.wilcoxon(nonzero)  # pyright: ignore[reportUnknownMemberType]
-            stat_result.update({
-                "W": float(w_result.statistic), "p": round(float(w_result.pvalue), 4),
-                "n_nonzero": int(len(nonzero)),
-            })
+            stat_result.update(
+                {
+                    "W": float(w_result.statistic),
+                    "p": round(float(w_result.pvalue), 4),
+                    "n_nonzero": int(len(nonzero)),
+                }
+            )
         else:
             stat_result["note"] = f"Too few nonzero diffs ({len(nonzero)})"
 
         # Print summary
-        metric_names: list[str] = ["ndcg", "precision", "token_efficiency",
-                                    "recall", "mean_fidelity", "beliefs_included",
-                                    "tokens_used"]
-        print(f"\n  {'Metric':<20s} {'Fixed':>8s} {'RD':>8s} {'Top-k':>8s}",
-              file=sys.stderr)
-        print(f"  {'-'*20} {'-'*8} {'-'*8} {'-'*8}", file=sys.stderr)
+        metric_names: list[str] = [
+            "ndcg",
+            "precision",
+            "token_efficiency",
+            "recall",
+            "mean_fidelity",
+            "beliefs_included",
+            "tokens_used",
+        ]
+        print(
+            f"\n  {'Metric':<20s} {'Fixed':>8s} {'RD':>8s} {'Top-k':>8s}",
+            file=sys.stderr,
+        )
+        print(f"  {'-' * 20} {'-' * 8} {'-' * 8} {'-' * 8}", file=sys.stderr)
         for m in metric_names:
             f_vals: list[float] = [q["fixed_ratio"][m] for q in budget_queries]
             r_vals: list[float] = [q["rd_optimal"][m] for q in budget_queries]
             t_vals: list[float] = [q["topk_full"][m] for q in budget_queries]
-            print(f"  {m:<20s} {np.mean(f_vals):>8.3f} "
-                  f"{np.mean(r_vals):>8.3f} {np.mean(t_vals):>8.3f}",
-                  file=sys.stderr)
+            print(
+                f"  {m:<20s} {np.mean(f_vals):>8.3f} "
+                f"{np.mean(r_vals):>8.3f} {np.mean(t_vals):>8.3f}",
+                file=sys.stderr,
+            )
 
-        print(f"\n  NDCG improvement (RD vs fixed): {improvement:+.1f}%",
-              file=sys.stderr)
+        print(
+            f"\n  NDCG improvement (RD vs fixed): {improvement:+.1f}%", file=sys.stderr
+        )
         if "p" in stat_result:
             print(f"  Wilcoxon: p={stat_result['p']:.4f}", file=sys.stderr)
 
@@ -691,47 +837,61 @@ def main() -> None:
     # Overall decision
     # ============================================================
 
-    print(f"\n{'='*70}", file=sys.stderr)
+    print(f"\n{'=' * 70}", file=sys.stderr)
     print("EXPERIMENT 55: RATE-DISTORTION RESULTS SUMMARY", file=sys.stderr)
-    print(f"{'='*70}", file=sys.stderr)
+    print(f"{'=' * 70}", file=sys.stderr)
 
-    print(f"\n  {'Budget':>6s} {'Fixed NDCG':>11s} {'RD NDCG':>9s} "
-          f"{'Improvement':>12s}", file=sys.stderr)
-    print(f"  {'-'*6} {'-'*11} {'-'*9} {'-'*12}", file=sys.stderr)
+    print(
+        f"\n  {'Budget':>6s} {'Fixed NDCG':>11s} {'RD NDCG':>9s} {'Improvement':>12s}",
+        file=sys.stderr,
+    )
+    print(f"  {'-' * 6} {'-' * 11} {'-' * 9} {'-' * 12}", file=sys.stderr)
 
     for budget in BUDGET_LEVELS:
         bdata: dict[str, Any] = all_results["per_budget"][str(budget)]["aggregate"]
-        print(f"  {budget:>6d} {bdata['fixed_ndcg_mean']:>11.3f} "
-              f"{bdata['rd_ndcg_mean']:>9.3f} "
-              f"{bdata['rd_vs_fixed_improvement_pct']:>+11.1f}%", file=sys.stderr)
+        print(
+            f"  {budget:>6d} {bdata['fixed_ndcg_mean']:>11.3f} "
+            f"{bdata['rd_ndcg_mean']:>9.3f} "
+            f"{bdata['rd_vs_fixed_improvement_pct']:>+11.1f}%",
+            file=sys.stderr,
+        )
 
     # H3 check: at generous budget, RD should degenerate to fixed
     generous: dict[str, Any] = all_results["per_budget"]["3000"]["aggregate"]
     tight: dict[str, Any] = all_results["per_budget"]["500"]["aggregate"]
 
-    print(f"\n  H3 check (budget=3000 degenerates): "
-          f"RD improvement = {generous['rd_vs_fixed_improvement_pct']:+.1f}%",
-          file=sys.stderr)
-    print(f"  Tight budget advantage (500): "
-          f"{tight['rd_vs_fixed_improvement_pct']:+.1f}%", file=sys.stderr)
+    print(
+        f"\n  H3 check (budget=3000 degenerates): "
+        f"RD improvement = {generous['rd_vs_fixed_improvement_pct']:+.1f}%",
+        file=sys.stderr,
+    )
+    print(
+        f"  Tight budget advantage (500): {tight['rd_vs_fixed_improvement_pct']:+.1f}%",
+        file=sys.stderr,
+    )
 
     # Decision
     at_2k: dict[str, Any] = all_results["per_budget"]["2000"]["aggregate"]
     imp_2k: float = at_2k["rd_vs_fixed_improvement_pct"]
 
-    print(f"\n--- Decision (at REQ-003 budget = 2000) ---", file=sys.stderr)
+    print("\n--- Decision (at REQ-003 budget = 2000) ---", file=sys.stderr)
     if imp_2k >= 10.0:
-        print(f"  ADOPT: RD allocation ({imp_2k:+.1f}% NDCG improvement)",
-              file=sys.stderr)
+        print(
+            f"  ADOPT: RD allocation ({imp_2k:+.1f}% NDCG improvement)", file=sys.stderr
+        )
     elif imp_2k >= 5.0:
-        print(f"  MARGINAL: {imp_2k:+.1f}% improvement. Adopt for tight "
-              f"budgets only.", file=sys.stderr)
+        print(
+            f"  MARGINAL: {imp_2k:+.1f}% improvement. Adopt for tight budgets only.",
+            file=sys.stderr,
+        )
     elif imp_2k > -5.0:
-        print(f"  REJECT: {imp_2k:+.1f}% improvement. Fixed-ratio heuristic "
-              f"is near-optimal.", file=sys.stderr)
+        print(
+            f"  REJECT: {imp_2k:+.1f}% improvement. Fixed-ratio heuristic "
+            f"is near-optimal.",
+            file=sys.stderr,
+        )
     else:
-        print(f"  REJECT: RD DECREASES quality ({imp_2k:+.1f}%).",
-              file=sys.stderr)
+        print(f"  REJECT: RD DECREASES quality ({imp_2k:+.1f}%).", file=sys.stderr)
 
     # Save
     out_path: Path = Path("experiments/exp55_results.json")

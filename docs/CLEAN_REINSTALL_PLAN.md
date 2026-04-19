@@ -17,16 +17,16 @@ cd ~/projects/agentmemory && git rev-parse HEAD > ~/.agentmemory.bak/git-commit.
 ls -la ~/.claude/hooks/agentmemory* > ~/.agentmemory.bak/hooks-list.txt
 
 # Snapshot MCP configs
-cp ~/projects/jose-bully/.mcp.json ~/.agentmemory.bak/jose-bully-mcp.json
+cp ~/projects/project-c/.mcp.json ~/.agentmemory.bak/project-c-mcp.json
 cp ~/projects/agentmemory/.mcp.json ~/.agentmemory.bak/agentmemory-mcp.json
 ```
 
 Current footprint:
-- Tool binary: `/Users/thelorax/.local/bin/agentmemory` (installed via `uv tool`)
+- Tool binary: `/home/user/.local/bin/agentmemory` (installed via `uv tool`)
 - Data directory: `~/.agentmemory/` (config, root DB, 4 project DBs, 3 backup DBs)
 - 9 hook scripts: `~/.claude/hooks/agentmemory-*.sh` and `agentmemory-*.py`
 - Conversation logger: `~/.claude/hooks/conversation-logger.sh` (referenced in settings.json UserPromptSubmit hooks)
-- MCP configs: `.mcp.json` in jose-bully and agentmemory projects
+- MCP configs: `.mcp.json` in project-c and agentmemory projects
 - Settings.json hooks: inject, directive-gate, commit-check, search-inject entries
 
 ## Uninstall: Remove Everything
@@ -68,9 +68,9 @@ rm ~/.claude/hooks/agentmemory-session-end.sh
 
 ```bash
 # Remove agentmemory entry from project .mcp.json files
-# jose-bully:
+# project-c:
 python3 -c "
-import json; p='$HOME/projects/jose-bully/.mcp.json'
+import json; p='$HOME/projects/project-c/.mcp.json'
 d=json.loads(open(p).read())
 d['mcpServers'].pop('agentmemory',None)
 open(p,'w').write(json.dumps(d,indent=4))

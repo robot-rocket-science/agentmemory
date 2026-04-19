@@ -20,10 +20,10 @@ The memory system needs to ingest projects it has never seen before and produce 
 
 | Project | Type | Files | Commits | Code | Docs | Signals |
 |---------|------|------:|--------:|------|------|---------|
-| alpha-seek | Trading system | 289 py | 552 | Dense | Rich (D### decisions) | Git, AST, citations, CLAUDE.md |
+| project-a | Trading system | 289 py | 552 | Dense | Rich (D### decisions) | Git, AST, citations, CLAUDE.md |
 | gsd-2 | Dev tooling | 240 ts | 2,649 | Dense | Very rich (609 md) | Git, AST, citations, graph tables |
-| jose-bully | Legal case | 0 code | 61 | None | 42 md + PDF | Git, docs only, narrative structure |
-| debserver | Infrastructure | 7 py | 538 | Thin | 24 md | Git, sparse AST, network topology |
+| project-c | Legal case | 0 code | 61 | None | 42 md + PDF | Git, docs only, narrative structure |
+| project-d | Infrastructure | 7 py | 538 | Thin | 24 md | Git, sparse AST, network topology |
 | mud_rust | Toy game | 7 rs | 5 | Minimal | 5 md | Almost nothing |
 | bigtime | Planning only | 0 code | 14 | None | 11 md | Git, docs only |
 
@@ -85,11 +85,11 @@ Everything else is conditional on project type.
 
 | Archetype | Example | Dominant Signals | Weak/Missing Signals |
 |-----------|---------|-----------------|---------------------|
-| **Rich code + rich docs** | alpha-seek, gsd-2 | Everything | -- |
-| **Code-heavy, doc-light** | ascii-evolve, sports-betting | AST, git, imports | Citations, structured decisions |
-| **Doc-only, no code** | jose-bully, bigtime | Git, document structure, narrative | AST, imports, CALLS |
+| **Rich code + rich docs** | project-a, gsd-2 | Everything | -- |
+| **Code-heavy, doc-light** | ascii-evolve, project-g | AST, git, imports | Citations, structured decisions |
+| **Doc-only, no code** | project-c, bigtime | Git, document structure, narrative | AST, imports, CALLS |
 | **Sparse/early stage** | mud_rust, orbitgame | File tree, README | Almost everything |
-| **Infrastructure** | debserver | Git, config files, network topology | Deep AST (few functions) |
+| **Infrastructure** | project-d | Git, config files, network topology | Deep AST (few functions) |
 
 ---
 
@@ -144,9 +144,9 @@ Run all applicable extractors based on the manifest. Each extractor is independe
 |-----------|-----------|----------|-------------|
 | **git_history** | has_git | COMMIT_BELIEF nodes, CO_CHANGED edges, REFERENCES_ISSUE edges, SUPERSEDES_TEMPORAL edges | T0.2 (7 repos) |
 | **imports** | languages detected | IMPORTS edges | T0.3 (5 repos, 4 languages) |
-| **ast_calls** | languages detected | CALLS edges, PASSES_DATA edges, CONTAINS edges, callable/type_def nodes | Exp 37 (alpha-seek) |
+| **ast_calls** | languages detected | CALLS edges, PASSES_DATA edges, CONTAINS edges, callable/type_def nodes | Exp 37 (project-a) |
 | **document_sentences** | doc_files found | Sentence-level observation nodes | Exp 16 (86% token reduction) |
-| **citation_refs** | citation_regex detected | CITES edges | T0.4, Exp 37b (alpha-seek) |
+| **citation_refs** | citation_regex detected | CITES edges | T0.4, Exp 37b (project-a) |
 | **directive_scan** | directive files found | Behavioral belief nodes (high-confidence, locked) | Exp 1 V2 (92% accuracy) |
 | **test_mapping** | test_files found | TESTS edges | T0.4 |
 | **file_tree** | always | CONTAINS edges (directory -> file), file nodes | Universal |
@@ -243,7 +243,7 @@ Store everything in SQLite (WAL mode, crash-safe per PLAN.md design).
 **Onboarding metadata:**
 ```sql
 INSERT INTO onboarding_runs (
-    project_id, run_at, manifest_hash, 
+    project_id, run_at, manifest_hash,
     extractors_run, nodes_created, edges_created,
     last_commit_indexed, duration_seconds
 ) VALUES (...);
@@ -284,7 +284,7 @@ On each subsequent session:
 
 ### 5.2 Pure Documentation Projects
 
-**Example:** jose-bully (61 commits, 42 .md files, 0 code files)
+**Example:** project-c (61 commits, 42 .md files, 0 code files)
 
 **What fires:** git_history, file_tree, document_sentences (all 42 .md files get sentence-split), citation_refs (if any cross-doc references exist), readme_extract.
 
@@ -294,7 +294,7 @@ On each subsequent session:
 
 ### 5.3 Multi-Language Projects
 
-**Example:** debserver (Python + TypeScript, 538 commits)
+**Example:** project-d (Python + TypeScript, 538 commits)
 
 **What fires:** All extractors, language-specific AST parsing for both Python and TypeScript.
 
@@ -362,7 +362,7 @@ Walk through the pipeline on three projects to validate the design.
 
 **Expected coverage:** Near-complete. All extraction layers fire. The graph has rich multi-type structure.
 
-### 7.2 jose-bully (Doc-Only)
+### 7.2 project-c (Doc-Only)
 
 | Stage | What Happens | Output |
 |-------|-------------|--------|
@@ -397,17 +397,17 @@ Walk through the pipeline on three projects to validate the design.
 ### 8.1 What Was Tested
 
 Ran the full extractor pipeline (file_tree, git_history, document_sentences, ast_calls, citation_refs, directive_scan) on three projects of different archetypes:
-- alpha-seek: rich code + rich docs (289 py, 552 commits)
-- jose-bully: doc-only (0 code, 61 commits, 42 md)
-- debserver: infrastructure (7 py, 538 commits, 107 md)
+- project-a: rich code + rich docs (289 py, 552 commits)
+- project-c: doc-only (0 code, 61 commits, 42 md)
+- project-d: infrastructure (7 py, 538 commits, 107 md)
 
 ### 8.2 Results
 
 | Project | Nodes | Edges | Commit Beliefs | Doc Sentences | Callables | LCC% | Components |
 |---------|------:|------:|---------------:|--------------:|----------:|-----:|-----------:|
-| alpha-seek | 16,850 | 9,465 | 541 | 8,805 | 2,651 | **12%** | 11,329 |
-| jose-bully | 5,377 | 250 | 57 | 5,076 | 0 | **1%** | 5,164 |
-| debserver | 4,713 | 807 | 495 | 3,392 | 248 | **1%** | 4,086 |
+| project-a | 16,850 | 9,465 | 541 | 8,805 | 2,651 | **12%** | 11,329 |
+| project-c | 5,377 | 250 | 57 | 5,076 | 0 | **1%** | 5,164 |
+| project-d | 4,713 | 807 | 495 | 3,392 | 248 | **1%** | 4,086 |
 
 ### 8.3 H1 Result: FAIL
 
@@ -415,23 +415,23 @@ Ran the full extractor pipeline (file_tree, git_history, document_sentences, ast
 
 | Project | Commits | Largest Component | Fraction | H1 |
 |---------|--------:|------------------:|---------:|----|
-| alpha-seek | 552 | 2,046 | 12% | FAIL |
-| jose-bully | 61 | 55 | 1% | FAIL |
-| debserver | 538 | 58 | 1% | FAIL |
+| project-a | 552 | 2,046 | 12% | FAIL |
+| project-c | 61 | 55 | 1% | FAIL |
+| project-d | 538 | 58 | 1% | FAIL |
 
 ### 8.4 Root Cause: No Cross-Level Edges
 
 The extractors produce two disconnected layers:
-1. **File/code layer** (connected): file nodes linked by CONTAINS, CO_CHANGED, CALLS, CITES. This is the 12% largest component in alpha-seek.
+1. **File/code layer** (connected): file nodes linked by CONTAINS, CO_CHANGED, CALLS, CITES. This is the 12% largest component in project-a.
 2. **Sentence cloud** (isolated): thousands of sentence and heading nodes with zero edges.
 
 55-95% of all nodes are isolated:
 
 | Project | Connected (files+callables) | Isolated (sentences+headings+commits) | Isolation Rate |
 |---------|----------------------------:|--------------------------------------:|---------------:|
-| alpha-seek | ~6,822 | ~9,346 | 55% |
-| jose-bully | ~206 | ~5,133 | 95% |
-| debserver | ~665 | ~3,887 | 82% |
+| project-a | ~6,822 | ~9,346 | 55% |
+| project-c | ~206 | ~5,133 | 95% |
+| project-d | ~665 | ~3,887 | 82% |
 
 ### 8.5 The Missing Edge Types
 
@@ -448,16 +448,16 @@ Without these edges, the sentence layer is a disconnected cloud that contributes
 
 ### 8.6 H4 Result: Manifest Detection Mostly Correct
 
-| Signal | alpha-seek | jose-bully | debserver | Correct? |
+| Signal | project-a | project-c | project-d | Correct? |
 |--------|-----------|-----------|----------|----------|
 | Git | True | True | True | All correct |
 | Languages | [python] | [] | [python, typescript] | All correct |
 | Docs | 109 | 56 | 107 | All correct |
 | Directives | [CLAUDE.md] | [] | [CLAUDE.md] | All correct |
-| Citation regex | \bD\d{3}\b | None | \bS\d{3}\b | Correct (debserver uses S### for service IDs) |
-| Tests | True | False | False | debserver: possibly wrong -- needs manual check |
+| Citation regex | \bD\d{3}\b | None | \bS\d{3}\b | Correct (project-d uses S### for service IDs) |
+| Tests | True | False | False | project-d: possibly wrong -- needs manual check |
 
-H4 is mostly passing. The manifest detector correctly identifies available signals. One potential false negative: debserver may have test files not detected by the directory-name heuristic.
+H4 is mostly passing. The manifest detector correctly identifies available signals. One potential false negative: project-d may have test files not detected by the directory-name heuristic.
 
 ### 8.7 Implications
 
@@ -478,15 +478,15 @@ Added to extractors:
 
 | Project | Nodes | Edges | LCC% (before) | LCC% (after) | Components (before) | Components (after) |
 |---------|------:|------:|---------------:|-------------:|--------------------:|-------------------:|
-| alpha-seek | 16,857 | 29,698 | 12% | **88%** | 11,329 | 1,390 |
-| jose-bully | 5,383 | 9,858 | 1% | **97%** | 5,164 | 7 |
-| debserver | 5,368 | 8,450 | 1% | **69%** | 4,086 | 198 |
+| project-a | 16,857 | 29,698 | 12% | **88%** | 11,329 | 1,390 |
+| project-c | 5,383 | 9,858 | 1% | **97%** | 5,164 | 7 |
+| project-d | 5,368 | 8,450 | 1% | **69%** | 4,086 | 198 |
 
 **H1 now PASSES on all three projects.** Largest connected component > 50% for all projects with >= 50 commits.
 
 Edge type distribution after fix:
 
-| Edge Type | alpha-seek | jose-bully | debserver |
+| Edge Type | project-a | project-c | project-d |
 |-----------|----------:|----------:|---------:|
 | SENTENCE_IN_FILE | 8,805 | 5,076 | 3,392 |
 | WITHIN_SECTION | 6,966 | 4,265 | 2,308 |
@@ -496,9 +496,9 @@ Edge type distribution after fix:
 | CITES | 1,992 | 0 | 15 |
 | CO_CHANGED | 138 | 44 | 67 |
 
-**Key finding:** SENTENCE_IN_FILE and WITHIN_SECTION are the primary connectivity bridges, not the code-level edges. They dominate the edge count on all three projects. This means document-centric projects (jose-bully) can achieve better connectivity than code-centric projects (debserver at 69%) because documents are sentence-dense while code is function-sparse.
+**Key finding:** SENTENCE_IN_FILE and WITHIN_SECTION are the primary connectivity bridges, not the code-level edges. They dominate the edge count on all three projects. This means document-centric projects (project-c) can achieve better connectivity than code-centric projects (project-d at 69%) because documents are sentence-dense while code is function-sparse.
 
-**Why debserver is only 69%:** 198 components remain, likely isolated commit_belief nodes that touch files not in the project tree (deleted files, files in SKIP_DIRS). These commits exist in git history but their target files are no longer in the directory. This is a known edge case: historical commits reference historical file paths that no longer exist.
+**Why project-d is only 69%:** 198 components remain, likely isolated commit_belief nodes that touch files not in the project tree (deleted files, files in SKIP_DIRS). These commits exist in git history but their target files are no longer in the directory. This is a known edge case: historical commits reference historical file paths that no longer exist.
 
 ### 8.10 H2 Result: PASS (with caveat)
 
@@ -506,9 +506,9 @@ Tested 5 queries per project with known-answer terms. Compared graph FTS5 (sente
 
 | Project | Graph Avg | Raw Avg | Winner |
 |---------|----------:|--------:|--------|
-| alpha-seek | 88% | 100% | Raw |
-| jose-bully | 93% | 100% | Raw |
-| debserver | 87% | 100% | Raw |
+| project-a | 88% | 100% | Raw |
+| project-c | 93% | 100% | Raw |
+| project-d | 87% | 100% | Raw |
 | **Overall** | **89%** | **100%** | **Raw** |
 
 **H2 passes the 80% threshold** but raw file FTS5 beats graph FTS5 on every project.
@@ -519,77 +519,77 @@ Tested 5 queries per project with known-answer terms. Compared graph FTS5 (sente
 
 ### 8.11 H3 Analysis: HRR Value on Non-Alpha-Seek Topologies
 
-**H3 could not be properly tested.** The reason: HRR's vocabulary-bridge mechanism requires **typed semantic edges** (like AGENT_CONSTRAINT) that group beliefs by concept. Jose-bully and debserver lack such edges. Their edge types are:
+**H3 could not be properly tested.** The reason: HRR's vocabulary-bridge mechanism requires **typed semantic edges** (like AGENT_CONSTRAINT) that group beliefs by concept. Jose-bully and project-d lack such edges. Their edge types are:
 
 | Project | Edge Types Available |
 |---------|-------------------|
-| alpha-seek | CO_CHANGED, CALLS, CITES, AGENT_CONSTRAINT (manual) |
-| jose-bully | CO_CHANGED only |
-| debserver | CO_CHANGED, CALLS, CITES (15 only) |
+| project-a | CO_CHANGED, CALLS, CITES, AGENT_CONSTRAINT (manual) |
+| project-c | CO_CHANGED only |
+| project-d | CO_CHANGED, CALLS, CITES (15 only) |
 
 HRR's value comes from typed traversal: "find all beliefs connected via AGENT_CONSTRAINT" bridges vocabulary gaps because behavioral beliefs share an edge type but not vocabulary. Without typed semantic edges, HRR degenerates to generic neighbor-finding, which CO_CHANGED already provides.
 
 **The real finding:** HRR value depends on **edge type richness**, not project archetype. Projects with rich typed edges (CITES, AGENT_CONSTRAINT, CALLS with multiple modules) benefit from HRR. Projects with only CO_CHANGED edges don't, regardless of whether they're code-heavy or doc-only.
 
-**What would give jose-bully typed edges?**
+**What would give project-c typed edges?**
 - **PERSON_INVOLVED:** Sentences mentioning "Jose", "Anbarasu", "Jonathan" linked by shared person references
 - **INCIDENT_LINKED:** Evidence documents linked to the incident they document
 - **MEETING_REFERENCED:** Meeting notes linked to the topics they discuss
 
-These require entity detection (person names, incident IDs, meeting dates) -- the CROSS_DOC_ENTITY edge type that was deferred in the fix. Without it, jose-bully's graph is connected (97% LCC) but semantically flat -- all edges are structural (proximity, co-change), none are semantic (about the same person, about the same incident).
+These require entity detection (person names, incident IDs, meeting dates) -- the CROSS_DOC_ENTITY edge type that was deferred in the fix. Without it, project-c's graph is connected (97% LCC) but semantically flat -- all edges are structural (proximity, co-change), none are semantic (about the same person, about the same incident).
 
 **H3 verdict (initial):** INCONCLUSIVE. HRR value cannot be tested without typed semantic edges.
 
 ### 8.13 Entity Detection Results (Exp 45c)
 
-Built zero-LLM entity detector: person names (capitalized bigrams, >= 2 mentions), incident IDs, hostnames/services, dates. Ran on jose-bully and debserver.
+Built zero-LLM entity detector: person names (capitalized bigrams, >= 2 mentions), incident IDs, hostnames/services, dates. Ran on project-c and project-d.
 
 **Entities found:**
 
 | Project | Persons | Incidents | Hosts | Dates | Entity Edges |
 |---------|--------:|----------:|------:|------:|-------------:|
-| jose-bully | 241 | 15 | 0 | 20 | 2,734 |
-| debserver | 364 | 0 | 18 | 0 | 16,547 |
+| project-c | 241 | 15 | 0 | 20 | 2,734 |
+| project-d | 364 | 0 | 18 | 0 | 16,547 |
 
 Top entities:
-- jose-bully: Jonathan Sobol (103x), Jose Marcio (72x), Anbarasu Chandran (64x), incident-01 (71x), March 10 (115x)
-- debserver: willow (420x), alnitak (261x), mintaka (203x), archon (202x), prometheus (179x)
+- project-c: Jonathan Sobol (103x), Jose Marcio (72x), Anbarasu Chandran (64x), incident-01 (71x), March 10 (115x)
+- project-d: server-b (420x), alnitak (261x), server-c (203x), server-a (202x), prometheus (179x)
 
 **Graph connectivity improved further:**
 
 | Project | LCC% (before entity) | LCC% (after entity) |
 |---------|--------------------:|--------------------:|
-| jose-bully | 97% | **100%** |
-| debserver | 69% | **89%** |
+| project-c | 97% | **100%** |
+| project-d | 69% | **89%** |
 
-**Note on debserver "PERSON_INVOLVED" false positives:** The name detector picked up "Apple Home", "Smart Home", "Dev Environment" as person names (capitalized bigrams). These are concept names, not people. The 364 "person" entities for debserver are mostly false positives from infrastructure terminology. This inflated PERSON_INVOLVED edges (2,809) with noise. A smarter detector would filter against a known-concepts list or require names to appear in human-context sentences.
+**Note on project-d "PERSON_INVOLVED" false positives:** The name detector picked up "Apple Home", "Smart Home", "Dev Environment" as person names (capitalized bigrams). These are concept names, not people. The 364 "person" entities for project-d are mostly false positives from infrastructure terminology. This inflated PERSON_INVOLVED edges (2,809) with noise. A smarter detector would filter against a known-concepts list or require names to appear in human-context sentences.
 
 ### 8.14 H3 Retest: HRR Value With Entity Edges
 
 | Project | Query | FTS5 | Combined | HRR Added Value? |
 |---------|-------|-----:|--------:|:---:|
-| jose-bully | PR blocked merge gatekeeping | 75% | 75% | No |
-| jose-bully | manager meeting escalation | 100% | 100% | No |
-| jose-bully | **evidence documentation proof** | **67%** | **100%** | **Yes** |
-| jose-bully | public shaming team channel | 100% | 100% | No |
-| jose-bully | work assignment task distribution | 100% | 100% | No |
-| debserver | server fleet management debian | 100% | 100% | No |
-| debserver | **media streaming video** | **50%** | **100%** | **Yes** |
-| debserver | network monitoring alerts | 75% | 75% | No |
-| debserver | VPN tunnel privacy torrent | 100% | 100% | No |
-| debserver | git server code hosting | 100% | 100% | No |
+| project-c | PR blocked merge gatekeeping | 75% | 75% | No |
+| project-c | manager meeting escalation | 100% | 100% | No |
+| project-c | **evidence documentation proof** | **67%** | **100%** | **Yes** |
+| project-c | public shaming team channel | 100% | 100% | No |
+| project-c | work assignment task distribution | 100% | 100% | No |
+| project-d | server fleet management debian | 100% | 100% | No |
+| project-d | **media streaming video** | **50%** | **100%** | **Yes** |
+| project-d | network monitoring alerts | 75% | 75% | No |
+| project-d | VPN tunnel privacy torrent | 100% | 100% | No |
+| project-d | git server code hosting | 100% | 100% | No |
 
-**H3 verdict: PARTIAL PASS.** HRR adds value on 1/5 queries (20%) for both jose-bully and debserver. Not zero -- the vocabulary bridge mechanism works beyond alpha-seek. But the value is modest: FTS5 alone handles 80% of queries adequately.
+**H3 verdict: PARTIAL PASS.** HRR adds value on 1/5 queries (20%) for both project-c and project-d. Not zero -- the vocabulary bridge mechanism works beyond project-a. But the value is modest: FTS5 alone handles 80% of queries adequately.
 
 The two cases where HRR helped:
-- jose-bully: "evidence documentation proof" missed "incident" via FTS5, but HRR found incident-linked sentences via INCIDENT_LINKED edges
-- debserver: "media streaming video" missed "jellyfin" via FTS5, but HRR found jellyfin-related sentences via HOST_LINKED edges
+- project-c: "evidence documentation proof" missed "incident" via FTS5, but HRR found incident-linked sentences via INCIDENT_LINKED edges
+- project-d: "media streaming video" missed "jellyfin" via FTS5, but HRR found jellyfin-related sentences via HOST_LINKED edges
 
 **Interpretation:** HRR's value scales with the vocabulary gap. When query terms overlap with target terms (most cases), FTS5 is sufficient. When they don't ("evidence" vs "incident", "media streaming" vs "jellyfin"), HRR bridges the gap through typed entity edges. The 20% hit rate matches the expected distribution: most queries have some vocabulary overlap with their targets.
 
 ### 8.12 H5 Status: Not Directly Tested
 
-H5 (minimum viable graph threshold) was not tested in this round. The smallest project tested (jose-bully, 5,383 nodes) is well above the hypothesized ~50 node threshold. A project like mud_rust (5 commits, 7 files) would need to be added to test H5. Deferred.
+H5 (minimum viable graph threshold) was not tested in this round. The smallest project tested (project-c, 5,383 nodes) is well above the hypothesized ~50 node threshold. A project like mud_rust (5 commits, 7 files) would need to be added to test H5. Deferred.
 
 ---
 
@@ -651,8 +651,8 @@ HRR's vocabulary-bridge mechanism depends on edge type richness, not project arc
 |-----------|--------|---------|
 | H1: Graph connectivity > 50% | **PASS** (after fix) | 69-97% LCC on 3 projects |
 | H2: Graph FTS5 >= 80% precision | **PASS** (87-93%) | But raw FTS5 beats it (100%) |
-| H3: HRR value beyond alpha-seek | **PARTIAL PASS** | 20% of queries improved on both jose-bully and debserver (Exp 45c). Modest but non-zero. |
-| H4: Manifest detection accuracy | **PASS** | Correct on all 3 projects (1 possible FN on debserver tests) |
+| H3: HRR value beyond project-a | **PARTIAL PASS** | 20% of queries improved on both project-c and project-d (Exp 45c). Modest but non-zero. |
+| H4: Manifest detection accuracy | **PASS** | Correct on all 3 projects (1 possible FN on project-d tests) |
 | H5: Minimum viable graph | **NOT TESTED** | Need to add mud_rust (5 commits) |
 
 ### Key Design Decisions (Evidence-Based)
@@ -662,14 +662,14 @@ HRR's vocabulary-bridge mechanism depends on edge type richness, not project arc
 3. **Cross-level edges are non-negotiable.** SENTENCE_IN_FILE, WITHIN_SECTION, COMMIT_TOUCHES must run on every project. Without them, 55-95% of nodes are isolated. (Validated: H1 fails without, passes with.)
 4. **Dual-mode FTS5.** Index at both sentence and file level. Sentence-level for precision; file-level for recall. (Validated: H2 shows sentence-level loses recall vs file-level.)
 5. **HRR value depends on edge type richness.** Don't encode HRR for projects with only CO_CHANGED edges -- it won't add retrieval value. HRR becomes valuable when >= 3 typed edge types exist. (Validated: H3 analysis.)
-6. **Entity detection is the next critical gap.** CROSS_DOC_ENTITY edges would give non-alpha-seek projects the typed semantic edges HRR needs. This is the most impactful remaining work for onboarding.
+6. **Entity detection is the next critical gap.** CROSS_DOC_ENTITY edges would give non-project-a projects the typed semantic edges HRR needs. This is the most impactful remaining work for onboarding.
 
 ### Open Work
 
-1. ~~**Entity detection for CROSS_DOC_ENTITY edges.**~~ DONE (Exp 45c). 2,734 edges on jose-bully, 16,547 on debserver. Person name detector has false positives on infrastructure terms -- needs concept-name filtering.
+1. ~~**Entity detection for CROSS_DOC_ENTITY edges.**~~ DONE (Exp 45c). 2,734 edges on project-c, 16,547 on project-d. Person name detector has false positives on infrastructure terms -- needs concept-name filtering.
 2. **Dual-mode FTS5 implementation.** Two FTS5 virtual tables: one sentence-level, one file-level. Required by H2 finding.
 3. **H5 test on mud_rust.** Determine minimum viable graph threshold. Not yet tested.
-4. ~~**H3 retest after entity detection.**~~ DONE. Partial pass: 20% of queries improved. HRR adds modest value on non-alpha-seek projects.
+4. ~~**H3 retest after entity detection.**~~ DONE. Partial pass: 20% of queries improved. HRR adds modest value on non-project-a projects.
 5. ~~**Entity detector quality improvement.**~~ DONE (Exp 45d). Added non-person word filter (40+ indicator words: home, assistant, environment, server, etc.) + table fragment filter in sentence extractor. Person FP rate: 0% on all 3 projects (was 5-12%). Overall FP rate: 1.2-1.3% (was 3.9-6.5%). Expected wrong encounters per session: 0.58-0.65 (was 2.5-17.5). All projects pass ACCEPTABLE threshold.
 
 ---
@@ -700,13 +700,13 @@ FTS5 retrieval on the extracted graph achieves >= 80% precision@5 on queries abo
 
 ### H3: HRR Value Beyond Alpha-Seek
 
-HRR adds retrieval value (finds nodes FTS5 misses) on at least 2 of the 5 project archetypes, not just the alpha-seek archetype.
+HRR adds retrieval value (finds nodes FTS5 misses) on at least 2 of the 5 project archetypes, not just the project-a archetype.
 
 **Why it matters:** HRR is the most complex component. If it only helps on citation-heavy projects with behavioral beliefs, it's not worth the complexity for the general case.
 
 **How to test:** For each test project, identify vocabulary-gap scenarios (queries where the target uses different words than the query). Run FTS5-only vs FTS5+HRR. Count how many projects show HRR benefit.
 
-**Null:** HRR only adds value on alpha-seek-style projects with explicit typed edges. On doc-only and sparse projects, it adds nothing.
+**Null:** HRR only adds value on project-a-style projects with explicit typed edges. On doc-only and sparse projects, it adds nothing.
 
 ### H4: Manifest Detection Accuracy
 
@@ -724,7 +724,7 @@ Graphs below ~50 nodes provide no retrieval benefit over raw file search (grep/F
 
 **Why it matters:** Defines when the onboarding pipeline is worth running. If a 5-commit project produces a 20-node graph that's no better than grep, the system should skip graph construction and fall back to raw file search.
 
-**How to test:** Compare retrieval quality (precision@5) on projects of increasing size: mud_rust (~70 nodes estimated), bigtime (~50 nodes estimated), debserver (~200 nodes estimated). Find the crossover point where graph retrieval outperforms raw file search.
+**How to test:** Compare retrieval quality (precision@5) on projects of increasing size: mud_rust (~70 nodes estimated), bigtime (~50 nodes estimated), project-d (~200 nodes estimated). Find the crossover point where graph retrieval outperforms raw file search.
 
 **Null:** Even at 50 nodes, graph structure provides measurable retrieval benefit (no minimum threshold exists).
 

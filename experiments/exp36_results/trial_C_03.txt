@@ -11,7 +11,7 @@ Here's where things stand:
 **Research completed (last session):**
 - Architecture designed, 9+ experiments run (Exp 1-9, Exp 26)
 - Thompson sampling + Jeffreys prior validated (ECE=0.066) for retrieval ranking
-- HRR (Hyperdimensional Computing) tested on real alpha-seek graph (586 nodes, 775 edges) -- real value is fuzzy-start traversal, NOT multi-hop. S^2 two-hop saturates and fails.
+- HRR (Hyperdimensional Computing) tested on real project-a graph (586 nodes, 775 edges) -- real value is fuzzy-start traversal, NOT multi-hop. S^2 two-hop saturates and fails.
 - 9 research documents produced (PLAN.md, REQUIREMENTS.md, APPROACHES.md, EXPERIMENTS.md, CASE_STUDIES.md, PRIVACY_THREAT_MODEL.md, HRR_RESEARCH.md, GRAPH_CONSTRUCTION_RESEARCH.md, etc.)
 - REQ-001 through REQ-030 defined
 

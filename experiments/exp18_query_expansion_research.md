@@ -128,7 +128,7 @@ Where alpha weights the contribution of graph links vs. simple co-occurrence.
 
 **Computational cost:** Using pre-trained vectors: load time ~1-5 seconds for a filtered subset, 50-300MB on disk. Query-time nearest-neighbor: <1ms with a small vocabulary. Training from scratch: seconds (corpus is tiny), but results are poor.
 
-**At our corpus size:** Pre-trained vectors work. Training from scratch does not. The gap between pre-trained general vectors and domain-specific associations means you still want the PMI map (#2) for domain terms like "dispatch", "gate", "archon".
+**At our corpus size:** Pre-trained vectors work. Training from scratch does not. The gap between pre-trained general vectors and domain-specific associations means you still want the PMI map (#2) for domain terms like "dispatch", "gate", "server-a".
 
 **Literature:** Mikolov et al. (2013) "Efficient Estimation of Word Representations in Vector Space" -- original Word2Vec. Bojanowski et al. (2017) "Enriching Word Vectors with Subword Information" -- FastText. Diaz et al. (2016) "Query Expansion with Locally-Trained Word Embeddings" (ACL) -- showed that locally-trained embeddings outperform global embeddings for query expansion, BUT their "local" corpora were 100K+ documents. At 1K documents, global pre-trained vectors are safer.
 

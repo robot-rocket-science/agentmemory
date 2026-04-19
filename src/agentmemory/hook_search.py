@@ -43,11 +43,11 @@ TYPE_WEIGHTS: dict[str, float] = {
 }
 
 SOURCE_WEIGHTS: dict[str, float] = {
-    "user_corrected": 1.5,
-    "user_stated": 1.3,
+    "user_corrected": 2.0,
+    "user_stated": 1.8,
     "document_recent": 1.0,
     "document_old": 0.8,
-    "agent_inferred": 1.0,
+    "agent_inferred": 0.6,
 }
 
 # Action verbs that imply the user is about to operate on a target entity.
@@ -61,11 +61,21 @@ ACTION_PATTERNS: list[tuple[str, str]] = [
     (r"\bclone\s+(\w+)", "clone source"),
 ]
 
-TOKEN_BUDGET_CHARS: int = 6000
+TOKEN_BUDGET_CHARS: int = 2500
 CORRECTION_RECENCY_HOURS: float = 72.0
 CORRECTION_BOOST: float = 5.0
 LOCK_BOOST: float = 3.0
 ACTIVATION_BOOST: float = 2.0
+MIN_SCORE_THRESHOLD: float = 0.15  # absolute floor; relative floor does heavy lifting
+
+# Patterns that indicate non-user-prompt content (XML, task notifications)
+_NON_PROMPT_PATTERNS: list[str] = [
+    r"<task-notification\b",
+    r"<system-reminder\b",
+    r"<task-id>",
+    r"<command-name>",
+    r"<local-command-",
+]
 
 # ---------------------------------------------------------------------------
 # Structural prompt analysis (Layer 0)
@@ -768,6 +778,16 @@ def _eval_structural_predicate(expr: str, analysis: StructuralAnalysis) -> bool:
     return False
 
 
+def _is_non_prompt(text: str) -> bool:
+    """Detect XML/task-notification content that should not trigger search."""
+    stripped: str = text.strip()
+    if stripped.startswith("<") and any(
+        re.search(p, stripped) for p in _NON_PROMPT_PATTERNS
+    ):
+        return True
+    return False
+
+
 def search_for_prompt(
     db: sqlite3.Connection,
     prompt: str,
@@ -775,15 +795,20 @@ def search_for_prompt(
 ) -> SearchResult:
     """Run the full search pipeline for a user prompt.
 
-    0. Structural prompt analysis + activation_condition matching
-    1. Process pending feedback from previous search (closes feedback loop)
-    2. FTS5 keyword search
-    3. Entity-aware secondary search (user corrections mentioning prompt entities)
-    4. Action-context detection (search for beliefs about action targets)
-    5. Supersession-chain following (surface replacements for superseded beliefs)
-    6. Score, deduplicate, pack into budget
-    7. Record new pending feedback for this search's results
+    0. Pre-filter: skip non-prompts (XML, task notifications)
+    1. Structural prompt analysis + activation_condition matching
+    2. Process pending feedback from previous search (closes feedback loop)
+    3. FTS5 keyword search
+    4. Entity-aware secondary search (user corrections mentioning prompt entities)
+    5. Action-context detection (search for beliefs about action targets)
+    6. Supersession-chain following (surface replacements for superseded beliefs)
+    7. Score, deduplicate, apply relevance floor, pack into budget
+    8. Record new pending feedback for this search's results
     """
+    # Pre-filter: skip non-user-prompt content
+    if _is_non_prompt(prompt):
+        return SearchResult()
+
     # Process feedback from previous turn before running new search
     _process_pending_feedback(db, prompt)
 
@@ -998,8 +1023,29 @@ def search_for_prompt(
         except sqlite3.OperationalError:
             pass
 
-    # --- Score, sort, pack ---
+    # --- Score, sort, apply relevance floor, pack ---
     all_scored.sort(key=lambda x: x.score, reverse=True)
+
+    # Relevance floor: two-pass filtering
+    # 1. Absolute floor: drop anything below MIN_SCORE_THRESHOLD
+    # 2. Relative floor: drop anything below 20% of the top score
+    # Locked beliefs and recent corrections are exempt from both
+    def _exempt(sb: ScoredBelief) -> bool:
+        return sb.locked or (
+            sb.belief_type == "correction"
+            and sb.age_days is not None
+            and sb.age_days < 3.0
+        )
+
+    top_score: float = all_scored[0].score if all_scored else 0.0
+    relative_floor: float = top_score * 0.20
+
+    all_scored = [
+        sb
+        for sb in all_scored
+        if _exempt(sb)
+        or (sb.score >= MIN_SCORE_THRESHOLD and sb.score >= relative_floor)
+    ]
 
     packed: list[ScoredBelief] = []
     used: int = 0

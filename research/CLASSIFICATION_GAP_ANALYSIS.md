@@ -1,7 +1,7 @@
 # Classification Gap Analysis: Offline vs LLM
 
 **Date:** 2026-04-11
-**Method:** Ran both classifiers on all 4 validation repos (debserver, email-secretary, bigtime, mud_rust). Sampled 100 sentences per repo, plus 50-sentence deep-dive on debserver. Hand-labeled 20 sentences as ground truth for test suite.
+**Method:** Ran both classifiers on all 4 validation repos (project-d, project-f, bigtime, mud_rust). Sampled 100 sentences per repo, plus 50-sentence deep-dive on project-d. Hand-labeled 20 sentences as ground truth for test suite.
 
 ---
 
@@ -42,11 +42,11 @@ No. The only place offline performs comparably is:
 2. **Requirements with "must"** -- offline keyword match works for genuine requirements like "All code must use strict typing." But it also fires on headings like "Requirements Validated" and commit messages like "compile Ray requirements lockfiles."
 
 For requirements specifically:
-- debserver: offline found 247 REQUIREMENTs, LLM agreed on 199 of them. The 48 extras are false positives (headings, commit messages containing the word "requirements").
+- project-d: offline found 247 REQUIREMENTs, LLM agreed on 199 of them. The 48 extras are false positives (headings, commit messages containing the word "requirements").
 - Offline REQUIREMENT precision vs LLM: ~81%. Decent but not better than LLM.
 
 For corrections, offline is much worse:
-- debserver: offline found 805 CORRECTIONs, LLM agreed on 32. That is 4% precision.
+- project-d: offline found 805 CORRECTIONs, LLM agreed on 32. That is 4% precision.
 - The correction detector fires on imperative verbs ("add", "use", "run", "fix"), negation ("not", "never"), and emphasis ("!"), which appear constantly in commit messages and documentation.
 
 ## Question 4: Should both classifiers run and merge? Or is LLM strictly superior?
@@ -57,7 +57,7 @@ Merging would mean: if either classifier says persist, persist. Since offline sa
 
 | Repo | LLM beliefs | Offline beliefs | Merge (union) would be |
 |---|---|---|---|
-| debserver | 2,379 | 2,883 | ~2,883 (back to offline) |
+| project-d | 2,379 | 2,883 | ~2,883 (back to offline) |
 | bigtime | 311 | 1,374 | ~1,374 (back to offline) |
 | mud_rust | 64 | 220 | ~220 (back to offline) |
 
@@ -80,7 +80,7 @@ The correction detector (`detect_correction`) uses signal-counting with a thresh
 - `negation`: contains "not ", "no " -- fires on almost any sentence with negation
 - `directive`: contains "must", "require" -- fires on commit messages mentioning requirements
 
-With threshold=1, a single pattern match produces a locked belief. The result: 805 "corrections" in debserver (4% actual precision), creating hundreds of permanent false locks.
+With threshold=1, a single pattern match produces a locked belief. The result: 805 "corrections" in project-d (4% actual precision), creating hundreds of permanent false locks.
 
 ### 3. Keyword ambiguity
 
@@ -92,7 +92,7 @@ The word "must" in "All code must use strict typing" is a real requirement. The 
 
 | Metric | Offline | LLM | LLM Advantage |
 |---|---|---|---|
-| Persist accuracy (debserver sample) | 76% | 99% (Exp 50) | +23pp |
+| Persist accuracy (project-d sample) | 76% | 99% (Exp 50) | +23pp |
 | False persist rate | 24-76% by repo | ~1% | 24-75x fewer false persists |
 | False lock rate | 79-96% by repo | <5% estimated | 16-19x fewer false locks |
 | CORRECTION precision | 4-11% | ~95% (Exp 50) | 9-24x better |

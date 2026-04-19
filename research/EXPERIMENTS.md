@@ -251,7 +251,7 @@ The citation graph and BFS traversal are the most complex components of our arch
 
 ### Materials
 
-**Dataset:** The GSD prototype's alpha-seek data (577 nodes, 742 edges). This is real project data with genuine citation structure.
+**Dataset:** The GSD prototype's project-a data (577 nodes, 742 edges). This is real project data with genuine citation structure.
 
 **Queries:** 20 task contexts, designed to cover:
 - 5 keyword-rich queries (expected FTS5 advantage: "exit rules for position sizing")
@@ -270,7 +270,7 @@ Labeling is done blind to which retrieval method produced which results. The use
 
 ### Methodology
 
-1. **Load graph.** Load alpha-seek data into SQLite with FTS5 index and in-memory adjacency list.
+1. **Load graph.** Load project-a data into SQLite with FTS5 index and in-memory adjacency list.
 
 2. **Run three retrieval methods** for each of 20 queries:
    a. **FTS5 only:** BM25-ranked text search, return top 15
@@ -838,7 +838,7 @@ Full protocols and results are in individual files under `experiments/`. This in
 | 34 | Closing HRR tests | Vocabulary bridge 184x separation. Multi-hop iterative: D097 rank 1 | exp34_hrr_closing_tests.py, exp34_results.md |
 | 35 | Multi-hop improvements | Weighting + beam search don't improve recall (1/3). SNR limit fundamental | exp35_multihop_test.py, exp35_results.md |
 | 36 | Hook injection for behavioral constraints | 3 conditions tested. Condition C (per-turn injection) = 0% violation rate | exp36_results/ |
-| 37 | Control/data flow extraction (AST) | 3 layers genuinely disjoint (Jaccard 0.000-0.012). CALLS + PASSES_DATA adopted | exp37_control_data_flow.py, exp37_alpha_seek_synthesis.py |
+| 37 | Control/data flow extraction (AST) | 3 layers genuinely disjoint (Jaccard 0.000-0.012). CALLS + PASSES_DATA adopted | exp37_control_data_flow.py, exp37_project_a_synthesis.py |
 | 38 | Feedback loop scaling | Source-stratified priors dominate: 21x ranking quality at 50K | exp38_feedback_scaling.py |
 | 39 | Query expansion (empirical) | PMI hurts FTS5, PRF safe. 92% irreducible. 8% gap = graph traversal | exp39_query_expansion.py |
 | 40 | FTS5+HRR hybrid pipeline (end-to-end) | 100% coverage (13/13). D157 rescued via AGENT_CONSTRAINT walk | exp40_hybrid_pipeline.py |
@@ -852,12 +852,12 @@ Full protocols and results are in individual files under `experiments/`. This in
 | 48 | Multi-layer extraction + retrieval at scale | **ALL METHODS DEGRADED.** Grep 85%, FTS5 69%, HRR 69% at 16K nodes. Type-blind retrieval drowns belief nodes (3.6% of graph). Temporal edges provide 0 unique signal. Cross-layer edges missing. | exp48_multilayer_extraction.py |
 | 49 | Onboarding pipeline validation (parallel session) | H1 PASS: 3 cross-level edge types raised LCC from 1-12% to 69-97% | exp49_onboarding_validation.py |
 | 49b | Retrieval validation H2/H3 (parallel session) | H2 PASS: graph FTS5 87-93% vs raw FTS5. Dual-mode needed | exp49b_retrieval_validation.py |
-| 49c | Entity edges + H3 HRR retest (parallel session) | 2,734 cross-doc entity edges on jose-bully. HRR 20% added value | exp49c_entity_edges.py |
+| 49c | Entity edges + H3 HRR retest (parallel session) | 2,734 cross-doc entity edges on project-c. HRR 20% added value | exp49c_entity_edges.py |
 | 49d | Precision audit + correction burden (parallel session) | 1.8% FP on sentences, 0% on commits/calls. Correction burden reframed as core metric | exp49d_precision_audit.py |
 | 50 | LLM classification prompts (parallel session) | Heuristic 30-47% on hard cases. LLM-verify (A032): 2,650 tokens, 11.5x ROI | exp50_llm_classification.py |
 | 51 | Triggered belief simulation (parallel session) | TB simulation against CS-003, CS-005, CS-020, CS-021 case studies | exp51_tb_simulation.py |
 | 52 | Type-filtered FTS5 (isolated worktree test) | Filtering to belief+sentence+heading recovers FTS5 from 69%->77% (+7.7pp). Grep unchanged at 85%. D137/D100/D157 still missing -- lexical gaps, not dilution | exp52_type_filtered_fts5.py |
-| 53 | Vocabulary gap prevalence across 5 projects | **31% of directives have vocabulary gaps.** 1,030/3,321 across alpha-seek/optimus-prime/debserver/jose-bully/code-monkey. 99.5% HRR-bridgeable. Null (gap<3%) REJECTED. HRR is essential infrastructure. | exp53_vocab_gap_prevalence.py |
+| 53 | Vocabulary gap prevalence across 5 projects | **31% of directives have vocabulary gaps.** 1,030/3,321 across project-a/project-b/project-d/project-c/project-e. 99.5% HRR-bridgeable. Null (gap<3%) REJECTED. HRR is essential infrastructure. | exp53_vocab_gap_prevalence.py |
 | 54 | Mutual information scoring for retrieval | **REJECTED.** PMI -12.4% MRR, NMI -4.4% vs BM25. BM25 near-ceiling (0.843). Short docs make MI no better than IDF | exp54_mutual_information_scoring.py |
 | 55 | Rate-distortion token budget allocation | **REJECTED.** 0.0% NDCG improvement at all budgets. Budget never binds at 1K nodes (~450 of 2000 tokens used). Fixed-ratio heuristic is near-optimal | exp55_rate_distortion_budget.py |
 | 56 | Conversation extraction (keyword classifier) | Keyword classifier extracts 76 beliefs from 159 sentences (48%). 91% from assistant, 9% from user. Classifier misses short user statements. Superseded by Exp 61 | exp56_conversation_extraction.py |

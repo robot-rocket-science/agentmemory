@@ -215,10 +215,10 @@ Assemble a complete project knowledge graph by extracting every available signal
 
 | Layer | Source | Edge/Node Types | Validated On |
 |-------|--------|----------------|-------------|
-| Code structure | Python `ast` / tree-sitter | CALLS, PASSES_DATA, CONTAINS | agentmemory (48 files), alpha-seek (289 files) |
-| Git history | `git log` | CO_CHANGED, COMMIT_BELIEF, SUPERSEDES_TEMPORAL | 7 T0 pilot repos + alpha-seek |
+| Code structure | Python `ast` / tree-sitter | CALLS, PASSES_DATA, CONTAINS | agentmemory (48 files), project-a (289 files) |
+| Git history | `git log` | CO_CHANGED, COMMIT_BELIEF, SUPERSEDES_TEMPORAL | 7 T0 pilot repos + project-a |
 | Imports | AST import parsing | IMPORTS | 5 T0 repos (Rust, TS, Python, C++) |
-| Documentation refs | D###/REQ/CS regex | CITES, CROSS_REFERENCES | alpha-seek (1,742 citations, 154 decisions) |
+| Documentation refs | D###/REQ/CS regex | CITES, CROSS_REFERENCES | project-a (1,742 citations, 154 decisions) |
 | Node classification | File structure + naming | Automatic node typing | 5 T0 repos |
 
 ### Designed but Not Yet Extracted
@@ -230,23 +230,23 @@ Assemble a complete project knowledge graph by extracting every available signal
 | Directives | CLAUDE.md, hooks, project configs | BEHAVIORAL_CONSTRAINT, LOCKED_BELIEF | Low |
 | Issue tracking | GitHub/Gitea issues, `#\d+` in commits | REFERENCES_ISSUE, RESOLVES | Low |
 | Local vs remote | Reflog + remote comparison | LOCAL_COMMIT_BELIEF, REMOTE_COMMIT_BELIEF | Medium |
-| Cross-machine | Gitea + lorax/archon reflogs | AUTHORED_ON, PUSHED_TO | Medium |
+| Cross-machine | Gitea + lorax/server-a reflogs | AUTHORED_ON, PUSHED_TO | Medium |
 | Type resolution | pyright/LSP batch mode | Resolved CALLS, OVERRIDES, IMPLEMENTS | Medium |
 | Backtest results | Results CSV/JSON, metrics files | PRODUCES, MEASURES, SCORED_AT | Medium |
 | Multi-project | Cross-repo shared concepts | SHARED_CONCEPT, CROSS_PROJECT_CITE | Hard |
 
 ### Key Findings From Initial Synthesis (Exp 37b)
 
-Three validated layers (CALLS, CO_CHANGED, CITES) on alpha-seek show **near-zero overlap** (Jaccard 0.000-0.012). Each layer captures genuinely different relationships. No file pair appeared in all three layers. This strongly suggests that adding more layers will continue to reveal new structure, not redundantly rediscover the same edges.
+Three validated layers (CALLS, CO_CHANGED, CITES) on project-a show **near-zero overlap** (Jaccard 0.000-0.012). Each layer captures genuinely different relationships. No file pair appeared in all three layers. This strongly suggests that adding more layers will continue to reveal new structure, not redundantly rediscover the same edges.
 
 ### Target Projects
 
-1. **Alpha-seek** -- richest signal diversity: 552 commits, 289 Python files, 154 decisions, GCP dispatches, paper trading, backtest results, structured tests, CLAUDE.md directives, multi-machine dev (lorax + archon via Gitea).
-2. **A second project with maximal sparsity and depth** -- thin documentation, deep call chains, minimal decision history. Tests generalization. Candidates: smoltcp (Rust, protocols), debserver (Python, infra), or a local project with sparse history.
+1. **Alpha-seek** -- richest signal diversity: 552 commits, 289 Python files, 154 decisions, GCP dispatches, paper trading, backtest results, structured tests, CLAUDE.md directives, multi-machine dev (lorax + server-a via Gitea).
+2. **A second project with maximal sparsity and depth** -- thin documentation, deep call chains, minimal decision history. Tests generalization. Candidates: smoltcp (Rust, protocols), project-d (Python, infra), or a local project with sparse history.
 
 ### What This Would Demonstrate
 
-A full-monty graph on alpha-seek would be the first concrete instance of the memory system's ingestion pipeline producing a multi-layer knowledge graph from a real project. It would answer:
+A full-monty graph on project-a would be the first concrete instance of the memory system's ingestion pipeline producing a multi-layer knowledge graph from a real project. It would answer:
 
 - What is the total node and edge count across all layers?
 - What is the per-layer coverage (which files/functions/decisions are visible in which layers)?

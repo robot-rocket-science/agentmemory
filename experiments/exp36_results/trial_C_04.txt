@@ -1,4 +1,4 @@
-The palace has 10,000 drawers across one wing (`alpha_seek`) with 9 rooms. The breakdown:
+The palace has 10,000 drawers across one wing (`project_a`) with 9 rooms. The breakdown:
 
 | Room | Drawers |
 |---|---|
@@ -12,4 +12,4 @@ The palace has 10,000 drawers across one wing (`alpha_seek`) with 9 rooms. The b
 | configuration | 95 |
 | testing | 58 |
 
-Everything is from the `alpha_seek` project -- the `agentmemory` project hasn't been mined yet. Want me to mine it?
+Everything is from the `project_a` project -- the `agentmemory` project hasn't been mined yet. Want me to mine it?

@@ -75,7 +75,7 @@ Paired Wilcoxon signed-rank test on per-query MRR (BM25 vs MI), n=18. Report p-v
 
 ## Materials
 
-- 1,195 sentence nodes from alpha-seek (Exp 16 decomposition)
+- 1,195 sentence nodes from project-a (Exp 16 decomposition)
 - 6-topic ground truth with 13 critical decisions (Exp 9)
 - 18 queries (3 per topic)
 - FTS5 with porter stemmer (same config as Exp 42/47)
@@ -94,7 +94,7 @@ Paired Wilcoxon signed-rank test on per-query MRR (BM25 vs MI), n=18. Report p-v
 | Result | Action |
 |--------|--------|
 | MRR improvement >= 10%, p < 0.05 | Adopt MI scoring as re-ranker on FTS5 candidates |
-| MRR improvement 5-10%, p < 0.10 | Note as marginal; test on jose-bully/debserver for confirmation |
+| MRR improvement 5-10%, p < 0.10 | Note as marginal; test on project-c/project-d for confirmation |
 | MRR improvement < 5% or p > 0.10 | Reject. BM25 is sufficient at this scale |
 | MI DECREASES ranking quality | Reject. Document why (likely: short documents make MI estimates noisy) |
 
