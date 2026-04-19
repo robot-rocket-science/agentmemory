@@ -122,40 +122,93 @@ agentmemory metrics --output metrics_$(date +%Y%m%d).json
 
 **Metrics computed:**
 
+### 3A. Core metrics
+
 | Metric | Description | Source |
 |--------|-------------|--------|
-| Correction rate | User corrections per turn | Regex patterns on user turns |
-| Memory-ON vs OFF | Correction rate comparison | Presence of mcp__agentmemory calls |
-| Searches performed | How often memory is queried | MCP tool call detection |
-| Feedback given | How often beliefs get scored | agentmemory DB sessions table |
-| Beliefs created | System learning rate | agentmemory DB sessions table |
-| Session velocity | Items per hour | agentmemory DB sessions table |
-| Quality score | Composite session quality | Auto-computed on session end |
+| Correction rate | User corrections per turn (FP-adjusted) | Regex patterns + false positive filter |
+| Session velocity | Messages per session, sessions per day | Conversation logs grouped by session_id |
+| Message length trend | Avg chars per user/assistant message (token proxy) | Conversation log text field |
+| Quality score | Composite session quality (-1.0 to +1.0) | Auto-computed on session end |
+
+### 3B. Git-derived metrics
+
+| Metric | Description | Source |
+|--------|-------------|--------|
+| Fix commit rate | Percentage of commits that are bug fixes | `git log --grep=^fix:` |
+| Rework concentration | Files with most fix commits | `git log --diff-filter=M --grep=^fix:` |
+| Feature velocity | New feature commits per day | `git log --grep=^feat:` |
+
+### 3C. Cross-machine analysis
+
+| Metric | Description | Source |
+|--------|-------------|--------|
+| Dev-server history | Pre-memory baseline (Feb-Mar) | `ssh dev-server "cat ~/.claude/history.jsonl"` |
+| Workstation logs | Memory-active period (Apr+) | `~/.claude/conversation-logs/` |
+| Per-project breakdown | Correction rate by project and day | Both sources, grouped by cwd/project |
+
+**How to run:**
+
+```bash
+# Quick report
+agentmemory metrics
+
+# With JSON output for tracking
+agentmemory metrics --output metrics_$(date +%Y%m%d).json
+
+# Git metrics (run from agentmemory project root)
+git log --since="30 days ago" --format="%ai|%s" | \
+  awk -F'|' '{day=substr($1,1,10); if($2~/^fix/) fix[day]++; total[day]++} \
+  END {for(d in total) printf "%s  %d/%d = %.0f%% fixes\n", d, fix[d]+0, total[d], (fix[d]+0)/total[d]*100}' | sort
+
+# Cross-machine (requires SSH to dev-server)
+ssh dev-server "cat ~/.claude/history.jsonl" > /tmp/dev-server-data/history.jsonl
+uv run python scripts/backfill_session_metrics.py
+```
 
 **Interpretation guide:**
 
-- **Correction rate** should decrease over time as the system learns user
-  preferences. Currently ~1.6% overall. Compare memory-ON vs OFF sessions,
-  but note the confounding variable caveat (complexity differs).
-- **Searches performed** indicates engagement. More searches = more
-  retrieval opportunities = more chances for the system to help.
-- **Feedback given** > 0 means the Bayesian feedback loop is active.
-  Sessions with zero feedback indicate the loop isn't firing.
-- **Quality score** is -1.0 to +1.0. Computed from feedback_rate,
-  correction_density, and belief_creation. Higher is better.
+- **Correction rate** (FP-adjusted): target is decreasing over time.
+  Measured at 0.97% (workstation, Apr 10-19) with 55% pattern precision.
+  Compare across project phases, not raw on/off (too confounded).
+- **Session velocity**: stable at ~40 msgs/session. Shorter sessions with
+  same output = memory helping. Longer sessions = deeper work (ambiguous).
+- **Message length**: tracks token usage proxy. Actual API token counts
+  are not yet captured (gap to fix).
+- **Fix rate**: expected to increase during hardening phases, decrease
+  during stable periods. 13% overall for Apr 10-19.
+- **Rework files**: server.py (8 fixes), store.py (6), hook_search.py (4).
+  High rework in core modules is normal during active development.
+
+**Baseline data (Run 1, 2026-04-19):**
+
+| Metric | Dev-server (Feb-Mar) | Workstation (Apr) | Note |
+|--------|-----------------|-------------|------|
+| Messages analyzed | 2,642 | 2,358 | Different log formats |
+| Correction rate (raw) | 0.23% | 1.78% | Not comparable (different work) |
+| Correction rate (FP-adjusted) | N/A | 0.97% | 55% precision |
+| Correction trend | flat | 1.7% -> 0.5% | Suggestive, not significant |
+| Avg user msg length | 85 chars | 1,100 chars | Different usage patterns |
+| Fix commit rate | N/A | 13% (49/381) | Expected for dev phase |
+| Session velocity | N/A | 40 msgs/session | Stable from Apr 14 |
 
 **Known limitations (update as fixed):**
 
 1. Memory-ON vs OFF comparison is confounded by session complexity.
    Memory-ON sessions tend to be development sessions (more corrections).
    Need a controlled experiment to isolate the effect.
-2. Correction detection uses regex patterns that may miss subtle corrections
-   or flag false positives (e.g., "don't" in a code instruction).
-3. Only 11/365 sessions currently show agentmemory usage in conversation
-   logs. This may undercount because hook-injected searches don't appear
-   as visible tool calls in the log.
+2. Correction detection has 55% precision. Major false positive sources:
+   quoting correction examples in docs, benchmark data containing "actually",
+   code comments with "don't". Needs ML-based or LLM-based classifier.
+3. MCP tool calls (search, remember, correct) do NOT appear in conversation
+   logs -- they happen server-side via hooks. Cannot distinguish memory-on
+   from memory-off sessions using log data alone.
 4. Session IDs differ between Claude (UUIDs) and agentmemory (12-char hex).
    Cannot join conversation log data with agentmemory DB sessions.
+5. No actual API token counts. Message character length is a rough proxy.
+   Need to instrument the MCP server to log tokens consumed per search.
+6. Dev-server and workstation data is not comparable (different log formats,
+   different project types, different time periods).
 
 **After running:** Save the JSON output. Compare with previous runs.
 Track correction rate trend over time. Update this section with any
@@ -195,9 +248,25 @@ StructMemEval 100%, LongMemEval 59.6%, LoCoMo 50.8%.
   agentmemory project directory. Fixed: added session-complete CLI command.
 - Quality score never auto-computed. Fixed: wired into session-complete.
 
-**Session metrics:** 4319 turns, 365 sessions, 8 days of data.
-Correction rate 1.64% overall. Memory-ON vs OFF comparison confounded.
-Only 11 sessions show agentmemory usage in logs.
+**Session metrics (deep analysis):**
+
+Cross-machine analysis: 5,000 messages across dev-server (Feb 2-Mar 9, 2,642 msgs)
+and workstation (Apr 10-19, 2,358 msgs).
+
+| Metric | Result |
+|--------|--------|
+| Overall correction rate | 0.97% (FP-adjusted, workstation only) |
+| Pattern precision | 55% (19/42 matches are false positives) |
+| Phase trend | 1.7% (early) -> 1.4% (hooks) -> 0.5% (stable) |
+| Dev-server baseline | 0.23% (not comparable, different work types) |
+| Session velocity | Stable at ~40 msgs/session from Apr 14 |
+| Fix commit rate | 13% overall (49/381 commits) |
+| Top rework files | server.py (8), store.py (6), hook_search.py (4) |
+| Token proxy | ~1,100 chars/user msg (workstation), ~85 chars (dev-server) |
+
+mem:reason verdict: UNCERTAIN. Cannot prove memory reduces corrections
+with current data. Suggestive trend but n=24 true corrections is
+insufficient for statistical significance.
 
 **Acceptance tests:** 872 passing.
 
@@ -207,7 +276,16 @@ Only 11 sessions show agentmemory usage in logs.
 - Added LoCoMo ceiling check (93.57%)
 - Added session-complete CLI command for portable hook
 - Added agentmemory metrics CLI command
+- Added git-derived metrics (fix rate, rework concentration)
+- Added cross-machine analysis (dev-server SSH, history.jsonl parsing)
+- Fixed dev-server SSH config (Tailscale IP -> LAN IP)
 - Created this evaluation protocol document
+
+**Gaps identified for Run 2:**
+- Improve correction pattern precision from 55% to >80%
+- Add actual API token counting (not just message char length)
+- Design controlled A/B experiment for correction burden
+- Accumulate 3+ months of data for trend significance
 
 ### Run 2: (next release)
 
