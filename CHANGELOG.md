@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [2.2.1] - 2026-04-18
+
+### Fixed
+- Hook feedback now records outcomes to test_results table. The hook-based search was updating alpha/beta directly but not recording outcomes, making "used" detection invisible to trend measurement (0% used rate since Apr 15 despite active hook usage).
+
+### Maintenance
+- Deleted 26 stale branches fully merged into main
+
 ## [2.2.0] - 2026-04-18
 
 ### Added
