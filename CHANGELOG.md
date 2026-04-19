@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [2.2.2] - 2026-04-19
+
+### Fixed
+- vault_store: rebuild_index() now runs in a single transaction (crash mid-rebuild rolls back instead of corrupting index)
+- server: global buffers (_retrieval_buffer, _signal_buffer, _explicit_feedback_ids) now bounded to prevent unbounded memory growth
+- store: clear_pending_feedback() respects transaction context (was committing prematurely)
+- store: flush implicit transaction before BEGIN IMMEDIATE in transaction()
+
+### Security
+- Database files now set to 0600 permissions on open (was 644)
+
 ## [2.2.1] - 2026-04-18
 
 ### Fixed
