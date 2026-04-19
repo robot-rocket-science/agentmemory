@@ -488,7 +488,7 @@ Better alternatives (all already in our architecture):
 **The problem this solves:**
 
 Zero-LLM extraction achieves 1.2% FP rate after heuristic filtering (Exp 45d). That's good but not zero. The remaining FPs are edge cases that heuristics struggle with:
-- Short sentences that are true but fragmentary ("Archon is overflow only.")
+- Short sentences that are true but fragmentary ("Server-A is overflow only.")
 - Capitalized bigrams that pass the non-person filter but are still concepts, not people
 - Directive-like statements that are actually descriptions, not rules
 - Ambiguous entity classifications that depend on domain context

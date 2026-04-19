@@ -15,12 +15,12 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from experiments.exp3_retrieval_comparison import (
-    load_graph, build_fts_index, prepare_blind_evaluation, ALPHA_SEEK_DB
+    load_graph, build_fts_index, prepare_blind_evaluation, project-a_DB
 )
 
 
 def main() -> None:
-    nodes, adj = load_graph(ALPHA_SEEK_DB)
+    nodes, adj = load_graph(project-a_DB)
     fts_db = build_fts_index(nodes)
 
     queries: list[dict[str, str]] = json.loads(Path("experiments/exp3_queries.json").read_text())

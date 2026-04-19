@@ -35,7 +35,7 @@ If profiles don't work (null hypothesis), injected beliefs are noise the model i
 
 ## Materials
 
-**Dataset:** Alpha-seek belief graph (1,195 nodes, 1,485 edges).
+**Dataset:** project-a belief graph (1,195 nodes, 1,485 edges).
 
 **Profile construction:**
 

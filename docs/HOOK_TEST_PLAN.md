@@ -17,8 +17,8 @@ time python3 ~/.claude/hooks/agentmemory-search-inline.py "test query"
 ### Test: Result equivalence
 ```bash
 # Both paths should return the same belief IDs for the same query
-uv run agentmemory search "alpha seek" > /tmp/uv_results.txt
-python3 ~/.claude/hooks/agentmemory-search-inline.py "alpha seek" > /tmp/inline_results.txt
+uv run agentmemory search "project-a" > /tmp/uv_results.txt
+python3 ~/.claude/hooks/agentmemory-search-inline.py "project-a" > /tmp/inline_results.txt
 diff /tmp/uv_results.txt /tmp/inline_results.txt
 ```
 **Pass criteria:** Same beliefs returned (order may differ due to Thompson sampling).

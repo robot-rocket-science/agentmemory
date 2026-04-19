@@ -181,7 +181,7 @@ Three research threads completed, each producing a research document, experiment
 
 ### Design Direction Added
 
-**Full-Monty Graph: Multi-Layer Ingestion From All Available Signals.** Documented in DESIGN_DIRECTIONS.md. Concept: assemble complete project knowledge graph from every signal source (code structure, git history, docs, cloud deploys, directives, test coverage, issue tracking, cross-machine history). Alpha-seek as first target, a sparse project as second. Not scheduled -- design direction for when architecture is settled.
+**Full-Monty Graph: Multi-Layer Ingestion From All Available Signals.** Documented in DESIGN_DIRECTIONS.md. Concept: assemble complete project knowledge graph from every signal source (code structure, git history, docs, cloud deploys, directives, test coverage, issue tracking, cross-machine history). project-a as first target, a sparse project as second. Not scheduled -- design direction for when architecture is settled.
 
 ### Evidence Summary (What Is Now Proven)
 

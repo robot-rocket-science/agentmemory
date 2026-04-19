@@ -35,7 +35,7 @@ If the cage threshold is low (e.g., B_cage = 1000 tokens), the feature is useful
 
 ## Materials
 
-**Dataset:** Alpha-seek belief graph (1,195 nodes, 1,485 edges).
+**Dataset:** project-a belief graph (1,195 nodes, 1,485 edges).
 
 **Ground truth:** 6-topic, 13-belief set from Exp 47.
 

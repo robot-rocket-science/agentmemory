@@ -37,7 +37,7 @@ If diffs are noise-dominated, we need to stabilize scoring before diffing is use
 
 ## Materials
 
-**Dataset:** Alpha-seek belief graph (1,195 nodes, 1,485 edges).
+**Dataset:** project-a belief graph (1,195 nodes, 1,485 edges).
 
 **Simulated turns:** 50 conversation turns, each containing 1-3 sentences. Content drawn from the existing observation corpus (reshuffle and replay in different order to simulate a new session).
 

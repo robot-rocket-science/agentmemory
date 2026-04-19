@@ -52,7 +52,7 @@ HRR_THRESHOLD: Final[float] = 0.08
 TOP_K: Final[int] = 15
 RNG: Final[np.random.Generator] = np.random.default_rng(42)
 
-ALPHA_SEEK_DB: Final[Path] = Path(
+project-a_DB: Final[Path] = Path(
     "/home/user/projects/.gsd/workflows/spikes/"
     "260406-1-associative-memory-for-gsd-please-explor/"
     "sandbox/project-a.db"
@@ -343,7 +343,7 @@ class HRRGraph:
 
 def load_spike_nodes() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Load all active nodes and edges from the project-a spike DB."""
-    db: sqlite3.Connection = sqlite3.connect(str(ALPHA_SEEK_DB))
+    db: sqlite3.Connection = sqlite3.connect(str(project-a_DB))
     nodes: list[dict[str, Any]] = []
     for row in db.execute(
         "SELECT id, content, category FROM mem_nodes WHERE superseded_by IS NULL"
@@ -1378,7 +1378,7 @@ def run_project(
 
 
 # ===================================================================
-# Alpha-seek retrieval comparison
+# project-a retrieval comparison
 # ===================================================================
 
 

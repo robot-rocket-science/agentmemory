@@ -26,7 +26,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Callable
 
-ALPHA_SEEK_DB = Path(
+project-a_DB = Path(
     "/home/user/projects/.gsd/workflows/spikes/"
     "260406-1-associative-memory-for-gsd-please-explor/"
     "sandbox/project-a.db"
@@ -180,7 +180,7 @@ STOPWORDS = {
 
 def load_nodes() -> dict[str, str]:
     """Load all active belief nodes from project-a DB."""
-    db = sqlite3.connect(str(ALPHA_SEEK_DB))
+    db = sqlite3.connect(str(project-a_DB))
     nodes: dict[str, str] = {}
     for row in db.execute(
         "SELECT id, content FROM mem_nodes WHERE superseded_by IS NULL"

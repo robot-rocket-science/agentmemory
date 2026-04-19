@@ -1,4 +1,4 @@
-# Experiment 6: Historical Analysis of Alpha-Seek as Memory Ground Truth
+# Experiment 6: Historical Analysis of Project-A as Memory Ground Truth
 
 **Date:** 2026-04-09
 **Status:** Planning
@@ -296,7 +296,7 @@ This is itself a test case for our zero-LLM vs LLM-enriched architecture questio
 
 The patterns detected in project-a generalize:
 
-| Alpha-Seek Pattern | General Pattern | Memory System Feature |
+| Project-A Pattern | General Pattern | Memory System Feature |
 |--------------------|-----------------|----------------------|
 | Repeated decisions | Context drift | Cross-session belief persistence (REQ-001) |
 | Repeated research | Knowledge loss | Observation/belief extraction (REQ-014) |

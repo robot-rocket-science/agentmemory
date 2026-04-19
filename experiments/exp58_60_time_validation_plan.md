@@ -26,7 +26,7 @@ Three uncertainties remain:
 Which decay half-lives per content type maximize correction prevention on the project-a timeline?
 
 ### Data source
-- Alpha-seek spike DB: 173 decisions, 586 sentence nodes
+- project-a spike DB: 173 decisions, 586 sentence nodes
 - Exp 6 correction data: 38 user corrections with timestamps, clustered into 6 topics
 - CLAUDE.md locked beliefs: known locked decisions (D073, D100, D157, D188, etc.)
 - Git history: 552 commits with timestamps for temporal metadata
@@ -66,8 +66,8 @@ Which decay half-lives per content type maximize correction prevention on the pr
 Do TEMPORAL_NEXT edges enable useful queries that timestamp filtering alone cannot answer?
 
 ### Data source
-- Alpha-seek spike DB: 173 decisions with timestamps
-- Alpha-seek git history: 552 commits
+- project-a spike DB: 173 decisions with timestamps
+- project-a git history: 552 commits
 - Session boundaries: milestone boundaries as proxy for session boundaries
 
 ### Method
@@ -111,7 +111,7 @@ Do TEMPORAL_NEXT edges enable useful queries that timestamp filtering alone cann
 Does adding temporal re-ranking as a post-retrieval step improve or degrade the FTS5+HRR pipeline results from Exp 56?
 
 ### Data source
-- Alpha-seek spike DB: 586 sentence nodes
+- project-a spike DB: 586 sentence nodes
 - Exp 56 pipeline: FTS5 K=30 + HRR (100% coverage, 13/13)
 - Temporal metadata: creation timestamps for each decision (from git history or spike DB)
 

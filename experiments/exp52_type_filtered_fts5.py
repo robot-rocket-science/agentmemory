@@ -43,13 +43,13 @@ EdgeList: TypeAlias = list[dict[str, Any]]
 
 TOP_K: Final[int] = 15
 
-ALPHA_SEEK_DB: Final[Path] = Path(
+project-a_DB: Final[Path] = Path(
     "/home/user/projects/.gsd/workflows/spikes/"
     "260406-1-associative-memory-for-gsd-please-explor/"
     "sandbox/project-a.db"
 )
 
-ALPHA_SEEK_ROOT: Final[Path] = Path("/home/user/projects/project-a")
+project-a_ROOT: Final[Path] = Path("/home/user/projects/project-a")
 
 SKIP_DIRS: Final[set[str]] = {
     ".venv",
@@ -117,7 +117,7 @@ EXP48_BASELINES: Final[dict[str, dict[str, float]]] = {
 
 def load_spike_nodes() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Load all active nodes and edges from the project-a spike DB."""
-    db: sqlite3.Connection = sqlite3.connect(str(ALPHA_SEEK_DB))
+    db: sqlite3.Connection = sqlite3.connect(str(project-a_DB))
     nodes: list[dict[str, Any]] = []
     for row in db.execute(
         "SELECT id, content, category FROM mem_nodes WHERE superseded_by IS NULL"
@@ -494,13 +494,13 @@ def main() -> None:
     # ------------------------------------------------------------------
     print("\n[2/5] Extracting multi-layer nodes...", file=sys.stderr)
 
-    file_nodes: list[dict[str, Any]] = extract_file_tree(ALPHA_SEEK_ROOT)
+    file_nodes: list[dict[str, Any]] = extract_file_tree(project-a_ROOT)
     print(f"  File nodes: {len(file_nodes)}", file=sys.stderr)
 
-    commit_nodes: list[dict[str, Any]] = extract_git_history(ALPHA_SEEK_ROOT)
+    commit_nodes: list[dict[str, Any]] = extract_git_history(project-a_ROOT)
     print(f"  Commit nodes: {len(commit_nodes)}", file=sys.stderr)
 
-    doc_nodes: list[dict[str, Any]] = extract_document_sentences(ALPHA_SEEK_ROOT)
+    doc_nodes: list[dict[str, Any]] = extract_document_sentences(project-a_ROOT)
     heading_count: int = sum(1 for n in doc_nodes if n["type"] == "heading")
     sentence_count: int = sum(1 for n in doc_nodes if n["type"] == "sentence")
     print(
@@ -508,10 +508,10 @@ def main() -> None:
         file=sys.stderr,
     )
 
-    callable_nodes: list[dict[str, Any]] = extract_ast_calls(ALPHA_SEEK_ROOT)
+    callable_nodes: list[dict[str, Any]] = extract_ast_calls(project-a_ROOT)
     print(f"  Callable nodes: {len(callable_nodes)}", file=sys.stderr)
 
-    directive_nodes: list[dict[str, Any]] = extract_directives(ALPHA_SEEK_ROOT)
+    directive_nodes: list[dict[str, Any]] = extract_directives(project-a_ROOT)
     print(f"  Directive nodes: {len(directive_nodes)}", file=sys.stderr)
 
     # Combine all nodes

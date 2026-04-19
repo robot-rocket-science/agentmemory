@@ -54,9 +54,9 @@ RESULTS_PATH: Final[Path] = Path(
     "/home/user/projects/agentmemory/experiments/exp58c_results.json"
 )
 
-OPTIMUS_PRIME_REPO: Final[Path] = Path("/home/user/projects/project-b")
-ALPHA_SEEK_REPO: Final[Path] = Path("/home/user/projects/project-a")
-ALPHA_SEEK_MEMTEST_REPO: Final[Path] = Path("/home/user/projects/project-a-test")
+project-b_REPO: Final[Path] = Path("/home/user/projects/project-b")
+project-a_REPO: Final[Path] = Path("/home/user/projects/project-a")
+project-a_MEMTEST_REPO: Final[Path] = Path("/home/user/projects/project-a-test")
 
 # ============================================================
 # Config
@@ -1271,17 +1271,17 @@ def main() -> None:
     print("\n[git] Building milestone hour index from 3 repos...", file=sys.stderr)
     milestone_index: dict[str, MilestoneInfo] = build_milestone_hour_index(
         [
-            OPTIMUS_PRIME_REPO,
-            ALPHA_SEEK_REPO,
-            ALPHA_SEEK_MEMTEST_REPO,
+            project-b_REPO,
+            project-a_REPO,
+            project-a_MEMTEST_REPO,
         ]
     )
 
-    # Optimus-prime earliest commit (hours since epoch) for "inherited" decisions
+    # project-b earliest commit (hours since epoch) for "inherited" decisions
     print("[git] Fetching project-b earliest commit...", file=sys.stderr)
     op_result = subprocess.run(
         ["git", "log", "--all", "--format=%ad", "--date=iso", "--reverse"],
-        cwd=str(OPTIMUS_PRIME_REPO),
+        cwd=str(project-b_REPO),
         capture_output=True,
         text=True,
         check=True,
@@ -1497,9 +1497,9 @@ def main() -> None:
             "archived_decisions": str(ARCHIVE_MD),
             "corrections": str(EXP6_FAILURES),
             "git_repos": [
-                str(OPTIMUS_PRIME_REPO),
-                str(ALPHA_SEEK_REPO),
-                str(ALPHA_SEEK_MEMTEST_REPO),
+                str(project-b_REPO),
+                str(project-a_REPO),
+                str(project-a_MEMTEST_REPO),
             ],
         },
         "summary": {

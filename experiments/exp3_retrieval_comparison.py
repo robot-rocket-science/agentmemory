@@ -27,7 +27,7 @@ from typing import Any
 import numpy as np
 
 
-ALPHA_SEEK_DB = Path(
+project-a_DB = Path(
     "/home/user/projects/.gsd/workflows/spikes/"
     "260406-1-associative-memory-for-gsd-please-explor/"
     "sandbox/project-a.db"
@@ -295,13 +295,13 @@ def prepare_blind_evaluation(
 
 
 def main() -> None:
-    if not ALPHA_SEEK_DB.exists():
+    if not project-a_DB.exists():
         print(
-            f"ERROR: Alpha-seek database not found at {ALPHA_SEEK_DB}", file=sys.stderr
+            f"ERROR: project-a database not found at {project-a_DB}", file=sys.stderr
         )
         sys.exit(1)
 
-    nodes, adj = load_graph(ALPHA_SEEK_DB)
+    nodes, adj = load_graph(project-a_DB)
     fts_db = build_fts_index(nodes)
 
     # Compute graph stats

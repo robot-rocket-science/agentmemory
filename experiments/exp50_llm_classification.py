@@ -25,7 +25,7 @@ from typing import Any
 # ============================================================
 
 # project-d entities: labeled as PERSON or NOT_PERSON
-DEBSERVER_ENTITIES: list[dict[str, str]] = [
+PROJECT_D_ENTITIES: list[dict[str, str]] = [
     # TRUE PERSONS (should be classified PERSON)
     # (project-d has very few actual person names in docs)
     # NOT_PERSON (concepts, products, services, categories)
@@ -50,7 +50,7 @@ DEBSERVER_ENTITIES: list[dict[str, str]] = [
     {"name": "Smart Switch", "truth": "NOT_PERSON", "what": "IoT hardware"},
     {"name": "Nest Protect", "truth": "NOT_PERSON", "what": "Google product"},
     {"name": "Power Relay", "truth": "NOT_PERSON", "what": "hardware component"},
-    {"name": "Willow Resource", "truth": "NOT_PERSON", "what": "server resource ref"},
+    {"name": "Server-B Resource", "truth": "NOT_PERSON", "what": "server resource ref"},
     {"name": "Developer Tools", "truth": "NOT_PERSON", "what": "software category"},
     {"name": "Verification Evidence", "truth": "NOT_PERSON", "what": "process concept"},
     {"name": "Level Verification", "truth": "NOT_PERSON", "what": "process step"},
@@ -80,7 +80,7 @@ DEBSERVER_ENTITIES: list[dict[str, str]] = [
 ]
 
 # project-c entities
-JOSE_BULLY_ENTITIES: list[dict[str, str]] = [
+project-c_ENTITIES: list[dict[str, str]] = [
     # TRUE PERSONS
     {"name": "Jonathan Sobol", "truth": "PERSON", "what": "plaintiff"},
     {"name": "Jose Marcio", "truth": "PERSON", "what": "antagonist (first+middle)"},
@@ -142,7 +142,7 @@ JOSE_BULLY_ENTITIES: list[dict[str, str]] = [
 ]
 
 # project-a directives
-ALPHA_SEEK_DIRECTIVES: list[dict[str, str]] = [
+project-a_DIRECTIVES: list[dict[str, str]] = [
     # TRUE DIRECTIVES (rules the agent must follow)
     {"text": "Never question this.", "truth": "DIRECTIVE"},
     {"text": "Never skip the pre-flight checklist.", "truth": "DIRECTIVE"},
@@ -407,7 +407,7 @@ def main() -> None:
 
     # Test 1: Entity classification (project-d)
     print("\n--- Test 1: Entity Classification (project-d) ---", file=sys.stderr)
-    deb_heuristic = score_heuristic(DEBSERVER_ENTITIES, heuristic_person)
+    deb_heuristic = score_heuristic(PROJECT_D_ENTITIES, heuristic_person)
     print(
         f"  Heuristic accuracy: {deb_heuristic['accuracy']:.0%} ({deb_heuristic['correct']}/{deb_heuristic['total']})",
         file=sys.stderr,
@@ -420,7 +420,7 @@ def main() -> None:
             )
 
     deb_prompts = build_entity_prompt(
-        DEBSERVER_ENTITIES, "project-d (home server infrastructure fleet)"
+        PROJECT_D_ENTITIES, "project-d (home server infrastructure fleet)"
     )
     total_tokens = sum(b["total_tokens_est"] for b in deb_prompts)
     print(
@@ -435,7 +435,7 @@ def main() -> None:
 
     # Test 2: Entity classification (project-c)
     print("\n--- Test 2: Entity Classification (project-c) ---", file=sys.stderr)
-    jb_heuristic = score_heuristic(JOSE_BULLY_ENTITIES, heuristic_person)
+    jb_heuristic = score_heuristic(project-c_ENTITIES, heuristic_person)
     print(
         f"  Heuristic accuracy: {jb_heuristic['accuracy']:.0%} ({jb_heuristic['correct']}/{jb_heuristic['total']})",
         file=sys.stderr,
@@ -448,7 +448,7 @@ def main() -> None:
             )
 
     jb_prompts = build_entity_prompt(
-        JOSE_BULLY_ENTITIES, "project-c (workplace situation documentation)"
+        project-c_ENTITIES, "project-c (workplace situation documentation)"
     )
     total_tokens = sum(b["total_tokens_est"] for b in jb_prompts)
     print(
@@ -463,7 +463,7 @@ def main() -> None:
 
     # Test 3: Directive classification (project-a)
     print("\n--- Test 3: Directive Classification (project-a) ---", file=sys.stderr)
-    as_heuristic = score_heuristic(ALPHA_SEEK_DIRECTIVES, heuristic_directive)
+    as_heuristic = score_heuristic(project-a_DIRECTIVES, heuristic_directive)
     print(
         f"  Heuristic accuracy: {as_heuristic['accuracy']:.0%} ({as_heuristic['correct']}/{as_heuristic['total']})",
         file=sys.stderr,
@@ -476,7 +476,7 @@ def main() -> None:
             )
 
     as_prompts = build_directive_prompt(
-        ALPHA_SEEK_DIRECTIVES, "project-a (options trading strategy system)"
+        project-a_DIRECTIVES, "project-a (options trading strategy system)"
     )
     total_tokens = sum(b["total_tokens_est"] for b in as_prompts)
     print(
@@ -536,7 +536,7 @@ def main() -> None:
     total_cost = input_cost + output_cost
     print(f"  Estimated cost (Haiku): ${total_cost:.5f}", file=sys.stderr)
     print(
-        f"  Cost per classification: ${total_cost / max(1, sum(len(DEBSERVER_ENTITIES) + len(JOSE_BULLY_ENTITIES) + len(ALPHA_SEEK_DIRECTIVES) for _ in [0])):.6f}",
+        f"  Cost per classification: ${total_cost / max(1, sum(len(PROJECT_D_ENTITIES) + len(project-c_ENTITIES) + len(project-a_DIRECTIVES) for _ in [0])):.6f}",
         file=sys.stderr,
     )
 

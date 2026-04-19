@@ -26,7 +26,7 @@ This is a significant negative result that reveals a fundamental problem: adding
 | project-b | 71,628 | 116,886 | 88% | 6,379 | 4.06s |
 | project-d | 5,054 | 8,338 | 74% | 142 | 0.66s |
 
-### 2.2 Alpha-Seek Node Type Distribution
+### 2.2 Project-A Node Type Distribution
 
 | Type | Count | % of total |
 |------|-------|-----------|
@@ -40,7 +40,7 @@ This is a significant negative result that reveals a fundamental problem: adding
 
 The 586 belief nodes that contain ground-truth decisions are only 3.6% of the full graph. The rest is file names, doc sentences, callables, and headings.
 
-### 2.3 Alpha-Seek Edge Type Distribution
+### 2.3 Project-A Edge Type Distribution
 
 | Edge Type | Count | Notes |
 |-----------|-------|-------|
@@ -58,7 +58,7 @@ The 586 belief nodes that contain ground-truth decisions are only 3.6% of the fu
 
 ---
 
-## 3. Retrieval Comparison (Alpha-Seek, K=15)
+## 3. Retrieval Comparison (Project-A, K=15)
 
 ### 3.1 Per-Topic Results
 

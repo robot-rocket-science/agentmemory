@@ -464,7 +464,7 @@ Numbered for tracking. Each maps to a hypothesis.
 
 **Resolution bottleneck:** Unresolved calls are overwhelmingly method calls on objects (.walk, .read_text, .parse, .replace, .most_common) and constructor calls (Path, Counter). Without type information, attribute access (obj.method()) cannot be resolved. This matches the literature prediction (Section 2.4): AST-only analysis captures 60-80% of *intra*-function dependencies but misses cross-function dispatch.
 
-### 10.2 Alpha-Seek Multi-Layer Synthesis
+### 10.2 Project-A Multi-Layer Synthesis
 
 **Corpus:** 289 Python files, 552 commits, 154 known decisions (D001-D209)
 

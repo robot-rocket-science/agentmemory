@@ -18,7 +18,7 @@ from typing import Any
 
 EVAL_PATH = Path("experiments/exp3_eval_sheets_v2.json")
 LABELS_PATH = Path("experiments/exp3_labels.json")
-ALPHA_SEEK_DB = Path(
+project-a_DB = Path(
     "/home/user/projects/.gsd/workflows/spikes/"
     "260406-1-associative-memory-for-gsd-please-explor/"
     "sandbox/project-a.db"
@@ -28,7 +28,7 @@ ALPHA_SEEK_DB = Path(
 def load_rich_content() -> dict[str, Any]:
     """Load richer content from source tables for terse mem_nodes entries."""
     enriched: dict[str, Any] = {}
-    db = sqlite3.connect(str(ALPHA_SEEK_DB))
+    db = sqlite3.connect(str(project-a_DB))
 
     # Decisions: combine decision + choice + rationale
     for row in db.execute("SELECT id, decision, choice, rationale FROM decisions"):

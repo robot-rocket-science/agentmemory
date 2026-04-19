@@ -41,7 +41,7 @@ import numpy as np
 # Config
 # ============================================================
 
-ALPHA_SEEK_DB: Final[Path] = Path(
+project-a_DB: Final[Path] = Path(
     "/home/user/projects/.gsd/workflows/spikes/"
     "260406-1-associative-memory-for-gsd-please-explor/"
     "sandbox/project-a.db"
@@ -301,7 +301,7 @@ class RankedResult:
 
 def load_sentence_nodes() -> dict[str, str]:
     """Load all sentence-level nodes."""
-    db: sqlite3.Connection = sqlite3.connect(str(ALPHA_SEEK_DB))
+    db: sqlite3.Connection = sqlite3.connect(str(project-a_DB))
     nodes: dict[str, str] = {}
     for row in db.execute(
         "SELECT id, content FROM mem_nodes WHERE superseded_by IS NULL"
@@ -327,7 +327,7 @@ def load_decision_metadata(current_time_epoch: float) -> dict[str, DecisionMeta]
     Timestamp is derived from the EARLIEST DECIDED_IN milestone's created_at.
     Decisions without a DECIDED_IN edge get no timestamp (age = 0).
     """
-    db: sqlite3.Connection = sqlite3.connect(str(ALPHA_SEEK_DB))
+    db: sqlite3.Connection = sqlite3.connect(str(project-a_DB))
 
     # Load decisions: id, scope, revisable
     decisions_raw: dict[str, tuple[str, str]] = {}
@@ -392,7 +392,7 @@ def load_decision_metadata(current_time_epoch: float) -> dict[str, DecisionMeta]
 
 def get_current_time_epoch() -> float:
     """Return Unix epoch for latest milestone + 1 day (simulated 'now')."""
-    db: sqlite3.Connection = sqlite3.connect(str(ALPHA_SEEK_DB))
+    db: sqlite3.Connection = sqlite3.connect(str(project-a_DB))
     row: Any = db.execute("SELECT MAX(created_at) FROM milestones").fetchone()
     db.close()
     latest_iso: str = str(row[0])

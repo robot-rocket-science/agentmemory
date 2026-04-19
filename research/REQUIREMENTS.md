@@ -461,7 +461,7 @@ Derived from CS-005. The system must not only store what was learned, but how co
 
 **Requirement:** When a user issues a permanent directive ("never use X", "always do Y"), the memory system must enforce that directive in every subsequent session with zero failures. The user must never have to repeat a permanent directive.
 
-**Rationale:** This is the core pain point that motivates the entire project. Alpha-seek had 13 dispatch gate overrides over 5 days. The user's words: "INCREDIBLY FRUSTRATING to have to tell the LLM sooo many times." Every repeat is a system failure.
+**Rationale:** This is the core pain point that motivates the entire project. project-a had 13 dispatch gate overrides over 5 days. The user's words: "INCREDIBLY FRUSTRATING to have to tell the LLM sooo many times." Every repeat is a system failure.
 
 **What "guarantee" means -- honest decomposition:**
 

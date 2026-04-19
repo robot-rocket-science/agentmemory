@@ -17,7 +17,7 @@ All T0 experiments used file-level nodes. A 200-line Python file becomes one nod
 
 3. **Retrieval imprecision.** When HRR or FTS5 finds a file, the user gets the whole file. At sentence level, they get the specific claim or decision.
 
-## What Exp 16/29/31 Established (Alpha-Seek)
+## What Exp 16/29/31 Established (Project-A)
 
 - 173 decisions decomposed into 1,195 sentence nodes (avg 6.9 per decision)
 - 86% token reduction (36K -> 4.8K for core assertions)

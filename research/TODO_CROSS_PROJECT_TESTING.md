@@ -166,18 +166,18 @@ This is a prerequisite for everything else -- if graph construction requires man
 **What needs to be discovered automatically:**
 
 Node types:
-- Alpha-seek: decision, milestone, sentence, concept
+- project-a: decision, milestone, sentence, concept
 - GSD-2: code module, memory node, wiki page, decision record, conversation
 - Evolve: perk node, entity type, system, biome
-- Debserver: physical device, service, network segment, config file
+- project-d: physical device, service, network segment, config file
 - Code-monkey: module, contract, execution, delivery, aerospace component
 - Bigtime: requirement, phase, component, technology
 
 Edge types:
-- Alpha-seek: CITES, DECIDED_IN, RELATES_TO, SOURCED_FROM, SUPERSEDES
+- project-a: CITES, DECIDED_IN, RELATES_TO, SOURCED_FROM, SUPERSEDES
 - GSD-2: CITES, DECIDED_IN, RELATES_TO, SOURCED_FROM, SUPERSEDES, CONCEPT_LINK, EVIDENCED_BY
 - Evolve: PREREQUISITE, MODIFIES_STAT, BELONGS_TO_BRANCH, UNLOCKS
-- Debserver: HOSTS, CONNECTS_TO, DEPENDS_ON, MONITORS, MANAGES
+- project-d: HOSTS, CONNECTS_TO, DEPENDS_ON, MONITORS, MANAGES
 - Code-monkey: IMPORTS, CALLS, DELIVERS_TO, SCOPES, SIMILAR_TO
 - Bigtime: REQUIRES, DEPENDS_ON, MAPS_TO, IMPLEMENTS
 

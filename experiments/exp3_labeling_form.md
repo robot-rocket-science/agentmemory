@@ -54,7 +54,7 @@ Do NOT look at exp3_attribution.json until all labeling is complete.
 | q02_item_003 | ___ | Serial port output as partial results fallback for running GCP VMs | knowledge |
 | q02_item_004 | ___ | Milestone with zero S02 results: label NEGATIVE for closure, not INCONCLUSIVE | knowledge |
 | q02_item_005 | ___ | Walk-forward verify JSON timing artifact: T01 failing verify does not mean files | knowledge |
-| q02_item_006 | ___ | Archon parallel nohup scans: check completion via file count, not log tailing | knowledge |
+| q02_item_006 | ___ | Server-A parallel nohup scans: check completion via file count, not log tailing | knowledge |
 | q02_item_007 | ___ | 6 pending results completed on GCS, never collected | knowledge |
 | q02_item_008 | ___ | Whether the kelly union coverage test is needed: Kelly-d10 and kelly-dte45 union | strategy |
 | q02_item_009 | ___ | assemble_r12_folds.py: R12 uses nested fold_YYYY/summary.json, not flat files | knowledge |
@@ -78,7 +78,7 @@ Do NOT look at exp3_attribution.json until all labeling is complete.
 | q02_item_027 | ___ | Dispatch-gate blocks gcp_dispatch.py when image_built not satisfied in current s | knowledge |
 | q02_item_028 | ___ | gcp_dispatch.py --matrix flag: dispatch from JSON run matrix file | knowledge |
 | q02_item_029 | ___ | M030 S02: VIX gate ablation falsifies N-starvation hypothesis as root cause of w | knowledge |
-| q02_item_030 | ___ | Archon is canonical data host: Archon hosts all DuckDB files. Rsync direction: a | data |
+| q02_item_030 | ___ | Server-A is canonical data host: Server-A hosts all DuckDB files. Rsync direction: a | data |
 
 ## q03: please review the results, use the 3 analysis frameworks and provide a summary table
 *Search terms: analysis frameworks summary results hamiltonian jacobian dual matrix*
@@ -299,7 +299,7 @@ Do NOT look at exp3_attribution.json until all labeling is complete.
 
 | # | Label | Content | Category |
 |---|-------|---------|----------|
-| q09_item_000 | ___ | M022: Archon fold count check must grep for " done." with leading space | knowledge |
+| q09_item_000 | ___ | M022: Server-A fold count check must grep for " done." with leading space | knowledge |
 | q09_item_001 | ___ | M022 best learned contract selector variant: V3 (classifier pre-filter threshold | strategy |
 | q09_item_002 | ___ | GCP batch collection: select by VM lifecycle state, not by dispatch order | knowledge |
 | q09_item_003 | ___ | Research direction: reframe profitability problem as detection rate (recall) on  | strategy |
@@ -351,7 +351,7 @@ Do NOT look at exp3_attribution.json until all labeling is complete.
 | q10_item_013 | ___ | gcloud storage ls returns full paths; use fnmatch for client-side glob | knowledge |
 | q10_item_014 | ___ | [M027] Milestone M027 | milestone |
 | q10_item_015 | ___ | hold_mode=expiry vs hold_mode=fixed: critical difference | knowledge |
-| q10_item_016 | ___ | Archon: SSH exec channel can break while transport/auth remains functional (port | knowledge |
+| q10_item_016 | ___ | Server-A: SSH exec channel can break while transport/auth remains functional (port | knowledge |
 | q10_item_017 | ___ | [M026] Milestone M026 | milestone |
 | q10_item_018 | ___ | [M015] Milestone M015 | milestone |
 | q10_item_019 | ___ | Whether M026-eq3jt1 is gated on M027-lelhcb completion: Remove the M027 dependen | strategy |
@@ -381,7 +381,7 @@ Do NOT look at exp3_attribution.json until all labeling is complete.
 | q11_item_009 | ___ | Put intrinsic exit pricing bug impact assessment: All GCP backtest put PnL is in | backtesting |
 | q11_item_010 | ___ | [M027] Milestone M027 | milestone |
 | q11_item_011 | ___ | GCS has duplicate results from prior sessions -- always collect by exact instanc | knowledge |
-| q11_item_012 | ___ | Archon deploy gate is session-scoped: cannot be satisfied across SSH sessions | knowledge |
+| q11_item_012 | ___ | Server-A deploy gate is session-scoped: cannot be satisfied across SSH sessions | knowledge |
 | q11_item_013 | ___ | Crash-start gate for put eligibility: Remove crash-start gate for put selection. | strategy |
 | q11_item_014 | ___ | Whether D097 is sufficient to declare live-trading readiness: D097 with $5K capi | methodology |
 | q11_item_015 | ___ | Spike research findings must land in KNOWLEDGE.md, DECISIONS.md, or milestone CO | knowledge |
@@ -525,7 +525,7 @@ Do NOT look at exp3_attribution.json until all labeling is complete.
 | q15_item_011 | ___ | scripts/paper_trade.py must load .env via python-dotenv at startup | knowledge |
 | q15_item_012 | ___ | How to evaluate strategy performance during paper trading and live deployment: A | methodology |
 | q15_item_013 | ___ | Whether Alpaca free-tier paper trading provides option Greeks for chain_adapter. | data-source |
-| q15_item_014 | ___ | M023: Archon summary.json echoes model_config.target_pct as default (0.10) even  | knowledge |
+| q15_item_014 | ___ | M023: Server-A summary.json echoes model_config.target_pct as default (0.10) even  | knowledge |
 | q15_item_015 | ___ | [M014] Milestone M014 | milestone |
 | q15_item_016 | ___ | trades.json schema: open-leg vs close-leg entries differ by key set | knowledge |
 | q15_item_017 | ___ | Whether Config B is ready for live deployment of $5,000: CONDITIONAL NO-GO. Pape | methodology |
@@ -558,7 +558,7 @@ Do NOT look at exp3_attribution.json until all labeling is complete.
 | q16_item_013 | ___ | BEP filter dominates fill rejections — slippage threshold is not the binding con | knowledge |
 | q16_item_014 | ___ | GCP dispatch: closer agent must complete incomplete dispatcher work | knowledge |
 | q16_item_015 | ___ | [M012] Milestone M012 | milestone |
-| q16_item_016 | ___ | Archon: scp fails -- use ssh cat pipe | knowledge |
+| q16_item_016 | ___ | Server-A: scp fails -- use ssh cat pipe | knowledge |
 | q16_item_017 | ___ | Fill rejections are 100% slippage for argmax (slippage_reject_pct=0.50, 2010-202 | knowledge |
 | q16_item_018 | ___ | Whether D120 (server-a is overflow only) applies to M032 S01 2-fold smoke test: Ex | infrastructure |
 | q16_item_019 | ___ | M032: High-VIX years have LOWEST fill rates — wider spreads cause more slippage  | knowledge |

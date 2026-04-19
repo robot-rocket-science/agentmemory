@@ -35,7 +35,7 @@ import numpy.typing as npt
 
 NDArr = npt.NDArray[np.floating[Any]]
 
-ALPHA_SEEK_DB = Path(
+project-a_DB = Path(
     "/home/user/projects/.gsd/workflows/spikes/"
     "260406-1-associative-memory-for-gsd-please-explor/"
     "sandbox/project-a.db"
@@ -504,7 +504,7 @@ def ib_to_hrr_dimension(
 
 
 def main() -> None:
-    db: sqlite3.Connection = sqlite3.connect(str(ALPHA_SEEK_DB))
+    db: sqlite3.Connection = sqlite3.connect(str(project-a_DB))
 
     decisions: list[tuple[str, ...]] = db.execute(
         "SELECT id, decision, choice, rationale FROM decisions ORDER BY seq"

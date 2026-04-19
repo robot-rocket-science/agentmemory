@@ -1,5 +1,5 @@
 """
-Experiment 26: Hierarchical Confidence on Real Alpha-Seek Topology
+Experiment 26: Hierarchical Confidence on Real Project-A Topology
 
 Exp 22 used artificial subgraphs (every 50th node). This tests on real
 graph topology where anchors have uneven degree (D097=70, most nodes=1-3).
@@ -23,7 +23,7 @@ import numpy as np
 from experiments.exp2_bayesian_calibration import Belief, compute_calibration
 
 
-ALPHA_SEEK_DB = Path(
+project-a_DB = Path(
     "/home/user/projects/.gsd/workflows/spikes/"
     "260406-1-associative-memory-for-gsd-please-explor/"
     "sandbox/project-a.db"
@@ -51,7 +51,7 @@ DegreeDict = dict[str, int]
 
 def load_real_graph() -> tuple[NodeDict, AdjDict, AnchorDict, SubgraphDict, DegreeDict]:
     """Load project-a nodes and build real subgraphs from anchors."""
-    db = sqlite3.connect(str(ALPHA_SEEK_DB))
+    db = sqlite3.connect(str(project-a_DB))
 
     nodes: NodeDict = {}
     for row in db.execute(

@@ -16,14 +16,14 @@ Test whether mem:search can reconstruct a project's self-provenance -- its ident
 
 **Verdict:** FTS5 keyword matching is too broad for abstract questions. The system found structural markers ("Purpose:", "Goal:", "Out of Scope") but couldn't synthesize them into an answer.
 
-## Test 2: "alpha seek trading strategy options"
+## Test 2: "project-a trading strategy options"
 
-**Query:** `alpha seek trading strategy options`
+**Query:** `project-a trading strategy options`
 
 **Result:** 28 beliefs. Found concrete operational details:
 - File paths: `/srv/data/project-a/data/options.duckdb`
 - Infrastructure: launchd jobs, paper trading configs, server-a working directory
-- "Research: New Approaches to the Alpha-Seek Strategy"
+- "Research: New Approaches to the Project-A Strategy"
 
 **Verdict:** Domain-specific keywords work well. The system knows this is a trading project with options, paper trading, and specific infrastructure.
 

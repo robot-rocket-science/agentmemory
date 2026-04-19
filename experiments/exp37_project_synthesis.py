@@ -1,5 +1,5 @@
 """
-Experiment 37b: Alpha-Seek Multi-Layer Graph Synthesis
+Experiment 37b: Project-A Multi-Layer Graph Synthesis
 
 Validates the control/data flow approach on a real project by synthesizing:
 1. Control flow (CALLS) and data flow (PASSES_DATA) from AST analysis
@@ -10,7 +10,7 @@ The synthesis question: do these three layers capture genuinely different
 relationships, and does combining them produce a richer graph than any
 single layer alone?
 
-Alpha-seek: 289 Python files, 552 commits, known decision history (165 decisions
+project-a: 289 Python files, 552 commits, known decision history (165 decisions
 from Exp 6), rich D### citation patterns in comments and docstrings.
 """
 
@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Any
 
 
-ALPHA_SEEK_ROOT = Path("/home/user/projects/project-a")
+project-a_ROOT = Path("/home/user/projects/project-a")
 
 # ============================================================
 # Layer 1: Control Flow / Data Flow (AST)
@@ -560,19 +560,19 @@ def synthesize(
 def main() -> None:
     print("=== Layer 1: AST Control/Data Flow ===")
     t0 = time.perf_counter()
-    ast_nodes, ast_edges, unresolved = extract_ast_layer(ALPHA_SEEK_ROOT)
+    ast_nodes, ast_edges, unresolved = extract_ast_layer(project-a_ROOT)
     t_ast = time.perf_counter() - t0
     print(f"  Extraction time: {t_ast:.2f}s")
 
     print("\n=== Layer 2: Git History ===")
     t0 = time.perf_counter()
-    git_data = extract_git_layer(ALPHA_SEEK_ROOT)
+    git_data = extract_git_layer(project-a_ROOT)
     t_git = time.perf_counter() - t0
     print(f"  Extraction time: {t_git:.2f}s")
 
     print("\n=== Layer 3: Documentation Citations ===")
     t0 = time.perf_counter()
-    cite_data = extract_citation_layer(ALPHA_SEEK_ROOT)
+    cite_data = extract_citation_layer(project-a_ROOT)
     t_cite = time.perf_counter() - t0
     print(f"  Extraction time: {t_cite:.2f}s")
 

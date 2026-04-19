@@ -33,7 +33,7 @@ import numpy as np
 import numpy.typing as npt
 
 
-ALPHA_SEEK_DB: Path = Path(
+project-a_DB: Path = Path(
     "/home/user/projects/.gsd/workflows/spikes/"
     "260406-1-associative-memory-for-gsd-please-explor/"
     "sandbox/project-a.db"
@@ -311,7 +311,7 @@ def main() -> None:
     # Load graph
     nodes: dict[str, NodeInfo]
     edges: list[EdgeInfo]
-    nodes, edges = load_graph(ALPHA_SEEK_DB)
+    nodes, edges = load_graph(project-a_DB)
     print(f"\nGraph: {len(nodes)} nodes, {len(edges)} edges", file=sys.stderr)
     edge_type_counts: defaultdict[str, int] = defaultdict(int)
     for e in edges:

@@ -36,7 +36,7 @@ from typing import Any, Final
 # Config
 # ============================================================
 
-ALPHA_SEEK_DB: Final[Path] = Path(
+project-a_DB: Final[Path] = Path(
     "/home/user/projects/.gsd/workflows/spikes/"
     "260406-1-associative-memory-for-gsd-please-explor/"
     "sandbox/project-a.db"
@@ -695,7 +695,7 @@ def main() -> None:
     print("=== Exp 58: Decay Half-Life Calibration ===", file=sys.stderr)
 
     # Load data
-    conn: sqlite3.Connection = sqlite3.connect(str(ALPHA_SEEK_DB))
+    conn: sqlite3.Connection = sqlite3.connect(str(project-a_DB))
     decisions: list[Decision] = load_decisions(conn)
     conn.close()
 

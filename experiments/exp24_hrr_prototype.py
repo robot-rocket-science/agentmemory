@@ -25,7 +25,7 @@ import numpy as np
 import numpy.typing as npt
 
 
-ALPHA_SEEK_DB = Path(
+project-a_DB = Path(
     "/home/user/projects/.gsd/workflows/spikes/"
     "260406-1-associative-memory-for-gsd-please-explor/"
     "sandbox/project-a.db"
@@ -148,7 +148,7 @@ def main() -> None:
     print("=" * 60, file=sys.stderr)
 
     # Load nodes
-    db = sqlite3.connect(str(ALPHA_SEEK_DB))
+    db = sqlite3.connect(str(project-a_DB))
     nodes: list[dict[str, str]] = []
     for row in db.execute(
         "SELECT id, content FROM mem_nodes WHERE superseded_by IS NULL"

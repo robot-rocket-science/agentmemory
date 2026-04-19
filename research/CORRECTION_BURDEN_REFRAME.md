@@ -177,7 +177,7 @@ For every belief/node the extractor pipeline stores in the graph, is it factuall
 
 **After fixes:** All three projects store < 0.65 wrong things per session. Less than 1 correction per session on average.
 
-**What "1.2% FP rate" means practically:** Out of every ~80 beliefs the system stores, ~1 is junk (a too-short sentence fragment like "Archon is overflow only." -- 23 characters). That fragment is technically true, just not very useful. It's not misinformation the user would need to actively correct. Noise, not poison.
+**What "1.2% FP rate" means practically:** Out of every ~80 beliefs the system stores, ~1 is junk (a too-short sentence fragment like "Server-A is overflow only." -- 23 characters). That fragment is technically true, just not very useful. It's not misinformation the user would need to actively correct. Noise, not poison.
 
 **What this doesn't yet measure:** Whether the *retrieved* context actually helps the LLM make better decisions. The current metric says "we're not storing garbage." It doesn't say "the stuff we store actually reduces how often the user has to correct the LLM." That requires a running system with real sessions (GAP 5 in TODO.md).
 

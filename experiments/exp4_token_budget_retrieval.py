@@ -21,7 +21,7 @@ from typing import Any
 import numpy as np
 
 
-ALPHA_SEEK_DB = Path(
+project-a_DB = Path(
     "/home/user/projects/.gsd/workflows/spikes/"
     "260406-1-associative-memory-for-gsd-please-explor/"
     "sandbox/project-a.db"
@@ -68,7 +68,7 @@ TOKEN_BUDGETS = [100, 250, 500, 1000, 1500, 2000, 3000, 5000]
 
 
 def load_nodes_and_fts() -> tuple[dict[str, dict[str, Any]], sqlite3.Connection]:
-    db = sqlite3.connect(str(ALPHA_SEEK_DB))
+    db = sqlite3.connect(str(project-a_DB))
     db.row_factory = sqlite3.Row
 
     nodes: dict[str, dict[str, Any]] = {}

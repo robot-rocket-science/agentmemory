@@ -1,4 +1,4 @@
-# Experiment 30 Results: Real HRR on Alpha-Seek Graph
+# Experiment 30 Results: Real HRR on Project-A Graph
 
 **Date:** 2026-04-09
 

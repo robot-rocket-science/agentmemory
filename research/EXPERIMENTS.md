@@ -315,7 +315,7 @@ Labeling is done blind to which retrieval method produced which results. The use
 
 - **Unbounded queries removed (IDENTIFIED 2026-04-09):** 6 of 20 queries (q06-q11) were cut because they have no well-defined relevant set. Queries like "full project status", "restore session context", and "review all documentation" make almost any belief potentially relevant, which makes R/P/N labeling meaningless. These query types belong in session recovery testing (Phase 1) or whole-project summarization, not retrieval precision measurement. 14 bounded queries remain (409 items).
 - **Query keyword conversion (IDENTIFIED 2026-04-09):** User queries are natural language ("what got reversed?") but FTS5 requires keyword strings. The experimenter manually converts queries to keyword form ("reversed superseded changed decisions overridden"). This is a lossy, subjective transformation. A production system would need automated query expansion or natural language handling. **This experiment measures retrieval quality given reasonable keyword extraction, not end-to-end natural language query handling.** The original natural-language queries are preserved in exp3_queries.json alongside the converted forms for transparency.
-- **Graph density:** Alpha-seek has 775 edges / 586 nodes = 1.3 edges/node (sparse). Denser graphs may favor BFS more. Note the density and caveat that results may not generalize.
+- **Graph density:** project-a has 775 edges / 586 nodes = 1.3 edges/node (sparse). Denser graphs may favor BFS more. Note the density and caveat that results may not generalize.
 - **Query authorship:** Queries written by the user during live conversation about the project. Not pre-selected for extractability. User was not shown retrieval results before writing queries. Satisfies the protocol requirement.
 - **Labeling fatigue:** 20 queries * ~29 beliefs each = 583 labeling decisions. Consider splitting across 2 sessions to prevent fatigue-driven shortcuts.
 - **Hub bias:** D097 has 70 incoming edges. BFS from any topic touching evaluation methodology will find it. Report results with and without D097 to measure hub influence.
@@ -804,7 +804,7 @@ Full protocols and results are in individual files under `experiments/`. This in
 
 | Exp | Question | Result | Files |
 |-----|----------|--------|-------|
-| 6A | Alpha-seek timeline extraction | 1,790 events, 173 decisions, 775 edges | exp6_build_timeline.py, exp6_historical_analysis.md |
+| 6A | project-a timeline extraction | 1,790 events, 173 decisions, 775 edges | exp6_build_timeline.py, exp6_historical_analysis.md |
 | 6B | Memory failure pattern detection | 38 overrides, 66% in 6 clusters (revised from 79%) | exp6_detect_failures.py, exp6_cluster_audit.md |
 | 6C | Before/after manual CLAUDE.md enforcement | 49% override reduction, plateau at 1.8/day | exp6_before_after.py |
 | 6D | Derive requirements from failures | REQ-019, 020, 021 added | exp6_derive_requirements.md |

@@ -165,4 +165,4 @@ Also addresses:
 | Multi-layer edges create over-capacity partitions | HRR fails on the richer graph | Increase DIM to 4096. Sub-partition by edge type. |
 | Temporal edges are mostly noise | TEMPORAL_NEXT adds density but not signal | Filter: only link commits that reference D###/M### patterns, not all consecutive commits. |
 | Extraction takes minutes per project | Not practical for onboarding | Profile and optimize. Most time should be git log parsing, not graph construction. |
-| Alpha-seek ground truth is too narrow (6 topics) | Results don't generalize | Qualitative eval on project-b and project-d provides breadth. |
+| project-a ground truth is too narrow (6 topics) | Results don't generalize | Qualitative eval on project-b and project-d provides breadth. |

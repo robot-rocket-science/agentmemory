@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 from typing import Any, TypedDict
 
-ALPHA_SEEK_DB: Path = Path(
+project-a_DB: Path = Path(
     "/home/user/projects/.gsd/workflows/spikes/"
     "260406-1-associative-memory-for-gsd-please-explor/"
     "sandbox/project-a.db"
@@ -85,7 +85,7 @@ def split_into_sentences(text: str) -> list[str]:
 
 
 def load_data() -> tuple[dict[str, DecisionItem], dict[str, SentenceItem]]:
-    db: sqlite3.Connection = sqlite3.connect(str(ALPHA_SEEK_DB))
+    db: sqlite3.Connection = sqlite3.connect(str(project-a_DB))
 
     # Decision-level nodes
     decisions: dict[str, DecisionItem] = {}

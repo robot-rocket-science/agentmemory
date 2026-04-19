@@ -69,7 +69,7 @@
         },
         {
           "timestamp": "2026-03-26T23:25:03.664Z",
-          "change": "you may use archon for overflow, but GCP is the primary compute platform.",
+          "change": "you may use server-a for overflow, but GCP is the primary compute platform.",
           "applied_at": "M010-kvjgne/S03/none"
         },
         {
@@ -79,7 +79,7 @@
         },
         {
           "timestamp": "2026-03-27T16:10:44.379Z",
-          "change": "if you need anything from optimus-prime, copy it directly into the alpha-seek directory and then organize it according to where it needs to go and how it needs to change. we need to keep alpha-seek an",
+          "change": "if you need anything from project-b, copy it directly into the project-a directory and then organize it according to where it needs to go and how it needs to change. we need to keep project-a an",
           "applied_at": "M006-wz8eaf/S04/T03"
         },
         {
@@ -104,7 +104,7 @@
         },
         {
           "timestamp": "2026-03-29T03:49:09.824Z",
-          "change": "archon is overflow only. do not run tests directly on archon, it can brick the pc we need to build and deploy to other machines like gcp.",
+          "change": "server-a is overflow only. do not run tests directly on server-a, it can brick the pc we need to build and deploy to other machines like gcp.",
           "applied_at": "M013-v8biv4/S03/none"
         },
         {
@@ -269,7 +269,7 @@
     },
     {
       "topic_id": "gcp_primary",
-      "description": "GCP is primary compute, archon is overflow only",
+      "description": "GCP is primary compute, server-a is overflow only",
       "override_count": 3,
       "date_range": "2026-03-26 to 2026-04-02",
       "span_days": 7,
@@ -279,7 +279,7 @@
       "overrides": [
         {
           "timestamp": "2026-03-26T00:19:11.119Z",
-          "change": "use GCP to get fast results, archon is overflow only",
+          "change": "use GCP to get fast results, server-a is overflow only",
           "applied_at": "M008-xnku0q/S02/T02"
         },
         {
@@ -412,7 +412,7 @@
     },
     {
       "topic": "gcp_primary",
-      "description": "GCP is primary compute, archon is overflow only",
+      "description": "GCP is primary compute, server-a is overflow only",
       "count": 3,
       "severity": "high",
       "span_days": 7,

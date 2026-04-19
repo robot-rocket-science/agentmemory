@@ -372,7 +372,7 @@ Exp 24 and Exp 25 for comparison.
 
 ---
 
-## 9. Exp26 Findings: Real HRR vs BFS on Alpha-Seek Graph (2026-04-09)
+## 9. Exp26 Findings: Real HRR vs BFS on Project-A Graph (2026-04-09)
 
 ### Setup
 - 586 nodes, 775 typed edges (CITES, RELATES_TO, DECIDED_IN, SOURCED_FROM)

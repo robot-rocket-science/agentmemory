@@ -26,7 +26,7 @@ import numpy as np
 # Config
 # ============================================================
 
-ALPHA_SEEK_DB: Path = Path(
+project-a_DB: Path = Path(
     "/home/user/projects/.gsd/workflows/spikes/"
     "260406-1-associative-memory-for-gsd-please-explor/"
     "sandbox/project-a.db"
@@ -186,7 +186,7 @@ STOPWORDS: set[str] = {
 
 def load_decision_nodes() -> dict[str, str]:
     """Load decision-level nodes (173 decisions, not sentence-split)."""
-    db: sqlite3.Connection = sqlite3.connect(str(ALPHA_SEEK_DB))
+    db: sqlite3.Connection = sqlite3.connect(str(project-a_DB))
     nodes: dict[str, str] = {}
     for row in db.execute(
         "SELECT id, content FROM mem_nodes WHERE superseded_by IS NULL"
@@ -201,7 +201,7 @@ def load_decision_nodes() -> dict[str, str]:
 
 def load_sentence_nodes() -> dict[str, str]:
     """Load all sentence-level nodes (1,195 sentences)."""
-    db: sqlite3.Connection = sqlite3.connect(str(ALPHA_SEEK_DB))
+    db: sqlite3.Connection = sqlite3.connect(str(project-a_DB))
     nodes: dict[str, str] = {}
     for row in db.execute(
         "SELECT id, content FROM mem_nodes WHERE superseded_by IS NULL"

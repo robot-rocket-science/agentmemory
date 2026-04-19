@@ -810,7 +810,7 @@ The agent then identified 5 specific untested questions:
 
 2. **Does HRR add value on non-project-a topologies?** The 8% vocabulary gap (D157) was found on project-a. Does project-c even have vocabulary-gap scenarios? HRR might be essential for some topologies and useless for others.
 
-3. **Do the extractors produce meaningful edges on projects without explicit citations?** Alpha-seek has D### references. Jose-bully has evidence documents referencing timeline events. The citation regex won't find those. What edges do emerge from doc-only projects?
+3. **Do the extractors produce meaningful edges on projects without explicit citations?** project-a has D### references. project-c has evidence documents referencing timeline events. The citation regex won't find those. What edges do emerge from doc-only projects?
 
 4. **Are source priors correct across project types?** A commit from project-c ("added meeting notes from April 3") has different epistemological weight than one from project-a ("implement D097 walk-forward protocol"). Same prior, different actual reliability.
 
@@ -1276,14 +1276,14 @@ The fix from session 504ccc1b was correct but incomplete. The agent fixed `remem
 
 ## CS-030: Cross-Project Knowledge Isolation (Stash Debugging)
 
-**What happened:** In session 14995e1c (2026-04-14, 57 turns), the user reported "stash is having major performance/streaming issues." The agent immediately misdiagnosed: "Willow is completely unreachable -- 100% packet loss." The user corrected: "server-b is not down entirely, you are on tailscale trying to access it from another LAN." The session spent 57 turns debugging network topology (DERP relay, symmetric NAT, subnet routing, SSH tunnels), proposing dead-end solutions (phone hotspot, Jellyfin migration), and eventually discovering that 39 of 42 Stash plugins were causing slow page loads.
+**What happened:** In session 14995e1c (2026-04-14, 57 turns), the user reported "stash is having major performance/streaming issues." The agent immediately misdiagnosed: "Server-B is completely unreachable -- 100% packet loss." The user corrected: "server-b is not down entirely, you are on tailscale trying to access it from another LAN." The session spent 57 turns debugging network topology (DERP relay, symmetric NAT, subnet routing, SSH tunnels), proposing dead-end solutions (phone hotspot, Jellyfin migration), and eventually discovering that 39 of 42 Stash plugins were causing slow page loads.
 
 **The memory failure:** The belief store contained 7,990 active beliefs, almost all about agentmemory's own research. Zero beliefs about: the user's network topology (Tailscale, DERP, gl-mt2500, symmetric NAT), Stash's configuration, prior debugging of server-b/stash, or the relationship between the user's travel setup and LAN access.
 
 **agentmemory search results (counterfactual):** Searching "stash streaming performance" returned 82 beliefs, all about agentmemory internals. The word "stash" does not appear in any belief. Searching "server-b server media" found 2 tangential beliefs -- one acknowledging server-b exists, one recording prior confusion about data location. Neither would have prevented any wrong turns.
 
 **Wrong turns identified:**
-1. Turn 1: "Willow completely unreachable" -- didn't consider Tailscale context (2 turns)
+1. Turn 1: "Server-B completely unreachable" -- didn't consider Tailscale context (2 turns)
 2. Turns 8-14, 20-22: Subnet routing through gl-mt2500 extensively configured, yielded 0.08 Mbps (8 turns)
 3. Turns 23-27: SSH tunnel approach, marginal improvement (5 turns)
 4. Turns 28-31: Proposing Jellyfin (content isolation violation) and phone hotspot (4 turns)
@@ -1307,7 +1307,7 @@ None of this is in agentmemory because: (a) it's a different project entirely, (
 
 **What memory should do:**
 1. **Cross-project tribal knowledge namespace.** Infrastructure facts (machine inventory, network topology, server roles), user habits (travel setup, permission preferences), and environmental context should live in a global namespace accessible from any project.
-2. **Onboard operational context.** When a user first mentions a project/server/service, create beliefs about its basic configuration. "Willow runs Stash, Jellyfin, and Sonarr behind Tailscale" should be a persistent belief.
+2. **Onboard operational context.** When a user first mentions a project/server/service, create beliefs about its basic configuration. "Server-B runs Stash, Jellyfin, and Sonarr behind Tailscale" should be a persistent belief.
 3. **"No relevant results" threshold.** When the belief store has nothing about the queried topic, say so explicitly rather than returning 82 irrelevant results about a different project.
 
 **REQ mapping:** New requirement candidates:

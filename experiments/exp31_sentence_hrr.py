@@ -26,7 +26,7 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
-ALPHA_SEEK_DB = Path(
+project-a_DB = Path(
     "/home/user/projects/.gsd/workflows/spikes/"
     "260406-1-associative-memory-for-gsd-please-explor/"
     "sandbox/project-a.db"
@@ -174,7 +174,7 @@ def main() -> None:
     print(f"  DIM={DIM}, capacity ~{DIM // 10} bindings", file=sys.stderr)
     print("=" * 60, file=sys.stderr)
 
-    db = sqlite3.connect(str(ALPHA_SEEK_DB))
+    db = sqlite3.connect(str(project-a_DB))
     sentences, groups = build_sentence_nodes(db)
     db.close()
 

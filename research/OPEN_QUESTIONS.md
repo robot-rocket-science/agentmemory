@@ -40,7 +40,7 @@ Exp 22 tested hierarchical confidence with artificial subgraphs (every 50th node
 
 **What we know:**
 - Artificial hierarchical: ECE 0.133 at 10K (vs 0.169 flat)
-- Alpha-seek has 25 natural anchors (degree >= 10)
+- project-a has 25 natural anchors (degree >= 10)
 - Degree distribution is power-law-ish (few hubs, many leaves)
 
 **What we don't know:**

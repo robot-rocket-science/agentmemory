@@ -23,13 +23,13 @@ from pathlib import Path
 from typing import Any
 
 
-ALPHA_SEEK_DB = Path(
+project-a_DB = Path(
     "/home/user/projects/.gsd/workflows/spikes/"
     "260406-1-associative-memory-for-gsd-please-explor/"
     "sandbox/project-a.db"
 )
-ALPHA_SEEK_REPO = Path("/home/user/projects/project-a")
-ALPHA_SEEK_MEMTEST_REPO = Path("/home/user/projects/project-a-test")
+project-a_REPO = Path("/home/user/projects/project-a")
+project-a_MEMTEST_REPO = Path("/home/user/projects/project-a-test")
 
 OUTPUT_PATH = Path("experiments/exp6_timeline.json")
 SUMMARY_PATH = Path("experiments/exp6_timeline_summary.txt")
@@ -263,7 +263,7 @@ def build_timeline() -> None:
     print("Experiment 6 Phase A: Building Unified Timeline", file=sys.stderr)
     print("=" * 60, file=sys.stderr)
 
-    db = sqlite3.connect(str(ALPHA_SEEK_DB))
+    db = sqlite3.connect(str(project-a_DB))
 
     # Extract from all sources
     print("  Extracting decisions...", file=sys.stderr)
@@ -285,11 +285,11 @@ def build_timeline() -> None:
     db.close()
 
     print("  Extracting git commits (project-a)...", file=sys.stderr)
-    commits_as = extract_git_commits(ALPHA_SEEK_REPO, "project-a")
+    commits_as = extract_git_commits(project-a_REPO, "project-a")
     print(f"    {len(commits_as)} commits", file=sys.stderr)
 
     print("  Extracting git commits (project-a-test)...", file=sys.stderr)
-    commits_mt = extract_git_commits(ALPHA_SEEK_MEMTEST_REPO, "project-a-test")
+    commits_mt = extract_git_commits(project-a_MEMTEST_REPO, "project-a-test")
     print(f"    {len(commits_mt)} commits", file=sys.stderr)
 
     # Combine all events

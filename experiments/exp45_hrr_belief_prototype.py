@@ -45,7 +45,7 @@ EdgeList: TypeAlias = list[EdgeTriple]
 # Config
 # ---------------------------------------------------------------------------
 
-ALPHA_SEEK_DB: Final[Path] = Path(
+project-a_DB: Final[Path] = Path(
     "/home/user/projects/.gsd/workflows/spikes/"
     "260406-1-associative-memory-for-gsd-please-explor/"
     "sandbox/project-a.db"
@@ -155,7 +155,7 @@ def split_sentences(text: str) -> list[str]:
 
 def load_sentence_graph() -> tuple[SentDict, GroupDict, EdgeList]:
     """Load sentences and build typed edges from project-a DB."""
-    db: sqlite3.Connection = sqlite3.connect(str(ALPHA_SEEK_DB))
+    db: sqlite3.Connection = sqlite3.connect(str(project-a_DB))
     sentences: SentDict = {}
     groups: GroupDict = {}
 

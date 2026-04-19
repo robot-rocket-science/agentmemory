@@ -390,7 +390,7 @@
     "id": "D014_s0",
     "parent_decision": "D014",
     "sentence_index": 0,
-    "content": "Archon is canonical data host: Archon hosts all DuckDB files.",
+    "content": "Server-A is canonical data host: Server-A hosts all DuckDB files.",
     "tokens": 15,
     "type": "evidence",
     "references": []
@@ -408,7 +408,7 @@
     "id": "D014_s2",
     "parent_decision": "D014",
     "sentence_index": 2,
-    "content": "Archon has broader data, is GPU pipeline host, has more disk headroom.",
+    "content": "Server-A has broader data, is GPU pipeline host, has more disk headroom.",
     "tokens": 17,
     "type": "evidence",
     "references": []

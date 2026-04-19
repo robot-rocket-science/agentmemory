@@ -77,7 +77,7 @@ Showing 10 of 66 vocabulary-gap directives:
   - HRR bridgeable: True
   - Low-confidence query: False
 
-- **Directive:** "IMPORTANT: Per D120, all backtest runs target GCP as primary compute. Archon is overflow only."
+- **Directive:** "IMPORTANT: Per D120, all backtest runs target GCP as primary compute. Server-A is overflow only."
   - Source: `docs/m014-s01-put-config-selection.md`
   - Category: domain_jargon
   - Queries: ['test strategy on historical data', 'simulate past trades', 'validate approach']

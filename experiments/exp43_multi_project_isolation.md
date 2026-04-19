@@ -189,7 +189,7 @@ Options B and C should not be pursued. The marginal benefit (slightly better ran
 **User profile:**
 - Project A (project-a): 552 beliefs about options trading strategy. Includes capital amounts ($5K), specific tickers (SPY, AAPL, GE), trading rules, ML model configs, GCP infrastructure decisions.
 - Project B (web-app): 50 beliefs about a React/PostgreSQL web application. (Hypothetical -- we only have project-a data.)
-- Alpha-seek uses local Ollama (no cloud leak).
+- project-a uses local Ollama (no cloud leak).
 - Web-app uses Claude API (cloud -- F4 leak vector active).
 
 **Question:** Which project-a beliefs could leak into web-app context sent to Anthropic's API?
@@ -229,7 +229,7 @@ Same scenario, but FTS5 searches the full corpus:
 #### Option C: Penalty
 
 1. All beliefs scored with Thompson sampling.
-2. Alpha-seek domain beliefs get 0.1x penalty.
+2. project-a domain beliefs get 0.1x penalty.
 3. High-confidence project-a beliefs: "Capital is $5K" has Beta(20, 1) after multiple user corrections. Thompson draw: ~0.95. After penalty: ~0.095. This is below typical web-app beliefs.
 4. But: "Capital is $5K" has been stated 3 times by the user -- it has very high alpha. A Thompson draw from Beta(20, 1) will exceed 0.99 about 18% of the time. 0.99 * 0.1 = 0.099. Still below 0.5 (typical uncertain belief).
 5. However, if the penalty is 0.5x instead of 0.1x (a "softer" configuration): 0.99 * 0.5 = 0.495. This competes with uncertain web-app beliefs.
@@ -405,7 +405,7 @@ HRR (Holographic Reduced Representation) encodes the graph as superposed vector 
 - webapp HRR: encodes webapp subgraph + global nodes
 - Retrieval: decode from project-specific HRR vector. Global nodes appear in both.
 
-**Advantage:** Hard isolation. Alpha-seek node encodings cannot leak into webapp retrieval.
+**Advantage:** Hard isolation. project-a node encodings cannot leak into webapp retrieval.
 **Disadvantage:** Global nodes are encoded redundantly. When a global belief is updated, both HRR vectors must be recomputed.
 
 **Option 2: Single HRR vector with project-tagged bindings.**

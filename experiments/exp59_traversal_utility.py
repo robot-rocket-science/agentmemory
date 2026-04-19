@@ -16,7 +16,7 @@ Each method is evaluated on:
   - STRUCTURAL_INSIGHT: whether result reveals ordering/relationships
 
 Data sources:
-  - Alpha-seek spike DB (173 decisions, DECIDED_IN edges -> milestone timestamps)
+  - project-a spike DB (173 decisions, DECIDED_IN edges -> milestone timestamps)
   - Exp 6 timeline (1790 events, 775 edges)
 
 Hypotheses:

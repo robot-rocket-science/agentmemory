@@ -241,7 +241,7 @@ Three validated layers (CALLS, CO_CHANGED, CITES) on project-a show **near-zero 
 
 ### Target Projects
 
-1. **Alpha-seek** -- richest signal diversity: 552 commits, 289 Python files, 154 decisions, GCP dispatches, paper trading, backtest results, structured tests, CLAUDE.md directives, multi-machine dev (lorax + server-a via Gitea).
+1. **project-a** -- richest signal diversity: 552 commits, 289 Python files, 154 decisions, GCP dispatches, paper trading, backtest results, structured tests, CLAUDE.md directives, multi-machine dev (lorax + server-a via Gitea).
 2. **A second project with maximal sparsity and depth** -- thin documentation, deep call chains, minimal decision history. Tests generalization. Candidates: smoltcp (Rust, protocols), project-d (Python, infra), or a local project with sparse history.
 
 ### What This Would Demonstrate

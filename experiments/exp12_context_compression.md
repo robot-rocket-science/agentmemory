@@ -86,7 +86,7 @@ Locked beliefs created via `correct` or `remember` must remain available to the 
 | Gemini CLI | Unknown | Research needed |
 | Local models | No compression (limited context window, not compressed) | Always-loaded in system prompt |
 
-## Connection to Alpha-Seek Evidence
+## Connection to Project-A Evidence
 
 This is exactly what the user did manually: rules added to CLAUDE.md after repeated overrides. CLAUDE.md survived compaction. The dispatch runbook (referenced in CLAUDE.md) also survived. The overrides that happened AFTER CLAUDE.md enforcement (the remaining 1.8/day) were either:
 - New topics not yet in CLAUDE.md

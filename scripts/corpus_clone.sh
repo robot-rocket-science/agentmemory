@@ -16,7 +16,7 @@
 #
 set -euo pipefail
 
-ARCHON="server-a"
+server-a="server-a"
 BASE="~/agentmemory-corpus"
 PROJECTS_DIR="${PROJECTS_DIR:-$HOME/projects}"
 TIER="${1:---tier}"
@@ -113,7 +113,7 @@ clone_or_update() {
 
     # Check if repo exists and is valid
     # Note: ~ expands on the remote side inside the heredoc since we don't quote REMOTE_EOF
-    ssh "$ARCHON" bash <<REMOTE_EOF
+    ssh "$server-a" bash <<REMOTE_EOF
         set -euo pipefail
         full="\$HOME/agentmemory-corpus/public/${dest}"
 
@@ -155,7 +155,7 @@ mirror_personal() {
 
     # Use rsync with .git included for full history
     local remote_dest="/home/user/agentmemory-corpus/personal/${name}"
-    ssh "$ARCHON" "mkdir -p '${remote_dest}'"
+    ssh "$server-a" "mkdir -p '${remote_dest}'"
     rsync -az --delete \
         --exclude='.venv' \
         --exclude='node_modules' \
@@ -167,13 +167,13 @@ mirror_personal() {
         --exclude='dist' \
         --exclude='.ruff_cache' \
         --exclude='uv.lock' \
-        "${src}/" "${ARCHON}:${remote_dest}/"
+        "${src}/" "${server-a}:${remote_dest}/"
 
     echo "    [synced]"
 }
 
 echo "Corpus clone/update -- tier: ${TIER_VAL}, personal: ${DO_PERSONAL}, dry-run: ${DRY_RUN}"
-echo "Target: ${ARCHON}:${BASE}"
+echo "Target: ${server-a}:${BASE}"
 echo ""
 
 # Public repos

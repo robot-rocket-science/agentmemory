@@ -562,7 +562,7 @@ Built two reference graphs per project: document cross-references (D###/M### cit
 Scripts: `extract_doc_references.py`, `extract_commit_intent.py`, `compare_edges.py`
 Data: `experiments/exp37_results/`
 
-### Alpha-Seek Precision
+### Project-A Precision
 
 | Method | vs Doc Refs | vs Commit Intent | vs Both | Unvalidated |
 |---|---|---|---|---|
@@ -572,7 +572,7 @@ Data: `experiments/exp37_results/`
 | IMPORTS | 0.0% | 41.4% | 0.0% | 222/379 |
 | TESTS | 0.0% | 86.2% | 0.0% | 4/29 |
 
-### Debserver Precision
+### project-d Precision
 
 | Method | vs Doc Refs | vs Commit Intent | vs Both | Unvalidated |
 |---|---|---|---|---|

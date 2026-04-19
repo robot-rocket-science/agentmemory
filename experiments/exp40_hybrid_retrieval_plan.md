@@ -78,7 +78,7 @@ Tests: does the pipeline work when edges are provided?
 
 ### Step 1: Prepare the belief corpus
 
-**Data source:** Alpha-seek DB (586 active belief nodes, same as Exp 39).
+**Data source:** project-a DB (586 active belief nodes, same as Exp 39).
 
 **What to do:**
 1. Load all 586 nodes from the project-a DB
@@ -212,7 +212,7 @@ Tests: can edges be created without manual classification?
 ## What You Need to Do (Step by Step)
 
 ### Prerequisites
-- Alpha-seek DB available at the existing path (verified: 5.7MB, 586 nodes)
+- project-a DB available at the existing path (verified: 5.7MB, 586 nodes)
 - numpy available (for HRR vectors)
 - Experiment scripts from Exp 31/34/39 available (for reuse)
 

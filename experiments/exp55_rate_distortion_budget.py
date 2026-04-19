@@ -31,7 +31,7 @@ import numpy as np
 from scipy import stats as scipy_stats  # type: ignore[import-untyped]
 from scipy.optimize import minimize as scipy_minimize  # type: ignore[import-untyped]
 
-ALPHA_SEEK_DB = Path(
+project-a_DB = Path(
     "/home/user/projects/.gsd/workflows/spikes/"
     "260406-1-associative-memory-for-gsd-please-explor/"
     "sandbox/project-a.db"
@@ -617,7 +617,7 @@ def recall_budget(
 
 def main() -> None:
     # Load and decompose
-    db: sqlite3.Connection = sqlite3.connect(str(ALPHA_SEEK_DB))
+    db: sqlite3.Connection = sqlite3.connect(str(project-a_DB))
     decisions: list[tuple[str, ...]] = db.execute(
         "SELECT id, decision, choice, rationale FROM decisions ORDER BY seq"
     ).fetchall()

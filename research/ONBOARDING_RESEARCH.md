@@ -348,7 +348,7 @@ On each subsequent session:
 
 Walk through the pipeline on three projects to validate the design.
 
-### 7.1 Alpha-Seek (Rich Signals)
+### 7.1 Project-A (Rich Signals)
 
 | Stage | What Happens | Output |
 |-------|-------------|--------|
@@ -517,9 +517,9 @@ Tested 5 queries per project with known-answer terms. Compared graph FTS5 (sente
 
 **Implication:** Sentence-level decomposition improves token efficiency (Exp 16: 86% reduction) but reduces retrieval recall compared to full-file search. The production system needs **dual-mode indexing**: FTS5 on both sentence nodes (for precise, token-efficient retrieval) AND raw files (for recall-oriented fallback). This is not a new idea -- it matches the L0-L3 progressive loading design from PLAN.md, where L0/L1 use sentence-level nodes and L2/L3 expand to full documents when sentence retrieval is insufficient.
 
-### 8.11 H3 Analysis: HRR Value on Non-Alpha-Seek Topologies
+### 8.11 H3 Analysis: HRR Value on Non-Project-A Topologies
 
-**H3 could not be properly tested.** The reason: HRR's vocabulary-bridge mechanism requires **typed semantic edges** (like AGENT_CONSTRAINT) that group beliefs by concept. Jose-bully and project-d lack such edges. Their edge types are:
+**H3 could not be properly tested.** The reason: HRR's vocabulary-bridge mechanism requires **typed semantic edges** (like AGENT_CONSTRAINT) that group beliefs by concept. project-c and project-d lack such edges. Their edge types are:
 
 | Project | Edge Types Available |
 |---------|-------------------|
@@ -698,7 +698,7 @@ FTS5 retrieval on the extracted graph achieves >= 80% precision@5 on queries abo
 
 **Null:** For sparse or doc-only projects, the graph provides no retrieval benefit over searching raw files.
 
-### H3: HRR Value Beyond Alpha-Seek
+### H3: HRR Value Beyond Project-A
 
 HRR adds retrieval value (finds nodes FTS5 misses) on at least 2 of the 5 project archetypes, not just the project-a archetype.
 

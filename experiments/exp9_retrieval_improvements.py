@@ -22,7 +22,7 @@ from collections.abc import Callable
 
 from datasketch import MinHash, MinHashLSH  # type: ignore[import-untyped]
 
-ALPHA_SEEK_DB = Path(
+project-a_DB = Path(
     "/home/user/projects/.gsd/workflows/spikes/"
     "260406-1-associative-memory-for-gsd-please-explor/"
     "sandbox/project-a.db"
@@ -84,7 +84,7 @@ CRITICAL_BELIEFS: dict[str, dict[str, list[str]]] = {
 
 
 def load_nodes() -> dict[str, dict[str, str | int]]:
-    db = sqlite3.connect(str(ALPHA_SEEK_DB))
+    db = sqlite3.connect(str(project-a_DB))
     nodes: dict[str, dict[str, str | int]] = {}
     for row in db.execute(
         "SELECT id, content FROM mem_nodes WHERE superseded_by IS NULL"
