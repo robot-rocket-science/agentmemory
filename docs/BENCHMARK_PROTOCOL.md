@@ -307,6 +307,76 @@ if __name__ == "__main__":
 - **Metric:** LLM judge accuracy (paper uses Qwen3-32B)
 - **Alternative judge:** must be disclosed
 
+## Automated Protocol Enforcement (pytest)
+
+The benchmark protocol is codified as a pytest test suite in
+`benchmarks/test_benchmark_suite.py`. Every protocol step is an enforceable
+test assertion. Contamination = test failure.
+
+```bash
+# Run retrieval adapters (slow, produces new data)
+uv run pytest benchmarks/test_benchmark_suite.py -v --run-retrieval -m retrieval
+
+# Validate contamination (fast, checks existing files)
+uv run pytest benchmarks/test_benchmark_suite.py -v -m contamination
+
+# Score predictions
+uv run pytest benchmarks/test_benchmark_suite.py -v -m scoring
+
+# Full validation (all protocol checks)
+uv run pytest benchmarks/test_benchmark_suite.py -v
+```
+
+The suite enforces:
+- 25 contamination checks (5 benchmarks x 5 checks each)
+- Dataset integrity (item counts match published papers)
+- GT file isolation (separate from retrieval)
+- LoCoMo mathematical ceiling (93.57% per locomo-audit)
+- Methodology metadata completeness (Lin checklist)
+- Metric type labeling
+
+## Methodology Checklist (Lin)
+
+Per github.com/lhl/agentic-memory benchmarks guide, every result must report:
+
+| Field | Description |
+|-------|-------------|
+| benchmark_name | Name + version/variant |
+| metric_type | Explicit metric (SEM, F1, Accuracy) |
+| reader_model | Model generating answers |
+| judge_model | Evaluation model or "automatic" |
+| retrieval_method | FTS5, embeddings, etc. |
+| token_budget | Retrieval budget |
+| prompt_template_hash | SHA256 of exact prompt |
+| run_count | Independent repetitions (>=5, or justify) |
+| git_commit | Exact commit hash |
+| timestamp | ISO 8601 |
+| code_link | Link to benchmark runner code |
+| variance_justification | If run_count < 5, explain why |
+
+These are enforced by `TestMethodology` in the pytest suite.
+
+## Known Contamination Incidents
+
+### Incident 1: LoCoMo adapter --retrieve-only (fixed 2026-04-19)
+
+The LoCoMo adapter's `--retrieve-only` mode wrote `answer` and `f1` fields
+directly into the retrieval file. The `verify_clean.py` check would have
+caught this (both are banned keys), but the adapter should never have
+written them. Fixed by separating GT into a `_gt.json` file with proper
+ID cross-referencing. Category 5 forced-choice options are in the retrieval
+file but the correct answer indicator is only in the GT file.
+
+### Incident 2: GT answers in retrieval output (fixed pre-v1.0)
+
+Retrieval JSON contained answer fields. LLM reader saw correct answers.
+Results inflated to 100% on MAB MH 262K. Fixed by two-file protocol.
+
+### Incident 3: LLM self-judging with GT visible (fixed pre-v1.0)
+
+LLM asked to both generate and judge in same pass. Fixed by two-pass
+protocol (generation pass with no GT, then separate scoring pass).
+
 ## Audit Trail
 
 Every benchmark run should produce an audit record:
