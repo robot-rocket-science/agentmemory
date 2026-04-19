@@ -17,6 +17,7 @@ from fastmcp import FastMCP
 from agentmemory.classification import (
     BATCH_SIZE,
     ClassifiedSentence,
+    classify_sentences_offline,
     get_source_adjusted_prior,
 )
 from agentmemory.hook_search import (
@@ -930,19 +931,19 @@ def get_locked() -> str:
 
 @mcp.tool
 def onboard(project_path: str) -> str:
-    """Onboard a project by scanning its directory for signals.
+    """Onboard a project: scan, classify, create beliefs. End-to-end.
 
-    Extracts content into observations and returns sentences for LLM
-    classification. Does NOT create beliefs -- the calling agent should:
-    1. Parse the returned sentences JSON
-    2. Spawn Haiku subagents to classify batches of 20
-    3. Call create_beliefs() with the classification results
+    One command does everything:
+    1. Scans the project directory for git history, code, docs, directives
+    2. Creates observations from extracted content
+    3. Stores structural edges for the graph
+    4. Classifies sentences offline (zero-LLM, no subagents needed)
+    5. Creates beliefs from classified sentences
+    6. Returns a summary
 
-    This separation ensures beliefs are created with LLM-quality types
-    and priors from the start, rather than relying on offline heuristics.
+    No LLM orchestration required. The agent calls onboard() and gets
+    back a completion summary.
     """
-    import json as _json
-
     path: Path = Path(project_path).expanduser().resolve()
     if not path.is_dir():
         return f"Not a directory: {path}"
@@ -950,7 +951,7 @@ def onboard(project_path: str) -> str:
     # Detect cross-project onboard for provenance tagging
     current_project: Path = Path.cwd().resolve()
     is_foreign: bool = path != current_project
-    source_project_tag: str = str(path) if is_foreign else ""
+    _source_project_tag: str = str(path) if is_foreign else ""
 
     # Check for incremental onboarding: use last onboard commit if available
     store_pre: MemoryStore = _get_store()
@@ -959,13 +960,14 @@ def onboard(project_path: str) -> str:
     if last_run is not None and last_run.get("commit_hash"):
         since_commit = last_run["commit_hash"]
 
-    # Scan the project (incremental if since_commit is set)
+    # Step 1: Scan the project
     scan: ScanResult = scan_project(path, since_commit=since_commit)
 
-    # Extract observations and sentences (no beliefs)
+    # Step 2: Extract observations and collect sentences
     store: MemoryStore = _get_store()
     observations_created: int = 0
-    all_sentences: list[dict[str, str]] = []
+    raw_sentences: list[tuple[str, str]] = []
+    sentence_metadata: list[dict[str, str]] = []
 
     for node in scan.nodes:
         if node.node_type == "file":
@@ -990,26 +992,74 @@ def onboard(project_path: str) -> str:
         observations_created += 1
 
         for text, src in extracted.sentences:
-            sentence: dict[str, str] = {
-                "text": text,
-                "source": src,
-                "observation_id": extracted.observation.id,
-                "created_at": node.date or "",
-                "is_correction": str(extracted.full_text_is_correction),
-                "full_text": node.content,
-            }
-            if source_project_tag:
-                sentence["source_project"] = source_project_tag
-            all_sentences.append(sentence)
+            raw_sentences.append((text, src))
+            sentence_metadata.append(
+                {
+                    "observation_id": extracted.observation.id,
+                    "created_at": node.date or "",
+                    "source_path": node.file or "",
+                }
+            )
 
-    # Store structural edges for HRR graph encoding (batched)
+    # Step 3: Store structural edges
     edge_batch: list[tuple[str, str, str, float, str]] = [
         (edge.src, edge.tgt, edge.edge_type, edge.weight, "scanner")
         for edge in scan.edges
     ]
     store.batch_insert_graph_edges(edge_batch)
 
-    # Record onboarding provenance
+    # Step 4: Classify sentences offline (zero-LLM)
+    classified: list[ClassifiedSentence] = classify_sentences_offline(raw_sentences)
+
+    # Step 5: Create beliefs from classified sentences
+    beliefs_created: int = 0
+    beliefs_filtered: int = 0
+    type_counts: dict[str, int] = {}
+
+    for i, cs in enumerate(classified):
+        if not cs.persist:
+            beliefs_filtered += 1
+            continue
+
+        belief_source: str
+        if cs.sentence_type == "CORRECTION":
+            belief_source = "user_corrected"
+        elif cs.source == "user":
+            belief_source = "user_stated"
+        else:
+            belief_source = "agent_inferred"
+
+        _type_to_belief: dict[str, str] = {
+            "REQUIREMENT": "requirement",
+            "CORRECTION": "correction",
+            "PREFERENCE": "preference",
+            "FACT": "factual",
+            "ASSUMPTION": "factual",
+            "DECISION": "factual",
+            "ANALYSIS": "factual",
+        }
+        belief_type: str = _type_to_belief.get(cs.sentence_type, "factual")
+
+        meta: dict[str, str] = (
+            sentence_metadata[i] if i < len(sentence_metadata) else {}
+        )
+
+        store.insert_belief(
+            content=cs.text,
+            belief_type=belief_type,
+            source_type=belief_source,
+            alpha=cs.alpha,
+            beta_param=cs.beta_param,
+            locked=False,
+            observation_id=meta.get("observation_id"),
+            created_at=meta.get("created_at") or None,
+            classified_by="offline",
+            data_source=meta.get("source_path", ""),
+        )
+        beliefs_created += 1
+        type_counts[belief_type] = type_counts.get(belief_type, 0) + 1
+
+    # Step 6: Record onboarding provenance
     import subprocess
 
     commit_hash: str | None = None
@@ -1030,7 +1080,7 @@ def onboard(project_path: str) -> str:
         commit_hash=commit_hash,
         nodes_extracted=len(scan.nodes),
         edges_extracted=len(scan.edges),
-        beliefs_created=0,  # Beliefs created later via create_beliefs()
+        beliefs_created=beliefs_created,
         observations_created=observations_created,
     )
 
@@ -1039,9 +1089,9 @@ def onboard(project_path: str) -> str:
     for n in scan.nodes:
         node_types[n.node_type] = node_types.get(n.node_type, 0) + 1
 
-    edge_types: dict[str, int] = {}
+    edge_type_counts: dict[str, int] = {}
     for e in scan.edges:
-        edge_types[e.edge_type] = edge_types.get(e.edge_type, 0) + 1
+        edge_type_counts[e.edge_type] = edge_type_counts.get(e.edge_type, 0) + 1
 
     mode: str = f"incremental (since {since_commit[:12]})" if since_commit else "full"
     lines: list[str] = [
@@ -1054,29 +1104,19 @@ def onboard(project_path: str) -> str:
     for ntype, count in sorted(node_types.items()):
         lines.append(f"    {ntype}: {count}")
     lines.append(f"  Edges extracted: {len(scan.edges)}")
-    for etype, count in sorted(edge_types.items()):
+    for etype, count in sorted(edge_type_counts.items()):
         lines.append(f"    {etype}: {count}")
-    lines.append(f"  Observations created: {observations_created}")
-    lines.append(f"  Sentences for classification: {len(all_sentences)}")
+    lines.append(f"  Observations: {observations_created}")
+    lines.append(f"  Sentences classified: {len(classified)}")
+    lines.append(f"  Beliefs created: {beliefs_created}")
+    for bt, bc in sorted(type_counts.items()):
+        lines.append(f"    {bt}: {bc}")
+    lines.append(f"  Filtered (ephemeral): {beliefs_filtered}")
 
     timing_parts: list[str] = [f"{k}={v:.2f}s" for k, v in scan.timings.items()]
     lines.append(f"  Timing: {', '.join(timing_parts)}")
     if commit_hash:
-        lines.append(f"  Git HEAD at onboard: {commit_hash[:12]}")
-
-    summary: str = "\n".join(lines)
-
-    if not all_sentences:
-        return summary + "\n\nNo sentences to classify."
-
-    lines.append(f"\n  Batch size: {BATCH_SIZE} sentences per subagent")
-    lines.append(
-        f"  Estimated batches: {(len(all_sentences) + BATCH_SIZE - 1) // BATCH_SIZE}"
-    )
-    lines.append("")
-    lines.append("SENTENCES_JSON_START")
-    lines.append(_json.dumps(all_sentences))
-    lines.append("SENTENCES_JSON_END")
+        lines.append(f"  Git HEAD: {commit_hash[:12]}")
 
     return "\n".join(lines)
 
