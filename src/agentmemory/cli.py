@@ -633,6 +633,220 @@ def _setup_telemetry() -> None:
 
 
 # ---------------------------------------------------------------------------
+# metrics
+# ---------------------------------------------------------------------------
+
+
+def cmd_metrics(args: argparse.Namespace) -> None:
+    """Analyze session data from conversation logs.
+
+    Parses conversation logs to compute correction rates, search usage,
+    memory utility, and session quality metrics. Compares memory-on vs
+    memory-off sessions when sufficient data exists.
+
+    This is the primary tool for validating agentmemory's real-world
+    impact beyond benchmark scores.
+    """
+    import re as _re
+    from collections import defaultdict
+
+    log_dir: Path = Path.home() / ".claude" / "conversation-logs"
+    if not log_dir.exists():
+        print("No conversation logs found at ~/.claude/conversation-logs/")
+        return
+
+    # Load all turns
+    all_turns: list[dict[str, str]] = []
+    for jsonl_file in sorted(log_dir.glob("**/*.jsonl")):
+        with jsonl_file.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    all_turns.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+
+    all_turns.sort(key=lambda t: t.get("timestamp", ""))
+
+    if not all_turns:
+        print("No conversation turns found.")
+        return
+
+    # Group by session
+    by_session: dict[str, list[dict[str, str]]] = defaultdict(list)
+    for turn in all_turns:
+        sid: str = turn.get("session_id", "")
+        if sid:
+            by_session[sid].append(turn)
+
+    # Date range
+    timestamps: list[str] = [
+        t.get("timestamp", "") for t in all_turns if t.get("timestamp")
+    ]
+    timestamps.sort()
+
+    print("=" * 60)
+    print("agentmemory Session Metrics Report")
+    print("=" * 60)
+    print(f"  Date range:     {timestamps[0][:10]} to {timestamps[-1][:10]}")
+    print(f"  Total turns:    {len(all_turns)}")
+    print(f"  Total sessions: {len(by_session)}")
+    print()
+
+    # Correction patterns
+    correction_pats: list[_re.Pattern[str]] = [
+        _re.compile(r"\bno[,.]?\s+(that'?s|it'?s)\s+(wrong|not|incorrect)", _re.I),
+        _re.compile(r"\bactually[,.]?\s+(it'?s|we|I|the)", _re.I),
+        _re.compile(r"\bthat'?s\s+not\s+(right|correct|what)", _re.I),
+        _re.compile(r"\bI\s+said\s+.+\s+not\s+", _re.I),
+        _re.compile(r"\bstop\s+(doing|adding|using|saying)", _re.I),
+        _re.compile(r"\bdon'?t\s+(do|add|use|say|mock|skip|commit)", _re.I),
+        _re.compile(r"\bnot\s+what\s+I\s+(asked|meant|said|wanted)", _re.I),
+    ]
+
+    # Per-session analysis
+    total_user: int = 0
+    total_corrections: int = 0
+    memory_on_sessions: list[dict[str, object]] = []
+    memory_off_sessions: list[dict[str, object]] = []
+
+    for sid, turns in by_session.items():
+        user_turns: list[dict[str, str]] = [
+            t for t in turns if t.get("event") == "user"
+        ]
+        assistant_turns: list[dict[str, str]] = [
+            t for t in turns if t.get("event") == "assistant"
+        ]
+
+        if len(user_turns) < 2:
+            continue  # skip trivial sessions
+
+        # Count corrections
+        corrections: int = 0
+        for t in user_turns:
+            text: str = t.get("text", "")
+            for pat in correction_pats:
+                if pat.search(text):
+                    corrections += 1
+                    break
+
+        # Check for agentmemory usage
+        has_memory: bool = any(
+            "mcp__agentmemory" in t.get("text", "") for t in assistant_turns
+        )
+
+        total_user += len(user_turns)
+        total_corrections += corrections
+
+        session_data: dict[str, object] = {
+            "user_turns": len(user_turns),
+            "corrections": corrections,
+            "correction_rate": round(corrections / len(user_turns), 4)
+            if user_turns
+            else 0.0,
+            "has_memory": has_memory,
+        }
+
+        if has_memory:
+            memory_on_sessions.append(session_data)
+        elif len(user_turns) >= 3:
+            memory_off_sessions.append(session_data)
+
+    # Overall stats
+    overall_rate: float = total_corrections / total_user if total_user > 0 else 0.0
+    print("## Correction Analysis")
+    print(f"  User turns analyzed: {total_user}")
+    print(f"  Corrections found:  {total_corrections}")
+    print(f"  Overall rate:       {overall_rate:.2%}")
+    print()
+
+    # Memory comparison
+    on_rate: float = 0.0
+    off_rate: float = 0.0
+    if memory_on_sessions and memory_off_sessions:
+        on_rate = sum(
+            float(s.get("correction_rate", 0))  # type: ignore[arg-type]
+            for s in memory_on_sessions
+        ) / len(memory_on_sessions)
+        off_rate = sum(
+            float(s.get("correction_rate", 0))  # type: ignore[arg-type]
+            for s in memory_off_sessions
+        ) / len(memory_off_sessions)
+
+        print("## Memory Impact")
+        print(f"  Memory-ON sessions:  {len(memory_on_sessions)}")
+        print(f"    Correction rate:   {on_rate:.2%}")
+        print(f"  Memory-OFF sessions: {len(memory_off_sessions)}")
+        print(f"    Correction rate:   {off_rate:.2%}")
+        if off_rate > 0:
+            delta: float = (off_rate - on_rate) / off_rate
+            direction: str = "reduction" if delta > 0 else "increase"
+            print(f"  Correction {direction}: {abs(delta):.1%}")
+        print()
+        print("  CAVEAT: Memory-ON sessions may differ in complexity")
+        print("  from Memory-OFF sessions. This is observational, not")
+        print("  a controlled experiment.")
+    else:
+        print("## Memory Impact")
+        print(f"  Memory-ON sessions:  {len(memory_on_sessions)}")
+        print(f"  Memory-OFF sessions: {len(memory_off_sessions)}")
+        print("  Insufficient data for comparison (need both)")
+    print()
+
+    # Agentmemory DB stats
+    store: MemoryStore = _get_store()
+    sessions_in_db: list[Session] = store.find_incomplete_sessions()
+    all_db_sessions: list[sqlite3.Row] = store.query(
+        "SELECT COUNT(*) as c, "
+        "SUM(CASE WHEN feedback_given > 0 THEN 1 ELSE 0 END) as with_fb, "
+        "SUM(beliefs_created) as beliefs, "
+        "SUM(corrections_detected) as corrections, "
+        "SUM(searches_performed) as searches, "
+        "AVG(quality_score) as avg_quality "
+        "FROM sessions"
+    )
+    if all_db_sessions:
+        row = all_db_sessions[0]
+        print("## agentmemory DB Stats")
+        print(f"  Sessions:         {row['c']}")
+        print(f"  With feedback:    {row['with_fb']}")
+        print(f"  Beliefs created:  {row['beliefs']}")
+        print(f"  Corrections:      {row['corrections']}")
+        print(f"  Searches:         {row['searches']}")
+        quality: object = row["avg_quality"]
+        if quality is not None:
+            print(f"  Avg quality:      {float(quality):.3f}")  # type: ignore[arg-type]
+        else:
+            print("  Avg quality:      N/A (never computed)")
+        print(f"  Incomplete:       {len(sessions_in_db)}")
+    print()
+
+    # Output JSON if requested
+    if args.output:
+        report: dict[str, object] = {
+            "date_range": f"{timestamps[0]} to {timestamps[-1]}",
+            "total_turns": len(all_turns),
+            "total_sessions": len(by_session),
+            "total_user_turns": total_user,
+            "total_corrections": total_corrections,
+            "overall_correction_rate": round(overall_rate, 4),
+            "memory_on_sessions": len(memory_on_sessions),
+            "memory_off_sessions": len(memory_off_sessions),
+        }
+        if memory_on_sessions and memory_off_sessions:
+            report["memory_on_correction_rate"] = round(on_rate, 4)
+            report["memory_off_correction_rate"] = round(off_rate, 4)
+        out_path: Path = Path(args.output)
+        with out_path.open("w", encoding="utf-8") as f:
+            json.dump(report, f, indent=2)
+        print(f"Report written to {args.output}")
+
+    print("=" * 60)
+
+
+# ---------------------------------------------------------------------------
 # session-complete
 # ---------------------------------------------------------------------------
 
@@ -2953,6 +3167,15 @@ def main() -> None:
         "health", help="Run diagnostics"
     )
     p_health.set_defaults(func=cmd_health)
+
+    # metrics
+    p_metrics: argparse.ArgumentParser = subparsers.add_parser(
+        "metrics", help="Session metrics from conversation logs"
+    )
+    p_metrics.add_argument(
+        "--output", default=None, help="Write JSON report to this path"
+    )
+    p_metrics.set_defaults(func=cmd_metrics)
 
     # core
     p_core: argparse.ArgumentParser = subparsers.add_parser(
