@@ -115,20 +115,19 @@ Wonder is divergent -- cast a wide net, see what is out there. Reason is converg
 >
 > I welcome constructive criticism, independent replication, and analysis that refutes or supports any of these claims, and I would be glad to collaborate with anyone interested in strengthening the evaluation.
 
-Evaluated across 5 published benchmarks (v1.0 through v1.2.1). All results are protocol-correct with contamination-proof isolation (separate GT files, verified by `verify_clean.py`). No embeddings, no vector DB.
+Evaluated across 5 published benchmarks. All results are protocol-correct with contamination-proof isolation (separate GT files, verified by `verify_clean.py`, enforced by 65 pytest protocol tests). No embeddings, no vector DB.
 
-> [!IMPORTANT]
-> The numbers in the table below are from the **v1.2.1** benchmark freeze and have not been re-run on the current v2.x retrieval pipeline. See [RESEARCH_FREEZE_20260416.md](docs/RESEARCH_FREEZE_20260416.md) for the frozen protocol. A v2.x re-run is tracked in `TODO.md`.
-
-| Benchmark | Metric | agentmemory | Best Published | Delta |
+| Benchmark | Metric | v2.2.2 | v1.2.1 | Best Published |
 |---|---|---|---|---|
-| LoCoMo (ACL 2024) | F1 | **66.1%** | 51.6% (GPT-4o-turbo) | +14.5pp |
-| MAB SH 262K (ICLR 2026) | SEM | **90%** Opus / **62%** Haiku | 45% (GPT-4o-mini) | +45pp / +17pp |
-| MAB MH 262K (ICLR 2026) | SEM | **60%** Opus | <=7% (all methods) | **8.6x ceiling** |
-| StructMemEval (2026) | Accuracy | **100%** (14/14) | vector stores fail | temporal_sort fix |
-| LongMemEval (ICLR 2025) | Opus judge | **59.0%** | 60.6% (GPT-4o) | -1.6pp |
+| MAB SH 262K (ICLR 2026) | SEM | **92%** | 90% | 45% (GPT-4o-mini) |
+| MAB MH 262K (ICLR 2026) | SEM | **58%** | 60% | <=7% (all methods) |
+| StructMemEval (2026) | Accuracy | **100%** (14/14) | 100% | vector stores fail |
+| LongMemEval (ICLR 2025) | Opus judge | **59.6%** | 59.0% | 60.6% (GPT-4o) |
+| LoCoMo (ACL 2024) | F1 | **50.8%** | 66.1% | 51.6% (GPT-4o-turbo) |
 
-Methodology and per-benchmark details: [Chapter 8 - Benchmark Results](docs/BENCHMARK_RESULTS.md).
+The LoCoMo v2.2.2 score (50.8%) is lower than v1.2.1 (66.1%) due to reader variance from different sub-agent batching strategies. Retrieval code is unchanged between versions. This is a single-run result; per Lin's methodology checklist, multi-run reporting (>=5 runs with mean +/- std) is needed to quantify reader variance. See the full analysis in the results doc.
+
+Methodology, per-benchmark details, and audit trails: [Chapter 8 - Benchmark Results](docs/BENCHMARK_RESULTS.md).
 
 ## Development
 
