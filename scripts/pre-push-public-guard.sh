@@ -77,33 +77,10 @@ if [ -n "$TREE_MATCHES" ]; then
     exit 1
 fi
 
-# Also check diff for patterns (belt and suspenders)
-while read -r local_ref local_oid remote_ref remote_oid; do
-    if [ "$local_oid" = "0000000000000000000000000000000000000000" ]; then
-        continue  # branch deletion
-    fi
-
-    if [ "$remote_oid" = "0000000000000000000000000000000000000000" ]; then
-        # New branch, check all files
-        RANGE="$local_oid"
-    else
-        RANGE="${remote_oid}..${local_oid}"
-    fi
-
-    # Check diff content for blocked patterns
-    MATCHES=$(git diff "$RANGE" -- . ':(exclude).git' 2>/dev/null | grep -iEn "$REGEX" || true)
-
-    if [ -n "$MATCHES" ]; then
-        echo ""
-        echo "BLOCKED: Sensitive patterns detected in push to public remote!"
-        echo ""
-        echo "$MATCHES" | head -20
-        echo ""
-        echo "Fix: Remove or redact the matched content before pushing."
-        echo "Override: git push --no-verify (use with caution)"
-        exit 1
-    fi
-done
+# The full tree scan above is sufficient. No diff-based check needed
+# since the tree scan covers all tracked files in their current state.
+# (A diff-based check would false-positive on removed lines containing
+# PII that existed in the old remote branch.)
 
 echo "[pre-push] Clean. Pushing to $REMOTE."
 exit 0

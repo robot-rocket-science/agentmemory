@@ -5,13 +5,13 @@
  * from the email body or attachments, validates and stores in D1, then
  * forwards the original email to Gmail as notification.
  *
- * Deployed as Cloudflare Worker "dry-term-30e8".
+ * Deployed as Cloudflare Worker "worker-name".
  */
 import * as PostalMime from "postal-mime";
 
 const SCHEMA_VERSION = 1;
 const REQUIRED_KEYS = ["v", "ts", "session", "feedback", "beliefs", "graph"];
-const FORWARD_TO = "jonsobol@gmail.com";
+const FORWARD_TO = "user@example.com";
 
 function validateSnapshot(obj) {
   if (typeof obj !== "object" || obj === null) return "not an object";
