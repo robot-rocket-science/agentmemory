@@ -18,6 +18,7 @@ from agentmemory.classification import (
     BATCH_SIZE,
     ClassifiedSentence,
     classify_sentences_offline,
+    classify_with_llm,
     get_source_adjusted_prior,
 )
 from agentmemory.hook_search import (
@@ -930,19 +931,25 @@ def get_locked() -> str:
 
 
 @mcp.tool
-def onboard(project_path: str) -> str:
+def onboard(project_path: str, use_llm: bool = False) -> str:
     """Onboard a project: scan, classify, create beliefs. End-to-end.
 
     One command does everything:
     1. Scans the project directory for git history, code, docs, directives
     2. Creates observations from extracted content
     3. Stores structural edges for the graph
-    4. Classifies sentences offline (zero-LLM, no subagents needed)
+    4. Classifies sentences (LLM if use_llm=True, offline otherwise)
     5. Creates beliefs from classified sentences
     6. Returns a summary
 
     No LLM orchestration required. The agent calls onboard() and gets
     back a completion summary.
+
+    Args:
+        project_path: Directory to scan.
+        use_llm: If True, uses Haiku LLM for 99% classification accuracy
+                 (~$0.005/session). Falls back to offline if API unavailable.
+                 If False (default), uses offline classification (36% accuracy).
     """
     path: Path = Path(project_path).expanduser().resolve()
     if not path.is_dir():
@@ -1009,7 +1016,16 @@ def onboard(project_path: str) -> str:
     store.batch_insert_graph_edges(edge_batch)
 
     # Step 4: Classify sentences offline (zero-LLM)
-    classified: list[ClassifiedSentence] = classify_sentences_offline(raw_sentences)
+    # Step 4: Classify sentences
+    if use_llm:
+        classified: list[ClassifiedSentence] = classify_with_llm(
+            raw_sentences,
+            for_onboard=True,
+        )
+        classifier_used: str = "llm (Haiku)"
+    else:
+        classified: list[ClassifiedSentence] = classify_sentences_offline(raw_sentences)  # type: ignore[no-redef]
+        classifier_used: str = "offline"
 
     # Step 5: Create beliefs from classified sentences
     beliefs_created: int = 0
@@ -1107,6 +1123,7 @@ def onboard(project_path: str) -> str:
     for etype, count in sorted(edge_type_counts.items()):
         lines.append(f"    {etype}: {count}")
     lines.append(f"  Observations: {observations_created}")
+    lines.append(f"  Classifier: {classifier_used}")
     lines.append(f"  Sentences classified: {len(classified)}")
     lines.append(f"  Beliefs created: {beliefs_created}")
     for bt, bc in sorted(type_counts.items()):

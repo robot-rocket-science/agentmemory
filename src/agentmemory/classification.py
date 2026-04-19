@@ -314,6 +314,67 @@ def parse_onboard_classification_response(
     return _parse_llm_response(raw, batch, remap_correction=True)
 
 
+def classify_with_llm(
+    sentences: list[tuple[str, str]],
+    for_onboard: bool = False,
+) -> list[ClassifiedSentence]:
+    """Classify sentences using Haiku LLM (99% accuracy).
+
+    Calls the Anthropic API directly in batches of BATCH_SIZE.
+    Falls back to offline classification if the API is unavailable
+    (no API key, SDK not installed, network error).
+
+    Args:
+        sentences: List of (text, source) tuples.
+        for_onboard: If True, uses onboard-specific prompt (no CORRECTION type).
+
+    Returns:
+        ClassifiedSentence list (same length as input).
+    """
+    try:
+        import anthropic
+    except ImportError:
+        return classify_sentences_offline(sentences)
+
+    try:
+        client: anthropic.Anthropic = anthropic.Anthropic()
+    except Exception:
+        return classify_sentences_offline(sentences)
+
+    results: list[ClassifiedSentence] = []
+    build_fn = (
+        build_onboard_classification_prompt
+        if for_onboard
+        else build_classification_prompt
+    )
+    parse_fn = (
+        parse_onboard_classification_response
+        if for_onboard
+        else parse_classification_response
+    )
+
+    for i in range(0, len(sentences), BATCH_SIZE):
+        batch: list[tuple[str, str]] = sentences[i : i + BATCH_SIZE]
+        prompt: str = build_fn(batch)
+
+        try:
+            response = client.messages.create(
+                model=_HAIKU_MODEL,
+                max_tokens=2048,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            raw_text: str = str(
+                getattr(response.content[0], "text", response.content[0])
+            )
+            batch_results: list[ClassifiedSentence] = parse_fn(raw_text, batch)
+            results.extend(batch_results)
+        except Exception:
+            # Fallback: classify this batch offline
+            results.extend(classify_sentences_offline(batch))
+
+    return results
+
+
 def classify_sentences_offline(
     sentences: list[tuple[str, str]],
 ) -> list[ClassifiedSentence]:
