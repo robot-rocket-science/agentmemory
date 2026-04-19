@@ -2151,5 +2151,147 @@ def recalibrate(
     )
 
 
+# ---------------------------------------------------------------------------
+# Exploratory wonder tools
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool
+def wonder(
+    query: str,
+    agent_count: int = 4,
+    budget: int = 2000,
+    depth: int = 2,
+) -> str:
+    """Explore a topic: analyze gaps in the belief graph and generate research axes.
+
+    Performs internal search + gap analysis, then returns structured output
+    describing what the graph knows, what it doesn't, and research directions
+    for parallel subagents to investigate.
+
+    The skill layer (/mem:wonder) uses this output to spawn subagents. Each
+    subagent writes a research document, which is then ingested via
+    wonder_ingest to create speculative beliefs.
+
+    Args:
+        query: The topic, hypothesis, or question to explore.
+        agent_count: Number of subagents to generate research axes for (default 4).
+            User can say "quick 2-agent wonder" or "deep 6-agent wonder" to override.
+        budget: Token budget for internal belief retrieval.
+        depth: Graph expansion depth for BFS from seed beliefs.
+
+    Returns:
+        JSON with: known beliefs, gaps, coverage score, research axes, and
+        speculative anchor belief IDs.
+    """
+    import json as _json
+
+    from agentmemory.wonder import wonder as _wonder
+    from agentmemory.wonder import wonder_result_to_dict
+
+    store: MemoryStore = _get_store()
+    result = _wonder(store, query, agent_count=agent_count, budget=budget, depth=depth)
+    return _json.dumps(wonder_result_to_dict(result), indent=2)
+
+
+@mcp.tool
+def wonder_ingest(
+    research_documents: str,
+    anchor_belief_ids: str = "",
+) -> str:
+    """Ingest subagent research documents as speculative beliefs.
+
+    Each research document is run through the standard ingest pipeline, then
+    all resulting beliefs are retagged as speculative (source_type=wonder_generated,
+    belief_type=speculative) with low confidence priors (alpha=0.3, beta=1.0).
+
+    Subagents should write freely -- there are no size limits on research
+    documents. A 500-word document typically produces 50-100 speculative beliefs.
+    Longer documents produce more.
+
+    All speculative beliefs are subject to GC: if not accessed or confirmed
+    within 14 days, they are soft-deleted.
+
+    Args:
+        research_documents: JSON array of objects, each with:
+            - "text": the research document content (string, no size limit)
+            - "axis_id": which research axis produced this (int)
+            Example: [{"text": "research content...", "axis_id": 1}, ...]
+        anchor_belief_ids: Comma-separated belief IDs to create RELATES_TO
+            edges from new speculative beliefs. Usually the speculative_ids
+            from the wonder() call.
+    """
+    import json as _json
+
+    from agentmemory.wonder import wonder_ingest as _wonder_ingest
+
+    # Parse research documents
+    try:
+        docs_parsed: list[dict[str, object]] = _json.loads(research_documents)
+    except (_json.JSONDecodeError, TypeError, ValueError) as e:
+        return f"Error: invalid JSON for research_documents: {e}"
+
+    docs: list[tuple[str, int]] = []
+    for d in docs_parsed:
+        text: str = str(d.get("text", ""))
+        axis_val: object = d.get("axis_id", 0)
+        axis_id: int = int(axis_val) if isinstance(axis_val, (int, float, str)) else 0
+        if text.strip():
+            docs.append((text, axis_id))
+
+    if not docs:
+        return "No non-empty research documents to ingest."
+
+    # Parse anchor IDs
+    anchors: list[str] | None = None
+    if anchor_belief_ids.strip():
+        anchors = [aid.strip() for aid in anchor_belief_ids.split(",") if aid.strip()]
+
+    store: MemoryStore = _get_store()
+    result = _wonder_ingest(store, docs, anchor_belief_ids=anchors)
+
+    return (
+        f"Wonder ingest complete.\n"
+        f"Documents processed: {result.documents_processed}\n"
+        f"Beliefs created: {result.beliefs_created}\n"
+        f"Beliefs tagged speculative: {result.beliefs_tagged}\n"
+        f"Anchor edges created: {result.anchor_edges_created}\n"
+        f"All speculative beliefs start at ~23% confidence (Beta(0.3, 1.0)) "
+        f"and will be GC'd after 14 days if not accessed or confirmed."
+    )
+
+
+@mcp.tool
+def wonder_gc(
+    ttl_days: int = 14,
+    dry_run: bool = True,
+) -> str:
+    """Garbage-collect stale speculative beliefs.
+
+    Removes speculative beliefs that are older than ttl_days and have not
+    been accessed, confirmed, or connected to evidence. Beliefs that have
+    RESOLVES edges or updated confidence are preserved.
+
+    Defaults to dry_run=True to show what would be deleted without acting.
+
+    Args:
+        ttl_days: Days before unaccessed speculative beliefs expire (default 14).
+        dry_run: If True, report what would be deleted without deleting.
+    """
+    from agentmemory.wonder import wonder_gc as _wonder_gc
+
+    store: MemoryStore = _get_store()
+    result = _wonder_gc(store, ttl_days=ttl_days, dry_run=dry_run)
+
+    mode: str = "DRY RUN" if dry_run else "EXECUTED"
+    return (
+        f"Wonder GC ({mode}):\n"
+        f"Scanned: {result.scanned} speculative beliefs older than {ttl_days} days\n"
+        f"{'Would delete' if dry_run else 'Deleted'}: {result.deleted}\n"
+        f"Surviving: {result.surviving}\n"
+        f"{'Set dry_run=False to execute.' if dry_run else 'Soft-deleted (valid_to set).'}"
+    )
+
+
 if __name__ == "__main__":
     mcp.run()
