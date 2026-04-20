@@ -263,7 +263,7 @@ Result stored as belief with source_type = "automated_research", confidence = 0.
 Triggered when: uncertainty is high but the query is not blocking. Return what exists with explicit epistemic markers.
 
 ```
-{"beliefs": [...], "epistemic_state": "UNCERTAIN", 
+{"beliefs": [...], "epistemic_state": "UNCERTAIN",
  "caveat": "These beliefs have low confidence (mean=0.3). Treat as hypotheses."}
 ```
 

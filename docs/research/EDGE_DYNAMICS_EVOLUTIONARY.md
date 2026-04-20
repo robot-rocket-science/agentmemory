@@ -86,7 +86,7 @@ def neat_edge_evolution(graph, query_log):
     # Start with minimal edge set: only SUPPORTS edges with weight > 0.7
     initial_edges = graph.edges.filter(type="SUPPORTS", weight__gt=0.7)
     population = [Species(initial_edges) for _ in range(5)]  # 5 species
-    
+
     for gen in range(generations):
         for species in population:
             for individual in species.members:
@@ -98,9 +98,9 @@ def neat_edge_evolution(graph, query_log):
                     individual.remove_weakest_edge()
                 # Weight mutations
                 individual.perturb_weights(sigma=0.1)
-            
+
             species.evaluate_fitness(query_log)
-        
+
         # Speciation: group by structural similarity
         population = respeciate(population, threshold=3.0)
         # Reproduce within species
@@ -169,13 +169,13 @@ class EdgeRL:
     def __init__(self, gnn, policy_net):
         self.gnn = gnn          # 2-layer GCN, d=64
         self.policy = policy_net # MLP: 2*d -> 4 actions
-    
+
     def decide_edge(self, src_id, tgt_id, graph):
         embeddings = self.gnn(graph)  # O(|E| * d)
         pair_repr = concat(embeddings[src_id], embeddings[tgt_id])
         action_probs = self.policy(pair_repr)  # create/strengthen/weaken/prune
         return sample(action_probs)
-    
+
     def reward(self, action, query_log_window):
         # Measure retrieval quality change after action
         precision_before = evaluate_retrieval(query_log_window[-10:])
@@ -208,7 +208,7 @@ This is the most natural fit for agentmemory because we already use Thompson sam
 ```python
 class EdgeBandit:
     """Each edge maintains Beta(alpha, beta) for Thompson sampling."""
-    
+
     def select_edges(self, node_id, k=5):
         edges = graph.edges_from(node_id)
         samples = []
@@ -217,13 +217,13 @@ class EdgeBandit:
             score = beta_sample(edge.alpha, edge.beta)
             samples.append((score, edge))
         return top_k(samples, k)
-    
+
     def update(self, edge, was_useful: bool):
         if was_useful:
             edge.alpha += 1   # success
         else:
             edge.beta += 1    # failure
-    
+
     def prune_threshold(self):
         """Remove edges where P(useful) < threshold with high confidence."""
         for edge in graph.edges:
@@ -254,12 +254,12 @@ class EdgeBandit:
 ```python
 class ContextualEdgeBandit:
     """LinUCB-style contextual bandit for edge selection."""
-    
+
     def __init__(self, d=64):
         # Per-edge-type parameters (5 edge types)
         self.A = {etype: np.eye(d) for etype in EDGE_TYPES}      # d x d
         self.b = {etype: np.zeros(d) for etype in EDGE_TYPES}     # d
-    
+
     def select_edges(self, query_embedding, candidate_edges, alpha=0.5):
         scores = []
         for edge in candidate_edges:
@@ -269,13 +269,13 @@ class ContextualEdgeBandit:
             ucb = x @ theta + alpha * np.sqrt(x @ np.linalg.solve(self.A[etype], x))
             scores.append((ucb, edge))
         return top_k(scores, k=5)
-    
+
     def update(self, query_embedding, edge, reward):
         x = self.featurize(query_embedding, edge)
         etype = edge.type
         self.A[etype] += np.outer(x, x)
         self.b[etype] += reward * x
-    
+
     def featurize(self, query_emb, edge):
         """Combine query context with edge features."""
         edge_feat = np.array([
@@ -325,27 +325,27 @@ class TemporalEdgeManager:
         edge.weight *= exp(-self.decay_rate * days_idle)
         if edge.weight < self.prune_threshold:
             edge.status = 'archived'
-    
+
     def access(self, edge):
         edge.last_accessed = now()
         edge.access_count += 1
         # Reinforce: slightly increase weight on access
         edge.weight = min(1.0, edge.weight + self.reinforce_delta)
-    
+
     def periodic_sweep(self):
         """Run nightly. Decay unused edges, prune dead ones."""
         for edge in graph.all_edges():
             self.decay_weight(edge)
         pruned = graph.edges.filter(status='archived').count()
         return pruned
-    
+
     def propose_new_edges(self, new_belief):
         """When a belief is ingested, propose edges to related beliefs."""
         candidates = semantic_search(new_belief.content, top_k=10)
         for candidate in candidates:
             edge_type = infer_edge_type(new_belief, candidate)
             if edge_type and not graph.edge_exists(new_belief.id, candidate.id):
-                graph.add_edge(new_belief.id, candidate.id, 
+                graph.add_edge(new_belief.id, candidate.id,
                              type=edge_type, weight=0.5, status='active')
 ```
 
@@ -384,7 +384,7 @@ class BeliefGraphCoarsener:
             coarse = self.merge_similar_nodes(hierarchy[-1])
             hierarchy.append(coarse)
         return hierarchy
-    
+
     def merge_similar_nodes(self, graph):
         """Merge nodes connected by strong SUPPORTS/RELATES_TO edges."""
         pairs = graph.edges.filter(
@@ -398,7 +398,7 @@ class BeliefGraphCoarsener:
                 merged[edge.source] = supernode
                 merged[edge.target] = supernode
         return rebuild_graph(graph, merged)
-    
+
     def hierarchical_retrieval(self, query, hierarchy):
         """Search coarse graph first, then refine."""
         # Level 3 (coarsest): find relevant supernodes
@@ -444,25 +444,25 @@ class SpectralEdgeAnalyzer:
         L = graph.laplacian(sparse=True)
         eigenvalues, eigenvectors = sparse_eigsh(L, k=10, which='SM')
         fiedler = eigenvectors[:, 1]  # second eigenvector
-        
+
         importance = {}
         for edge in graph.edges:
             # Edge importance proportional to difference in Fiedler values
             importance[edge.id] = abs(fiedler[edge.source] - fiedler[edge.target])
         return importance
-    
+
     def suggest_new_edges(self, graph, threshold=0.05):
         """Nodes with similar Fiedler values but no edge."""
         L = graph.laplacian(sparse=True)
         _, eigvecs = sparse_eigsh(L, k=5, which='SM')
-        
+
         suggestions = []
         for i, j in candidate_pairs(graph):
             spectral_dist = np.linalg.norm(eigvecs[i] - eigvecs[j])
             if spectral_dist < threshold and not graph.has_edge(i, j):
                 suggestions.append((i, j, spectral_dist))
         return sorted(suggestions, key=lambda x: x[2])
-    
+
     def detect_community_drift(self, graph, prev_eigenvalues):
         """Compare current spectral gap to previous."""
         eigenvalues = compute_top_k_eigenvalues(graph, k=10)
@@ -521,7 +521,7 @@ class BeliefSOM:
     def __init__(self, grid_size=30):
         self.grid = np.random.randn(grid_size, grid_size, 64)  # 30x30 grid, d=64
         self.belief_map = {}  # belief_id -> (row, col)
-    
+
     def train(self, beliefs, epochs=50):
         for epoch in range(epochs):
             lr = 0.5 * (1 - epoch / epochs)
@@ -531,7 +531,7 @@ class BeliefSOM:
                 bmu = self.find_bmu(vec)
                 self.update_neighborhood(bmu, vec, lr, radius)
                 self.belief_map[belief.id] = bmu
-    
+
     def suggest_edges(self, graph):
         """Beliefs on adjacent cells without edges."""
         suggestions = []
@@ -541,7 +541,7 @@ class BeliefSOM:
                     if not graph.has_edge(b1_id, b2_id):
                         suggestions.append((b1_id, b2_id))
         return suggestions
-    
+
     def validate_edges(self, graph):
         """Flag edges between beliefs on distant cells."""
         suspicious = []
@@ -584,33 +584,33 @@ class BeliefGNG:
         self.edges = [Edge(self.nodes[0], self.nodes[1], age=0)]
         self.max_age = max_age
         self.step_count = 0
-    
+
     def ingest_belief(self, belief_vec):
         # Find two nearest nodes
         bmu1, bmu2 = self.find_two_nearest(belief_vec)
-        
+
         # Create or reset edge between them
         edge = self.find_edge(bmu1, bmu2)
         if edge:
             edge.age = 0  # reinforce
         else:
             self.edges.append(Edge(bmu1, bmu2, age=0))
-        
+
         # Move BMU toward input
         bmu1.weight += 0.1 * (belief_vec - bmu1.weight)
         for neighbor in bmu1.neighbors():
             neighbor.weight += 0.01 * (belief_vec - neighbor.weight)
-        
+
         # Age all edges from BMU
         for edge in bmu1.edges():
             edge.age += 1
-        
+
         # Prune old edges
         self.edges = [e for e in self.edges if e.age < self.max_age]
-        
+
         # Remove isolated nodes
         self.nodes = [n for n in self.nodes if n.degree() > 0]
-        
+
         # Periodically insert new nodes
         self.step_count += 1
         if self.step_count % self.insert_interval == 0:
@@ -621,7 +621,7 @@ class BeliefGNG:
             self.edges.append(Edge(new_node, worst, age=0))
             self.edges.append(Edge(new_node, worst_neighbor, age=0))
             self.remove_edge(worst, worst_neighbor)
-    
+
     def map_to_belief_edges(self, beliefs, graph):
         """Transfer GNG topology to belief graph edges."""
         for gng_edge in self.edges:
@@ -661,18 +661,18 @@ class BeliefART:
     def __init__(self, vigilance=0.8, d=64):
         self.vigilance = vigilance
         self.clusters = []  # each cluster: (centroid, member_ids, internal_edges)
-    
+
     def ingest_belief(self, belief, graph):
         vec = belief.embedding
         best_match = None
         best_similarity = 0
-        
+
         for cluster in self.clusters:
             sim = cosine_similarity(vec, cluster.centroid)
             if sim > best_similarity:
                 best_match = cluster
                 best_similarity = sim
-        
+
         if best_similarity >= self.vigilance:
             # Resonance: assimilate into existing cluster
             best_match.add_member(belief.id)
@@ -688,7 +688,7 @@ class BeliefART:
             if best_match:
                 bridge_target = best_match.most_similar_member(vec)
                 graph.add_edge(belief.id, bridge_target, type="RELATES_TO", weight=best_similarity)
-    
+
     def adapt_vigilance(self, feedback):
         """Increase vigilance if clusters are too coarse (retrievals imprecise).
            Decrease if too fine (retrievals miss related beliefs)."""

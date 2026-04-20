@@ -197,7 +197,7 @@ P(belief_A correct | evidence) vs P(belief_B correct | evidence)
 
 If Beta(alpha_A, beta_A) vs Beta(beta_B, beta_B):
   Point estimate: alpha_A/(alpha_A + beta_A) vs alpha_B/(alpha_B + beta_B)
-  
+
   More principled: P(p_A > p_B) where p_A ~ Beta(alpha_A, beta_A), p_B ~ Beta(alpha_B, beta_B)
   -- This can be computed exactly but is expensive. For practical purposes, compare means
      and use variance as a tiebreaker (prefer the belief with lower uncertainty).
@@ -215,7 +215,7 @@ When CONTRADICTS edge is detected between belief_A and belief_B:
 2. If |mean_A - mean_B| > threshold (e.g., 0.2):
    -- Clear winner. Present the higher-confidence belief.
    -- But still surface the conflict in provenance metadata.
-   
+
 3. If |mean_A - mean_B| <= threshold:
    -- Genuinely uncertain. Present BOTH beliefs with their evidence chains.
    -- Let the agent or user resolve.
@@ -309,21 +309,21 @@ from scipy.stats import beta as beta_dist
 def score_belief(belief, query_relevance, config):
     alpha = belief.alpha
     beta_val = belief.beta_param
-    
+
     # Posterior mean (success probability)
     posterior_mean = alpha / (alpha + beta_val)
-    
+
     # Posterior variance (uncertainty)
     posterior_var = (alpha * beta_val) / ((alpha + beta_val)**2 * (alpha + beta_val + 1))
-    
+
     # Beta distribution entropy (exploration bonus)
     entropy = beta_dist.entropy(alpha, beta_val)
-    
+
     # Expected utility
     reward = query_relevance * posterior_mean
     risk = query_relevance * (1 - posterior_mean) * config.failure_cost_weight
     exploration = config.exploration_weight * entropy
-    
+
     return reward - risk + exploration
 ```
 
@@ -352,23 +352,23 @@ class BayesianBelief:
     """Belief with Beta-distributed confidence."""
     alpha: float  # success count (evidence for)
     beta: float   # failure count (evidence against)
-    
+
     @property
     def confidence(self) -> float:
         """Posterior mean: point estimate of P(belief is correct)."""
         return self.alpha / (self.alpha + self.beta)
-    
+
     @property
     def uncertainty(self) -> float:
         """Posterior variance: how unsure we are."""
         total = self.alpha + self.beta
         return (self.alpha * self.beta) / (total * total * (total + 1))
-    
+
     @property
     def evidence_count(self) -> float:
         """Total evidence accumulated (prior strength + observations)."""
         return self.alpha + self.beta
-    
+
     def update(self, outcome: str, weight: float = 1.0):
         """Update belief based on test outcome or new evidence."""
         if outcome in ("used", "supports", "corroborated"):
@@ -377,7 +377,7 @@ class BayesianBelief:
             self.beta += weight
         elif outcome == "ignored":
             pass  # No update -- absence of evidence != evidence of absence
-    
+
     @classmethod
     def from_source(cls, source_type: str) -> "BayesianBelief":
         """Create belief with source-appropriate prior."""
@@ -391,10 +391,10 @@ class BayesianBelief:
         }
         alpha, beta = priors.get(source_type, (1.0, 1.0))
         return cls(alpha=alpha, beta=beta)
-    
+
     def credible_interval(self, width: float = 0.9) -> tuple[float, float]:
         """Bayesian credible interval for the true confidence.
-        
+
         Unlike a frequentist confidence interval, this has the intuitive
         interpretation: 'there is a 90% probability that the true confidence
         lies in this interval.'
