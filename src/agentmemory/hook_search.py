@@ -1078,6 +1078,54 @@ def search_for_prompt(
         except sqlite3.OperationalError:
             pass
 
+    # --- Layer 6: Cross-project shared scope search ---
+    # Exp 97/98: ATTACH-based federated FTS5, Config B (3 per scope).
+    # Only runs if shared scopes are configured for this project.
+    try:
+        from agentmemory.shared_scopes import (
+            get_scopes_for_project,
+            search_shared_scopes,
+        )
+
+        cwd_str: str = ""
+        try:
+            import os as _os
+
+            cwd_str = _os.getcwd()
+        except OSError:
+            pass
+
+        if cwd_str:
+            active_scopes: list[str] = get_scopes_for_project(cwd_str)
+            if active_scopes and query_words:
+                shared_fts: str = " OR ".join(f'"{w}"' for w in query_words)
+                shared_results = search_shared_scopes(
+                    active_scopes, shared_fts, budget_per_scope=3
+                )
+                for scope_name, s_id, s_content, _s_score in shared_results:
+                    if s_id not in seen_ids:
+                        sb = ScoredBelief(
+                            id=f"{scope_name}:{s_id}",
+                            content=s_content,
+                            belief_type="factual",
+                            source_type="shared_scope",
+                            locked=False,
+                            confidence=0.5,
+                            score=0.0,
+                            age_days=None,
+                            via=f"shared:{scope_name}",
+                        )
+                        # Score using query word overlap (no row metadata available)
+                        content_lower: str = s_content.lower()
+                        word_hits: int = sum(
+                            1 for w in query_words if w.lower() in content_lower
+                        )
+                        sb.score = (word_hits / max(len(query_words), 1)) * 1.2
+                        all_scored.append(sb)
+                        seen_ids.add(s_id)
+    except ImportError:
+        pass  # shared_scopes module not available -- degrade silently
+
     # --- Score, sort, apply relevance floor, pack ---
     all_scored.sort(key=lambda x: x.score, reverse=True)
 
