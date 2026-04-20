@@ -32,7 +32,7 @@ CORE BELIEFS:
   33 production modules. Production system in daily use.
 ```
 
-This context -- accumulated over weeks of prior sessions -- meant the agent already knew the project's constraints, version, architecture, and communication style before a single word was typed.
+This context, accumulated over weeks of prior sessions, meant the agent already knew the project's constraints, version, architecture, and communication style before a single word was typed.
 
 ### Step 2: The Wonder Query
 
@@ -147,15 +147,15 @@ Without the memory system, this session would have started from zero. The agent 
 
 Every one of those facts was injected automatically from prior sessions. The wonder and reason tools then used the memory graph to ground their research in project-specific context rather than generic advice.
 
-The result: a complete marketing strategy, grounded in evidence, executed in one session -- with the memory system contributing both the research methodology and the accumulated context that made the research specific rather than generic.
+The result: a complete marketing strategy, grounded in evidence, executed in one session, with the memory system contributing both the research methodology and the accumulated context that made the research specific rather than generic.
 
 ## The Iteration Loop
 
 The story didn't end with the rewrite. Over the next hour, the maintainer read the result and made rapid corrections:
 
 1. **"You said nothing" was inaccurate.** The user typed three words ("push the release to github"). A 30-second commit fixed it.
-2. **The accumulation mechanism was missing.** The worked example showed *what* happened but not *why* it was impressive -- that the knowledge assembled itself from fragments over weeks. Two sentences added.
-3. **A high-context communication analogy was added, then cut.** It was intellectually satisfying but slowed the scroll. The wonder's own recommendation (progressive disclosure) won -- the analogy moved to documentation, the README stayed fast.
+2. **The accumulation mechanism was missing.** The worked example showed *what* happened but not *why* it was impressive: that the knowledge assembled itself from fragments over weeks. Two sentences added.
+3. **A high-context communication analogy was added, then cut.** It was intellectually satisfying but slowed the scroll. The wonder's own recommendation (progressive disclosure) won. The analogy moved to documentation, the README stayed fast.
 
 Each iteration was a single atomic commit. Total time: 6 minutes of refinement after a 10-minute research + rewrite session.
 
@@ -165,7 +165,7 @@ This is the loop agentmemory enables: research grounded in accumulated context, 
 
 All findings were saved automatically:
 
-- `experiments/wonder_20260420_160000_readme_positioning.md` -- Full wonder output with 4 agent findings
-- `experiments/reason_20260420_161500_meta_demo_decision.md` -- Reason chain for the meta-demo question
+- `experiments/wonder_20260420_160000_readme_positioning.md`: full wonder output with 4 agent findings
+- `experiments/reason_20260420_161500_meta_demo_decision.md`: reason chain for the meta-demo question
 
 These persist across sessions. The next time someone asks about README positioning or marketing strategy, the system will retrieve these findings and build on them rather than starting over.

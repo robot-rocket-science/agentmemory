@@ -15,7 +15,7 @@ If you're using Claude Code to contribute, the `CLAUDE.md` file at the project r
 
 agentmemory is built through experiment-driven development. Every design decision is backed by a numbered experiment in `experiments/`. When proposing a change:
 
-1. **Check existing experiments** -- your idea may already have been tested
+1. **Check existing experiments.** Your idea may already have been tested.
 2. **Write an experiment** if the change involves a design tradeoff
 3. **Run the test suite** to verify nothing breaks
 
@@ -64,8 +64,8 @@ uv run pytest tests/acceptance/ -x -q
 
 The repo uses pre-commit hooks for formatting and type checking. They run automatically on commit. If a hook fails:
 
-1. `ruff format` -- fix formatting first, then re-stage
-2. `pyright` -- fix type errors (strict mode, no `Any` allowed)
+1. `ruff format`: fix formatting first, then re-stage
+2. `pyright`: fix type errors (strict mode, no `Any` allowed)
 3. Re-stage changed files and commit again
 
 ## Key Documentation

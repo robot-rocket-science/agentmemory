@@ -8,9 +8,9 @@
 
 ---
 
-You correct your AI agent. It says "got it." Next session, it makes the same mistake. You correct it again. And again. And again.
+You correct your AI agent. It says *"got it."* Next session, it makes the same mistake. You correct it again. And again. And again.
 
-**agentmemory makes the next correction your last.** It captures what matters from your conversations -- corrections, decisions, preferences -- stores them locally, and injects them into every future session. Silently. Automatically. You stop repeating yourself.
+**agentmemory makes the next correction your last.** It captures what matters from your conversations (corrections, decisions, preferences), stores them locally, and injects them into every future session. **Silently. Automatically.** You stop repeating yourself.
 
 ```bash
 pip install agentmemory-rrs
@@ -54,7 +54,7 @@ The agent receives this context injection alongside your message:
 - Remote 'github' points to git@github.com:robot-rocket-science/agentmemory.git
 ```
 
-Without agentmemory, the agent takes "push to github" literally and runs `git push github main`, bypassing every safety check. With it, the agent heard three words and executed the full procedure -- publish script, PII guards, pre-push hook. That procedure was never taught in one session. It accumulated from corrections over weeks. [Why this matters: from low-context to high-context.](docs/PHILOSOPHY.md)
+Without agentmemory, the agent takes "push to github" literally and runs `git push github main`, bypassing every safety check. With it, the agent heard **three words** and executed the **full procedure**: publish script, PII guards, pre-push hook. That procedure was never taught in one session. It accumulated from corrections over weeks. [Why this matters: from low-context to high-context.](docs/PHILOSOPHY.md)
 
 ---
 
@@ -66,7 +66,7 @@ Without agentmemory, the agent takes "push to github" literally and runs `git pu
 | "The endpoint moved to /v2" | Correction. Replaces the old belief. |
 | "I prefer terse commits" | Preference. Shapes behavior silently. |
 
-Beliefs accumulate over time. Each one carries a [Bayesian confidence score](https://en.wikipedia.org/wiki/Bayesian_inference) that strengthens when the belief proves useful and fades when it doesn't. After a few weeks:
+Beliefs accumulate over time. Each one carries a [Bayesian confidence score](https://en.wikipedia.org/wiki/Bayesian_inference) that *strengthens* when the belief proves useful and *fades* when it doesn't. After a few weeks:
 
 ```
 /mem:stats
@@ -90,9 +90,9 @@ Last locked: "never force-push to main" (4 weeks ago)
 
 agentmemory works in the background:
 
-1. **It listens** -- picks up decisions, corrections, and preferences from your conversations
-2. **It retrieves** -- injects relevant beliefs before the agent responds to each prompt
-3. **It learns** -- beliefs that help get stronger; beliefs that don't, fade
+1. **It listens.** Picks up decisions, corrections, and preferences from your conversations.
+2. **It retrieves.** Injects relevant beliefs before the agent responds to each prompt.
+3. **It learns.** Beliefs that help get stronger; beliefs that don't, fade.
 
 To explicitly lock a permanent rule:
 
@@ -125,7 +125,7 @@ user    Clean up the config file, I think agentmemory handles this now.
 
 agent   [searches memory, compares against config]
         Found 2 redundant items. But also: this locked belief about
-        your server setup is stale -- it references infrastructure
+        your server setup is stale. It references infrastructure
         you removed. Every session is getting incorrect instructions.
 
 user    Fix it.
@@ -134,15 +134,15 @@ agent   [corrects the belief, supersedes the old one]
         Done. Want to lock the updated version?
 ```
 
-The system caught its own error because it had enough accumulated context to notice the inconsistency. [More examples and a full session transcript showing wonder + reason in action](docs/case-study-positioning.md).
+The system caught *its own error* because it had enough accumulated context to notice the inconsistency. [More examples and a full session transcript showing wonder + reason in action](docs/case-study-positioning.md).
 
 ---
 
 ## Under the Hood
 
-Conversations are broken into individual beliefs stored in a local SQLite database. Retrieval uses full-text search, graph traversal, and vocabulary bridging -- no embeddings, no vector database, no external API calls.
+Conversations are broken into individual beliefs stored in a local SQLite database. Retrieval uses full-text search, graph traversal, and vocabulary bridging. Nothing to install, nothing to host, nothing that phones home.
 
-98 experiments drove every design decision. 954 tests. 5 academic benchmarks. Architecture details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+**98 experiments** drove every design decision. **954 tests.** **5 academic benchmarks.** Architecture details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 <p align="center"><img src="https://robotrocketscience.com/projects/agentmemory/obsidian-graph-full.jpg" width="600" alt="Knowledge graph visualization showing thousands of interconnected beliefs built up over weeks of use"></p>
 <p align="center"><em>The knowledge graph after a few weeks of daily use. Each dot is a belief. Lines are relationships (supports, contradicts, supersedes).</em></p>
@@ -151,15 +151,15 @@ Conversations are broken into individual beliefs stored in a local SQLite databa
 
 ## Compatibility
 
-Currently supports **Claude Code** via MCP (Model Context Protocol). The architecture is agent-agnostic -- any MCP-compatible client can use agentmemory as a memory backend.
+Currently supports **Claude Code** via MCP (Model Context Protocol). The architecture is agent-agnostic. Any MCP-compatible client can use agentmemory as a memory backend.
 
 ---
 
 ## Documentation
 
-- **Getting Started:** [Installation](docs/INSTALL.md) -- [Workflow](docs/WORKFLOW.md)
-- **Reference:** [Commands](docs/COMMANDS.md) -- [Obsidian Integration](docs/OBSIDIAN.md) -- [Privacy](docs/PRIVACY.md)
-- **Technical:** [Architecture](docs/ARCHITECTURE.md) -- [Benchmarks](docs/BENCHMARK_RESULTS.md) -- [Case Studies](docs/case-study-positioning.md)
+- **Getting Started:** [Installation](docs/INSTALL.md) | [Workflow](docs/WORKFLOW.md)
+- **Reference:** [Commands](docs/COMMANDS.md) | [Obsidian Integration](docs/OBSIDIAN.md) | [Privacy](docs/PRIVACY.md)
+- **Technical:** [Architecture](docs/ARCHITECTURE.md) | [Benchmarks](docs/BENCHMARK_RESULTS.md) | [Case Studies](docs/case-study-positioning.md) | [Philosophy](docs/PHILOSOPHY.md)
 
 ## Development
 
