@@ -95,6 +95,26 @@ if [ -n "$TAG" ]; then
     git push "$REMOTE" "$TAG"
     echo ""
     echo "Tagged $TAG and pushed. PyPI publish workflow will trigger."
+
+    # Create GitHub Release from CHANGELOG entry
+    echo "Creating GitHub Release..."
+    CHANGELOG_ENTRY=$(sed -n "/^## \[$TAG\]/,/^## \[/p" CHANGELOG.md 2>/dev/null | head -n -1)
+    if [ -z "$CHANGELOG_ENTRY" ]; then
+        # Try without v prefix
+        TAG_NO_V="${TAG#v}"
+        CHANGELOG_ENTRY=$(sed -n "/^## \[$TAG_NO_V\]/,/^## \[/p" CHANGELOG.md 2>/dev/null | head -n -1)
+    fi
+    if [ -n "$CHANGELOG_ENTRY" ]; then
+        gh release create "$TAG" --repo "$(git remote get-url "$REMOTE" | sed 's|.*github.com[:/]||;s|\.git$||')" \
+            --title "$TAG" --notes "$CHANGELOG_ENTRY" 2>/dev/null && \
+            echo "GitHub Release created." || \
+            echo "Warning: could not create GitHub Release. Create manually at the repo."
+    else
+        gh release create "$TAG" --repo "$(git remote get-url "$REMOTE" | sed 's|.*github.com[:/]||;s|\.git$||')" \
+            --title "$TAG" --generate-notes 2>/dev/null && \
+            echo "GitHub Release created (auto-generated notes)." || \
+            echo "Warning: could not create GitHub Release. Create manually at the repo."
+    fi
 fi
 
 echo ""

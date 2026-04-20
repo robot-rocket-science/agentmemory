@@ -1,6 +1,6 @@
 # agentmemory
 
-> Your AI coding agent forgets everything when the session ends. agentmemory fixes that.
+> **Correct your AI agent once. It remembers forever.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![PyPI](https://img.shields.io/pypi/v/agentmemory-rrs)](https://pypi.org/project/agentmemory-rrs/)
@@ -8,13 +8,13 @@
 
 ---
 
-## The Problem
+## You Shouldn't Have to Repeat Yourself
 
-Every time you start a new session with Claude (or any AI coding agent), it starts from zero. It doesn't remember that you prefer uv over poetry, that you decided on SQLite last week, or that you corrected it about your API three times already. You end up repeating yourself, re-explaining your project, and watching the same mistakes happen again.
+Every time you start a new session with an AI coding agent, it forgets everything. Your preferences, your decisions, your corrections -- gone. You end up saying the same things session after session:
 
-## The Solution
+*"Use uv, not pip." "I told you, we're using PostgreSQL." "Stop adding co-author lines to commits."*
 
-agentmemory runs in the background and gives your agent a persistent memory. It captures what you discuss, decide, and correct during normal conversation -- no manual notes, no copying context, no extra work from you.
+**agentmemory makes that stop.** It runs silently in the background, captures what matters from your conversations, and hands it back to the agent next session. You correct once. It sticks.
 
 ```text
 Session 1
@@ -31,19 +31,22 @@ agent  Using uv, per the project decision from last week.
 
 The second session starts already knowing. That's it. That's the whole thing.
 
-## What It Remembers
+## What Changes For You
 
-- **Your decisions.** "We're using PostgreSQL." "Deploy to Cloudflare." "Never auto-commit."
-- **Your corrections.** "No, use X not Y." It won't make the same mistake twice.
-- **Your preferences.** Coding style, tool choices, communication preferences.
-- **Project context.** Architecture decisions, who's doing what, deadlines, constraints.
+| Before agentmemory | After agentmemory |
+|---|---|
+| Repeat the same corrections every session | Correct once, remembered permanently |
+| Re-explain your project setup each time | Agent already knows your stack, preferences, and constraints |
+| Watch the agent make the same mistakes | Mistakes are stored as corrections and never repeated |
+| Lose important decisions when sessions end | Decisions persist across sessions, weeks, months |
+| Start every session from scratch | Agent picks up where you left off |
 
-## What It Doesn't Do
+## Your Data Stays Yours
 
-- It doesn't send your data anywhere. Everything stays in a local file on your machine.
-- It doesn't require any setup beyond two commands.
-- It doesn't slow down your workflow. It runs silently in the background.
-- It doesn't need a GPU, a vector database, or an API key (beyond what Claude already uses).
+- **100% local.** Everything lives in a SQLite file on your machine. Nothing leaves your computer.
+- **No cloud, no accounts, no telemetry.** There is no server, no signup, and no tracking.
+- **No GPU or vector database required.** It runs on any machine that runs Python.
+- **Two commands to install.** Nothing else to configure.
 
 ## Real Examples
 
