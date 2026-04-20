@@ -56,9 +56,11 @@ The agent receives this context injection alongside your message:
 
 Without agentmemory, the agent takes "push to github" literally and runs `git push github main`, bypassing every safety check. With it, the agent understands that "push to github" actually means "run the publish script with PII guards and the pre-push hook." You said three words. It heard the full procedure.
 
-In linguistics, [high-context communication](https://en.wikipedia.org/wiki/High-context_and_low-context_cultures) is when meaning is carried by shared background rather than explicit words. Japanese speakers leave most of the sentence unsaid because both parties already know. Low-context communication (like talking to a fresh AI session) requires spelling out everything from scratch every single time.
+That procedure was never taught in one session. It accumulated -- one correction about the publish script, another about the PII hook, a third about the remote rename. Each was a 5-second interaction. Weeks later, those fragments compose into a complex workflow the agent executes correctly with zero prompting. That's the key: learned behavior accumulates on increasingly complex processes and stays consistent, with minimal effort on your part.
 
-agentmemory moves your agent from low-context to high-context. It builds the shared background that lets communication become implicit. The more sessions you work together, the less you need to explain -- the same way a teammate who's been on the project for months stops needing the backstory.
+In linguistics, this is called [high-context communication](https://en.wikipedia.org/wiki/High-context_and_low-context_cultures). Japanese speakers leave most of a sentence unsaid because both parties carry enough shared background to fill the gaps. A fresh AI session is the opposite -- low-context, where you spell out everything from scratch every time.
+
+agentmemory moves your agent from low-context to high-context. The more sessions you work together, the less you need to explain.
 
 ---
 
