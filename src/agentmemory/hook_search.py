@@ -862,33 +862,50 @@ def search_for_prompt(
             all_scored.append(sb)
             seen_ids.add(r["id"])
 
-    # --- Layer 1.5: Edge-based vocabulary expansion (lightweight HRR proxy) ---
-    # HRR runs in retrieval.py but is too heavy for the hook path (numpy, ~117ms).
-    # Instead, traverse edges from FTS5 hits to find connected beliefs that FTS5
-    # missed due to vocabulary gaps. This bridges ~31% of directive vocabulary
-    # gaps (exp53) without numpy overhead. ~5-10ms for edge traversal.
+    # --- Layer 1.5: HRR vocabulary expansion via precomputed neighbors ---
+    # retrieval.py precomputes HRR neighbors into the hrr_neighbors table
+    # during graph build. This gives us HRR's vocabulary-bridging power
+    # via a simple SQL JOIN -- no numpy in the hook path. Falls back to
+    # edge traversal if hrr_neighbors table is empty or missing.
     if seen_ids:
-        fts_ids_list: list[str] = list(seen_ids)[:20]  # cap to avoid large queries
-        ph_edge: str = ",".join("?" * len(fts_ids_list))
+        fts_ids_list: list[str] = list(seen_ids)[:20]
+        ph_hrr: str = ",".join("?" * len(fts_ids_list))
+
+        hrr_rows: list[sqlite3.Row] = []
         try:
-            edge_rows: list[sqlite3.Row] = db.execute(
-                f"""SELECT DISTINCT b.* FROM edges e
-                    JOIN beliefs b ON b.id = e.to_id
-                    WHERE e.from_id IN ({ph_edge})
-                      AND e.edge_type IN ('RELATES_TO', 'SUPPORTS', 'IMPLEMENTS')
+            hrr_rows = db.execute(
+                f"""SELECT DISTINCT b.* FROM hrr_neighbors h
+                    JOIN beliefs b ON b.id = h.neighbor_id
+                    WHERE h.belief_id IN ({ph_hrr})
                       AND b.valid_to IS NULL
-                      AND b.id NOT IN ({ph_edge})
+                      AND b.id NOT IN ({ph_hrr})
+                    ORDER BY h.similarity DESC
                     LIMIT 10""",
                 fts_ids_list + fts_ids_list,
             ).fetchall()
         except sqlite3.OperationalError:
-            edge_rows = []
+            hrr_rows = []
 
-        for r in edge_rows:
+        if not hrr_rows:
+            try:
+                hrr_rows = db.execute(
+                    f"""SELECT DISTINCT b.* FROM edges e
+                        JOIN beliefs b ON b.id = e.to_id
+                        WHERE e.from_id IN ({ph_hrr})
+                          AND e.edge_type IN ('RELATES_TO', 'SUPPORTS', 'IMPLEMENTS')
+                          AND b.valid_to IS NULL
+                          AND b.id NOT IN ({ph_hrr})
+                        LIMIT 10""",
+                    fts_ids_list + fts_ids_list,
+                ).fetchall()
+            except sqlite3.OperationalError:
+                hrr_rows = []
+
+        for r in hrr_rows:
             if r["id"] not in seen_ids:
                 sb = score_belief(r, query_words, now)
-                sb.via = "edge_expansion"
-                sb.score *= 0.8  # slight discount for indirect match
+                sb.via = "hrr_expansion"
+                sb.score *= 0.85  # slight discount for indirect match
                 all_scored.append(sb)
                 seen_ids.add(r["id"])
 
