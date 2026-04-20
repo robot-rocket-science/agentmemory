@@ -19,3 +19,8 @@ TODO.md
 CLAUDE.md
 .mcp.json
 .github-exclude
+
+# Research artifacts (available on Gitea, not needed on public repo)
+experiments/
+benchmarks/
+workers/
