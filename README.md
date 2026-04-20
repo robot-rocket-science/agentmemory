@@ -74,6 +74,14 @@ AI agents love to report impressive-sounding metrics. Without memory, there's no
 
 With agentmemory, the correction ("that metric is misleading") persists. The next session knows the real state of things, not the inflated version.
 
+### "We literally worked on them. IN THIS DIRECTORY."
+
+Real incident: a user asked the agent to review documents they had worked on together the previous session. The agent searched the entire filesystem and found nothing. Two minutes later it found them in the working directory.
+
+<p align="center"><img src="docs/images/cartoons/07-whered-it-go.png" width="420" alt="Comic: user asks to review docs from yesterday. Agent searches entire filesystem, finds nothing. User: 'we literally worked on them IN THIS DIRECTORY.' Agent: 'oh. found them.' User: '(no token refunds)'"></p>
+
+With agentmemory, the agent would have known about the documents from the previous session's context. No filesystem search needed -- the memory of working on them persists.
+
 ### Catching stale information before it causes problems
 
 In a real session, the user asked the agent to audit a configuration file for redundancy. The agent searched memory and found that a locked belief about the project's git remote setup was stale -- it still referenced a remote that had been removed days earlier. Every new session was getting injected with incorrect instructions.
