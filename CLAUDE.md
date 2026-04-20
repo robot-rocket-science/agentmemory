@@ -1,4 +1,8 @@
+<!-- For contributors only. If you're a user, see docs/INSTALL.md for setup. -->
 # Agentmemory Project Instructions
+
+> **Note:** This file configures Claude Code for developing agentmemory itself.
+> If you're a user installing agentmemory, see [docs/INSTALL.md](docs/INSTALL.md).
 
 ## Memory System: agentmemory MCP Server
 

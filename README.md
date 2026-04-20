@@ -8,7 +8,7 @@
 
 ---
 
-You tell your AI agent "never commit .env files." It says "got it." Next session, it stages `.env` in a commit. You correct it again. And again. And again.
+You correct your AI agent. It says "got it." Next session, it makes the same mistake. You correct it again. And again. And again.
 
 **agentmemory makes the next correction your last.** It captures what matters from your conversations -- corrections, decisions, preferences -- stores them locally, and injects them into every future session. Silently. Automatically. You stop repeating yourself.
 
