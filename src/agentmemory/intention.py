@@ -56,9 +56,10 @@ FEATURE_DIM: int = (
     len(BELIEF_TYPES) + len(SOURCE_TYPES) + 2 * len(EDGE_TYPES) + len(BELIEF_TYPES) + 3
 )
 
-# Default cluster count. Exp 94b elbow analysis showed k=8 gives
-# good separation without fragmenting the two large factual clusters.
-DEFAULT_K: int = 8
+# Default cluster count. Exp 96 showed k=40 drops the largest cluster
+# from 81% to 29%, making expansion queries discriminative. k=8 produced
+# a single 12,764-belief mega-cluster that was useless for expansion.
+DEFAULT_K: int = 40
 
 
 def build_features(

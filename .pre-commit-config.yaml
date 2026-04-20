@@ -16,13 +16,15 @@ repos:
       - id: check-merge-conflict
       - id: detect-private-key
 
-  # --- Linting + Formatting (ruff) ---
+  # --- Linting (ruff check only, no auto-format) ---
+  # ruff-format removed from pre-commit: 1,200:1 noise-to-signal ratio.
+  # Formatting caused ~12,000 lines of churn per session while catching zero bugs.
+  # Run `uv run ruff format .` manually before releases instead.
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.11.9
     hooks:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
-      - id: ruff-format
 
   # --- Type checking (pyright, staged files only) ---
   - repo: local
