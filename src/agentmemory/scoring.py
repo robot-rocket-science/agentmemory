@@ -10,6 +10,7 @@ import random
 from datetime import datetime, timezone
 
 from agentmemory.models import Belief
+from agentmemory.multi_axis import ConfidenceAxes
 
 # Content type to decay half-life in hours (from Exp 58c).
 # None means the belief never decays (stays at 1.0 regardless of age).
@@ -345,5 +346,58 @@ def score_belief(
 
     freq_boost: float = retrieval_frequency_boost(retrieval_count, used_count)
     base: float = type_w * source_w * sample * decay * recency * freq_boost
+    ucb: float = ucb_exploration_bonus(retrieval_count, _global_retrieval_estimate)
+    return base * (1.0 + ucb)
+
+
+def score_belief_multi_axis(
+    belief: Belief,
+    query: str,
+    current_time_iso: str | datetime,
+    retrieval_count: int = 0,
+    used_count: int = 0,
+) -> float:
+    """Exp 91: Multi-axis scoring using per-dimension Thompson samples.
+
+    Replaces the single thompson_sample(alpha, beta) with a composite
+    sample from accuracy * relevance axes, combined with freshness via
+    decay_factor (which already handles temporal scoring).
+
+    Falls back to single-axis score_belief if no uncertainty_vector is set.
+    """
+    if belief.superseded_by is not None or belief.valid_to is not None:
+        return 0.01
+
+    # Parse multi-axis vector; fall back to legacy if absent
+    if belief.uncertainty_vector is None:
+        return score_belief(
+            belief, query, current_time_iso, retrieval_count, used_count
+        )
+
+    axes: ConfidenceAxes = ConfidenceAxes.from_json(belief.uncertainty_vector)
+
+    query_terms: list[str] = query.split()
+    decay: float = decay_factor(belief, current_time_iso)
+    boost: float = lock_boost_typed(belief, query_terms)
+    type_w: float = _TYPE_WEIGHTS.get(belief.belief_type, 1.0)
+    source_w: float = _SOURCE_WEIGHTS.get(belief.source_type, 1.0)
+    recency: float = recency_boost(belief, current_time_iso)
+
+    # Multi-axis: sample accuracy and relevance independently.
+    # Freshness is handled by decay_factor (not a separate sample)
+    # to avoid double-counting temporal signals.
+    accuracy_sample: float = thompson_sample(
+        axes.accuracy.alpha, axes.accuracy.beta_param
+    )
+    relevance_sample: float = thompson_sample(
+        axes.relevance.alpha, axes.relevance.beta_param
+    )
+    composite: float = accuracy_sample * relevance_sample
+
+    if belief.locked:
+        return boost * composite
+
+    freq_boost: float = retrieval_frequency_boost(retrieval_count, used_count)
+    base: float = type_w * source_w * composite * decay * recency * freq_boost
     ucb: float = ucb_exploration_bonus(retrieval_count, _global_retrieval_estimate)
     return base * (1.0 + ucb)
