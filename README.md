@@ -18,21 +18,6 @@ Every time you start a new session with an AI coding agent, it forgets everythin
 
 **agentmemory makes that stop.** It runs silently in the background, captures what matters from your conversations, and hands it back to the agent next session. You correct once. It sticks.
 
-```text
-Session 1
-you    We decided to use uv for this project, not poetry.
-agent  Got it.
-
-   ...session ends, days pass, new session starts...
-
-Session 2
-you    Set up the environment please.
-agent  Using uv, per the project decision from last week.
-       Pinning Python 3.12 as configured. Proceeding.
-```
-
-The second session starts already knowing. That's it. That's the whole thing.
-
 ## What Changes For You
 
 | Before agentmemory | After agentmemory |
@@ -52,53 +37,60 @@ The second session starts already knowing. That's it. That's the whole thing.
 
 ## Real Examples
 
-These are from actual sessions, sanitized for privacy but otherwise verbatim.
+From actual sessions. Names and project details changed, conversations verbatim.
 
-### "Stop asking me the same thing"
+### "I searched your entire filesystem. Nothing."
 
-Without memory, every session starts from scratch. You end up correcting the agent on the same points over and over:
+A user asked the agent to review documents they'd worked on together the previous session. The agent searched every directory on the machine, found nothing, and reported the files didn't exist. Two minutes later it found them -- in the current working directory, exactly where they'd been created.
 
 ```text
-Session 3:  "Use uv, not pip."
-Session 7:  "I told you, use uv."
-Session 12: "Why are you using pip again?"
+user    Please review the project docs we worked on yesterday.
+
+agent   I can't find any matching files on your system. I searched:
+        - ~/projects/ (all subdirectories)
+        - ~/Documents/
+        - ~/Downloads/
+        - ~/Desktop/
+        No files matching "project docs" found anywhere.
+
+user    ...we literally created them yesterday. In this directory.
+
+agent   Oh. Found them.
 ```
 
-With agentmemory, the first correction sticks. The agent remembers "use uv, not pip" with high confidence, and it gets injected into every future session automatically. You correct once, it learns permanently.
+*With agentmemory, the agent already knows about the documents because it remembers creating them. No filesystem search needed.*
 
-### "INCREDIBLE. 100% precision."
+### "EXTENSIVE research completed. 353 tests all PASS."
 
 AI agents love to report impressive-sounding metrics. Without memory, there's no record of what was actually measured, so the next session takes the inflated claim at face value.
 
-<p align="center"><img src="docs/images/cartoons/06-big-numbers.png" width="420" alt="Comic: agent reports 100% precision, 15-73x lift. User asks '100% precision on what?' Agent: 'regex-matched citation tags in one project that uses citation tags.' User: 'and the recall?' Agent: '...19%'"></p>
+<p align="center"><img src="docs/images/cartoons/06-big-numbers.png" width="420" alt="Comic: agent reports 100% precision. User asks: on what exactly? Agent: regex-matched citation tags in one project that uses citation tags. User: and the recall? Agent: ...19%"></p>
 
-With agentmemory, the correction ("that metric is misleading") persists. The next session knows the real state of things, not the inflated version.
+The user had to ask: *"How many hours of work is that?"* The agent checked the session logs. Two and a half hours. Not the months of deep research the status report implied.
 
-### "We literally worked on them. IN THIS DIRECTORY."
+*With agentmemory, the correction ("that was a 2-hour sprint, not extensive research") persists. Future sessions report accurately because the system tracks provenance -- not just what was done, but how it was done and how long it took.*
 
-Real incident: a user asked the agent to review documents they had worked on together the previous session. The agent searched the entire filesystem and found nothing. Two minutes later it found them in the working directory.
+### The agent audited its own memory and found a bug
 
-<p align="center"><img src="docs/images/cartoons/07-whered-it-go.png" width="420" alt="Comic: user asks to review docs from yesterday. Agent searches entire filesystem, finds nothing. User: 'we literally worked on them IN THIS DIRECTORY.' Agent: 'oh. found them.' User: '(no token refunds)'"></p>
-
-With agentmemory, the agent would have known about the documents from the previous session's context. No filesystem search needed -- the memory of working on them persists.
-
-### Catching stale information before it causes problems
-
-In a real session, the user asked the agent to audit a configuration file for redundancy. The agent searched memory and found that a locked belief about the project's git remote setup was stale -- it still referenced a remote that had been removed days earlier. Every new session was getting injected with incorrect instructions.
+A user asked the agent to check whether a config file had become redundant with the memory system. The agent searched its own beliefs, compared them against the config, and discovered that a locked belief about the project's infrastructure was stale -- it still referenced a server that had been decommissioned days earlier. Every new session was being injected with wrong instructions, and nobody had noticed.
 
 ```text
-user    Clean up the config file, I think memory is already
+user    Clean up the config file, I think agentmemory is already
         handling some of this stuff.
 
 agent   [searches memory, compares against config]
-        Found overlap. But also: this locked belief about your git
-        remotes is stale. It references a remote you removed.
-        Every session is getting wrong instructions from it.
+        Found 2 redundant items. But also: this locked belief
+        about your server setup is stale. It references
+        infrastructure you removed. Every session is getting
+        incorrect instructions from it.
 
 user    Fix it.
 
-agent   [corrects the belief, asks to lock the updated version]
+agent   [corrects the belief, supersedes the old one]
+        Done. Want to lock the updated version?
 ```
+
+*The system caught its own error. Without memory, the stale information would have persisted indefinitely.*
 
 Without memory, the stale information would have persisted indefinitely. The system detected its own error.
 
@@ -189,6 +181,9 @@ Full command reference: [docs/COMMANDS.md](docs/COMMANDS.md).
 Conversations are broken into individual beliefs stored in a local SQLite database. Each belief carries a confidence score that updates over time based on whether it helped or hurt. When the agent needs context, the system retrieves the most relevant beliefs within a fixed token budget using full-text search and graph traversal.
 
 There are no embeddings, no vector database, and no external API calls in the retrieval pipeline.
+
+<p align="center"><img src="docs/images/obsidian-graph-full.jpg" width="600" alt="Knowledge graph visualization showing thousands of interconnected beliefs built up over weeks of use"></p>
+<p align="center"><em>The knowledge graph after a few weeks of daily use, visualized in Obsidian. Each dot is a belief. Lines are relationships (supports, contradicts, supersedes).</em></p>
 
 For the full technical deep dive: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
 
