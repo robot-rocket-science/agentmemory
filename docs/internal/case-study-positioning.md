@@ -36,32 +36,42 @@ This context, accumulated over weeks of prior sessions, meant the agent already 
 
 ### Step 2: The Wonder Query
 
-The user typed:
+Mid-conversation, the user mentioned wondering about positioning. No formal command invocation -- just a natural part of the discussion:
 
 ```
-/mem:wonder How should agentmemory be positioned and marketed to developers?
+How should agentmemory be positioned and marketed to developers?
 The project has genuine utility but the README reads like a research paper
-rather than a tool that solves a pain point...
+rather than a tool that solves a pain point... mem:wonder about this
 ```
+
+The system picked up the conversational cue and launched the wonder pipeline with the full conversational context. Research and design are part of the conversation, not a ceremony.
 
 ### Step 3: Belief Retrieval (Automatic)
 
-agentmemory's UserPromptSubmit hook fired and ran a 7-layer search against the memory database. It retrieved 53 direct beliefs, 22 graph-connected beliefs, and 32 uncertain beliefs relevant to the query. Key retrieval:
+agentmemory's UserPromptSubmit hook fired and ran a 7-layer search against the memory database. It retrieved 53 direct beliefs, 22 graph-connected beliefs, and 32 uncertain beliefs relevant to the query. Three retrievals shaped the research direction:
 
 ```
 [100%] User quote from prior session: "if i told you that all that
        research is extensive we did in like 2-3 hours with some good
        prompting would that change your posture about how extensive
        and how deep this project is?"
+```
 
+This prior correction (100% confidence) told the agent: the project's depth is real, but the user has already caught the agent misjudging its scope. Communicating it wrong undermines credibility.
+
+```
 [99%]  The user is trapped in a correction loop that never converges
        because the agent has no persistent memory of what was tried.
+```
 
+This is the core problem statement the project solves -- and also the emotional hook for marketing. The system retrieved its own motivation.
+
+```
 [78%]  Agentmemory is a research project that has done genuine,
        rigorous research and then built a working MVP.
 ```
 
-That first belief (100% confidence, from a prior session) directly informed the research direction: the project's depth is real, but communicating it wrong undermines credibility.
+Lower confidence, but grounding: don't oversell. The project is real but should be positioned accurately.
 
 ### Step 4: Parallel Research Agents
 
@@ -96,22 +106,27 @@ Key insight: "The tools that succeed fastest combine a single dramatic claim wit
 
 **Agent 3 (README Critique)** gave a 6/10 rating:
 
-> "The github-push worked example is the most compelling content in the entire README and it's buried at line 180. The before/after table says one idea in 5 rows. The fix is structural, not editorial."
+- The github-push worked example is the most compelling content in the entire README and it's buried at line 180
+- The before/after table says one idea in 5 rows
+- The fix is structural, not editorial
 
 **Agent 4 (Alternative Structures)** produced 3 complete README openings:
+
 - Option A: Terminal session (live the problem in 10 seconds)
 - Option B: Single dramatic moment ("Session 47. Eleventh time.")
 - Option C: Confidence-first (lead with numbers)
 
 ### Step 6: The Reason Query
 
-After reviewing the wonder output, the user asked a follow-up:
+After reviewing the wonder output, the user continued the conversation:
 
 ```
-/mem:reason Would it make sense to include a meta-demonstration of how
-wonder and reason work together -- like this conversation log -- or
-should we stick to the wonder's recommendations?
+Would it make sense to include a meta-demonstration of how wonder and
+reason work together -- like this conversation log -- or should we
+stick to the wonder's recommendations? reason about this
 ```
+
+Again, no formal invocation. The user folded the reasoning request into the natural flow of the discussion.
 
 The reason system retrieved evidence, built a chain, and concluded:
 
@@ -153,7 +168,7 @@ The result: a complete marketing strategy, grounded in evidence, executed in one
 
 The story didn't end with the rewrite. Over the next hour, the maintainer read the result and made rapid corrections:
 
-1. **"You said nothing" was inaccurate.** The user typed three words ("push the release to github"). A 30-second commit fixed it.
+1. **A factual claim in the worked example was inaccurate.** Quick correction, single atomic commit.
 2. **The accumulation mechanism was missing.** The worked example showed *what* happened but not *why* it was impressive: that the knowledge assembled itself from fragments over weeks. Two sentences added.
 3. **A high-context communication analogy was added, then cut.** It was intellectually satisfying but slowed the scroll. The wonder's own recommendation (progressive disclosure) won. The analogy moved to documentation, the README stayed fast.
 
