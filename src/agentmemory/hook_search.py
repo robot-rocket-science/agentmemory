@@ -1168,10 +1168,36 @@ def search_for_prompt(
                 [now_str, *belief_ids_packed],
             )
             # Insert pending feedback (batch insert for speed)
+            feedback_batch: list[tuple[str, str, str]] = [
+                (b.id, b.content[:200], now_str) for b in packed
+            ]
+
+            # Exploration sampling: include 3 random never-feedback beliefs
+            # in the pending_feedback batch. They won't appear in results but
+            # will enter the feedback loop on the next prompt. This expands
+            # coverage from 35% toward the full corpus over time.
+            try:
+                explore_rows: list[sqlite3.Row] = db.execute(
+                    """SELECT b.id, b.content FROM beliefs b
+                       LEFT JOIN tests t ON t.belief_id = b.id
+                       WHERE b.superseded_by IS NULL
+                         AND b.valid_to IS NULL
+                         AND b.locked = 0
+                         AND t.id IS NULL
+                       ORDER BY RANDOM()
+                       LIMIT 3"""
+                ).fetchall()
+                for er in explore_rows:
+                    feedback_batch.append(
+                        (str(er["id"]), str(er["content"])[:200], now_str)
+                    )
+            except sqlite3.OperationalError:
+                pass
+
             db.executemany(
                 "INSERT INTO pending_feedback (belief_id, belief_content, session_id, created_at) "
                 "VALUES (?, ?, NULL, ?)",
-                [(b.id, b.content[:200], now_str) for b in packed],
+                feedback_batch,
             )
             db.commit()
         except sqlite3.OperationalError:

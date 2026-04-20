@@ -451,11 +451,12 @@ def test_hook_feedback_loop_records_pending(tmp_path: Path) -> None:
     pending: list[sqlite3.Row] = db.execute("SELECT * FROM pending_feedback").fetchall()
     assert len(pending) > 0, "No pending feedback recorded"
 
-    # Pending entries should match returned belief IDs
+    # Pending entries should include all returned belief IDs
+    # (may also include exploration samples for feedback coverage)
     pending_ids: set[str] = {r["belief_id"] for r in pending}
     result_ids: set[str] = {b.id for b in result.beliefs}
-    assert pending_ids == result_ids, (
-        f"Pending IDs {pending_ids} don't match result IDs {result_ids}"
+    assert result_ids <= pending_ids, (
+        f"Result IDs {result_ids} not all in pending {pending_ids}"
     )
 
     db.close()
