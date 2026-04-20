@@ -9,7 +9,7 @@ Jacobian: sensitivity of confidence to each input parameter.
 Hamiltonian: energy analysis of the belief population trajectory,
   conservation tests, and regime classification.
 
-Methodology adapted from alpha-seek Jacobian/Hamiltonian diagnostic
+Methodology adapted from Jacobian/Hamiltonian diagnostic
 skills (jacobian.md, hamiltonian.md).
 """
 
