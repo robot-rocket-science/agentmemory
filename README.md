@@ -174,6 +174,58 @@ Conversations are broken into individual beliefs stored in a local SQLite databa
 
 There are no embeddings, no vector database, and no external API calls in the retrieval pipeline.
 
+### Under the Hood: What Happens When You Send a Prompt
+
+Here's a real example. The user types:
+
+```text
+push the release to github
+```
+
+Before the agent sees this message, agentmemory's hook fires and runs a 6-layer search in ~50ms:
+
+```
+Layer 0: Structural analysis
+         Task type: deployment (verbs: push)
+         Action target: github (matched "push to <target>")
+
+Layer 1: FTS5 full-text search
+         Query: "push release github"
+         Hits: 4 beliefs (publish script, remote config, CI checks, tag workflow)
+
+Layer 2: Entity expansion
+         Entity "github" -> 3 additional beliefs about repo setup
+
+Layer 3: Action-context detection
+         "push to github" matches activation_condition on 1 locked belief
+
+Layer 4: Supersession check
+         1 belief was superseded (old remote URL) -> excluded
+
+Layer 5: Recent observations
+         Correction from 2 days ago: "never push directly, use publish script"
+```
+
+The agent receives this structured context injection alongside your message:
+
+```
+AGENTMEMORY: 6 belief(s) relevant to your prompt:
+
+== OPERATIONAL STATE ==
+[!] GitHub account renamed from yoshi280 to robot-rocket-science (changed 2d ago)
+
+== STANDING CONSTRAINTS ==
+- NEVER use git push github directly. Use scripts/publish-to-github.sh
+- Pre-push hook scans for PII patterns; direct push bypasses this safety check
+- To release with tag: bash scripts/publish-to-github.sh --tag vX.Y.Z
+
+== BACKGROUND ==
+- Remote 'github' points to git@github.com:robot-rocket-science/agentmemory.git
+- CI requires lint + test + secrets check before merge to main
+```
+
+Without agentmemory, the agent would run `git push github main` and bypass every safety check. With it, the agent knows to use the publish script, knows the correct remote name, and knows about the recent rename -- all without the user having to say any of it.
+
 <p align="center"><img src="https://robotrocketscience.com/projects/agentmemory/obsidian-graph-full.jpg" width="600" alt="Knowledge graph visualization showing thousands of interconnected beliefs built up over weeks of use"></p>
 <p align="center"><em>The knowledge graph after a few weeks of daily use, visualized in Obsidian. Each dot is a belief. Lines are relationships (supports, contradicts, supersedes).</em></p>
 

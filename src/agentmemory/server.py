@@ -2293,5 +2293,116 @@ def wonder_gc(
     )
 
 
+# ---------------------------------------------------------------------------
+# Cross-project shared scopes (Exp 97/98)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool
+def share_belief(
+    belief_id: str,
+    scope: str = "infra",
+) -> str:
+    """Share a belief to a cross-project scope.
+
+    Copies the belief into a shared scope database so it can be retrieved
+    from other projects that subscribe to the same scope. The original
+    belief remains in the project database unchanged.
+
+    Args:
+        belief_id: ID of the belief to share.
+        scope: Name of the shared scope (e.g., "infra", "deploy", "tooling").
+    """
+    if _is_foreign_id(belief_id):
+        return _FOREIGN_ID_ERROR
+
+    store: MemoryStore = _get_store()
+    belief: Belief | None = store.get_belief(belief_id)
+    if belief is None:
+        return f"Belief {belief_id} not found."
+
+    from agentmemory.shared_scopes import share_belief as _share_belief
+
+    import os
+
+    project_path: str = os.getcwd()
+    shared_id: str = _share_belief(
+        scope_name=scope,
+        belief_id=belief.id,
+        content=belief.content,
+        belief_type=belief.belief_type,
+        source_type=belief.source_type,
+        alpha=belief.alpha,
+        beta_param=belief.beta_param,
+        locked=belief.locked,
+        origin_project=project_path,
+    )
+    return (
+        f"Shared belief to scope '{scope}': {belief.content[:80]}...\n"
+        f"Shared ID: {shared_id}"
+    )
+
+
+@mcp.tool
+def manage_scopes(
+    action: str = "list",
+    scope: str = "",
+    project_path: str = "",
+) -> str:
+    """Manage cross-project shared scopes.
+
+    Actions:
+      - list: Show all scopes and their subscribers
+      - subscribe: Add current project (or project_path) to a scope
+      - unsubscribe: Remove current project from a scope
+      - create: Create a new empty scope
+
+    Args:
+        action: One of "list", "subscribe", "unsubscribe", "create".
+        scope: Scope name (required for subscribe/unsubscribe/create).
+        project_path: Optional project path (defaults to cwd).
+    """
+    from agentmemory.shared_scopes import (
+        ensure_scope_db,
+        get_scopes_config,
+        list_scopes,
+        subscribe_project,
+        unsubscribe_project,
+    )
+    import os
+
+    resolved_path: str = project_path or os.getcwd()
+
+    if action == "list":
+        scopes: list[str] = list_scopes()
+        if not scopes:
+            return "No shared scopes exist yet. Use action='create' to create one."
+        config: dict[str, list[str]] = get_scopes_config()
+        lines: list[str] = ["Shared scopes:"]
+        for s in scopes:
+            subscribers: list[str] = config.get(s, [])
+            sub_str: str = ", ".join(subscribers) if subscribers else "(no subscribers)"
+            lines.append(f"  {s}: {sub_str}")
+        return "\n".join(lines)
+
+    if not scope:
+        return "Error: 'scope' parameter required for this action."
+
+    if action == "create":
+        ensure_scope_db(scope)
+        return f"Created shared scope '{scope}'."
+
+    if action == "subscribe":
+        ensure_scope_db(scope)
+        subscribe_project(scope, resolved_path)
+        return f"Subscribed '{resolved_path}' to scope '{scope}'."
+
+    if action == "unsubscribe":
+        unsubscribe_project(scope, resolved_path)
+        return f"Unsubscribed '{resolved_path}' from scope '{scope}'."
+
+    return f"Unknown action: {action}. Use list/subscribe/unsubscribe/create."
+
+
 if __name__ == "__main__":
     mcp.run()
