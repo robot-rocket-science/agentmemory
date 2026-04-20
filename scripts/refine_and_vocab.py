@@ -25,28 +25,164 @@ from typing import Any
 
 
 SKIP_DIRS: set[str] = {
-    ".git", "node_modules", "target", ".venv", "venv", "__pycache__",
-    ".mypy_cache", ".ruff_cache", "dist", "build", ".tox", "vendor",
-    "third_party", "3rdparty",
+    ".git",
+    "node_modules",
+    "target",
+    ".venv",
+    "venv",
+    "__pycache__",
+    ".mypy_cache",
+    ".ruff_cache",
+    "dist",
+    "build",
+    ".tox",
+    "vendor",
+    "third_party",
+    "3rdparty",
 }
 
 STOP_WORDS: set[str] = {
-    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-    "have", "has", "had", "do", "does", "did", "will", "would", "could",
-    "should", "may", "might", "shall", "can", "need", "must", "to", "of",
-    "in", "for", "on", "with", "at", "by", "from", "as", "into", "through",
-    "during", "before", "after", "above", "below", "between", "out", "off",
-    "over", "under", "again", "further", "then", "once", "here", "there",
-    "when", "where", "why", "how", "all", "each", "every", "both", "few",
-    "more", "most", "other", "some", "such", "no", "nor", "not", "only",
-    "own", "same", "so", "than", "too", "very", "and", "but", "or", "if",
-    "while", "that", "this", "it", "its", "they", "them", "their", "we",
-    "our", "you", "your", "he", "him", "his", "she", "her", "i", "me", "my",
-    "self", "none", "true", "false", "null", "return", "import", "from",
-    "def", "class", "fn", "let", "const", "var", "pub", "use", "mod",
-    "struct", "enum", "impl", "trait", "type", "async", "await", "else",
-    "elif", "match", "case", "break", "continue", "pass", "raise", "try",
-    "except", "finally", "with", "yield", "lambda", "assert",
+    "the",
+    "a",
+    "an",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "being",
+    "have",
+    "has",
+    "had",
+    "do",
+    "does",
+    "did",
+    "will",
+    "would",
+    "could",
+    "should",
+    "may",
+    "might",
+    "shall",
+    "can",
+    "need",
+    "must",
+    "to",
+    "of",
+    "in",
+    "for",
+    "on",
+    "with",
+    "at",
+    "by",
+    "from",
+    "as",
+    "into",
+    "through",
+    "during",
+    "before",
+    "after",
+    "above",
+    "below",
+    "between",
+    "out",
+    "off",
+    "over",
+    "under",
+    "again",
+    "further",
+    "then",
+    "once",
+    "here",
+    "there",
+    "when",
+    "where",
+    "why",
+    "how",
+    "all",
+    "each",
+    "every",
+    "both",
+    "few",
+    "more",
+    "most",
+    "other",
+    "some",
+    "such",
+    "no",
+    "nor",
+    "not",
+    "only",
+    "own",
+    "same",
+    "so",
+    "than",
+    "too",
+    "very",
+    "and",
+    "but",
+    "or",
+    "if",
+    "while",
+    "that",
+    "this",
+    "it",
+    "its",
+    "they",
+    "them",
+    "their",
+    "we",
+    "our",
+    "you",
+    "your",
+    "he",
+    "him",
+    "his",
+    "she",
+    "her",
+    "i",
+    "me",
+    "my",
+    "self",
+    "none",
+    "true",
+    "false",
+    "null",
+    "return",
+    "import",
+    "from",
+    "def",
+    "class",
+    "fn",
+    "let",
+    "const",
+    "var",
+    "pub",
+    "use",
+    "mod",
+    "struct",
+    "enum",
+    "impl",
+    "trait",
+    "type",
+    "async",
+    "await",
+    "else",
+    "elif",
+    "match",
+    "case",
+    "break",
+    "continue",
+    "pass",
+    "raise",
+    "try",
+    "except",
+    "finally",
+    "with",
+    "yield",
+    "lambda",
+    "assert",
 }
 
 
@@ -145,7 +281,9 @@ def main() -> None:
     nt_path: Path = extracted_dir / "node_types" / f"{name}.json"
     if nt_path.exists():
         node_data = json.loads(nt_path.read_text())
-    classifications: dict[str, str] = node_data.get("classifications", {}) if node_data else {}
+    classifications: dict[str, str] = (
+        node_data.get("classifications", {}) if node_data else {}
+    )
 
     # Collect all file-to-file edges with their types
     all_edges: list[dict[str, Any]] = []
@@ -158,12 +296,14 @@ def main() -> None:
         for e in co_changed:
             weight: int = e["weight"]
             if weight >= 3:
-                all_edges.append({
-                    "source": e["source"],
-                    "target": e["target"],
-                    "raw_type": "CO_CHANGED",
-                    "weight": e["weight"],
-                })
+                all_edges.append(
+                    {
+                        "source": e["source"],
+                        "target": e["target"],
+                        "raw_type": "CO_CHANGED",
+                        "weight": e["weight"],
+                    }
+                )
 
     # Imports
     imp_path: Path = extracted_dir / "import_edges" / f"{name}.json"
@@ -171,11 +311,13 @@ def main() -> None:
         imp_data: dict[str, Any] = json.loads(imp_path.read_text())
         imp_edges: list[dict[str, Any]] = imp_data.get("edges", [])
         for e in imp_edges:
-            all_edges.append({
-                "source": e["source"],
-                "target": e["target"],
-                "raw_type": "IMPORTS",
-            })
+            all_edges.append(
+                {
+                    "source": e["source"],
+                    "target": e["target"],
+                    "raw_type": "IMPORTS",
+                }
+            )
 
     # Structural
     str_path: Path = extracted_dir / "structural_edges" / f"{name}.json"
@@ -186,11 +328,13 @@ def main() -> None:
             s: str = e.get("source", "")
             t: str = e.get("target", "")
             if ":" not in s and ":" not in t:  # file-to-file only
-                all_edges.append({
-                    "source": s,
-                    "target": t,
-                    "raw_type": e.get("type", "STRUCTURAL"),
-                })
+                all_edges.append(
+                    {
+                        "source": s,
+                        "target": t,
+                        "raw_type": e.get("type", "STRUCTURAL"),
+                    }
+                )
 
     print(f"  {len(all_edges)} file-to-file edges to analyze", file=sys.stderr)
 
@@ -208,7 +352,7 @@ def main() -> None:
         refined_counts[refined] += 1
         raw_to_refined[e["raw_type"]][refined] += 1
 
-    print(f"\n  T0.7 Edge type refinement:", file=sys.stderr)
+    print("\n  T0.7 Edge type refinement:", file=sys.stderr)
     for raw, refined_dist in sorted(raw_to_refined.items()):
         total: int = sum(refined_dist.values())
         print(f"    {raw} ({total} edges) ->", file=sys.stderr)
@@ -249,9 +393,15 @@ def main() -> None:
         overlap_by_type[refined_type].append(j)
         total_computed += 1
 
-    print(f"\n  M2 Vocabulary overlap ({total_computed} computed, {total_skipped} skipped):", file=sys.stderr)
-    print(f"  {'Type':<25} {'Count':>6} {'Mean':>6} {'Med':>6} {'<0.05':>6} {'<0.1':>6} {'>0.3':>6}", file=sys.stderr)
-    print(f"  {'-'*75}", file=sys.stderr)
+    print(
+        f"\n  M2 Vocabulary overlap ({total_computed} computed, {total_skipped} skipped):",
+        file=sys.stderr,
+    )
+    print(
+        f"  {'Type':<25} {'Count':>6} {'Mean':>6} {'Med':>6} {'<0.05':>6} {'<0.1':>6} {'>0.3':>6}",
+        file=sys.stderr,
+    )
+    print(f"  {'-' * 75}", file=sys.stderr)
 
     type_summaries: dict[str, dict[str, int | float]] = {}
     for etype, overlaps in sorted(overlap_by_type.items()):
@@ -274,19 +424,33 @@ def main() -> None:
             "pct_above_03": round(high_03 / n * 100, 1),
         }
 
-        print(f"  {etype:<25} {n:>6} {mean:>6.3f} {median:>6.3f} {low_005:>6} {low_01:>6} {high_03:>6}", file=sys.stderr)
+        print(
+            f"  {etype:<25} {n:>6} {mean:>6.3f} {median:>6.3f} {low_005:>6} {low_01:>6} {high_03:>6}",
+            file=sys.stderr,
+        )
 
     # Overall HRR relevance assessment
-    all_overlaps: list[float] = [o for overlaps in overlap_by_type.values() for o in overlaps]
+    all_overlaps: list[float] = [
+        o for overlaps in overlap_by_type.values() for o in overlaps
+    ]
     if all_overlaps:
         total_low: int = sum(1 for o in all_overlaps if o < 0.1)
         total_high: int = sum(1 for o in all_overlaps if o > 0.3)
         pct_low: float = total_low / len(all_overlaps) * 100
         pct_high: float = total_high / len(all_overlaps) * 100
         print(f"\n  HRR relevance for {name}:", file=sys.stderr)
-        print(f"    {pct_low:.1f}% of edges have vocab overlap < 0.1 (HRR needed)", file=sys.stderr)
-        print(f"    {pct_high:.1f}% of edges have vocab overlap > 0.3 (FTS5 sufficient)", file=sys.stderr)
-        print(f"    Verdict: {'HRR adds significant value' if pct_low > 50 else 'HRR adds moderate value' if pct_low > 25 else 'FTS5 may suffice'}", file=sys.stderr)
+        print(
+            f"    {pct_low:.1f}% of edges have vocab overlap < 0.1 (HRR needed)",
+            file=sys.stderr,
+        )
+        print(
+            f"    {pct_high:.1f}% of edges have vocab overlap > 0.3 (FTS5 sufficient)",
+            file=sys.stderr,
+        )
+        print(
+            f"    Verdict: {'HRR adds significant value' if pct_low > 50 else 'HRR adds moderate value' if pct_low > 25 else 'FTS5 may suffice'}",
+            file=sys.stderr,
+        )
 
     # Write results
     output_dir: Path = extracted_dir / "refined"

@@ -1,4 +1,5 @@
 """Tests for Obsidian vault export: serialization, sync, index generation."""
+
 from __future__ import annotations
 
 import json
@@ -139,7 +140,7 @@ def test_belief_to_markdown_locked_property(store: MemoryStore) -> None:
     assert "locked: true" in md
     # locked should NOT be a tag (avoids duplicate graph nodes in Obsidian)
     lines: list[str] = md.split("\n")
-    tag_lines: list[str] = [l for l in lines if l.strip() == "- locked"]
+    tag_lines: list[str] = [line for line in lines if line.strip() == "- locked"]
     assert len(tag_lines) == 0
 
 
@@ -188,8 +189,12 @@ def test_parse_frontmatter_empty() -> None:
 def test_collect_edges_outgoing() -> None:
     """Outgoing edges keep their type as-is."""
     edge: Edge = Edge(
-        id=1, from_id="aaa", to_id="bbb",
-        edge_type="SUPPORTS", weight=1.0, reason="test",
+        id=1,
+        from_id="aaa",
+        to_id="bbb",
+        edge_type="SUPPORTS",
+        weight=1.0,
+        reason="test",
         created_at="2026-01-01T00:00:00Z",
     )
     result = collect_edges_for_belief("aaa", {"aaa": [edge]})
@@ -200,8 +205,12 @@ def test_collect_edges_outgoing() -> None:
 def test_collect_edges_incoming_reversed() -> None:
     """Incoming edges get reversed labels."""
     edge: Edge = Edge(
-        id=1, from_id="bbb", to_id="aaa",
-        edge_type="SUPERSEDES", weight=1.0, reason="replaced",
+        id=1,
+        from_id="bbb",
+        to_id="aaa",
+        edge_type="SUPERSEDES",
+        weight=1.0,
+        reason="replaced",
         created_at="2026-01-01T00:00:00Z",
     )
     result = collect_edges_for_belief("aaa", {"aaa": [edge]})
@@ -212,8 +221,12 @@ def test_collect_edges_incoming_reversed() -> None:
 def test_collect_edges_dedup() -> None:
     """Same edge ID is not duplicated."""
     edge: Edge = Edge(
-        id=1, from_id="aaa", to_id="bbb",
-        edge_type="RELATES_TO", weight=1.0, reason="",
+        id=1,
+        from_id="aaa",
+        to_id="bbb",
+        edge_type="RELATES_TO",
+        weight=1.0,
+        reason="",
         created_at="2026-01-01T00:00:00Z",
     )
     # Same edge appearing twice (could happen in bulk fetch)
@@ -388,7 +401,9 @@ def test_sync_performance_bulk(store: MemoryStore, vault_path: Path) -> None:
 
     assert result.beliefs_written == 0
     assert result.beliefs_unchanged == 1000
-    assert incr_elapsed < 1.0, f"Incremental sync took {incr_elapsed:.2f}s (expected <1s)"
+    assert incr_elapsed < 1.0, (
+        f"Incremental sync took {incr_elapsed:.2f}s (expected <1s)"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -540,11 +555,18 @@ def test_canvas_basic(store: MemoryStore, vault_path: Path) -> None:
     edge_id: int = store.insert_edge(bid1, bid2, "SUPPORTS", reason="test")
 
     from agentmemory.models import Edge as EdgeModel
-    edges: list[EdgeModel] = [EdgeModel(
-        id=edge_id, from_id=bid1, to_id=bid2,
-        edge_type="SUPPORTS", weight=1.0, reason="test",
-        created_at="2026-01-01T00:00:00Z",
-    )]
+
+    edges: list[EdgeModel] = [
+        EdgeModel(
+            id=edge_id,
+            from_id=bid1,
+            to_id=bid2,
+            edge_type="SUPPORTS",
+            weight=1.0,
+            reason="test",
+            created_at="2026-01-01T00:00:00Z",
+        )
+    ]
 
     canvas_path: Path = vault_path / "_canvas" / "test.canvas"
     result: dict[str, object] = beliefs_to_canvas(
@@ -557,9 +579,10 @@ def test_canvas_basic(store: MemoryStore, vault_path: Path) -> None:
 
     import json
     from typing import Any, cast
-    data: dict[str, Any] = cast("dict[str, Any]", json.loads(
-        canvas_path.read_text(encoding="utf-8")
-    ))
+
+    data: dict[str, Any] = cast(
+        "dict[str, Any]", json.loads(canvas_path.read_text(encoding="utf-8"))
+    )
     nodes: list[Any] = cast("list[Any]", data["nodes"])
     assert len(nodes) == 2
     canvas_edges: list[Any] = cast("list[Any]", data["edges"])
@@ -569,6 +592,7 @@ def test_canvas_basic(store: MemoryStore, vault_path: Path) -> None:
 def test_canvas_empty(store: MemoryStore) -> None:
     """Canvas with no beliefs produces empty nodes/edges."""
     from typing import Any, cast
+
     result: dict[str, object] = beliefs_to_canvas([], [], title="Empty")
     nodes: list[Any] = cast("list[Any]", result["nodes"])
     assert len(nodes) == 0

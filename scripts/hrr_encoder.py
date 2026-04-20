@@ -40,13 +40,17 @@ def random_vector(dim: int, rng: np.random.Generator) -> Vector:
 
 def bind(a: Vector, b: Vector) -> Vector:
     """Circular convolution (binding) via FFT."""
-    result: Vector = np.real(np.fft.ifft(np.fft.fft(a) * np.fft.fft(b))).astype(np.float64)
+    result: Vector = np.real(np.fft.ifft(np.fft.fft(a) * np.fft.fft(b))).astype(
+        np.float64
+    )
     return result
 
 
 def unbind(key: Vector, composite: Vector) -> Vector:
     """Circular correlation (approximate unbinding) via FFT."""
-    result: Vector = np.real(np.fft.ifft(np.conj(np.fft.fft(key)) * np.fft.fft(composite))).astype(np.float64)
+    result: Vector = np.real(
+        np.fft.ifft(np.conj(np.fft.fft(key)) * np.fft.fft(composite))
+    ).astype(np.float64)
     return result
 
 
@@ -67,6 +71,7 @@ def cosine_similarity(a: Vector, b: Vector) -> float:
 
 
 # --- Cleanup Memory ---
+
 
 class CleanupMemory:
     """Nearest-neighbor lookup for recovering approximate vectors."""
@@ -116,6 +121,7 @@ class CleanupMemory:
 
 # --- Edge Loading ---
 
+
 class Edge(NamedTuple):
     source: str
     target: str
@@ -161,15 +167,20 @@ def load_edges(
         for e in co_changed:
             w: int = e.get("weight", 1)
             if w >= threshold:
-                edges.append(Edge(
-                    source=e["source"],
-                    target=e["target"],
-                    edge_type="CO_CHANGED",
-                    weight=float(w),
-                ))
+                edges.append(
+                    Edge(
+                        source=e["source"],
+                        target=e["target"],
+                        edge_type="CO_CHANGED",
+                        weight=float(w),
+                    )
+                )
                 loaded_count += 1
 
-        print(f"  co-change threshold: w>={threshold} (adaptive from {git_data.get('summary', {}).get('commits_analyzed', '?')} commits), {loaded_count} edges", file=sys.stderr)
+        print(
+            f"  co-change threshold: w>={threshold} (adaptive from {git_data.get('summary', {}).get('commits_analyzed', '?')} commits), {loaded_count} edges",
+            file=sys.stderr,
+        )
 
     # Imports
     imp_path: Path = extracted_dir / "import_edges" / f"{repo_name}.json"
@@ -177,12 +188,14 @@ def load_edges(
         imp_data: dict[str, Any] = json.loads(imp_path.read_text())
         imp_edges: list[dict[str, Any]] = imp_data.get("edges", [])
         for e in imp_edges:
-            edges.append(Edge(
-                source=e["source"],
-                target=e["target"],
-                edge_type="IMPORTS",
-                weight=1.0,
-            ))
+            edges.append(
+                Edge(
+                    source=e["source"],
+                    target=e["target"],
+                    edge_type="IMPORTS",
+                    weight=1.0,
+                )
+            )
 
     # Structural (file-to-file only)
     str_path: Path = extracted_dir / "structural_edges" / f"{repo_name}.json"
@@ -193,17 +206,20 @@ def load_edges(
             s: str = e.get("source", "")
             t: str = e.get("target", "")
             if ":" not in s and ":" not in t:
-                edges.append(Edge(
-                    source=s,
-                    target=t,
-                    edge_type=e.get("type", "STRUCTURAL"),
-                    weight=1.0,
-                ))
+                edges.append(
+                    Edge(
+                        source=s,
+                        target=t,
+                        edge_type=e.get("type", "STRUCTURAL"),
+                        weight=1.0,
+                    )
+                )
 
     return edges
 
 
 # --- Subgraph Partitioning ---
+
 
 def partition_edges(edges: list[Edge], max_per_partition: int) -> list[list[Edge]]:
     """Partition edges into subgraphs that fit within HRR capacity.
@@ -222,13 +238,14 @@ def partition_edges(edges: list[Edge], max_per_partition: int) -> list[list[Edge
         else:
             # Split into chunks
             for i in range(0, len(type_edges), max_per_partition):
-                chunk: list[Edge] = type_edges[i:i + max_per_partition]
+                chunk: list[Edge] = type_edges[i : i + max_per_partition]
                 partitions.append(chunk)
 
     return partitions
 
 
 # --- HRR Graph Encoding ---
+
 
 class HRRGraph:
     """HRR-encoded graph with typed edge traversal."""
@@ -300,13 +317,15 @@ class HRRGraph:
                 self.node_to_partitions[e.source].add(partition_idx)
                 self.node_to_partitions[e.target].add(partition_idx)
 
-            self.partitions.append({
-                "superposition": S,
-                "edge_count": len(part_edges),
-                "edge_types": dict(edge_types_in_partition),
-                "capacity_usage": round(len(part_edges) / self.capacity, 3),
-                "nodes": nodes_in_partition,
-            })
+            self.partitions.append(
+                {
+                    "superposition": S,
+                    "edge_count": len(part_edges),
+                    "edge_types": dict(edge_types_in_partition),
+                    "capacity_usage": round(len(part_edges) / self.capacity, 3),
+                    "nodes": nodes_in_partition,
+                }
+            )
 
     def _get_relevant_partitions(self, node_id: str) -> list[int]:
         """Get partition indices relevant to a node query."""
@@ -314,7 +333,9 @@ class HRRGraph:
             return list(range(len(self.partitions)))
         return sorted(self.node_to_partitions[node_id])
 
-    def query_forward(self, source: str, edge_type: str, top_k: int = 10) -> list[tuple[str, float]]:
+    def query_forward(
+        self, source: str, edge_type: str, top_k: int = 10
+    ) -> list[tuple[str, float]]:
         """Single-hop forward query: 'What does source connect to via edge_type?'"""
         if source not in self.node_vectors:
             return []
@@ -332,17 +353,23 @@ class HRRGraph:
             partition: dict[str, Any] = self.partitions[idx]
             S: Vector = partition["superposition"]
             result_vec: Vector = unbind(query_vec, S)
-            matches: list[tuple[str, float]] = self.cleanup.query(result_vec, top_k=top_k)
+            matches: list[tuple[str, float]] = self.cleanup.query(
+                result_vec, top_k=top_k
+            )
             for label, sim in matches:
                 if label != source:  # exclude self
                     if label not in all_results or sim > all_results[label]:
                         all_results[label] = sim
 
         # Sort by similarity
-        sorted_results: list[tuple[str, float]] = sorted(all_results.items(), key=lambda x: x[1], reverse=True)
+        sorted_results: list[tuple[str, float]] = sorted(
+            all_results.items(), key=lambda x: x[1], reverse=True
+        )
         return sorted_results[:top_k]
 
-    def query_reverse(self, target: str, edge_type: str, top_k: int = 10) -> list[tuple[str, float]]:
+    def query_reverse(
+        self, target: str, edge_type: str, top_k: int = 10
+    ) -> list[tuple[str, float]]:
         """Single-hop reverse query: 'What connects to target via edge_type?'"""
         if target not in self.node_vectors:
             return []
@@ -359,20 +386,28 @@ class HRRGraph:
             partition: dict[str, Any] = self.partitions[idx]
             S: Vector = partition["superposition"]
             result_vec: Vector = unbind(query_vec, S)
-            matches: list[tuple[str, float]] = self.cleanup.query(result_vec, top_k=top_k)
+            matches: list[tuple[str, float]] = self.cleanup.query(
+                result_vec, top_k=top_k
+            )
             for label, sim in matches:
                 if label != target:
                     if label not in all_results or sim > all_results[label]:
                         all_results[label] = sim
 
-        sorted_results: list[tuple[str, float]] = sorted(all_results.items(), key=lambda x: x[1], reverse=True)
+        sorted_results: list[tuple[str, float]] = sorted(
+            all_results.items(), key=lambda x: x[1], reverse=True
+        )
         return sorted_results[:top_k]
 
     def summary(self) -> dict[str, Any]:
         """Return encoding summary."""
         # Routing stats
-        partitions_per_node: list[int] = [len(v) for v in self.node_to_partitions.values()]
-        avg_partitions: float = sum(partitions_per_node) / max(len(partitions_per_node), 1)
+        partitions_per_node: list[int] = [
+            len(v) for v in self.node_to_partitions.values()
+        ]
+        avg_partitions: float = sum(partitions_per_node) / max(
+            len(partitions_per_node), 1
+        )
         max_partitions: int = max(partitions_per_node) if partitions_per_node else 0
 
         return {
@@ -397,6 +432,7 @@ class HRRGraph:
 
 
 # --- Evaluation ---
+
 
 class RetrievalResult(NamedTuple):
     edge_type: str
@@ -424,15 +460,21 @@ def evaluate_retrieval(
         ground_truth[(e.source, e.edge_type)].add(e.target)
 
     # Select random queries (source, edge_type pairs with known targets)
-    query_keys: list[tuple[str, str]] = [k for k, v in ground_truth.items() if len(v) >= 1]
+    query_keys: list[tuple[str, str]] = [
+        k for k, v in ground_truth.items() if len(v) >= 1
+    ]
     if len(query_keys) > num_queries:
-        indices: NDArray[np.intp] = rng.choice(len(query_keys), size=num_queries, replace=False)
+        indices: NDArray[np.intp] = rng.choice(
+            len(query_keys), size=num_queries, replace=False
+        )
         query_keys = [query_keys[int(i)] for i in indices]
 
     results: list[RetrievalResult] = []
     for source, edge_type in query_keys:
         targets: set[str] = ground_truth[(source, edge_type)]
-        retrieved: list[tuple[str, float]] = graph.query_forward(source, edge_type, top_k=10)
+        retrieved: list[tuple[str, float]] = graph.query_forward(
+            source, edge_type, top_k=10
+        )
 
         retrieved_ids_5: set[str] = {r[0] for r in retrieved[:5]}
         retrieved_ids_10: set[str] = {r[0] for r in retrieved[:10]}
@@ -445,23 +487,27 @@ def evaluate_retrieval(
         p_at_5: float = hits_5 / min(5, len(retrieved)) if retrieved else 0.0
         p_at_10: float = hits_10 / min(10, len(retrieved)) if retrieved else 0.0
 
-        results.append(RetrievalResult(
-            edge_type=edge_type,
-            source=source,
-            ground_truth_targets=sorted(targets),
-            retrieved=retrieved,
-            recall_at_5=round(r_at_5, 4),
-            recall_at_10=round(r_at_10, 4),
-            precision_at_5=round(p_at_5, 4),
-            precision_at_10=round(p_at_10, 4),
-        ))
+        results.append(
+            RetrievalResult(
+                edge_type=edge_type,
+                source=source,
+                ground_truth_targets=sorted(targets),
+                retrieved=retrieved,
+                recall_at_5=round(r_at_5, 4),
+                recall_at_10=round(r_at_10, 4),
+                precision_at_5=round(p_at_5, 4),
+                precision_at_10=round(p_at_10, 4),
+            )
+        )
 
     return results
 
 
 def main() -> None:
     if len(sys.argv) < 3:
-        print(f"Usage: {sys.argv[0]} /path/to/extracted_dir <repo_name> [--dim N] [--output path]")
+        print(
+            f"Usage: {sys.argv[0]} /path/to/extracted_dir <repo_name> [--dim N] [--output path]"
+        )
         sys.exit(1)
 
     extracted_dir: Path = Path(sys.argv[1])
@@ -510,11 +556,17 @@ def main() -> None:
     graph.encode(edges)
 
     summary: dict[str, Any] = graph.summary()
-    print(f"  encoded: {summary['total_nodes']} nodes, {summary['num_partitions']} partitions", file=sys.stderr)
-    print(f"  routing: {routing}, avg {summary['avg_partitions_per_node']} partitions/node, max {summary['max_partitions_per_node']}", file=sys.stderr)
+    print(
+        f"  encoded: {summary['total_nodes']} nodes, {summary['num_partitions']} partitions",
+        file=sys.stderr,
+    )
+    print(
+        f"  routing: {routing}, avg {summary['avg_partitions_per_node']} partitions/node, max {summary['max_partitions_per_node']}",
+        file=sys.stderr,
+    )
 
     # Evaluate
-    print(f"\n  evaluating retrieval (50 random queries)...", file=sys.stderr)
+    print("\n  evaluating retrieval (50 random queries)...", file=sys.stderr)
     results: list[RetrievalResult] = evaluate_retrieval(graph, edges, num_queries=50)
 
     # Aggregate by edge type
@@ -522,8 +574,11 @@ def main() -> None:
     for r in results:
         by_type[r.edge_type].append(r)
 
-    print(f"\n  {'Edge Type':<25} {'Queries':>8} {'R@5':>6} {'R@10':>6} {'P@5':>6} {'P@10':>6}", file=sys.stderr)
-    print(f"  {'-'*70}", file=sys.stderr)
+    print(
+        f"\n  {'Edge Type':<25} {'Queries':>8} {'R@5':>6} {'R@10':>6} {'P@5':>6} {'P@10':>6}",
+        file=sys.stderr,
+    )
+    print(f"  {'-' * 70}", file=sys.stderr)
 
     type_summaries: dict[str, dict[str, float]] = {}
     for etype, type_results in sorted(by_type.items()):
@@ -532,7 +587,10 @@ def main() -> None:
         avg_r10: float = sum(r.recall_at_10 for r in type_results) / n
         avg_p5: float = sum(r.precision_at_5 for r in type_results) / n
         avg_p10: float = sum(r.precision_at_10 for r in type_results) / n
-        print(f"  {etype:<25} {n:>8} {avg_r5:>6.3f} {avg_r10:>6.3f} {avg_p5:>6.3f} {avg_p10:>6.3f}", file=sys.stderr)
+        print(
+            f"  {etype:<25} {n:>8} {avg_r5:>6.3f} {avg_r10:>6.3f} {avg_p5:>6.3f} {avg_p10:>6.3f}",
+            file=sys.stderr,
+        )
         type_summaries[etype] = {
             "queries": n,
             "recall_at_5": round(avg_r5, 4),
@@ -552,7 +610,10 @@ def main() -> None:
         overall_r10 = sum(r.recall_at_10 for r in results) / total_queries
         overall_p5 = sum(r.precision_at_5 for r in results) / total_queries
         overall_p10 = sum(r.precision_at_10 for r in results) / total_queries
-        print(f"  {'OVERALL':<25} {total_queries:>8} {overall_r5:>6.3f} {overall_r10:>6.3f} {overall_p5:>6.3f} {overall_p10:>6.3f}", file=sys.stderr)
+        print(
+            f"  {'OVERALL':<25} {total_queries:>8} {overall_r5:>6.3f} {overall_r10:>6.3f} {overall_p5:>6.3f} {overall_p10:>6.3f}",
+            file=sys.stderr,
+        )
 
     # Write results
     output_data: dict[str, Any] = {
@@ -572,7 +633,9 @@ def main() -> None:
                 "edge_type": r.edge_type,
                 "source": r.source,
                 "ground_truth": r.ground_truth_targets,
-                "retrieved_top10": [(label, round(sim, 4)) for label, sim in r.retrieved],
+                "retrieved_top10": [
+                    (label, round(sim, 4)) for label, sim in r.retrieved
+                ],
                 "recall_at_5": r.recall_at_5,
                 "recall_at_10": r.recall_at_10,
             }
