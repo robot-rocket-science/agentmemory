@@ -85,3 +85,4 @@ _canvas/
 *.db-wal
 *.db-shm
 benchmarks/locomo_final_results.json
+docs/PRIVATE_*.md
