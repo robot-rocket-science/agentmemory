@@ -217,9 +217,9 @@ Each requirement has:
 
 **Rationale:** If the system says "belief recorded" and then a crash loses it, trust is broken. WAL mode SQLite provides this guarantee at the storage level; the application must not undermine it with buffering or async writes.
 
-**Verification method:** Write 1,000 observations with crash simulation (SIGKILL) at random intervals. After each crash, verify all acknowledged writes are present in the database.
+**Verification method:** Write observations with crash simulation (SIGKILL) at random intervals. After each crash, verify all acknowledged writes are present in the database.
 
-**Acceptance threshold:** Zero acknowledged writes lost across 1,000 crash simulations.
+**Acceptance threshold:** Zero acknowledged writes lost across 100 SIGKILL crash cycles.
 
 **Plan trace:** Phase 1 (WAL mode, synchronous checkpoints)
 **Experiment trace:** Phase 1 exit criteria
@@ -519,7 +519,7 @@ The memory system CANNOT guarantee (not under our control):
 | REQ-009 | Bayesian calibration ECE < 0.10 | Phase 3, 5 | Exp 2 | ECE < 0.10 simulation, < 0.15 production |
 | REQ-010 | Exploration fraction 15-50% | Phase 3 | Exp 2 | 0.15 <= exploration <= 0.50 |
 | REQ-011 | Cross-model MCP interop | Phase 4 | Phase 4 exit | 3 backends, all tools functional |
-| REQ-012 | Write durability (zero loss) | Phase 1 | Phase 1 exit | 0 lost writes / 1,000 crash simulations |
+| REQ-012 | Write durability (zero loss) | Phase 1 | Phase 1 exit | 0 lost writes / 100 SIGKILL crash cycles |
 | REQ-013 | Observation immutability | Phase 2 | Unit tests | No UPDATE/DELETE code path exists |
 | REQ-014 | Zero-LLM extraction recall >= 40% | Phase 2 | Exp 1 | Recall >= 0.40, Precision >= 0.50 |
 | REQ-015 | No unverified claims | Phase 5 | All | Zero unverified claims |

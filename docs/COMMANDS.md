@@ -2,7 +2,7 @@
 
 # Chapter 3. Command Reference
 
-All commands are available as Claude Code slash commands after setup.
+Most commands are available as Claude Code slash commands after setup. Some tools (e.g., `correct`, `feedback`) are MCP-only and called by the agent automatically.
 
 | Command | Description |
 |---------|-------------|

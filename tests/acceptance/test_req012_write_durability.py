@@ -5,8 +5,9 @@ without error) must survive a subsequent process crash. Tests WAL mode
 durability by forking a child process, writing beliefs, then killing it
 with SIGKILL at random points.
 
-Acceptance threshold: zero acknowledged writes lost across 100 crash cycles.
+Acceptance threshold: zero acknowledged writes lost across 100 SIGKILL crash cycles.
 """
+
 from __future__ import annotations
 
 import multiprocessing
@@ -32,7 +33,10 @@ def _writer_process(db_path: str, start_idx: int, count: int) -> None:
 
 
 def _writer_process_with_signal(
-    db_path: str, start_idx: int, count: int, kill_after: int,
+    db_path: str,
+    start_idx: int,
+    count: int,
+    kill_after: int,
 ) -> None:
     """Child process: write beliefs, then self-SIGKILL after kill_after writes."""
     store = MemoryStore(db_path)
@@ -121,12 +125,13 @@ def test_req012_sigkill_committed_writes_survive(tmp_path: Path) -> None:
 
 
 def test_req012_repeated_crash_cycles(tmp_path: Path) -> None:
-    """Run 10 crash cycles, each writing 10 beliefs then crashing after 5.
+    """Run 100 crash cycles, each writing 10 beliefs then crashing after 5.
 
     Every belief committed before each crash must survive.
+    REQ-012 acceptance: zero acknowledged writes lost across 100 crash cycles.
     """
     db_path: str = str(tmp_path / "multi_crash.db")
-    cycles: int = 10
+    cycles: int = 100
     per_cycle: int = 10
     kill_at: int = 5
     expected_survivors: list[str] = []

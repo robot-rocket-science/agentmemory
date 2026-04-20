@@ -2253,6 +2253,48 @@ def cmd_unlock(args: argparse.Namespace) -> None:
 
 
 # ---------------------------------------------------------------------------
+# demote
+# ---------------------------------------------------------------------------
+
+
+def cmd_demote(args: argparse.Namespace) -> None:
+    """Demote the least-relevant promoted beliefs back to regular beliefs."""
+    count: int = args.count
+    store: MemoryStore = _get_store()
+
+    # Get promoted beliefs (lock_level='promoted')
+    rows: list[sqlite3.Row] = store._conn.execute(  # pyright: ignore[reportPrivateUsage]
+        "SELECT * FROM beliefs WHERE lock_level = 'promoted' AND valid_to IS NULL"
+    ).fetchall()
+
+    if not rows:
+        print("No promoted beliefs to demote.")
+        store.close()
+        return
+
+    # Convert to Belief objects and score
+    current_time: str = _now_iso()
+    scored: list[tuple[Belief, float]] = []
+    for row in rows:
+        b: Belief = Belief(**dict(row))
+        s: float = score_belief(b, "", current_time)
+        scored.append((b, s))
+
+    scored.sort(key=lambda x: x[1])
+    to_demote: list[tuple[Belief, float]] = scored[: min(count, len(scored))]
+
+    print(f"Demoting {len(to_demote)} least-relevant promoted beliefs:")
+    for b, s in to_demote:
+        store.demote_belief(b.id)
+        print(
+            f"  Demoted: [{b.confidence:.0%}] {b.content} (ID: {b.id}, score: {s:.3f})"
+        )
+
+    store.close()
+    print(f"\n{len(to_demote)} beliefs demoted.")
+
+
+# ---------------------------------------------------------------------------
 # delete
 # ---------------------------------------------------------------------------
 
@@ -3406,6 +3448,15 @@ def main() -> None:
         "--count", type=int, default=5, help="Number of beliefs to unlock (default: 5)"
     )
     p_unlock.set_defaults(func=cmd_unlock)
+
+    # demote
+    p_demote: argparse.ArgumentParser = subparsers.add_parser(
+        "demote", help="Demote least-relevant promoted beliefs to regular beliefs"
+    )
+    p_demote.add_argument(
+        "--count", type=int, default=5, help="Number of beliefs to demote (default: 5)"
+    )
+    p_demote.set_defaults(func=cmd_demote)
 
     # delete
     p_delete: argparse.ArgumentParser = subparsers.add_parser(
