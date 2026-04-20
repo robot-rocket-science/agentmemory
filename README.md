@@ -8,128 +8,125 @@
 
 ---
 
-## You Shouldn't Have to Repeat Yourself
+You tell your AI agent "use uv, not pip." It says "got it." Next session, it reaches for pip. You correct it again. And again. And again.
 
-Every time you start a new session with an AI coding agent, it forgets everything. Your preferences, your decisions, your corrections -- gone. You end up saying the same things session after session:
-
-*"Use uv, not pip." "I told you, we're using PostgreSQL." "Stop adding co-author lines to commits."*
-
-<p align="center"><img src="https://robotrocketscience.com/projects/agentmemory/comics/01-no-implementation-cs002cs006.png" width="480" alt="Comic: user says 'no implementation, we're in research.' Agent says 'got it!' Next session: 'Ready to implement?' User: 'I TOLD YOU. TWICE.' Agent: '...three times, actually!'"></p>
-
-**agentmemory makes that stop.** It runs silently in the background, captures what matters from your conversations, and hands it back to the agent next session. You correct once. It sticks.
-
-| Before agentmemory | After agentmemory |
-|---|---|
-| Repeat the same corrections every session | Correct once, remembered permanently |
-| Re-explain your project setup each time | Agent already knows your stack, preferences, and constraints |
-| Watch the agent make the same mistakes | Mistakes are stored as corrections and never repeated |
-| Lose important decisions when sessions end | Decisions persist across sessions, weeks, months |
-| Start every session from scratch | Agent picks up where you left off |
-
-## Get Started
+**agentmemory makes the next correction your last.** It captures what matters from your conversations -- corrections, decisions, preferences -- stores them locally, and injects them into every future session. Silently. Automatically. You stop repeating yourself.
 
 ```bash
 pip install agentmemory-rrs
 agentmemory setup
 ```
 
-Restart Claude Code, then in any project:
+Restart Claude Code. In any project: `/mem:onboard .`
+
+That's it. Three commands. Your agent now remembers permanently.
+
+<p align="center"><img src="https://robotrocketscience.com/projects/agentmemory/comics/01-no-implementation-cs002cs006.png" width="480" alt="Comic: user says 'no implementation, we're in research.' Agent says 'got it!' Next session: 'Ready to implement?' User: 'I TOLD YOU. TWICE.' Agent: '...three times, actually!'"></p>
+
+---
+
+## What It Actually Does
+
+Here's a real example. You type `push the release to github`. Before the agent sees your message, agentmemory's hook fires and runs a 7-layer search in ~50ms:
 
 ```
-/mem:onboard .
+Layer 0: Structural analysis    -> task type: deployment, target: github
+Layer 1: FTS5 full-text search  -> 4 hits (publish script, CI checks, remote config)
+Layer 2: Entity expansion       -> "github" links to 3 beliefs about repo setup
+Layer 3: Action-context         -> "push to github" triggers activation condition
+Layer 4: Supersession check     -> old remote URL excluded (superseded)
+Layer 5: Recent observations    -> correction from 2 days ago about publish script
+Layer 6: Cross-project scopes   -> checks shared infra beliefs
 ```
 
-That's it. Three commands. Your agent now remembers across sessions.
+The agent receives this context injection alongside your message:
 
-- **100% local.** Everything lives in a SQLite file on your machine. Nothing is sent anywhere.
-- **No cloud, no accounts.** There is no server, no signup.
-- **No GPU or vector database required.** Runs on any machine that runs Python.
+```
+== OPERATIONAL STATE ==
+[!] GitHub account renamed (changed 2d ago)
 
-Full prerequisites and troubleshooting: [docs/INSTALL.md](docs/INSTALL.md).
+== STANDING CONSTRAINTS ==
+- NEVER use git push github directly. Use scripts/publish-to-github.sh
+- Pre-push hook scans for PII; direct push bypasses safety checks
+- To release with tag: bash scripts/publish-to-github.sh --tag vX.Y.Z
 
-## What Happens Next
+== BACKGROUND ==
+- Remote 'github' points to git@github.com:robot-rocket-science/agentmemory.git
+```
 
-You don't need to learn any commands. agentmemory works automatically:
+Without agentmemory, the agent runs `git push github main` and bypasses every safety check. With it, the agent already knows. You said nothing.
 
-1. **It listens** to your conversations and picks up decisions, corrections, and preferences.
-2. **It retrieves** relevant memories at the start of each turn and injects them into the agent's context.
-3. **It learns** which memories are useful and which aren't -- helpful ones get stronger, unhelpful ones fade.
+---
 
-If you want to explicitly tell it something important:
+## What It Remembers
+
+| You say | It stores |
+|---|---|
+| "Use uv, not pip" | Permanent rule. Injected every session. |
+| "The endpoint moved to /v2" | Correction. Replaces the old belief. |
+| "I prefer terse commits" | Preference. Shapes behavior silently. |
+
+Beliefs accumulate over time. Each one carries a Bayesian confidence score that strengthens when the belief proves useful and fades when it doesn't. After a few weeks:
+
+```
+/mem:stats
+Beliefs: 312 (18 locked, 294 learned)
+Sessions: 47
+Corrections surfaced this session: 3
+Last locked: "never commit .env files" (4 weeks ago)
+```
+
+---
+
+## Your Data Stays Yours
+
+- **100% local.** SQLite on your machine. No network calls in the retrieval pipeline.
+- **No cloud, no accounts.** No server, no signup, no telemetry by default.
+- **No GPU or vector database.** Runs on any machine that runs Python.
+
+---
+
+## What Happens After Install
+
+You don't need to learn commands. agentmemory works in the background:
+
+1. **It listens** -- picks up decisions, corrections, and preferences from your conversations
+2. **It retrieves** -- injects relevant beliefs before the agent responds to each prompt
+3. **It learns** -- beliefs that help get stronger; beliefs that don't, fade
+
+To explicitly lock a permanent rule:
 
 ```
 /mem:lock "always use uv, never poetry"
 ```
 
-That creates a permanent rule that persists across every session.
-
-When you're ready to explore further:
+For deeper exploration:
 
 | Command | What it does |
 |---|---|
 | `/mem:search <query>` | Find specific memories |
 | `/mem:lock <rule>` | Create a permanent rule |
-| `/mem:wonder <topic>` | Deep research across the memory graph |
+| `/mem:wonder <topic>` | Deep parallel research across the memory graph |
 | `/mem:reason <question>` | Test a hypothesis against stored evidence |
 | `/mem:stats` | See what's in memory |
-| `/mem:health` | Check system health |
 
 Full command reference: [docs/COMMANDS.md](docs/COMMANDS.md).
 
-## See It in Action
+---
 
-From actual sessions. Names and project details changed, conversations reconstructed from memory.
+## Emergent Behavior
 
-### Problems that made us build this
-
-These are real failures that happened without persistent memory.
-
-**"I searched your entire filesystem. Nothing."**
-
-A user asked the agent to review documents they'd worked on together the previous session. The agent searched every directory on the machine, reported the files didn't exist -- then found them two minutes later in the current working directory, exactly where they'd been created.
-
-```text
-user    Please review the project docs we worked on yesterday.
-
-agent   I can't find any matching files on your system. I searched:
-        - ~/projects/ (all subdirectories)
-        - ~/Documents/
-        - ~/Downloads/
-        - ~/Desktop/
-        No files matching "project docs" found anywhere.
-
-user    ...we literally created them yesterday. In this directory.
-
-agent   Oh. Found them.
-```
-
-*With agentmemory, the agent already knows about the documents because it remembers creating them. No filesystem search needed.*
-
-**"EXTENSIVE research completed. 353 tests all PASS."**
-
-AI agents love to report impressive-sounding metrics. Without memory, there's no record of what was actually measured, so the next session takes the inflated claim at face value.
-
-<p align="center"><img src="https://robotrocketscience.com/projects/agentmemory/comics/05-big-numbers-cs008.png" width="420" alt="Comic: agent reports 100% precision. User asks: on what exactly? Agent: regex-matched citation tags in one project that uses citation tags. User: and the recall? Agent: ...19%"></p>
-
-*With agentmemory, the correction ("that metric is misleading -- 100% precision on a rigged test, 19% recall") persists. The next session knows the real numbers, not the inflated ones.*
-
-### What happens once memory is running
-
-These weren't planned features. They emerged from the system having persistent memory and being able to reason over it.
+These weren't planned features. They emerged from persistent memory + reasoning tools.
 
 **The agent audited its own memory and found a bug**
 
-A user asked the agent to check whether a config file had become redundant with the memory system. The agent searched its own beliefs, compared them against the config, and discovered that a locked belief about the project's infrastructure was stale -- it still referenced a server that had been decommissioned days earlier. Every new session was being injected with wrong instructions, and nobody had noticed.
-
 ```text
-user    Clean up the config file, I think agentmemory is already
-        handling some of this stuff.
+user    Clean up the config file, I think agentmemory handles this now.
 
 agent   [searches memory, compares against config]
-        Found 2 redundant items. But also: this locked belief
-        about your server setup is stale. It references
-        infrastructure you removed. Every session is getting
-        incorrect instructions from it.
+        Found 2 redundant items. But also: this locked belief about
+        your server setup is stale -- it references infrastructure
+        you removed. Every session is getting incorrect instructions.
 
 user    Fix it.
 
@@ -137,119 +134,32 @@ agent   [corrects the belief, supersedes the old one]
         Done. Want to lock the updated version?
 ```
 
-*The system caught its own error. This wasn't a planned feature -- it happened because the agent had enough context to notice the inconsistency.*
+The system caught its own error because it had enough accumulated context to notice the inconsistency. [More examples and a full session transcript showing wonder + reason in action](docs/case-study-positioning.md).
 
-**The agent pushed back on a version number**
+---
 
-A user asked `/mem:reason "do we have enough changes since the last release to justify a v3?"` The system analyzed its own belief graph, reviewed experiment results and git history, then argued against the user's framing:
+## Under the Hood
 
-```text
-ANSWER: Not v3. v2.5.0 at most.
+Conversations are broken into individual beliefs stored in a local SQLite database. Retrieval uses full-text search, graph traversal, and vocabulary bridging -- no embeddings, no vector database, no external API calls.
 
-Evidence:
-- No breaking API changes (all new params default to neutral)
-- New features are additive layers, not architectural changes
-- Core scoring problem diagnosed but not solved
-- Intention clustering needs validation at scale
-
-What's nagging me:
-  Locked beliefs are drowning out relevant content in search
-  results. The lock boost is too aggressive relative to
-  everything else.
-
-Recommendation: Ship as v2.5.0, go deeper on retrieval quality
-before any v3 claim.
-```
-
-*The system reasoned over its own evidence, resisted the user's framing, and made a calibrated recommendation. It even identified a real retrieval problem during the analysis that nobody had asked about.*
-
-## How It Works
-
-Conversations are broken into individual beliefs stored in a local SQLite database. Each belief carries a confidence score that updates over time based on whether it helped or hurt. When the agent needs context, the system retrieves the most relevant beliefs within a fixed token budget using full-text search and graph traversal.
-
-There are no embeddings, no vector database, and no external API calls in the retrieval pipeline.
-
-### Under the Hood: What Happens When You Send a Prompt
-
-Here's a real example. The user types:
-
-```text
-push the release to github
-```
-
-Before the agent sees this message, agentmemory's hook fires and runs a 7-layer search in ~50ms:
-
-```
-Layer 0: Structural analysis
-         Task type: deployment (verbs: push)
-         Action target: github (matched "push to <target>")
-
-Layer 1: FTS5 full-text search
-         Query: "push release github"
-         Hits: 4 beliefs (publish script, remote config, CI checks, tag workflow)
-
-Layer 2: Entity expansion
-         Entity "github" -> 3 additional beliefs about repo setup
-
-Layer 3: Action-context detection
-         "push to github" matches activation_condition on 1 locked belief
-
-Layer 4: Supersession check
-         1 belief was superseded (old remote URL) -> excluded
-
-Layer 5: Recent observations
-         Correction from 2 days ago: "never push directly, use publish script"
-
-Layer 6: Cross-project shared scopes
-         Subscribed to "infra" scope -> 0 additional (already found locally)
-```
-
-The agent receives this structured context injection alongside your message:
-
-```
-AGENTMEMORY: 6 belief(s) relevant to your prompt:
-
-== OPERATIONAL STATE ==
-[!] GitHub account renamed from yoshi280 to robot-rocket-science (changed 2d ago)
-
-== STANDING CONSTRAINTS ==
-- NEVER use git push github directly. Use scripts/publish-to-github.sh
-- Pre-push hook scans for PII patterns; direct push bypasses this safety check
-- To release with tag: bash scripts/publish-to-github.sh --tag vX.Y.Z
-
-== BACKGROUND ==
-- Remote 'github' points to git@github.com:robot-rocket-science/agentmemory.git
-- CI requires lint + test + secrets check before merge to main
-```
-
-Without agentmemory, the agent would run `git push github main` and bypass every safety check. With it, the agent knows to use the publish script, knows the correct remote name, and knows about the recent rename -- all without the user having to say any of it.
+98 experiments drove every design decision. 954 tests. 5 academic benchmarks. Architecture details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 <p align="center"><img src="https://robotrocketscience.com/projects/agentmemory/obsidian-graph-full.jpg" width="600" alt="Knowledge graph visualization showing thousands of interconnected beliefs built up over weeks of use"></p>
-<p align="center"><em>The knowledge graph after a few weeks of daily use, visualized in Obsidian. Each dot is a belief. Lines are relationships (supports, contradicts, supersedes).</em></p>
+<p align="center"><em>The knowledge graph after a few weeks of daily use. Each dot is a belief. Lines are relationships (supports, contradicts, supersedes).</em></p>
 
-For the full technical deep dive: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
+---
 
-## Benchmarks
+## Compatibility
 
-agentmemory has been evaluated against 5 published academic benchmarks with protocol-correct methodology, contamination-proof isolation, and pre-registered hypotheses.
+Currently supports **Claude Code** via MCP (Model Context Protocol). The architecture is agent-agnostic -- any MCP-compatible client can use agentmemory as a memory backend.
 
-| Benchmark | Score | Context |
-|---|---|---|
-| MAB Single-Hop 262K | 92% | 2x the published GPT-4o-mini ceiling |
-| StructMemEval | 100% | Perfect state tracking (14/14) |
-| MAB Multi-Hop 262K | 58% | 8x the published 7% ceiling |
-| LongMemEval | 59.6% | Near GPT-4o pipeline (60.6%) |
-| LoCoMo | 50.8% | Multi-session dialogue reasoning |
-
-Full results, methodology, and audit trails: [docs/BENCHMARK_RESULTS.md](docs/BENCHMARK_RESULTS.md).
+---
 
 ## Documentation
 
-The full handbook is at **[docs/README.md](docs/README.md)**:
-
 - **Getting Started:** [Installation](docs/INSTALL.md) -- [Workflow](docs/WORKFLOW.md)
 - **Reference:** [Commands](docs/COMMANDS.md) -- [Obsidian Integration](docs/OBSIDIAN.md) -- [Privacy](docs/PRIVACY.md)
-- **Technical:** [Architecture](docs/ARCHITECTURE.md) -- [Benchmarks](docs/BENCHMARK_RESULTS.md) -- [Research](docs/RESEARCH_FREEZE_20260416.md)
+- **Technical:** [Architecture](docs/ARCHITECTURE.md) -- [Benchmarks](docs/BENCHMARK_RESULTS.md) -- [Case Studies](docs/case-study-positioning.md)
 
 ## Development
 

@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [3.0.1] - 2026-04-20
+
+### Changed
+- Complete README rewrite: visceral opening, install at line 10, github-push example moved above fold, killed generic before/after table, added compatibility section, added /mem:stats visibility block.
+- PyPI description updated to match new positioning.
+
 ## [3.0.0] - 2026-04-20
 
 Cross-project shared scopes and automatic update notifications. Beliefs can now
