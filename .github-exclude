@@ -1,0 +1,15 @@
+# Files and patterns that must never be pushed to GitHub.
+# Checked by scripts/publish-to-github.sh before every push.
+# Uses git pathspec patterns (same as .gitignore).
+
+# Private documents
+docs/LLC_FORMATION_DRAFT.md
+docs/*DRAFT*.md
+
+# Personal research notes (prefix convention: PRIVATE_)
+docs/PRIVATE_*.md
+research/PRIVATE_*.md
+
+# Internal infrastructure references
+**/debserver*
+**/fleet*
