@@ -19,14 +19,27 @@
 
 ## [2.3.0] - 2026-04-19
 
-### Added
-- 3-tier `lock_level` schema (none / promoted / user) replacing the binary locked flag
-- `recalibrate` wired into CLI and MCP server to deflate agent-inferred priors after the fact
-- Obsidian sync filters: `--tier` and `--max-beliefs` for selective export
-
 ### Fixed
-- Bayesian score inflation: insertion priors deflated for agent-inferred content so user-sourced beliefs retain higher confidence
-- `recalibrate_scores()` with 13 diagnostic tests to detect and correct inflated distributions
+- Bayesian score inflation: deflate insertion priors for agent-inferred content
+- Complete case-insensitive PII sanitization for public release
+- Remove diff-based guard check, fix workers PII
+- Sanitize filesystem paths in error messages
+
+### Added
+- `recalibrate_scores()` with 13 diagnostic tests for score inflation
+- 3-tier `lock_level` schema (none/promoted/user)
+- `--tier` and `--max-beliefs` filters for Obsidian sync
+- 27 acceptance tests for case studies CS-012 through CS-035
+- 25 acceptance tests for REQ-003/023/024/025/026/027
+- 181 tests for scoring, correction_detection, classification
+- 19 validation tests for open design questions
+- REQ-015/016 claims audit (20 claims, zero unverified) + LIMITATIONS.md
+
+### Changed
+- Wire `recalibrate` into CLI and MCP server
+- Close all open research questions (R2/R3/D1/D2/D3/F4/F5/C1)
+- Set `ingest.use_llm` default to False
+- Add ruff to dev dependencies for pre-commit hooks
 
 ### Security
 - Full PII sanitization sweep across tracked files ahead of public release
