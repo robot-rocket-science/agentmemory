@@ -12,6 +12,7 @@ References:
 - Pearl (1988), Probabilistic Reasoning in Intelligent Systems, Chapter 4
 - Russo & Van Roy (2018), Learning to Optimize via Information-Directed Sampling
 """
+
 from __future__ import annotations
 
 import json
@@ -56,6 +57,7 @@ def _log_beta(a: float, b: float) -> float:
 @dataclass
 class BetaAxis:
     """A single uncertainty dimension with Beta distribution parameters."""
+
     alpha: float = 1.0  # success count (1.0 = uninformative prior)
     beta_param: float = 1.0  # failure count
 
@@ -116,12 +118,15 @@ class UncertaintyVector:
     Each dimension is an independent Beta distribution. Joint entropy
     is the sum of individual entropies (independence assumption).
     """
-    axes: list[BetaAxis] = field(default_factory=lambda: [
-        BetaAxis(1.0, 1.0),  # feasibility
-        BetaAxis(1.0, 1.0),  # value
-        BetaAxis(1.0, 1.0),  # cost
-        BetaAxis(1.0, 1.0),  # dependency
-    ])
+
+    axes: list[BetaAxis] = field(
+        default_factory=lambda: [
+            BetaAxis(1.0, 1.0),  # feasibility
+            BetaAxis(1.0, 1.0),  # value
+            BetaAxis(1.0, 1.0),  # cost
+            BetaAxis(1.0, 1.0),  # dependency
+        ]
+    )
 
     @staticmethod
     def from_json(s: str) -> UncertaintyVector:
@@ -154,7 +159,9 @@ class UncertaintyVector:
             return 0.0
         return self.joint_entropy() / h_max
 
-    def update_dimension(self, dimension: int, outcome: bool, weight: float = 1.0) -> None:
+    def update_dimension(
+        self, dimension: int, outcome: bool, weight: float = 1.0
+    ) -> None:
         """Update a single dimension with new evidence."""
         if 0 <= dimension < len(self.axes):
             self.axes[dimension].update(outcome, weight)

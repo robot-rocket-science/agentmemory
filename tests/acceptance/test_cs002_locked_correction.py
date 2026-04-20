@@ -7,6 +7,7 @@ confidence reduced by a 'harmful' outcome update.
 Note: remember() no longer creates locked beliefs. Only explicit
 store.insert_belief(..., locked=True) creates locked beliefs.
 """
+
 from __future__ import annotations
 
 from agentmemory.models import (
@@ -50,11 +51,15 @@ def test_cs002_locked_belief_survives_new_session(store: MemoryStore) -> None:
     _insert_locked_belief(store)
 
     # Simulate session 1 completing.
-    session1: Session = store.create_session(model="test", project_context="agentmemory")
+    session1: Session = store.create_session(
+        model="test", project_context="agentmemory"
+    )
     store.complete_session(session1.id, summary="session 1 done")
 
     # Session 2 starts. Locked beliefs must still be present.
-    session2: Session = store.create_session(model="test", project_context="agentmemory")
+    session2: Session = store.create_session(
+        model="test", project_context="agentmemory"
+    )
     assert session2.id != session1.id
 
     locked: list[Belief] = store.get_locked_beliefs()

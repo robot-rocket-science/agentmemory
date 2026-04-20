@@ -30,6 +30,7 @@ from typing import TypedDict
 # Type definitions
 # ---------------------------------------------------------------------------
 
+
 class CommitRecord(TypedDict):
     hash: str
     date: str
@@ -124,6 +125,7 @@ ISSUE_REF_PATTERN: re.Pattern[str] = re.compile(
 # Git interaction (batched)
 # ---------------------------------------------------------------------------
 
+
 def _run_git(repo: Path, args: list[str], timeout: int = 300) -> str:
     """Run a git command and return stdout. Raises on failure."""
     result: subprocess.CompletedProcess[str] = subprocess.run(
@@ -178,15 +180,17 @@ def parse_git_log(repo: Path) -> list[CommitRecord]:
             if stripped and not stripped.startswith("\x01"):
                 files.append(stripped)
 
-        commits.append(CommitRecord(
-            hash=hash_val,
-            date=date,
-            author=author,
-            subject=subject,
-            body=body,
-            files=files,
-            parent_count=parent_count,
-        ))
+        commits.append(
+            CommitRecord(
+                hash=hash_val,
+                date=date,
+                author=author,
+                subject=subject,
+                body=body,
+                files=files,
+                parent_count=parent_count,
+            )
+        )
 
     return commits
 
@@ -201,7 +205,9 @@ def extract_branches(repo: Path, commit_hashes: list[str]) -> dict[str, list[str
     """
     # Get all local branches
     raw_branches: str = _run_git(repo, ["branch", "--format=%(refname:short)"])
-    branch_names: list[str] = [b.strip() for b in raw_branches.strip().split("\n") if b.strip()]
+    branch_names: list[str] = [
+        b.strip() for b in raw_branches.strip().split("\n") if b.strip()
+    ]
 
     if not branch_names:
         return {}
@@ -220,7 +226,8 @@ def extract_branches(repo: Path, commit_hashes: list[str]) -> dict[str, list[str
             continue
 
         hashes: list[str] = [
-            h.strip() for h in raw_log.strip().split("\n")
+            h.strip()
+            for h in raw_log.strip().split("\n")
             if h.strip() and h.strip() in hash_set
         ]
         branch_commits[branch] = hashes
@@ -231,6 +238,7 @@ def extract_branches(repo: Path, commit_hashes: list[str]) -> dict[str, list[str
 # ---------------------------------------------------------------------------
 # Filtering
 # ---------------------------------------------------------------------------
+
 
 def _is_trivial_file(filepath: str) -> bool:
     """Check if a file matches trivial/noise patterns."""
@@ -293,6 +301,7 @@ def filter_commits(
 # ---------------------------------------------------------------------------
 # Edge and belief extraction
 # ---------------------------------------------------------------------------
+
 
 def extract_issue_refs(text: str) -> list[str]:
     """Extract issue references like #123 from text."""
@@ -361,15 +370,17 @@ def build_intent_edges(
     for pair, weight in pair_count.most_common():
         if weight < min_weight:
             continue
-        edges.append(IntentEdge(
-            source=pair[0],
-            target=pair[1],
-            weight=weight,
-            commit_messages=pair_messages[pair],
-            issue_refs=sorted(pair_issues[pair]),
-            first_seen=pair_first[pair],
-            last_seen=pair_last[pair],
-        ))
+        edges.append(
+            IntentEdge(
+                source=pair[0],
+                target=pair[1],
+                weight=weight,
+                commit_messages=pair_messages[pair],
+                issue_refs=sorted(pair_issues[pair]),
+                first_seen=pair_first[pair],
+                last_seen=pair_last[pair],
+            )
+        )
 
     return edges
 
@@ -390,13 +401,15 @@ def build_belief_nodes(commits: list[CommitRecord]) -> list[BeliefNode]:
 
         # Use subject as the primary belief assertion.
         # Body sentences are additional context but the subject is the intent.
-        nodes.append(BeliefNode(
-            commit=commit["hash"][:12],
-            date=commit["date"][:10],
-            message=commit["subject"],
-            files_touched=commit["files"],
-            issue_refs=issues,
-        ))
+        nodes.append(
+            BeliefNode(
+                commit=commit["hash"][:12],
+                date=commit["date"][:10],
+                message=commit["subject"],
+                files_touched=commit["files"],
+                issue_refs=issues,
+            )
+        )
 
     return nodes
 
@@ -418,9 +431,7 @@ def build_branch_info(
     for branch_name, commit_hashes in branch_commits.items():
         if not commit_hashes:
             continue
-        dates: list[str] = [
-            date_by_hash[h] for h in commit_hashes if h in date_by_hash
-        ]
+        dates: list[str] = [date_by_hash[h] for h in commit_hashes if h in date_by_hash]
         if not dates:
             continue
         sorted_dates: list[str] = sorted(dates)
@@ -435,6 +446,7 @@ def build_branch_info(
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser: argparse.ArgumentParser = argparse.ArgumentParser(
@@ -463,7 +475,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="append",
         default=None,
         help="Regex pattern for commit messages to skip (repeatable). "
-             "Replaces defaults if provided.",
+        "Replaces defaults if provided.",
     )
     return parser
 
@@ -527,9 +539,7 @@ def main() -> None:
     # Summary stats
     files_per_commit: list[int] = [len(c["files"]) for c in filtered if c["files"]]
     avg_files: float = (
-        sum(files_per_commit) / len(files_per_commit)
-        if files_per_commit
-        else 0.0
+        sum(files_per_commit) / len(files_per_commit) if files_per_commit else 0.0
     )
     weights: list[int] = [e["weight"] for e in edges]
     avg_weight: float = sum(weights) / len(weights) if weights else 0.0

@@ -3,6 +3,7 @@
 Pass criterion: rigor_tier metadata is preserved through insert and retrieval,
 allowing consumers to distinguish validated findings from unvalidated ones.
 """
+
 from __future__ import annotations
 
 from agentmemory.models import (
@@ -20,7 +21,10 @@ def test_cs008_rigor_tier_preserved_in_retrieval(store: MemoryStore) -> None:
     tiers: list[tuple[str, str]] = [
         ("hypothesis", "HRR binding may improve retrieval recall"),
         ("simulated", "HRR binding simulated on 500 synthetic queries, 0.82 recall"),
-        ("empirically_tested", "HRR binding tested on live agentmemory traffic, 0.79 recall"),
+        (
+            "empirically_tested",
+            "HRR binding tested on live agentmemory traffic, 0.79 recall",
+        ),
     ]
     inserted: dict[str, str] = {}  # id -> expected tier
     for tier, content in tiers:
@@ -55,7 +59,10 @@ def test_cs008_mixed_rigor_distinguishable(store: MemoryStore) -> None:
         ("hypothesis", "Proposed: event sourcing for belief history"),
         ("hypothesis", "Proposed: CRDT merge for multi-agent beliefs"),
         ("simulated", "Simulated: event sourcing handles 10k beliefs in 200ms"),
-        ("empirically_tested", "Tested: CRDT merge on 2 agents, 0 conflicts in 50 runs"),
+        (
+            "empirically_tested",
+            "Tested: CRDT merge on 2 agents, 0 conflicts in 50 runs",
+        ),
         ("validated", "Validated: FTS5 search latency under 5ms on 10k beliefs"),
     ]
     for tier, content in entries:

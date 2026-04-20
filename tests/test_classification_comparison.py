@@ -11,6 +11,7 @@ Key findings from gap analysis:
   requirement, but also fires on headings like "Requirements Validated"
 - LLM is strictly superior for persist/type classification
 """
+
 from __future__ import annotations
 
 import json

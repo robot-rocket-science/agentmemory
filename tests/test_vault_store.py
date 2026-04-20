@@ -1,4 +1,5 @@
 """Tests for VaultStore: vault-first storage with SQLite index."""
+
 from __future__ import annotations
 
 from collections.abc import Generator

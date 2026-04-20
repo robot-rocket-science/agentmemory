@@ -3,6 +3,7 @@
 Pass criterion: TESTS edges enable coverage gap detection -- files without
 incoming TESTS edges are identifiable as untested.
 """
+
 from __future__ import annotations
 
 from agentmemory.store import MemoryStore

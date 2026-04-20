@@ -11,6 +11,7 @@ Metrics:
   - Session duration (first turn to last turn)
   - Output density: commits per hour of session time
 """
+
 from __future__ import annotations
 
 import json
@@ -30,14 +31,38 @@ ARCHIVE_DIR = LOG_DIR / "archive"
 REPO_DIR = Path(__file__).resolve().parent.parent
 CHARS_PER_TOKEN = 4  # conservative estimate
 CORRECTION_MARKERS: list[str] = [
-    "no,", "no ", "don't", "stop", "wrong", "incorrect", "not that",
-    "actually,", "actually ", "i said", "i meant", "that's not",
-    "you should", "correction:", "fix that", "undo that",
+    "no,",
+    "no ",
+    "don't",
+    "stop",
+    "wrong",
+    "incorrect",
+    "not that",
+    "actually,",
+    "actually ",
+    "i said",
+    "i meant",
+    "that's not",
+    "you should",
+    "correction:",
+    "fix that",
+    "undo that",
 ]
 POSITIVE_MARKERS: list[str] = [
-    "good", "perfect", "great", "yes", "correct", "exactly",
-    "nice", "thanks", "thank you", "looks good", "ship it",
-    "do it", "go ahead", "proceed",
+    "good",
+    "perfect",
+    "great",
+    "yes",
+    "correct",
+    "exactly",
+    "nice",
+    "thanks",
+    "thank you",
+    "looks good",
+    "ship it",
+    "do it",
+    "go ahead",
+    "proceed",
 ]
 
 
@@ -102,7 +127,9 @@ class Commit:
             return "test"
         if any(w in s for w in ("doc", "readme", "comment", "clarif")):
             return "docs"
-        if any(w in s for w in ("refactor", "rename", "clean", "remove", "delete", "split")):
+        if any(
+            w in s for w in ("refactor", "rename", "clean", "remove", "delete", "split")
+        ):
             return "refactor"
         if any(w in s for w in ("update", "upgrade", "bump")):
             return "update"
@@ -131,7 +158,9 @@ class SessionMetrics:
         sorted_turns = sorted(self.turns, key=lambda t: t.timestamp)
         active = 0.0
         for i in range(1, len(sorted_turns)):
-            gap = (sorted_turns[i].timestamp - sorted_turns[i - 1].timestamp).total_seconds()
+            gap = (
+                sorted_turns[i].timestamp - sorted_turns[i - 1].timestamp
+            ).total_seconds()
             if gap < 1800:  # 30 min threshold
                 active += gap
         return max(1.0, active / 60.0)
@@ -217,13 +246,15 @@ def load_turns() -> list[Turn]:
                 ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
             except ValueError:
                 continue
-            turns.append(Turn(
-                timestamp=ts,
-                event=d.get("event", ""),
-                session_id=d.get("session_id", ""),
-                text=d.get("text", ""),
-                cwd=d.get("cwd", ""),
-            ))
+            turns.append(
+                Turn(
+                    timestamp=ts,
+                    event=d.get("event", ""),
+                    session_id=d.get("session_id", ""),
+                    text=d.get("text", ""),
+                    cwd=d.get("cwd", ""),
+                )
+            )
 
     turns.sort(key=lambda t: t.timestamp)
     return turns
@@ -233,7 +264,9 @@ def load_commits(since: str = "2026-04-11") -> list[Commit]:
     """Load git commits from the repo."""
     result = subprocess.run(
         ["git", "log", f"--since={since}", "--format=%H|%aI|%s", "--all"],
-        capture_output=True, text=True, cwd=REPO_DIR,
+        capture_output=True,
+        text=True,
+        cwd=REPO_DIR,
     )
     commits: list[Commit] = []
     for line in result.stdout.strip().splitlines():
@@ -314,9 +347,7 @@ def repeated_corrections(turns: list[Turn]) -> list[tuple[str, int]]:
                     word_session_count[word].add(sid)
 
     repeated = [
-        (word, len(sids))
-        for word, sids in word_session_count.items()
-        if len(sids) >= 2
+        (word, len(sids)) for word, sids in word_session_count.items() if len(sids) >= 2
     ]
     repeated.sort(key=lambda x: -x[1])
     return repeated[:15]
@@ -330,16 +361,23 @@ def print_report(
 ) -> None:
     # Filter to agentmemory sessions only
     am_sessions = {
-        sid: sm for sid, sm in sessions.items()
+        sid: sm
+        for sid, sm in sessions.items()
         if any("agentmemory" in t.cwd for t in sm.turns)
     }
 
     print("=" * 78)
     print("AGENTMEMORY SESSION CORRELATION REPORT")
-    print(f"Period: {commits[0].timestamp.strftime('%Y-%m-%d')} to "
-          f"{commits[-1].timestamp.strftime('%Y-%m-%d')}" if commits else "No commits")
-    print(f"Data: {len(turns)} conversation turns, {len(commits)} commits, "
-          f"{len(am_sessions)} agentmemory sessions")
+    print(
+        f"Period: {commits[0].timestamp.strftime('%Y-%m-%d')} to "
+        f"{commits[-1].timestamp.strftime('%Y-%m-%d')}"
+        if commits
+        else "No commits"
+    )
+    print(
+        f"Data: {len(turns)} conversation turns, {len(commits)} commits, "
+        f"{len(am_sessions)} agentmemory sessions"
+    )
     print("=" * 78)
 
     # --- Aggregate metrics ---
@@ -355,15 +393,25 @@ def print_report(
     total_wall = sum(sm.duration_minutes for sm in am_sessions.values())
 
     print(f"  Sessions:            {len(am_sessions)}")
-    print(f"  Active time:         {format_duration(total_active)} (wall: {format_duration(total_wall)})")
+    print(
+        f"  Active time:         {format_duration(total_active)} (wall: {format_duration(total_wall)})"
+    )
     print(f"  User turns:          {total_user}")
     print(f"  Assistant turns:     {total_asst}")
     print(f"  Est. tokens in:      {total_tok_in:,}")
     print(f"  Est. tokens out:     {total_tok_out:,}")
-    print(f"  Corrections:         {total_corrections} "
-          f"({total_corrections/total_user*100:.1f}% of user turns)" if total_user else "")
-    print(f"  Positive signals:    {total_positives} "
-          f"({total_positives/total_user*100:.1f}% of user turns)" if total_user else "")
+    print(
+        f"  Corrections:         {total_corrections} "
+        f"({total_corrections / total_user * 100:.1f}% of user turns)"
+        if total_user
+        else ""
+    )
+    print(
+        f"  Positive signals:    {total_positives} "
+        f"({total_positives / total_user * 100:.1f}% of user turns)"
+        if total_user
+        else ""
+    )
     print(f"  Commits attributed:  {total_commits_attr} / {len(commits)}")
     print(f"  Commits unattributed:{len(unattributed)}")
 
@@ -379,23 +427,29 @@ def print_report(
 
     # --- Per-session table ---
     print("\n## PER-SESSION METRICS\n")
-    print(f"  {'Session ID':<12} {'Active':>8} {'Turns':>6} {'Corr':>5} "
-          f"{'Pos':>5} {'Commits':>7} {'Comm/hr':>8} {'TokOut':>8} {'Date':>11}")
-    print(f"  {'-'*12} {'-'*8} {'-'*6} {'-'*5} {'-'*5} {'-'*7} {'-'*8} {'-'*8} {'-'*11}")
+    print(
+        f"  {'Session ID':<12} {'Active':>8} {'Turns':>6} {'Corr':>5} "
+        f"{'Pos':>5} {'Commits':>7} {'Comm/hr':>8} {'TokOut':>8} {'Date':>11}"
+    )
+    print(
+        f"  {'-' * 12} {'-' * 8} {'-' * 6} {'-' * 5} {'-' * 5} {'-' * 7} {'-' * 8} {'-' * 8} {'-' * 11}"
+    )
 
     sorted_sessions = sorted(am_sessions.values(), key=lambda s: s.start)
     for sm in sorted_sessions:
         if sm.user_turns < 2:
             continue  # skip trivial sessions
-        print(f"  {sm.session_id[:12]} "
-              f"{format_duration(sm.active_minutes):>8} "
-              f"{len(sm.turns):>6} "
-              f"{sm.corrections:>5} "
-              f"{sm.positives:>5} "
-              f"{len(sm.commits):>7} "
-              f"{sm.commits_per_hour:>8.1f} "
-              f"{sm.estimated_tokens_out:>8,} "
-              f"{sm.start.strftime('%m-%d %H:%M'):>11}")
+        print(
+            f"  {sm.session_id[:12]} "
+            f"{format_duration(sm.active_minutes):>8} "
+            f"{len(sm.turns):>6} "
+            f"{sm.corrections:>5} "
+            f"{sm.positives:>5} "
+            f"{len(sm.commits):>7} "
+            f"{sm.commits_per_hour:>8.1f} "
+            f"{sm.estimated_tokens_out:>8,} "
+            f"{sm.start.strftime('%m-%d %H:%M'):>11}"
+        )
 
     # --- Commit attribution detail ---
     print("\n## COMMIT ATTRIBUTION (session -> commits)\n")
@@ -403,7 +457,9 @@ def print_report(
         if not sm.commits:
             continue
         cats = sm.commit_categories
-        cat_str = ", ".join(f"{v} {k}" for k, v in sorted(cats.items(), key=lambda x: -x[1]))
+        cat_str = ", ".join(
+            f"{v} {k}" for k, v in sorted(cats.items(), key=lambda x: -x[1])
+        )
         print(f"  {sm.session_id[:12]} ({cat_str}):")
         for c in sorted(sm.commits, key=lambda x: x.timestamp):
             print(f"    {c.hash} [{c.category:8s}] {c.subject[:65]}")
@@ -417,19 +473,27 @@ def print_report(
         if sm.user_turns >= 2:
             by_date[sm.start.strftime("%Y-%m-%d")].append(sm)
 
-    print(f"  {'Date':<12} {'Sessions':>8} {'Avg Turns':>10} {'Avg Corr%':>10} "
-          f"{'Commits':>8} {'AvgActive':>10} {'Avg TokOut':>10}")
-    print(f"  {'-'*12} {'-'*8} {'-'*10} {'-'*10} {'-'*8} {'-'*10} {'-'*10}")
+    print(
+        f"  {'Date':<12} {'Sessions':>8} {'Avg Turns':>10} {'Avg Corr%':>10} "
+        f"{'Commits':>8} {'AvgActive':>10} {'Avg TokOut':>10}"
+    )
+    print(
+        f"  {'-' * 12} {'-' * 8} {'-' * 10} {'-' * 10} {'-' * 8} {'-' * 10} {'-' * 10}"
+    )
     for date in sorted(by_date):
         day_sessions = by_date[date]
         avg_turns = sum(len(s.turns) for s in day_sessions) / len(day_sessions)
-        avg_corr = sum(s.correction_rate for s in day_sessions) / len(day_sessions) * 100
+        avg_corr = (
+            sum(s.correction_rate for s in day_sessions) / len(day_sessions) * 100
+        )
         total_day_commits = sum(len(s.commits) for s in day_sessions)
         avg_active = sum(s.active_minutes for s in day_sessions) / len(day_sessions)
         avg_tok = sum(s.estimated_tokens_out for s in day_sessions) / len(day_sessions)
-        print(f"  {date:<12} {len(day_sessions):>8} {avg_turns:>10.1f} "
-              f"{avg_corr:>9.1f}% {total_day_commits:>8} "
-              f"{format_duration(avg_active):>10} {avg_tok:>10,.0f}")
+        print(
+            f"  {date:<12} {len(day_sessions):>8} {avg_turns:>10.1f} "
+            f"{avg_corr:>9.1f}% {total_day_commits:>8} "
+            f"{format_duration(avg_active):>10} {avg_tok:>10,.0f}"
+        )
 
     # --- Repeated corrections ---
     print("\n## REPEATED CORRECTION KEYWORDS (across 2+ sessions)\n")
@@ -444,8 +508,10 @@ def print_report(
     if unattributed:
         print(f"\n## UNATTRIBUTED COMMITS ({len(unattributed)})\n")
         for c in unattributed[:20]:
-            print(f"  {c.hash} {c.timestamp.strftime('%m-%d %H:%M')} "
-                  f"[{c.category}] {c.subject[:60]}")
+            print(
+                f"  {c.hash} {c.timestamp.strftime('%m-%d %H:%M')} "
+                f"[{c.category}] {c.subject[:60]}"
+            )
 
     print("\n" + "=" * 78)
 
@@ -473,7 +539,9 @@ def main() -> None:
     print(f"  {len(sessions)} unique sessions")
     print("Attributing commits to sessions ...")
     unattributed = attribute_commits(sessions, commits)
-    print(f"  {len(commits) - len(unattributed)} attributed, {len(unattributed)} unattributed\n")
+    print(
+        f"  {len(commits) - len(unattributed)} attributed, {len(unattributed)} unattributed\n"
+    )
 
     print_report(sessions, commits, unattributed, turns)
 
