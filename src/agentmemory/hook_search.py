@@ -520,9 +520,16 @@ def score_belief(
         if any(w.lower() in content_lower_c for w in query_words):
             correction_boost = CORRECTION_BOOST
 
-    # Type/source weights
-    tw: float = TYPE_WEIGHTS.get(btype, 1.0)
-    sw: float = SOURCE_WEIGHTS.get(src, 1.0)
+    # Type/source weights -- relevance-gated (Exp 95).
+    # Without gating, correction (2.0) * user_corrected (1.5) = 3.0x compound
+    # boost drowns relevant unlocked content. Interpolate weight by query overlap.
+    raw_tw: float = TYPE_WEIGHTS.get(btype, 1.0)
+    raw_sw: float = SOURCE_WEIGHTS.get(src, 1.0)
+    content_for_rel: str = (row["content"] or "").lower()
+    relevant_terms: int = sum(1 for w in query_words if w.lower() in content_for_rel)
+    rel_ratio: float = relevant_terms / max(1, len(query_words))
+    tw: float = 1.0 + (raw_tw - 1.0) * rel_ratio
+    sw: float = 1.0 + (raw_sw - 1.0) * rel_ratio
 
     # Recency boost
     recency: float = 1.0
@@ -918,11 +925,13 @@ def search_for_prompt(
         try:
             cluster_rows: list[sqlite3.Row] = db.execute(
                 f"""SELECT DISTINCT b.* FROM belief_clusters bc
-                    JOIN belief_clusters bc2 ON bc2.cluster_id = bc.cluster_id
-                    JOIN beliefs b ON b.id = bc2.belief_id
-                    WHERE bc.belief_id IN ({ph_cl})
-                      AND b.valid_to IS NULL
-                      AND b.id NOT IN ({ph_cl})
+                    JOIN beliefs b ON b.id = bc.belief_id
+                    WHERE bc.cluster_id IN (
+                        SELECT cluster_id FROM belief_clusters
+                        WHERE belief_id IN ({ph_cl})
+                    )
+                    AND b.valid_to IS NULL
+                    AND b.id NOT IN ({ph_cl})
                     ORDER BY b.confidence DESC
                     LIMIT 5""",
                 fts_cluster_ids + fts_cluster_ids,

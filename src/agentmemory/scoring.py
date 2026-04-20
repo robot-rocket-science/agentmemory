@@ -333,9 +333,21 @@ def score_belief(
     decay: float = decay_factor(belief, current_time_iso)
     boost: float = lock_boost_typed(belief, query_terms)
     sample: float = thompson_sample(belief.alpha, belief.beta_param)
-    type_w: float = _TYPE_WEIGHTS.get(belief.belief_type, 1.0)
-    source_w: float = _SOURCE_WEIGHTS.get(belief.source_type, 1.0)
     recency: float = recency_boost(belief, current_time_iso)
+
+    # Relevance-gated type/source weights (Exp 95).
+    # Without gating, correction (2.0) * user_corrected (1.5) = 3.0x compound
+    # boost that drowns relevant unlocked content. Gate the boost by query
+    # overlap: full weight when content matches the query, attenuated when not.
+    raw_type_w: float = _TYPE_WEIGHTS.get(belief.belief_type, 1.0)
+    raw_source_w: float = _SOURCE_WEIGHTS.get(belief.source_type, 1.0)
+    content_lower: str = belief.content.lower()
+    relevant_terms: int = sum(1 for t in query_terms if t.lower() in content_lower)
+    relevance_ratio: float = relevant_terms / max(1, len(query_terms))
+    # Interpolate: at 0% relevance, weights collapse to 1.0 (no boost).
+    # At 100% relevance, full type/source weights apply.
+    type_w: float = 1.0 + (raw_type_w - 1.0) * relevance_ratio
+    source_w: float = 1.0 + (raw_source_w - 1.0) * relevance_ratio
 
     # Track exploration vs exploitation for instrumentation.
     unc: float = uncertainty_score(belief.alpha, belief.beta_param)
