@@ -24,7 +24,7 @@ The retrieval pipeline also uses [information-theoretic scoring](https://en.wiki
 
 ## Why Files Aren't Enough
 
-Every power user of AI coding agents independently converges on the same workaround: externalize state into markdown files. A config file for rules. A state file for current position. A roadmap for what's next. A decisions log for rationale. Runbooks for procedures. Cross-references linking them all together.
+Power users of AI coding agents independently converge on the same workaround: externalize state into markdown files. A config file for rules. A state file for current position. A roadmap for what's next. A decisions log for rationale. Runbooks for procedures. Cross-references linking them all together.
 
 This works until it doesn't. The failure modes are predictable:
 

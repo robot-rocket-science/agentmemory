@@ -13,3 +13,9 @@ research/PRIVATE_*.md
 # Internal infrastructure references
 **/debserver*
 **/fleet*
+
+# Dev-only config files (not needed on public repo)
+TODO.md
+CLAUDE.md
+.mcp.json
+.github-exclude
