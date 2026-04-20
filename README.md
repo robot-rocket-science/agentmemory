@@ -14,7 +14,7 @@ Every time you start a new session with an AI coding agent, it forgets everythin
 
 *"Use uv, not pip." "I told you, we're using PostgreSQL." "Stop adding co-author lines to commits."*
 
-<p align="center"><img src="docs/images/cartoons/01-no-implementation.png" width="480" alt="Comic: user says 'no implementation, we're in research.' Agent says 'got it!' Next session: 'Ready to implement?' User: 'I TOLD YOU. TWICE.' Agent: '...three times, actually!'"></p>
+<p align="center"><img src="https://robotrocketscience.com/projects/agentmemory/comics/01-no-implementation-cs002cs006.png" width="480" alt="Comic: user says 'no implementation, we're in research.' Agent says 'got it!' Next session: 'Ready to implement?' User: 'I TOLD YOU. TWICE.' Agent: '...three times, actually!'"></p>
 
 **agentmemory makes that stop.** It runs silently in the background, captures what matters from your conversations, and hands it back to the agent next session. You correct once. It sticks.
 
@@ -30,8 +30,8 @@ Every time you start a new session with an AI coding agent, it forgets everythin
 
 ## Your Data Stays Yours
 
-- **100% local.** Everything lives in a SQLite file on your machine. Nothing leaves your computer.
-- **No cloud, no accounts, no telemetry.** There is no server, no signup, and no tracking.
+- **100% local.** Everything lives in a SQLite file on your machine. Nothing is sent anywhere.
+- **No cloud, no accounts.** There is no server, no signup. Optional anonymous telemetry exists but is disabled by default and only collects counts, never content.
 - **No GPU or vector database required.** It runs on any machine that runs Python.
 - **Two commands to install.** Nothing else to configure.
 
@@ -64,7 +64,7 @@ agent   Oh. Found them.
 
 AI agents love to report impressive-sounding metrics. Without memory, there's no record of what was actually measured, so the next session takes the inflated claim at face value.
 
-<p align="center"><img src="docs/images/cartoons/06-big-numbers.png" width="420" alt="Comic: agent reports 100% precision. User asks: on what exactly? Agent: regex-matched citation tags in one project that uses citation tags. User: and the recall? Agent: ...19%"></p>
+<p align="center"><img src="https://robotrocketscience.com/projects/agentmemory/comics/05-big-numbers-cs008.png" width="420" alt="Comic: agent reports 100% precision. User asks: on what exactly? Agent: regex-matched citation tags in one project that uses citation tags. User: and the recall? Agent: ...19%"></p>
 
 The user had to ask: *"How many hours of work is that?"* The agent checked the session logs. Two and a half hours. Not the months of deep research the status report implied.
 
@@ -182,7 +182,7 @@ Conversations are broken into individual beliefs stored in a local SQLite databa
 
 There are no embeddings, no vector database, and no external API calls in the retrieval pipeline.
 
-<p align="center"><img src="docs/images/obsidian-graph-full.jpg" width="600" alt="Knowledge graph visualization showing thousands of interconnected beliefs built up over weeks of use"></p>
+<p align="center"><img src="https://robotrocketscience.com/projects/agentmemory/obsidian-graph-full.jpg" width="600" alt="Knowledge graph visualization showing thousands of interconnected beliefs built up over weeks of use"></p>
 <p align="center"><em>The knowledge graph after a few weeks of daily use, visualized in Obsidian. Each dot is a belief. Lines are relationships (supports, contradicts, supersedes).</em></p>
 
 For the full technical deep dive: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
