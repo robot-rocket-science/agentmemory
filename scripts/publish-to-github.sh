@@ -38,31 +38,25 @@ if [ -n "$TAG" ]; then
 fi
 echo ""
 
-# Check for files that should not be on GitHub
+# Collect files that should not be on GitHub
 EXCLUDE_FILE=".github-exclude"
+EXCLUDED_FILES=""
 if [ -f "$EXCLUDE_FILE" ]; then
     echo "Checking .github-exclude..."
-    VIOLATIONS=""
     while IFS= read -r pattern; do
-        # Skip comments and blank lines
         [[ "$pattern" =~ ^#.*$ || -z "$pattern" ]] && continue
         MATCHES=$(git ls-files -- "$pattern" 2>/dev/null || true)
         if [ -n "$MATCHES" ]; then
-            VIOLATIONS="${VIOLATIONS}${MATCHES}\n"
+            EXCLUDED_FILES="${EXCLUDED_FILES}${MATCHES}"$'\n'
         fi
     done < "$EXCLUDE_FILE"
 
-    if [ -n "$VIOLATIONS" ]; then
-        echo ""
-        echo "BLOCKED: Files matching .github-exclude are tracked:"
-        echo -e "$VIOLATIONS" | head -20
-        echo ""
-        echo "Remove them from git tracking before publishing:"
-        echo "  git rm --cached <file>"
-        echo "  git commit -m 'chore: remove private files from tracking'"
-        exit 1
+    if [ -n "$EXCLUDED_FILES" ]; then
+        COUNT=$(echo "$EXCLUDED_FILES" | grep -c . || true)
+        echo "  $COUNT file(s) will be excluded from GitHub push."
+    else
+        echo "  No excluded files found in tracked tree."
     fi
-    echo "  No excluded files found in tracked tree."
 fi
 
 # Show what will be pushed
@@ -87,8 +81,26 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 0
 fi
 
+# If there are excluded files, create a temporary filtered commit for the push
+NEEDS_RESET=false
+if [ -n "$EXCLUDED_FILES" ]; then
+    echo "Creating filtered commit (excluding private files)..."
+    echo "$EXCLUDED_FILES" | while IFS= read -r f; do
+        [ -n "$f" ] && git rm --cached -q "$f" 2>/dev/null || true
+    done
+    git commit -q -m "chore: filtered publish (excluded files removed)" --allow-empty
+    NEEDS_RESET=true
+fi
+
 # Push (pre-push hook will run PII scan automatically)
 git push "$REMOTE" "$BRANCH"
+
+# Reset the temporary commit so excluded files are tracked again for origin
+if [ "$NEEDS_RESET" = true ]; then
+    echo "Restoring excluded files to local tracking..."
+    git reset -q HEAD~1
+    git checkout -q -- .
+fi
 
 if [ -n "$TAG" ]; then
     git tag "$TAG"
