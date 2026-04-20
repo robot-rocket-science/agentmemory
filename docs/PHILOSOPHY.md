@@ -22,6 +22,24 @@ Every belief in agentmemory carries a confidence score updated through [Bayesian
 
 The retrieval pipeline also uses [information-theoretic scoring](https://en.wikipedia.org/wiki/Information_theory) to decide what context to inject. With a fixed context budget per prompt, the system selects beliefs that maximize relevance while minimizing redundancy, a practical application of [rate-distortion theory](https://en.wikipedia.org/wiki/Rate%E2%80%93distortion_theory).
 
+## Why Files Aren't Enough
+
+Every power user of AI coding agents independently converges on the same workaround: externalize state into markdown files. A config file for rules. A state file for current position. A roadmap for what's next. A decisions log for rationale. Runbooks for procedures. Cross-references linking them all together.
+
+This works until it doesn't. The failure modes are predictable:
+
+**The agent reads but doesn't follow.** You write "always use the publish script, never push directly." The agent reads it, acknowledges it, and runs `git push` anyway. The rule was in the file. The file was in the context. The agent treated it as a suggestion.
+
+**Cross-references break silently.** You write "see `docs/deploy-runbook.md` for deployment steps." The agent skips the reference entirely, or reads the wrong section, or reads it but loses it after compaction. You don't find out until something breaks in production.
+
+**Manual state rots.** State files require discipline to maintain. One missed update after a decision, one forgotten correction, one stale cross-reference, and downstream sessions operate on incomplete context. There's no integrity check. The chain is only as strong as the human maintaining it.
+
+**The files multiply.** What starts as one config file becomes 5, then 10, then 47 across your projects. Each new failure mode gets a new file. Each new file gets a new cross-reference. The overhead compounds.
+
+agentmemory was built out of frustration with this pattern. The insight: the problem isn't organization. It's that the entire approach relies on the agent to *voluntarily* read the right file, at the right time, and follow what it says. That's a convention enforced by documentation, not a mechanism.
+
+The fix is mechanical injection. agentmemory doesn't ask the agent to find context. It finds the context itself (7-layer search, ~50ms) and injects it directly into the prompt. The agent never has to remember to check a file, follow a cross-reference, or maintain state. The knowledge is already there.
+
 ## Why Local-Only Matters
 
 Your corrections, preferences, and project decisions are yours. They live in a SQLite database on your machine. No cloud sync, no telemetry, no API calls in the retrieval path. This isn't just a privacy feature. It's a design constraint that forces the system to be fast (retrieval completes in ~50ms) and reliable (no network dependency means no outages).

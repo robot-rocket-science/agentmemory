@@ -78,6 +78,23 @@ Last locked: "never force-push to main" (4 weeks ago)
 
 ---
 
+## The Problem Is Bigger Than You Think
+
+Most power users end up building the same workaround: a growing collection of markdown files. `STATE.md` for current position. `ROADMAP.md` for what's next. `DECISIONS.md` for why you stopped doing it that way. Cross-references in your config file pointing to runbooks, registries, and troubleshooting guides. Some projects have 7+ mandatory external reads the agent is *supposed* to follow.
+
+Every cross-reference is a bet. You write "see `docs/deploy-runbook.md` for deployment steps" and hope the agent actually reads it, finds the right section, and follows it. When it doesn't (and it often doesn't), you get silent failures: re-suggested dead approaches, guessed credentials, skipped safety checks.
+
+agentmemory replaces that entire chain with a **mechanism**. Relevant context is found through a 7-layer search and injected *as part of your prompt* before the agent sees it. The agent doesn't have to remember to check a file. It doesn't have to follow a cross-reference. The knowledge is already there, selected by relevance, every time.
+
+| Manual approach | What breaks | agentmemory |
+|---|---|---|
+| Rules in config files | Agent reads them, doesn't follow them | Injected per-prompt, not per-session |
+| Cross-references to docs | Agent skips the reference or reads the wrong section | Relevant content extracted and injected directly |
+| State files updated by hand | One missed update and the chain is broken | State tracked automatically with [100% accuracy](docs/BENCHMARK_RESULTS.md) |
+| Workaround frameworks | Add structure but still rely on the agent to voluntarily read files in the right order | No voluntary reads. Mechanical injection. |
+
+---
+
 ## Your Data Stays Yours
 
 - **100% local.** SQLite on your machine. No network calls in the retrieval pipeline.
