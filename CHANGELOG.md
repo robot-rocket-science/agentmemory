@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-04-20
+
+Cross-project shared scopes and automatic update notifications. Beliefs can now
+flow between projects without data duplication, and users get notified when a
+newer version is available.
+
+### Added
+- `shared_scopes.py`: cross-project belief sharing via SQLite ATTACH federation. Separate DB per scope under `~/.agentmemory/shared/{scope}/`. Content-hash dedup prevents duplicates.
+- 2 new MCP tools: `share_belief` (copy belief to a shared scope), `manage_scopes` (list/subscribe/unsubscribe/create scopes)
+- Hook search Layer 6: automatically queries subscribed shared scopes with budget 3 per scope (Exp 98 Config B)
+- `update_check.py`: PyPI version check with 24-hour file cache, 2-second timeout, silent on failure
+- SessionStart hook integration: shows "Update available: vX.Y.Z -> vA.B.C" when outdated
+- README "Under the Hood" section: real example of 7-layer search pipeline and 4-zone context injection
+- Exp 97: cross-project retrieval via ATTACH (100% recall, 0% top-5 contamination, 1.06x latency)
+- Exp 98: scope-aware scoring comparison (4 configs; Config B 12/3 wins)
+- 19 new tests in test_shared_scopes.py
+
+### Fixed
+- README benchmark table: added missing LoCoMo (50.8%) entry
+- README layer count: corrected "6-layer" to "7-layer" after Layer 6 addition
+
 ## [2.5.0] - 2026-04-20
 
 Retrieval quality overhaul: beliefs that answer the question now outrank beliefs

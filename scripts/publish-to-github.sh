@@ -98,11 +98,11 @@ if [ -n "$TAG" ]; then
 
     # Create GitHub Release from CHANGELOG entry
     echo "Creating GitHub Release..."
-    CHANGELOG_ENTRY=$(sed -n "/^## \[$TAG\]/,/^## \[/p" CHANGELOG.md 2>/dev/null | head -n -1)
+    CHANGELOG_ENTRY=$(sed -n "/^## \[$TAG\]/,/^## \[/p" CHANGELOG.md 2>/dev/null | sed '$d')
     if [ -z "$CHANGELOG_ENTRY" ]; then
         # Try without v prefix
         TAG_NO_V="${TAG#v}"
-        CHANGELOG_ENTRY=$(sed -n "/^## \[$TAG_NO_V\]/,/^## \[/p" CHANGELOG.md 2>/dev/null | head -n -1)
+        CHANGELOG_ENTRY=$(sed -n "/^## \[$TAG_NO_V\]/,/^## \[/p" CHANGELOG.md 2>/dev/null | sed '$d')
     fi
     if [ -n "$CHANGELOG_ENTRY" ]; then
         gh release create "$TAG" --repo "$(git remote get-url "$REMOTE" | sed 's|.*github.com[:/]||;s|\.git$||')" \
