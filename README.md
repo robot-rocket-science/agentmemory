@@ -14,6 +14,8 @@ Every time you start a new session with an AI coding agent, it forgets everythin
 
 *"Use uv, not pip." "I told you, we're using PostgreSQL." "Stop adding co-author lines to commits."*
 
+<p align="center"><img src="docs/images/cartoons/01-no-implementation.png" width="480" alt="Comic: user says 'no implementation, we're in research.' Agent says 'got it!' Next session: 'Ready to implement?' User: 'I TOLD YOU. TWICE.' Agent: '...three times, actually!'"></p>
+
 **agentmemory makes that stop.** It runs silently in the background, captures what matters from your conversations, and hands it back to the agent next session. You correct once. It sticks.
 
 ```text
@@ -63,6 +65,14 @@ Session 12: "Why are you using pip again?"
 ```
 
 With agentmemory, the first correction sticks. The agent remembers "use uv, not pip" with high confidence, and it gets injected into every future session automatically. You correct once, it learns permanently.
+
+### "INCREDIBLE. 100% precision."
+
+AI agents love to report impressive-sounding metrics. Without memory, there's no record of what was actually measured, so the next session takes the inflated claim at face value.
+
+<p align="center"><img src="docs/images/cartoons/06-big-numbers.png" width="420" alt="Comic: agent reports 100% precision, 15-73x lift. User asks '100% precision on what?' Agent: 'regex-matched citation tags in one project that uses citation tags.' User: 'and the recall?' Agent: '...19%'"></p>
+
+With agentmemory, the correction ("that metric is misleading") persists. The next session knows the real state of things, not the inflated version.
 
 ### Catching stale information before it causes problems
 
