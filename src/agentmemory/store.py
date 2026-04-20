@@ -198,6 +198,27 @@ CREATE TABLE IF NOT EXISTS pending_feedback (
 );
 
 CREATE INDEX IF NOT EXISTS idx_pending_feedback_session ON pending_feedback(session_id);
+
+CREATE TABLE IF NOT EXISTS hrr_neighbors (
+    belief_id TEXT NOT NULL,
+    neighbor_id TEXT NOT NULL,
+    similarity REAL NOT NULL,
+    edge_type TEXT NOT NULL,
+    direction TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (belief_id, neighbor_id, edge_type, direction)
+);
+
+CREATE INDEX IF NOT EXISTS idx_hrr_neighbors_belief ON hrr_neighbors(belief_id);
+CREATE INDEX IF NOT EXISTS idx_hrr_neighbors_neighbor ON hrr_neighbors(neighbor_id);
+
+CREATE TABLE IF NOT EXISTS belief_clusters (
+    belief_id TEXT PRIMARY KEY,
+    cluster_id INTEGER NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_belief_clusters_cluster ON belief_clusters(cluster_id);
 """
 
 

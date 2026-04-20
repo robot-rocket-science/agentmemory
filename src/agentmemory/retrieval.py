@@ -6,6 +6,7 @@ returns a token-budget-aware ranked list of beliefs.
 
 from __future__ import annotations
 
+import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -220,7 +221,7 @@ def _get_hrr_graph(store: MemoryStore) -> HRRGraph | None:
         return None
     # Filter to semantic edge types at build time (not just query time).
     triples: list[tuple[str, str, str]] = [
-        t for t in all_triples if t[2] in _HRR_EDGE_TYPES
+        t for t in all_triples if t[2] in HRR_EDGE_TYPES
     ]
     if not triples:
         return None
@@ -231,13 +232,107 @@ def _get_hrr_graph(store: MemoryStore) -> HRRGraph | None:
     graph.encode(triples)
     _hrr_graph = graph
     _hrr_edge_count = len(triples)
+    # Precompute neighbors for hook-path SQL lookup
+    precompute_hrr_neighbors(store, graph)
+    # Build intention clusters for vocabulary-gap bridging
+    _build_intention_clusters(store)
     return graph
+
+
+def _build_intention_clusters(store: MemoryStore) -> None:
+    """Build intention clusters if the table exists."""
+    try:
+        from agentmemory.intention import build_cluster_table
+
+        build_cluster_table(store.connection)
+    except Exception:
+        pass  # Table missing or import error -- skip silently
+
+
+def precompute_hrr_neighbors(
+    store: MemoryStore,
+    graph: HRRGraph,
+    top_k: int = 5,
+    max_nodes: int = 2000,
+) -> None:
+    """Precompute HRR neighbors into SQLite for hook-path use.
+
+    Only precomputes for the most-retrieved active beliefs (up to max_nodes)
+    to keep build time under ~60s. The hook path falls back to edge traversal
+    for beliefs not in the precomputed set.
+
+    Batch approach: query each (node, edge_type, direction) and store top-k.
+    """
+    now_iso: str = datetime.now(timezone.utc).isoformat()
+    active_types: list[str] = [et for et in graph.edge_types() if et in HRR_EDGE_TYPES]
+    if not active_types:
+        return
+
+    conn: sqlite3.Connection = store.connection
+    try:
+        conn.execute("DELETE FROM hrr_neighbors")
+    except Exception:
+        # Table may not exist in test DBs or pre-migration DBs
+        return
+
+    # Prioritize nodes that are active beliefs (not superseded) and have
+    # been retrieved or have feedback. Fall back to all graph nodes if the
+    # tests table is empty.
+    priority_rows: list[sqlite3.Row] = conn.execute(
+        """SELECT DISTINCT b.id FROM beliefs b
+           LEFT JOIN tests t ON t.belief_id = b.id
+           WHERE b.valid_to IS NULL AND b.superseded_by IS NULL
+           ORDER BY t.created_at DESC NULLS LAST
+           LIMIT ?""",
+        (max_nodes,),
+    ).fetchall()
+
+    if priority_rows:
+        node_ids: list[str] = [r[0] for r in priority_rows if graph.has_node(r[0])]
+    else:
+        node_ids = graph.node_ids()[:max_nodes]
+
+    batch: list[tuple[str, str, float, str, str, str]] = []
+
+    for node_id in node_ids:
+        for edge_type in active_types:
+            for direction in ("forward", "reverse"):
+                if direction == "forward":
+                    results: list[tuple[str, float]] = graph.query_forward(
+                        node_id, edge_type, top_k=top_k, threshold=0.08
+                    )
+                else:
+                    results = graph.query_reverse(
+                        node_id, edge_type, top_k=top_k, threshold=0.08
+                    )
+                for neighbor_id, sim in results:
+                    batch.append(
+                        (node_id, neighbor_id, sim, edge_type, direction, now_iso)
+                    )
+
+        if len(batch) >= 5000:
+            conn.executemany(
+                """INSERT OR REPLACE INTO hrr_neighbors
+                   (belief_id, neighbor_id, similarity, edge_type, direction, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                batch,
+            )
+            batch.clear()
+
+    if batch:
+        conn.executemany(
+            """INSERT OR REPLACE INTO hrr_neighbors
+               (belief_id, neighbor_id, similarity, edge_type, direction, created_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            batch,
+        )
+    conn.commit()
 
 
 # Edge types worth querying via HRR. Semantic edges provide vocabulary
 # bridging; structural edges (COMMIT_TOUCHES, CO_CHANGED, SENTENCE_IN_FILE,
 # WITHIN_SECTION) add noise without improving retrieval quality.
-_HRR_EDGE_TYPES: frozenset[str] = frozenset(
+HRR_EDGE_TYPES: frozenset[str] = frozenset(
     {
         "SUPERSEDES",
         "CONTRADICTS",
@@ -263,7 +358,7 @@ def _hrr_expand(
     to avoid O(seeds * edge_types * cleanup_size) blowup.
     """
     # Only query edge types that exist in the graph AND are semantic.
-    active_types: list[str] = [et for et in hrr.edge_types() if et in _HRR_EDGE_TYPES]
+    active_types: list[str] = [et for et in hrr.edge_types() if et in HRR_EDGE_TYPES]
 
     found_ids: set[str] = set()
     for seed_id in seed_ids[:3]:  # Cap seeds to limit query count.

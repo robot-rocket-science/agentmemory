@@ -290,6 +290,14 @@ class HRRGraph:
         ]
         return filtered[:top_k]
 
+    def node_ids(self) -> list[str]:
+        """Return all encoded node IDs."""
+        return list(self._node_vecs.keys())
+
+    def has_node(self, node_id: str) -> bool:
+        """Check if a node is encoded in the graph."""
+        return node_id in self._node_vecs
+
     def node_count(self) -> int:
         return len(self._node_vecs)
 
