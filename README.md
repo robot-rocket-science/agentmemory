@@ -54,9 +54,11 @@ The agent receives this context injection alongside your message:
 - Remote 'github' points to git@github.com:robot-rocket-science/agentmemory.git
 ```
 
-Without agentmemory, the agent runs `git push github main` and bypasses every safety check. With it, the agent infers the right action from accumulated context -- the way a senior teammate who's been on the project for months already knows the unwritten rules. You said nothing. It understood anyway.
+Without agentmemory, the agent runs `git push github main` and bypasses every safety check. With it, the agent infers the right action from accumulated context. You said nothing. It understood anyway.
 
-This is how high-context communication works. Japanese leaves most meaning implicit because both parties share enough context to fill in the gaps. agentmemory gives your AI agent that shared context. The more you work together, the less you have to say.
+In linguistics, [high-context communication](https://en.wikipedia.org/wiki/High-context_and_low-context_cultures) is when meaning is carried by shared background rather than explicit words. Japanese speakers leave most of the sentence unsaid because both parties already know. Low-context communication (like talking to a fresh AI session) requires spelling out everything from scratch every single time.
+
+agentmemory moves your agent from low-context to high-context. It builds the shared background that lets communication become implicit. The more sessions you work together, the less you need to explain -- the same way a teammate who's been on the project for months stops needing the backstory.
 
 ---
 
