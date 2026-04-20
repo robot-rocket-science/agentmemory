@@ -54,13 +54,7 @@ The agent receives this context injection alongside your message:
 - Remote 'github' points to git@github.com:robot-rocket-science/agentmemory.git
 ```
 
-Without agentmemory, the agent takes "push to github" literally and runs `git push github main`, bypassing every safety check. With it, the agent understands that "push to github" actually means "run the publish script with PII guards and the pre-push hook." You said three words. It heard the full procedure.
-
-That procedure was never taught in one session. It accumulated -- one correction about the publish script, another about the PII hook, a third about the remote rename. Each was a 5-second interaction. Weeks later, those fragments compose into a complex workflow the agent executes correctly with zero prompting. That's the key: learned behavior accumulates on increasingly complex processes and stays consistent, with minimal effort on your part.
-
-In linguistics, this is called [high-context communication](https://en.wikipedia.org/wiki/High-context_and_low-context_cultures). Japanese speakers leave most of a sentence unsaid because both parties carry enough shared background to fill the gaps. A fresh AI session is the opposite -- low-context, where you spell out everything from scratch every time.
-
-agentmemory moves your agent from low-context to high-context. The more sessions you work together, the less you need to explain.
+Without agentmemory, the agent takes "push to github" literally and runs `git push github main`, bypassing every safety check. With it, the agent heard three words and executed the full procedure -- publish script, PII guards, pre-push hook. That procedure was never taught in one session. It accumulated from corrections over weeks.
 
 ---
 
@@ -94,7 +88,7 @@ Last locked: "never commit .env files" (4 weeks ago)
 
 ## What Happens After Install
 
-You don't need to learn commands. agentmemory works in the background:
+agentmemory works in the background:
 
 1. **It listens** -- picks up decisions, corrections, and preferences from your conversations
 2. **It retrieves** -- injects relevant beliefs before the agent responds to each prompt

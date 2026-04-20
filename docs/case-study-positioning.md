@@ -149,6 +149,18 @@ Every one of those facts was injected automatically from prior sessions. The won
 
 The result: a complete marketing strategy, grounded in evidence, executed in one session -- with the memory system contributing both the research methodology and the accumulated context that made the research specific rather than generic.
 
+## The Iteration Loop
+
+The story didn't end with the rewrite. Over the next hour, the maintainer read the result and made rapid corrections:
+
+1. **"You said nothing" was inaccurate.** The user typed three words ("push the release to github"). A 30-second commit fixed it.
+2. **The accumulation mechanism was missing.** The worked example showed *what* happened but not *why* it was impressive -- that the knowledge assembled itself from fragments over weeks. Two sentences added.
+3. **A high-context communication analogy was added, then cut.** It was intellectually satisfying but slowed the scroll. The wonder's own recommendation (progressive disclosure) won -- the analogy moved to documentation, the README stayed fast.
+
+Each iteration was a single atomic commit. Total time: 6 minutes of refinement after a 10-minute research + rewrite session.
+
+This is the loop agentmemory enables: research grounded in accumulated context, execute, then iterate with the same accumulated context informing what to keep and what to cut.
+
 ## The Research Artifacts
 
 All findings were saved automatically:
