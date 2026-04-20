@@ -45,6 +45,78 @@ The second session starts already knowing. That's it. That's the whole thing.
 - It doesn't slow down your workflow. It runs silently in the background.
 - It doesn't need a GPU, a vector database, or an API key (beyond what Claude already uses).
 
+## Real Examples
+
+These are from actual sessions, sanitized for privacy but otherwise verbatim.
+
+### "Stop asking me the same thing"
+
+Without memory, every session starts from scratch. You end up correcting the agent on the same points over and over:
+
+```text
+Session 3:  "Use uv, not pip."
+Session 7:  "I told you, use uv."
+Session 12: "Why are you using pip again?"
+```
+
+With agentmemory, the first correction sticks. The agent remembers "use uv, not pip" with high confidence, and it gets injected into every future session automatically. You correct once, it learns permanently.
+
+### Catching stale information before it causes problems
+
+In a real session, the user asked the agent to audit a configuration file for redundancy. The agent searched memory and found that a locked belief about the project's git remote setup was stale -- it still referenced a remote that had been removed days earlier. Every new session was getting injected with incorrect instructions.
+
+```text
+user    Clean up the config file, I think memory is already
+        handling some of this stuff.
+
+agent   [searches memory, compares against config]
+        Found overlap. But also: this locked belief about your git
+        remotes is stale. It references a remote you removed.
+        Every session is getting wrong instructions from it.
+
+user    Fix it.
+
+agent   [corrects the belief, asks to lock the updated version]
+```
+
+Without memory, the stale information would have persisted indefinitely. The system detected its own error.
+
+### Deep research with /mem:wonder
+
+A user ran `/mem:wonder "state tracking formal design framework"` to explore whether the project needed a formal state machine. The system:
+
+1. Found 64 existing beliefs about state tracking (64.7% coverage)
+2. Identified 7 contradictions between them
+3. Found 3 gaps where the system had no beliefs at all
+4. Spawned 4 research agents in parallel to investigate the gaps
+5. Ingested the findings as low-confidence speculative beliefs with a 14-day expiration
+
+The speculative beliefs either get confirmed by evidence (and promoted to real beliefs) or expire and get garbage collected. The system explores on its own, but doesn't pollute the knowledge base with unvalidated claims.
+
+### Hypothesis testing with /mem:reason
+
+A user asked `/mem:reason "do we have enough changes since the last release to justify a v3?"` The system analyzed its own belief graph and git history, then pushed back:
+
+```text
+ANSWER: Not v3. v2.5.0 at most.
+
+Evidence:
+- No breaking API changes (all new params default to neutral)
+- New features are additive layers, not architectural changes
+- Core scoring problem diagnosed but not solved
+- Intention clustering needs validation at scale
+
+What's nagging me:
+  Locked beliefs are drowning out relevant content in search results.
+  7 of 10 top results for a technical query were irrelevant locked
+  beliefs about git remotes. The lock boost is too aggressive.
+
+Recommendation: Ship as v2.5.0, go deeper on retrieval quality
+before any v3 claim.
+```
+
+The system reasoned over its own evidence, resisted the user's framing, identified a real problem it discovered during its own analysis, and made a calibrated recommendation. This is what memory-backed reasoning looks like in practice.
+
 ## Install
 
 ```bash
