@@ -19,6 +19,13 @@ agentmemory captures decisions, corrections, and context as you work, and hands 
 ## Install
 
 ```bash
+pip install agentmemory-rrs
+agentmemory setup
+```
+
+Or install from source:
+
+```bash
 uv pip install git+https://github.com/robot-rocket-science/agentmemory.git
 agentmemory setup
 ```

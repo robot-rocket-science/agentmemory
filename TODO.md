@@ -1,7 +1,7 @@
 # TODO: Agentic Memory Project
 
 **Last updated:** 2026-04-20
-**Status:** Phases 1-4 complete. Phase 5 complete (except REQ-011). v2.4.1, 28 modules, 902 tests, 29 MCP tools. Score inflation fixed, 3-tier lock_level, onboard end-to-end, PII sanitized, all research closed. Exploratory wonder (3 tools, TTL-based GC), confidence differentiation (Fixes 1-5).
+**Status:** Phases 1-4 complete. Phase 5 complete (except REQ-011). v2.5.0, 31 modules, 920 tests, 29 MCP tools. Retrieval quality overhaul: intention clustering, multi-model Bayesian scoring, precomputed HRR neighbors, relevance-gated scoring. Published to PyPI as agentmemory-rrs.
 
 ---
 
