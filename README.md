@@ -18,8 +18,6 @@ Every time you start a new session with an AI coding agent, it forgets everythin
 
 **agentmemory makes that stop.** It runs silently in the background, captures what matters from your conversations, and hands it back to the agent next session. You correct once. It sticks.
 
-## What Changes For You
-
 | Before agentmemory | After agentmemory |
 |---|---|
 | Repeat the same corrections every session | Correct once, remembered permanently |
@@ -28,20 +26,63 @@ Every time you start a new session with an AI coding agent, it forgets everythin
 | Lose important decisions when sessions end | Decisions persist across sessions, weeks, months |
 | Start every session from scratch | Agent picks up where you left off |
 
-## Your Data Stays Yours
+## Get Started
+
+```bash
+pip install agentmemory-rrs
+agentmemory setup
+```
+
+Restart Claude Code, then in any project:
+
+```
+/mem:onboard .
+```
+
+That's it. Three commands. Your agent now remembers across sessions.
 
 - **100% local.** Everything lives in a SQLite file on your machine. Nothing is sent anywhere.
-- **No cloud, no accounts.** There is no server, no signup. Optional anonymous telemetry exists but is disabled by default and only collects counts, never content.
-- **No GPU or vector database required.** It runs on any machine that runs Python.
-- **Two commands to install.** Nothing else to configure.
+- **No cloud, no accounts.** There is no server, no signup.
+- **No GPU or vector database required.** Runs on any machine that runs Python.
 
-## Real Examples
+Full prerequisites and troubleshooting: [docs/INSTALL.md](docs/INSTALL.md).
+
+## What Happens Next
+
+You don't need to learn any commands. agentmemory works automatically:
+
+1. **It listens** to your conversations and picks up decisions, corrections, and preferences.
+2. **It retrieves** relevant memories at the start of each turn and injects them into the agent's context.
+3. **It learns** which memories are useful and which aren't -- helpful ones get stronger, unhelpful ones fade.
+
+If you want to explicitly tell it something important:
+
+```
+/mem:lock "always use uv, never poetry"
+```
+
+That creates a permanent rule that persists across every session.
+
+When you're ready to explore further:
+
+| Command | What it does |
+|---|---|
+| `/mem:search <query>` | Find specific memories |
+| `/mem:lock <rule>` | Create a permanent rule |
+| `/mem:wonder <topic>` | Deep research across the memory graph |
+| `/mem:reason <question>` | Test a hypothesis against stored evidence |
+| `/mem:stats` | See what's in memory |
+| `/mem:health` | Check system health |
+
+Full command reference: [docs/COMMANDS.md](docs/COMMANDS.md).
+
+## See It in Action
 
 From actual sessions. Names and project details changed, conversations reconstructed from memory.
 
-### Before: Problems that made us build this
+### Problems that made us build this
 
-These are real failures that happened without persistent memory. They're why agentmemory exists.
+These are real failures that happened without persistent memory.
 
 **"I searched your entire filesystem. Nothing."**
 
@@ -72,7 +113,7 @@ AI agents love to report impressive-sounding metrics. Without memory, there's no
 
 *With agentmemory, the correction ("that metric is misleading -- 100% precision on a rigged test, 19% recall") persists. The next session knows the real numbers, not the inflated ones.*
 
-### After: Emergent behavior once memory is running
+### What happens once memory is running
 
 These weren't planned features. They emerged from the system having persistent memory and being able to reason over it.
 
@@ -120,55 +161,9 @@ Recommendation: Ship as v2.5.0, go deeper on retrieval quality
 before any v3 claim.
 ```
 
-*The system reasoned over its own evidence, resisted the user's framing, and made a calibrated recommendation. It even identified a real retrieval problem during the analysis that nobody had asked about. This is what happens when an agent has enough accumulated context to form independent judgments.*
+*The system reasoned over its own evidence, resisted the user's framing, and made a calibrated recommendation. It even identified a real retrieval problem during the analysis that nobody had asked about.*
 
-## Install
-
-```bash
-pip install agentmemory-rrs
-agentmemory setup
-```
-
-Restart Claude Code, then in any project:
-
-```
-/mem:onboard .
-```
-
-That's it. From now on, your agent remembers across sessions.
-
-Full prerequisites and troubleshooting: [docs/INSTALL.md](docs/INSTALL.md).
-
-## Daily Use
-
-You don't need to learn any commands. agentmemory works automatically:
-
-1. **It listens** to your conversations and picks up decisions, corrections, and preferences.
-2. **It retrieves** relevant memories at the start of each turn and injects them into the agent's context.
-3. **It learns** which memories are useful and which aren't -- helpful ones get stronger, unhelpful ones fade.
-
-If you want to explicitly tell it something important:
-
-```
-/mem:lock "always use uv, never poetry"
-```
-
-That creates a permanent rule that persists across every session.
-
-### Power User Commands
-
-| Command | What it does |
-|---|---|
-| `/mem:search <query>` | Find specific memories |
-| `/mem:lock <rule>` | Create a permanent rule |
-| `/mem:wonder <topic>` | Deep research across the memory graph |
-| `/mem:reason <question>` | Test a hypothesis against stored evidence |
-| `/mem:stats` | See what's in memory |
-| `/mem:health` | Check system health |
-
-Full command reference: [docs/COMMANDS.md](docs/COMMANDS.md).
-
-## How It Works (For the Curious)
+## How It Works
 
 Conversations are broken into individual beliefs stored in a local SQLite database. Each belief carries a confidence score that updates over time based on whether it helped or hurt. When the agent needs context, the system retrieves the most relevant beliefs within a fixed token budget using full-text search and graph traversal.
 
@@ -234,17 +229,9 @@ Without agentmemory, the agent would run `git push github main` and bypass every
 
 For the full technical deep dive: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
 
-## Documentation
-
-The full handbook is at **[docs/README.md](docs/README.md)**:
-
-- **Getting Started:** [Installation](docs/INSTALL.md) -- [Workflow](docs/WORKFLOW.md)
-- **Reference:** [Commands](docs/COMMANDS.md) -- [Obsidian Integration](docs/OBSIDIAN.md) -- [Privacy](docs/PRIVACY.md)
-- **Technical:** [Architecture](docs/ARCHITECTURE.md) -- [Benchmarks](docs/BENCHMARK_RESULTS.md) -- [Research](docs/RESEARCH_FREEZE_20260416.md)
-
 ## Benchmarks
 
-agentmemory has been evaluated against 5 published academic benchmarks with protocol-correct methodology, contamination-proof isolation, and pre-registered hypotheses. Highlights:
+agentmemory has been evaluated against 5 published academic benchmarks with protocol-correct methodology, contamination-proof isolation, and pre-registered hypotheses.
 
 | Benchmark | Score | Context |
 |---|---|---|
@@ -255,6 +242,14 @@ agentmemory has been evaluated against 5 published academic benchmarks with prot
 | LoCoMo | 50.8% | Multi-session dialogue reasoning |
 
 Full results, methodology, and audit trails: [docs/BENCHMARK_RESULTS.md](docs/BENCHMARK_RESULTS.md).
+
+## Documentation
+
+The full handbook is at **[docs/README.md](docs/README.md)**:
+
+- **Getting Started:** [Installation](docs/INSTALL.md) -- [Workflow](docs/WORKFLOW.md)
+- **Reference:** [Commands](docs/COMMANDS.md) -- [Obsidian Integration](docs/OBSIDIAN.md) -- [Privacy](docs/PRIVACY.md)
+- **Technical:** [Architecture](docs/ARCHITECTURE.md) -- [Benchmarks](docs/BENCHMARK_RESULTS.md) -- [Research](docs/RESEARCH_FREEZE_20260416.md)
 
 ## Development
 
