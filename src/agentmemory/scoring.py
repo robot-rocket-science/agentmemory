@@ -311,12 +311,18 @@ def score_belief(
     current_time_iso: str | datetime,
     retrieval_count: int = 0,
     used_count: int = 0,
+    ignored_count: int = 0,
+    harmful_count: int = 0,
 ) -> float:
-    """Combined scoring using decay, lock boost, Thompson sampling, type/source weights, recency, frequency, and UCB.
+    """Combined scoring using decay, lock boost, Thompson sampling, type/source weights, recency, frequency, UCB, and multi-model classification.
 
     Superseded beliefs always score 0.01.
     Locked beliefs: score = lock_boost_typed * thompson_sample (always elevated, no frequency boost).
-    Normal beliefs: score = type_weight * source_weight * thompson_sample * decay_factor * recency_boost * freq_boost + ucb_bonus.
+    Normal beliefs: score = type_weight * source_weight * thompson_sample * decay_factor * recency_boost * freq_boost * multimodel + ucb_bonus.
+
+    Multi-model classification (Exp 93b) applies only when the belief has
+    feedback history (used + ignored + harmful > 0). Maps beliefs to
+    SIGNAL/NOISE/STALE/CONTESTED and adjusts score by [0.6, 1.3].
 
     current_time_iso accepts a pre-parsed datetime to avoid redundant parsing.
     """
@@ -344,6 +350,29 @@ def score_belief(
         return boost * sample
 
     freq_boost: float = retrieval_frequency_boost(retrieval_count, used_count)
-    base: float = type_w * source_w * sample * decay * recency * freq_boost
+
+    # Multi-model quality multiplier (Exp 93b archaeology-style).
+    # Only fires when feedback exists; returns 1.0 otherwise.
+    from agentmemory.multimodel import multimodel_multiplier
+
+    current: datetime = (
+        current_time_iso
+        if isinstance(current_time_iso, datetime)
+        else _parse_iso(current_time_iso)
+    )
+    created: datetime = _parse_iso(belief.created_at)
+    # Compute max_age from a reasonable bound (180 days)
+    age_hours: float = max(0.0, (current - created).total_seconds() / 3600.0)
+    age_norm: float = min(1.0, age_hours / (180.0 * 24.0))
+
+    mm: float = multimodel_multiplier(
+        used_count=used_count,
+        ignored_count=ignored_count,
+        harmful_count=harmful_count,
+        age_normalized=age_norm,
+        source_type=belief.source_type,
+    )
+
+    base: float = type_w * source_w * sample * decay * recency * freq_boost * mm
     ucb: float = ucb_exploration_bonus(retrieval_count, _global_retrieval_estimate)
     return base * (1.0 + ucb)
