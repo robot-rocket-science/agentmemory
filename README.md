@@ -54,7 +54,7 @@ The agent receives this context injection alongside your message:
 - Remote 'github' points to git@github.com:robot-rocket-science/agentmemory.git
 ```
 
-Without agentmemory, the agent runs `git push github main` and bypasses every safety check. With it, the agent infers the right action from accumulated context. You said nothing. It understood anyway.
+Without agentmemory, the agent takes "push to github" literally and runs `git push github main`, bypassing every safety check. With it, the agent understands that "push to github" actually means "run the publish script with PII guards and the pre-push hook." You said three words. It heard the full procedure.
 
 In linguistics, [high-context communication](https://en.wikipedia.org/wiki/High-context_and_low-context_cultures) is when meaning is carried by shared background rather than explicit words. Japanese speakers leave most of the sentence unsaid because both parties already know. Low-context communication (like talking to a fresh AI session) requires spelling out everything from scratch every single time.
 
