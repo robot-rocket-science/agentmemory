@@ -66,9 +66,7 @@ AI agents love to report impressive-sounding metrics. Without memory, there's no
 
 <p align="center"><img src="https://robotrocketscience.com/projects/agentmemory/comics/05-big-numbers-cs008.png" width="420" alt="Comic: agent reports 100% precision. User asks: on what exactly? Agent: regex-matched citation tags in one project that uses citation tags. User: and the recall? Agent: ...19%"></p>
 
-The user had to ask: *"How many hours of work is that?"* The agent checked the session logs. Two and a half hours. Not the months of deep research the status report implied.
-
-*With agentmemory, the correction ("that was a 2-hour sprint, not extensive research") persists. Future sessions report accurately because the system tracks provenance -- not just what was done, but how it was done and how long it took.*
+*With agentmemory, the correction ("that metric is misleading -- 100% precision on a rigged test, 19% recall") persists. The next session knows the real numbers, not the inflated ones.*
 
 ### The agent audited its own memory and found a bug
 
