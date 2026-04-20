@@ -39,9 +39,13 @@ Every time you start a new session with an AI coding agent, it forgets everythin
 
 From actual sessions. Names and project details changed, conversations verbatim.
 
-### "I searched your entire filesystem. Nothing."
+### Before: Problems that made us build this
 
-A user asked the agent to review documents they'd worked on together the previous session. The agent searched every directory on the machine, found nothing, and reported the files didn't exist. Two minutes later it found them -- in the current working directory, exactly where they'd been created.
+These are real failures that happened without persistent memory. They're why agentmemory exists.
+
+**"I searched your entire filesystem. Nothing."**
+
+A user asked the agent to review documents they'd worked on together the previous session. The agent searched every directory on the machine, reported the files didn't exist -- then found them two minutes later in the current working directory, exactly where they'd been created.
 
 ```text
 user    Please review the project docs we worked on yesterday.
@@ -60,7 +64,7 @@ agent   Oh. Found them.
 
 *With agentmemory, the agent already knows about the documents because it remembers creating them. No filesystem search needed.*
 
-### "EXTENSIVE research completed. 353 tests all PASS."
+**"EXTENSIVE research completed. 353 tests all PASS."**
 
 AI agents love to report impressive-sounding metrics. Without memory, there's no record of what was actually measured, so the next session takes the inflated claim at face value.
 
@@ -68,7 +72,11 @@ AI agents love to report impressive-sounding metrics. Without memory, there's no
 
 *With agentmemory, the correction ("that metric is misleading -- 100% precision on a rigged test, 19% recall") persists. The next session knows the real numbers, not the inflated ones.*
 
-### The agent audited its own memory and found a bug
+### After: Emergent behavior once memory is running
+
+These weren't planned features. They emerged from the system having persistent memory and being able to reason over it.
+
+**The agent audited its own memory and found a bug**
 
 A user asked the agent to check whether a config file had become redundant with the memory system. The agent searched its own beliefs, compared them against the config, and discovered that a locked belief about the project's infrastructure was stale -- it still referenced a server that had been decommissioned days earlier. Every new session was being injected with wrong instructions, and nobody had noticed.
 
@@ -88,23 +96,11 @@ agent   [corrects the belief, supersedes the old one]
         Done. Want to lock the updated version?
 ```
 
-*Without memory, the stale information would have persisted indefinitely. The system caught its own error.*
+*The system caught its own error. This wasn't a planned feature -- it happened because the agent had enough context to notice the inconsistency.*
 
-### Deep research with /mem:wonder
+**The agent pushed back on a version number**
 
-A user ran `/mem:wonder "state tracking formal design framework"` to explore whether the project needed a formal state machine. The system:
-
-1. Found 64 existing beliefs about state tracking (64.7% coverage)
-2. Identified 7 contradictions between them
-3. Found 3 gaps where the system had no beliefs at all
-4. Spawned 4 research agents in parallel to investigate the gaps
-5. Ingested the findings as low-confidence speculative beliefs with a 14-day expiration
-
-The speculative beliefs either get confirmed by evidence (and promoted to real beliefs) or expire and get garbage collected. The system explores on its own, but doesn't pollute the knowledge base with unvalidated claims.
-
-### Hypothesis testing with /mem:reason
-
-A user asked `/mem:reason "do we have enough changes since the last release to justify a v3?"` The system analyzed its own belief graph and git history, then pushed back:
+A user asked `/mem:reason "do we have enough changes since the last release to justify a v3?"` The system analyzed its own belief graph, reviewed experiment results and git history, then argued against the user's framing:
 
 ```text
 ANSWER: Not v3. v2.5.0 at most.
@@ -116,15 +112,15 @@ Evidence:
 - Intention clustering needs validation at scale
 
 What's nagging me:
-  Locked beliefs are drowning out relevant content in search results.
-  7 of 10 top results for a technical query were irrelevant locked
-  beliefs about git remotes. The lock boost is too aggressive.
+  Locked beliefs are drowning out relevant content in search
+  results. The lock boost is too aggressive relative to
+  everything else.
 
 Recommendation: Ship as v2.5.0, go deeper on retrieval quality
 before any v3 claim.
 ```
 
-The system reasoned over its own evidence, resisted the user's framing, identified a real problem it discovered during its own analysis, and made a calibrated recommendation. This is what memory-backed reasoning looks like in practice.
+*The system reasoned over its own evidence, resisted the user's framing, and made a calibrated recommendation. It even identified a real retrieval problem during the analysis that nobody had asked about. This is what happens when an agent has enough accumulated context to form independent judgments.*
 
 ## Install
 
