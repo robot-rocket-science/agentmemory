@@ -37,7 +37,7 @@ Every time you start a new session with an AI coding agent, it forgets everythin
 
 ## Real Examples
 
-From actual sessions. Names and project details changed, conversations verbatim.
+From actual sessions. Names and project details changed, conversations reconstructed from memory.
 
 ### Before: Problems that made us build this
 
