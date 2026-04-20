@@ -88,9 +88,7 @@ agent   [corrects the belief, supersedes the old one]
         Done. Want to lock the updated version?
 ```
 
-*The system caught its own error. Without memory, the stale information would have persisted indefinitely.*
-
-Without memory, the stale information would have persisted indefinitely. The system detected its own error.
+*Without memory, the stale information would have persisted indefinitely. The system caught its own error.*
 
 ### Deep research with /mem:wonder
 
