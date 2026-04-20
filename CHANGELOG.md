@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [3.0.2] - 2026-04-20
+
+### Changed
+- README: universal opener, emphasis/formatting pass, "Problem Is Bigger Than You Think" section, Bayesian inference link, user-facing language for technical details.
+- Repo reorganization: research/ to docs/research/, website-content/ to docs/website/, CLAIMS-AUDIT files to docs/audits/.
+- New docs: PHILOSOPHY.md (high-context analogy, "Why Files Aren't Enough"), RELEASE.md (runbook), expanded CONTRIBUTING.md.
+- CLAUDE.md: added contributor disclaimer separating user vs contributor concerns.
+- Removed all em dashes from documentation.
+
 ## [3.0.1] - 2026-04-20
 
 ### Changed
