@@ -7,6 +7,7 @@ negation signals.
 Runs alongside temporal supersession detection in the ingest pipeline.
 Addresses REQ-002: contradiction detection.
 """
+
 from __future__ import annotations
 
 import re
@@ -122,7 +123,8 @@ def detect_relationships(
 
     # Search for candidates using the new belief's content as query
     candidates: list[Belief] = store.search(
-        new_belief.content, top_k=_MAX_CANDIDATES,
+        new_belief.content,
+        top_k=_MAX_CANDIDATES,
     )
 
     for candidate in candidates:
@@ -194,9 +196,7 @@ def detect_relationships(
             )
             result.edges_created += 1
             result.relates += 1
-            result.details.append(
-                f"RELATES_TO {candidate.id} (jaccard={jaccard:.2f})"
-            )
+            result.details.append(f"RELATES_TO {candidate.id} (jaccard={jaccard:.2f})")
 
     if result.edges_created == 0:
         result.details.append("no relationships detected")
@@ -314,7 +314,8 @@ def detect_gap_closure(
         return result
 
     candidates: list[Belief] = store.search(
-        new_belief.content, top_k=_MAX_CANDIDATES,
+        new_belief.content,
+        top_k=_MAX_CANDIDATES,
     )
 
     for candidate in candidates:

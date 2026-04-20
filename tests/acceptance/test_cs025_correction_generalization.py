@@ -3,6 +3,7 @@
 Pass criterion: Corrections are findable by related queries (shared vocabulary),
 and SUPPORTS edges enable generalization from specific corrections to broader rules.
 """
+
 from __future__ import annotations
 
 from agentmemory.models import (
@@ -64,6 +65,4 @@ def test_cs025_correction_with_supports_edge(store: MemoryStore) -> None:
     # Verify edge type is SUPPORTS.
     c2_entries: list[tuple[Belief, str, int]] = graph[c2.id]
     edge_types: list[str] = [etype for _, etype, _ in c2_entries]
-    assert "SUPPORTS" in edge_types, (
-        f"Edge type should be SUPPORTS. Got: {edge_types}"
-    )
+    assert "SUPPORTS" in edge_types, f"Edge type should be SUPPORTS. Got: {edge_types}"

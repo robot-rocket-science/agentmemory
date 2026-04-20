@@ -2,6 +2,7 @@
 
 These tests are placeholders documenting what infrastructure is needed.
 """
+
 from __future__ import annotations
 
 import pytest

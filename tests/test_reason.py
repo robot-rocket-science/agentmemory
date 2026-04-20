@@ -2,6 +2,7 @@
 
 Covers the new store methods and scoring function added for /mem:reason.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -16,21 +17,39 @@ def _make_store(tmp_path: Path) -> MemoryStore:
     store: MemoryStore = MemoryStore(tmp_path / "test.db")
 
     # Insert 5 beliefs
-    store.insert_belief("Alpha requirement", "requirement", "user_stated", alpha=9.0, beta_param=0.5)
-    store.insert_belief("Beta fact", "factual", "agent_inferred", alpha=3.0, beta_param=1.0)
-    store.insert_belief("Gamma correction", "correction", "user_corrected", alpha=9.0, beta_param=0.5)
-    store.insert_belief("Delta preference", "preference", "user_stated", alpha=0.5, beta_param=0.5)
-    store.insert_belief("Epsilon causal", "causal", "agent_inferred", alpha=5.0, beta_param=5.0)
+    store.insert_belief(
+        "Alpha requirement", "requirement", "user_stated", alpha=9.0, beta_param=0.5
+    )
+    store.insert_belief(
+        "Beta fact", "factual", "agent_inferred", alpha=3.0, beta_param=1.0
+    )
+    store.insert_belief(
+        "Gamma correction", "correction", "user_corrected", alpha=9.0, beta_param=0.5
+    )
+    store.insert_belief(
+        "Delta preference", "preference", "user_stated", alpha=0.5, beta_param=0.5
+    )
+    store.insert_belief(
+        "Epsilon causal", "causal", "agent_inferred", alpha=5.0, beta_param=5.0
+    )
 
     # Get IDs
     rows = store.query("SELECT id, content FROM beliefs ORDER BY content")
     ids: dict[str, str] = {r["content"]: r["id"] for r in rows}
 
     # Insert edges
-    store.insert_edge(ids["Alpha requirement"], ids["Beta fact"], "SUPPORTS", weight=0.8)
-    store.insert_edge(ids["Beta fact"], ids["Gamma correction"], "RELATES_TO", weight=0.5)
-    store.insert_edge(ids["Alpha requirement"], ids["Delta preference"], "CONTRADICTS", weight=0.9)
-    store.insert_edge(ids["Gamma correction"], ids["Epsilon causal"], "CITES", weight=0.7)
+    store.insert_edge(
+        ids["Alpha requirement"], ids["Beta fact"], "SUPPORTS", weight=0.8
+    )
+    store.insert_edge(
+        ids["Beta fact"], ids["Gamma correction"], "RELATES_TO", weight=0.5
+    )
+    store.insert_edge(
+        ids["Alpha requirement"], ids["Delta preference"], "CONTRADICTS", weight=0.9
+    )
+    store.insert_edge(
+        ids["Gamma correction"], ids["Epsilon causal"], "CITES", weight=0.7
+    )
 
     return store
 
@@ -280,7 +299,8 @@ def test_consequence_paths_basic(tmp_path: Path) -> None:
     alpha_id: str = rows[0]["id"]
 
     paths: list[list[tuple[Belief, str, float]]] = store.find_consequence_paths(
-        [alpha_id], max_depth=3,
+        [alpha_id],
+        max_depth=3,
     )
     assert len(paths) > 0
     # Each path should start with Alpha as ROOT
@@ -297,7 +317,8 @@ def test_consequence_paths_compound_confidence_decays(tmp_path: Path) -> None:
     alpha_id: str = rows[0]["id"]
 
     paths: list[list[tuple[Belief, str, float]]] = store.find_consequence_paths(
-        [alpha_id], max_depth=3,
+        [alpha_id],
+        max_depth=3,
     )
     for path in paths:
         if len(path) >= 2:
@@ -314,10 +335,14 @@ def test_consequence_paths_pruning(tmp_path: Path) -> None:
 
     # Very high floor should produce few or no paths
     paths_high: list[list[tuple[Belief, str, float]]] = store.find_consequence_paths(
-        [alpha_id], max_depth=3, confidence_floor=0.99,
+        [alpha_id],
+        max_depth=3,
+        confidence_floor=0.99,
     )
     paths_low: list[list[tuple[Belief, str, float]]] = store.find_consequence_paths(
-        [alpha_id], max_depth=3, confidence_floor=0.1,
+        [alpha_id],
+        max_depth=3,
+        confidence_floor=0.1,
     )
     assert len(paths_high) <= len(paths_low)
     store.close()
@@ -330,7 +355,9 @@ def test_consequence_paths_max_branches(tmp_path: Path) -> None:
     alpha_id: str = rows[0]["id"]
 
     paths: list[list[tuple[Belief, str, float]]] = store.find_consequence_paths(
-        [alpha_id], max_depth=3, max_branches=1,
+        [alpha_id],
+        max_depth=3,
+        max_branches=1,
     )
     assert len(paths) <= 1
     store.close()
@@ -351,7 +378,8 @@ def test_consequence_paths_contradicts_creates_fork(tmp_path: Path) -> None:
     alpha_id: str = rows[0]["id"]
 
     paths: list[list[tuple[Belief, str, float]]] = store.find_consequence_paths(
-        [alpha_id], max_depth=2,
+        [alpha_id],
+        max_depth=2,
     )
     # Should have at least 2 paths: one via SUPPORTS (Beta) and one via CONTRADICTS (Delta)
     edge_types_in_paths: set[str] = set()
@@ -387,7 +415,8 @@ def test_detect_impasses_tie(tmp_path: Path) -> None:
             all_beliefs[b.id] = b
 
     impasses: list[MemoryStore.Impasse] = store.detect_impasses(
-        beliefs=all_beliefs, paths=[],
+        beliefs=all_beliefs,
+        paths=[],
     )
     tie_impasses: list[MemoryStore.Impasse] = [
         i for i in impasses if i.impasse_type == "tie"
@@ -416,7 +445,8 @@ def test_detect_impasses_gap(tmp_path: Path) -> None:
     ]
 
     impasses: list[MemoryStore.Impasse] = store.detect_impasses(
-        beliefs=all_beliefs, paths=fake_path,
+        beliefs=all_beliefs,
+        paths=fake_path,
     )
     gap_impasses: list[MemoryStore.Impasse] = [
         i for i in impasses if i.impasse_type == "gap"
@@ -443,7 +473,9 @@ def test_detect_impasses_constraint_failure(tmp_path: Path) -> None:
     locked: list[Belief] = store.get_locked_beliefs()
 
     impasses: list[MemoryStore.Impasse] = store.detect_impasses(
-        beliefs=all_beliefs, paths=[], locked_beliefs=locked,
+        beliefs=all_beliefs,
+        paths=[],
+        locked_beliefs=locked,
     )
     constraint_impasses: list[MemoryStore.Impasse] = [
         i for i in impasses if i.impasse_type == "constraint_failure"
@@ -458,12 +490,14 @@ def test_detect_impasses_no_change(tmp_path: Path) -> None:
     store: MemoryStore = _make_store(tmp_path)
 
     # Create beliefs with very low confidence
-    store.insert_belief("Low conf A", "factual", "agent_inferred", alpha=0.5, beta_param=5.0)
-    store.insert_belief("Low conf B", "factual", "agent_inferred", alpha=0.5, beta_param=5.0)
-
-    rows = store.query(
-        "SELECT id FROM beliefs WHERE content LIKE 'Low conf%'"
+    store.insert_belief(
+        "Low conf A", "factual", "agent_inferred", alpha=0.5, beta_param=5.0
     )
+    store.insert_belief(
+        "Low conf B", "factual", "agent_inferred", alpha=0.5, beta_param=5.0
+    )
+
+    rows = store.query("SELECT id FROM beliefs WHERE content LIKE 'Low conf%'")
     all_beliefs: dict[str, Belief] = {}
     for r in rows:
         b: Belief | None = store.get_belief(r["id"])
@@ -471,7 +505,8 @@ def test_detect_impasses_no_change(tmp_path: Path) -> None:
             all_beliefs[b.id] = b
 
     impasses: list[MemoryStore.Impasse] = store.detect_impasses(
-        beliefs=all_beliefs, paths=[],
+        beliefs=all_beliefs,
+        paths=[],
     )
     no_change: list[MemoryStore.Impasse] = [
         i for i in impasses if i.impasse_type == "no_change"
@@ -490,26 +525,57 @@ def test_negation_filter_deprioritizes_noise() -> None:
     from agentmemory.retrieval import _filter_negation_noise  # pyright: ignore[reportPrivateUsage]
 
     b1: Belief = Belief(
-        id="a1", content_hash="h1", content="Service is not running correctly",
-        belief_type="factual", alpha=5.0, beta_param=0.5, confidence=0.91,
-        source_type="agent_inferred", locked=False, valid_from=None,
-        valid_to=None, superseded_by=None, created_at="", updated_at="",
+        id="a1",
+        content_hash="h1",
+        content="Service is not running correctly",
+        belief_type="factual",
+        alpha=5.0,
+        beta_param=0.5,
+        confidence=0.91,
+        source_type="agent_inferred",
+        locked=False,
+        valid_from=None,
+        valid_to=None,
+        superseded_by=None,
+        created_at="",
+        updated_at="",
     )
     b2: Belief = Belief(
-        id="a2", content_hash="h2", content="HRR is not enough alone",
-        belief_type="correction", alpha=5.0, beta_param=0.5, confidence=0.91,
-        source_type="agent_inferred", locked=False, valid_from=None,
-        valid_to=None, superseded_by=None, created_at="", updated_at="",
+        id="a2",
+        content_hash="h2",
+        content="HRR is not enough alone",
+        belief_type="correction",
+        alpha=5.0,
+        beta_param=0.5,
+        confidence=0.91,
+        source_type="agent_inferred",
+        locked=False,
+        valid_from=None,
+        valid_to=None,
+        superseded_by=None,
+        created_at="",
+        updated_at="",
     )
     b3: Belief = Belief(
-        id="a3", content_hash="h3", content="The running service crashed yesterday",
-        belief_type="factual", alpha=5.0, beta_param=0.5, confidence=0.91,
-        source_type="agent_inferred", locked=False, valid_from=None,
-        valid_to=None, superseded_by=None, created_at="", updated_at="",
+        id="a3",
+        content_hash="h3",
+        content="The running service crashed yesterday",
+        belief_type="factual",
+        alpha=5.0,
+        beta_param=0.5,
+        confidence=0.91,
+        source_type="agent_inferred",
+        locked=False,
+        valid_from=None,
+        valid_to=None,
+        superseded_by=None,
+        created_at="",
+        updated_at="",
     )
 
     result: list[Belief] = _filter_negation_noise(
-        "service not running", [b1, b2, b3],
+        "service not running",
+        [b1, b2, b3],
     )
     # b1 and b3 share topical terms ("service", "running"), b2 only shares "not"
     result_ids: list[str] = [b.id for b in result]
@@ -522,10 +588,20 @@ def test_negation_filter_all_negation_query() -> None:
     from agentmemory.retrieval import _filter_negation_noise  # pyright: ignore[reportPrivateUsage]
 
     b1: Belief = Belief(
-        id="a1", content_hash="h1", content="Something unrelated",
-        belief_type="factual", alpha=5.0, beta_param=0.5, confidence=0.91,
-        source_type="agent_inferred", locked=False, valid_from=None,
-        valid_to=None, superseded_by=None, created_at="", updated_at="",
+        id="a1",
+        content_hash="h1",
+        content="Something unrelated",
+        belief_type="factual",
+        alpha=5.0,
+        beta_param=0.5,
+        confidence=0.91,
+        source_type="agent_inferred",
+        locked=False,
+        valid_from=None,
+        valid_to=None,
+        superseded_by=None,
+        created_at="",
+        updated_at="",
     )
 
     result: list[Belief] = _filter_negation_noise("not no never", [b1])

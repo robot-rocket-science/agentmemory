@@ -7,6 +7,7 @@ Verifies that:
 3. _process_auto_feedback() checks term overlap and records used/ignored.
 4. The tests table contains the correct auto-feedback records.
 """
+
 from __future__ import annotations
 
 from collections.abc import Generator
@@ -100,12 +101,14 @@ def _query_test_results(
     )
     results: list[dict[str, str]] = []
     for row in rows:
-        results.append({
-            "belief_id": row[0],
-            "outcome": row[1],
-            "outcome_detail": row[2] or "",
-            "detection_layer": row[3],
-        })
+        results.append(
+            {
+                "belief_id": row[0],
+                "outcome": row[1],
+                "outcome_detail": row[2] or "",
+                "detection_layer": row[3],
+            }
+        )
     return results
 
 
@@ -142,9 +145,7 @@ def test_auto_feedback_end_to_end(store: MemoryStore) -> None:
     # 4. Simulate the search() populating _retrieval_buffer.
     #    In the real server, search() does this. We do it manually.
     now_ts: str = datetime.now(timezone.utc).isoformat()
-    buffer_entries: list[tuple[str, str]] = [
-        (b.id, now_ts) for b in beliefs
-    ]
+    buffer_entries: list[tuple[str, str]] = [(b.id, now_ts) for b in beliefs]
     server_mod._retrieval_buffer[session_id] = buffer_entries
 
     # 5. Simulate ingest: text that references beliefs 0 and 1 but NOT belief 2.
@@ -214,10 +215,10 @@ def test_auto_feedback_skips_explicit(store: MemoryStore) -> None:
     server_mod._explicit_feedback_ids.add(beliefs[0].id)
 
     now_ts: str = datetime.now(timezone.utc).isoformat()
-    server_mod._retrieval_buffer[session_id] = [
-        (b.id, now_ts) for b in beliefs
-    ]
-    server_mod._signal_buffer.append("uv package manager python database migrations schema")
+    server_mod._retrieval_buffer[session_id] = [(b.id, now_ts) for b in beliefs]
+    server_mod._signal_buffer.append(
+        "uv package manager python database migrations schema"
+    )
 
     count: int = server_mod._process_auto_feedback(session_id)
     # Only 2 should get auto-feedback (belief 0 is skipped).
@@ -225,7 +226,9 @@ def test_auto_feedback_skips_explicit(store: MemoryStore) -> None:
 
     results: list[dict[str, str]] = _query_test_results(store, session_id)
     feedback_ids: set[str] = {r["belief_id"] for r in results}
-    assert beliefs[0].id not in feedback_ids, "Explicit-feedback belief should be skipped"
+    assert beliefs[0].id not in feedback_ids, (
+        "Explicit-feedback belief should be skipped"
+    )
 
 
 def test_auto_feedback_no_ingest_all_ignored(store: MemoryStore) -> None:
@@ -238,9 +241,7 @@ def test_auto_feedback_no_ingest_all_ignored(store: MemoryStore) -> None:
     beliefs: list[Belief] = _insert_test_beliefs(store)
 
     now_ts: str = datetime.now(timezone.utc).isoformat()
-    server_mod._retrieval_buffer[session_id] = [
-        (b.id, now_ts) for b in beliefs
-    ]
+    server_mod._retrieval_buffer[session_id] = [(b.id, now_ts) for b in beliefs]
     # No ingest -- _signal_buffer stays empty.
 
     count: int = server_mod._process_auto_feedback(session_id)

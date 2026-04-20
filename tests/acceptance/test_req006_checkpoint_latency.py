@@ -4,6 +4,7 @@ Pass criterion: p95 latency for writing a checkpoint must be < 50ms.
 p99 must be < 100ms.
 1,000 checkpoints with payload sizes from 100 bytes to 10KB.
 """
+
 from __future__ import annotations
 
 import statistics
@@ -30,7 +31,9 @@ def _make_payload(size_bytes: int) -> str:
 
 def test_req006_checkpoint_latency(store: MemoryStore) -> None:
     """Write 1,000 checkpoints, measure latency, assert p95 < 50ms and p99 < 100ms."""
-    session: Session = store.create_session(model="claude", project_context="latency-test")
+    session: Session = store.create_session(
+        model="claude", project_context="latency-test"
+    )
 
     checkpoint_types: list[str] = [CKPT_DECISION, CKPT_FILE_CHANGE, CKPT_TASK_STATE]
     latencies_ms: list[float] = []

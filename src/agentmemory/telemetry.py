@@ -10,6 +10,7 @@ source_type names, edge_type names) are collected.
 
 Users can disable telemetry via config: {"telemetry": {"enabled": false}}
 """
+
 from __future__ import annotations
 
 import json
@@ -25,6 +26,7 @@ from agentmemory.store import MemoryStore
 @dataclass
 class SessionMetrics:
     """Per-session counters (no content)."""
+
     retrieval_tokens: int = 0
     classification_tokens: int = 0
     beliefs_created: int = 0
@@ -39,6 +41,7 @@ class SessionMetrics:
 @dataclass
 class FeedbackMetrics:
     """Feedback loop health (aggregated counts only)."""
+
     outcome_counts: dict[str, int] = field(default_factory=lambda: {})
     detection_layer_counts: dict[str, int] = field(default_factory=lambda: {})
     feedback_rate: float = 0.0
@@ -47,6 +50,7 @@ class FeedbackMetrics:
 @dataclass
 class BeliefMetrics:
     """Belief lifecycle metrics (counts and distributions only)."""
+
     total_active: int = 0
     total_superseded: int = 0
     total_locked: int = 0
@@ -60,6 +64,7 @@ class BeliefMetrics:
 @dataclass
 class GraphMetrics:
     """Graph health metrics (counts only)."""
+
     total_edges: int = 0
     edge_type_distribution: dict[str, int] = field(default_factory=lambda: {})
     avg_edges_per_belief: float = 0.0
@@ -68,6 +73,7 @@ class GraphMetrics:
 @dataclass
 class TelemetrySnapshot:
     """Complete telemetry snapshot. Content-free by construction."""
+
     v: int = 1
     ts: str = ""
     session: SessionMetrics = field(default_factory=SessionMetrics)
@@ -132,7 +138,9 @@ def collect_feedback_metrics(store: MemoryStore, session_id: str) -> FeedbackMet
            WHERE session_id = ? GROUP BY outcome""",
         (session_id,),
     ).fetchall()
-    outcome_counts: dict[str, int] = {str(r["outcome"]): int(r["cnt"]) for r in outcome_rows}
+    outcome_counts: dict[str, int] = {
+        str(r["outcome"]): int(r["cnt"]) for r in outcome_rows
+    }
 
     # Detection layer distribution
     layer_rows = conn.execute(
@@ -140,7 +148,9 @@ def collect_feedback_metrics(store: MemoryStore, session_id: str) -> FeedbackMet
            WHERE session_id = ? GROUP BY detection_layer""",
         (session_id,),
     ).fetchall()
-    layer_counts: dict[str, int] = {str(r["detection_layer"]): int(r["cnt"]) for r in layer_rows}
+    layer_counts: dict[str, int] = {
+        str(r["detection_layer"]): int(r["cnt"]) for r in layer_rows
+    }
 
     # Feedback rate
     session_row = conn.execute(
@@ -172,7 +182,9 @@ def collect_belief_metrics(store: MemoryStore) -> BeliefMetrics:
 
     active: int = count("SELECT COUNT(*) FROM beliefs WHERE valid_to IS NULL")
     superseded: int = count("SELECT COUNT(*) FROM beliefs WHERE valid_to IS NOT NULL")
-    locked: int = count("SELECT COUNT(*) FROM beliefs WHERE locked = 1 AND valid_to IS NULL")
+    locked: int = count(
+        "SELECT COUNT(*) FROM beliefs WHERE locked = 1 AND valid_to IS NULL"
+    )
 
     # Confidence histogram
     conf_rows = conn.execute(
@@ -194,7 +206,9 @@ def collect_belief_metrics(store: MemoryStore) -> BeliefMetrics:
         """SELECT belief_type, COUNT(*) as cnt FROM beliefs
            WHERE valid_to IS NULL GROUP BY belief_type"""
     ).fetchall()
-    type_dist: dict[str, int] = {str(r["belief_type"]): int(r["cnt"]) for r in type_rows}
+    type_dist: dict[str, int] = {
+        str(r["belief_type"]): int(r["cnt"]) for r in type_rows
+    }
 
     # Source distribution
     src_rows = conn.execute(
@@ -287,7 +301,9 @@ def collect_rolling_window(store: MemoryStore, n_sessions: int) -> dict[str, Any
         "sessions_in_window": count,
         "totals": totals,
         "averages": {k: round(v / count, 2) for k, v in totals.items()},
-        "feedback_rate": round(totals["feedback_given"] / searches, 3) if searches > 0 else 0.0,
+        "feedback_rate": round(totals["feedback_given"] / searches, 3)
+        if searches > 0
+        else 0.0,
         "correction_rate": round(totals["corrections_detected"] / count, 3),
     }
     return result

@@ -1,4 +1,5 @@
 """Tests for temporal supersession detector."""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -57,14 +58,16 @@ def test_extract_terms_minimum_length() -> None:
 def test_jaccard_identical_sets() -> None:
     s: set[str] = {"database", "postgresql", "wal"}
     assert jaccard_similarity(s, s) == pytest.approx(  # pyright: ignore[reportUnknownMemberType]
-1.0)
+        1.0
+    )
 
 
 def test_jaccard_disjoint_sets() -> None:
     a: set[str] = {"database", "postgresql"}
     b: set[str] = {"frontend", "react"}
     assert jaccard_similarity(a, b) == pytest.approx(  # pyright: ignore[reportUnknownMemberType]
-0.0)
+        0.0
+    )
 
 
 def test_jaccard_partial_overlap() -> None:
@@ -73,14 +76,17 @@ def test_jaccard_partial_overlap() -> None:
     # intersection = {database, production} = 2
     # union = {database, postgresql, production, sqlite} = 4
     assert jaccard_similarity(a, b) == pytest.approx(  # pyright: ignore[reportUnknownMemberType]
-0.5)
+        0.5
+    )
 
 
 def test_jaccard_empty_sets() -> None:
     assert jaccard_similarity(set(), set()) == pytest.approx(  # pyright: ignore[reportUnknownMemberType]
-0.0)
+        0.0
+    )
     assert jaccard_similarity({"a"}, set()) == pytest.approx(  # pyright: ignore[reportUnknownMemberType]
-0.0)
+        0.0
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -179,6 +185,7 @@ def test_no_supersession_when_old_is_locked(store: MemoryStore) -> None:
 def test_time_gate_respected(store: MemoryStore) -> None:
     """Beliefs created close together should NOT supersede each other."""
     from datetime import datetime, timezone
+
     now: str = datetime.now(timezone.utc).isoformat()
 
     store.insert_belief(

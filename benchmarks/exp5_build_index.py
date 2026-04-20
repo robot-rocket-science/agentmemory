@@ -8,6 +8,7 @@ Usage:
         /tmp/exp5_lines.json /tmp/exp5_llm_triples.json \
         --retrieve-only /tmp/exp5_treatment_b.json
 """
+
 from __future__ import annotations
 
 import argparse
@@ -34,7 +35,9 @@ def main() -> None:
     parser.add_argument("lines_file", help="Path to exp5_lines.json (from Phase 1)")
     parser.add_argument("triples_file", help="Path to LLM-extracted triples JSON")
     parser.add_argument(
-        "--retrieve-only", default=None, metavar="PATH",
+        "--retrieve-only",
+        default=None,
+        metavar="PATH",
         help="Write retrieval results (NO answers) to PATH",
     )
     args: argparse.Namespace = parser.parse_args()
@@ -58,27 +61,35 @@ def main() -> None:
         prop: str = str(rt.get("property", "")).strip()
         value: str = str(rt.get("value", "")).strip()
         raw_serial: object = rt.get("serial")
-        serial: int | None = int(raw_serial) if isinstance(raw_serial, (int, float)) else None
+        serial: int | None = (
+            int(raw_serial) if isinstance(raw_serial, (int, float)) else None
+        )
 
         if entity and prop and value:
-            triples.append(FactTriple(
-                entity=entity,
-                property_name=prop,
-                value=value,
-                serial=serial,
-                source_text=str(rt.get("source_text", "")),
-            ))
+            triples.append(
+                FactTriple(
+                    entity=entity,
+                    property_name=prop,
+                    value=value,
+                    serial=serial,
+                    source_text=str(rt.get("source_text", "")),
+                )
+            )
 
-    print(f"Loaded {len(triples)} LLM-extracted triples from {total_lines} lines "
-          f"({len(triples)/total_lines*100:.1f}%)")
+    print(
+        f"Loaded {len(triples)} LLM-extracted triples from {total_lines} lines "
+        f"({len(triples) / total_lines * 100:.1f}%)"
+    )
 
     # Build entity index
     index: EntityIndex = EntityIndex()
     for triple in triples:
         index.add(triple)
 
-    print(f"Index: {index.entity_count} entities, {index.fact_count} facts, "
-          f"{index.conflict_count} conflicts")
+    print(
+        f"Index: {index.entity_count} entities, {index.fact_count} facts, "
+        f"{index.conflict_count} conflicts"
+    )
 
     # Run queries
     per_question: list[dict[str, object]] = []
@@ -88,15 +99,19 @@ def main() -> None:
     answer_in_ctx: int = 0
     for i, (question, answer_list) in enumerate(zip(questions, answers)):
         ctx: str = multi_hop_retrieve(index, question)
-        per_question.append({
-            "id": i,
-            "question": question,
-            "context": ctx,
-        })
-        ground_truth.append({
-            "id": i,
-            "answers": answer_list,
-        })
+        per_question.append(
+            {
+                "id": i,
+                "question": question,
+                "context": ctx,
+            }
+        )
+        ground_truth.append(
+            {
+                "id": i,
+                "answers": answer_list,
+            }
+        )
 
         if answer_list[0].lower() in ctx.lower():
             answer_in_ctx += 1
@@ -104,8 +119,10 @@ def main() -> None:
     query_time: float = time.monotonic() - t0
 
     print(f"Queried {len(questions)} questions in {query_time:.2f}s")
-    print(f"Answer in context: {answer_in_ctx}/{len(questions)} "
-          f"= {answer_in_ctx/len(questions)*100:.0f}%")
+    print(
+        f"Answer in context: {answer_in_ctx}/{len(questions)} "
+        f"= {answer_in_ctx / len(questions) * 100:.0f}%"
+    )
 
     # Write output
     if args.retrieve_only:

@@ -1,4 +1,5 @@
 """Tests for the Exp 61 extraction and classification pipeline modules."""
+
 from __future__ import annotations
 
 from collections.abc import Generator
@@ -44,7 +45,11 @@ def test_extract_sentences_strips_inline_code() -> None:
         assert "`" not in s
     # Surrounding text should still be present
     joined: str = " ".join(sentences)
-    assert "run" in joined.lower() or "command" in joined.lower() or "execute" in joined.lower()
+    assert (
+        "run" in joined.lower()
+        or "command" in joined.lower()
+        or "execute" in joined.lower()
+    )
 
 
 def test_extract_sentences_strips_urls() -> None:
@@ -134,7 +139,9 @@ def test_detect_correction_from_now_on() -> None:
 
 
 def test_detect_correction_directive() -> None:
-    is_corr, signals, _conf = detect_correction("strict static typing is mandatory in all code")
+    is_corr, signals, _conf = detect_correction(
+        "strict static typing is mandatory in all code"
+    )
     assert is_corr is True
     assert "directive" in signals or "declarative" in signals
 
@@ -235,7 +242,7 @@ def test_ingest_turn_creates_observation_and_beliefs(store: MemoryStore) -> None
         store=store,
         text=text,
         source="user",
-            )
+    )
     assert result.observations_created == 1
     assert result.sentences_extracted >= 1
     # At least one sentence should persist (strong correction signals)
@@ -248,12 +255,12 @@ def test_ingest_turn_user_vs_assistant(store: MemoryStore) -> None:
         store=store,
         text="We have decided to use PostgreSQL for the backend database.",
         source="user",
-            )
+    )
     assistant_result: IngestResult = ingest_turn(
         store=store,
         text="The schema migration completed successfully across all environments.",
         source="assistant",
-            )
+    )
     assert user_result.observations_created == 1
     assert assistant_result.observations_created == 1
 
@@ -264,7 +271,7 @@ def test_ingest_turn_empty_text(store: MemoryStore) -> None:
         store=store,
         text="",
         source="user",
-            )
+    )
     assert result.sentences_extracted == 0
     assert result.beliefs_created == 0
 
@@ -282,7 +289,7 @@ def test_correction_creates_unlocked_belief(store: MemoryStore) -> None:
         store=store,
         text=text,
         source="user",
-            )
+    )
     # Corrections are detected and persisted as beliefs
     assert result.corrections_detected >= 1
     assert result.beliefs_created >= 1
@@ -299,7 +306,7 @@ def test_correction_detection_count(store: MemoryStore) -> None:
         store=store,
         text=text,
         source="user",
-            )
+    )
     assert result.corrections_detected >= 1
 
 

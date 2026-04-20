@@ -11,6 +11,7 @@ Usage:
     uv run python benchmarks/structmemeval_adapter.py [--data PATH] [--task location] [--bench small]
     uv run python benchmarks/structmemeval_adapter.py --retrieve-only results.json --task accounting
 """
+
 from __future__ import annotations
 
 import argparse
@@ -113,11 +114,13 @@ def _load_case(path: Path) -> Case:
             Message(role=m.get("role", "user"), content=m.get("content", ""))
             for m in raw_messages
         ]
-        sessions.append(Session(
-            session_id=str(rs.get("session_id", "")),
-            topic=str(rs.get("topic", "")),
-            messages=messages,
-        ))
+        sessions.append(
+            Session(
+                session_id=str(rs.get("session_id", "")),
+                topic=str(rs.get("topic", "")),
+                messages=messages,
+            )
+        )
 
     # Parse queries
     raw_queries: list[dict[str, object]] = raw.get("queries", [])  # type: ignore[assignment]
@@ -137,10 +140,12 @@ def _load_case(path: Path) -> Case:
             ref = ReferenceAnswer(text=str(raw_ref.get("text", "")))  # type: ignore[union-attr]
         else:
             ref = ReferenceAnswer(text=str(raw_ref))
-        queries.append(Query(
-            question=str(rq.get("question", "")),
-            reference_answer=ref,
-        ))
+        queries.append(
+            Query(
+                question=str(rq.get("question", "")),
+                reference_answer=ref,
+            )
+        )
 
     return Case(
         case_id=case_id,
@@ -198,6 +203,7 @@ def _synthetic_timestamp(session_idx: int, total_sessions: int) -> str:
     the first session gets (total_sessions - 1) * 30 days ago.
     """
     from datetime import timedelta
+
     now: datetime = datetime.now(timezone.utc)
     months_ago: int = total_sessions - 1 - session_idx
     dt: datetime = now - timedelta(days=months_ago * 30)
@@ -296,8 +302,10 @@ def check_state_correctness(retrieved: str, reference: ReferenceAnswer) -> bool:
     # For a simple heuristic, check if any significant word from the
     # reference appears in the retrieved content.
     ref_words: list[str] = [
-        w for w in ref_lower.split()
-        if len(w) > 3 and w not in {"the", "that", "this", "with", "from", "should", "their", "about"}
+        w
+        for w in ref_lower.split()
+        if len(w) > 3
+        and w not in {"the", "that", "this", "with", "from", "should", "their", "about"}
     ]
 
     if not ref_words:
@@ -405,12 +413,14 @@ def run_case(
         if correct:
             result.correct_state += 1
 
-        result.per_query.append({
-            "question": query.question,
-            "reference_answer": query.reference_answer.text,
-            "context": retrieved,
-            "correct": correct,
-        })
+        result.per_query.append(
+            {
+                "question": query.question,
+                "reference_answer": query.reference_answer.text,
+                "context": retrieved,
+                "correct": correct,
+            }
+        )
 
     result.query_time_s = time.monotonic() - t1
 
@@ -435,8 +445,10 @@ def print_task_result(result: TaskResult) -> None:
     print(f"{'=' * 60}")
     print(f"Cases:             {len(result.cases)}")
     print(f"Total queries:     {result.total_queries}")
-    print(f"Correct state:     {result.total_correct}/{result.total_queries} "
-          f"({result.accuracy * 100:.1f}%)")
+    print(
+        f"Correct state:     {result.total_correct}/{result.total_queries} "
+        f"({result.accuracy * 100:.1f}%)"
+    )
     print(f"Perfect cases:     {result.cases_with_perfect_state}/{len(result.cases)}")
     print(f"Total ingest time: {result.total_ingest_time:.2f}s")
     print(f"Total query time:  {result.total_query_time:.2f}s")
@@ -470,29 +482,37 @@ def main() -> None:
         description="Run StructMemEval benchmark on agentmemory",
     )
     parser.add_argument(
-        "--data", default=DEFAULT_DATA_PATH,
+        "--data",
+        default=DEFAULT_DATA_PATH,
         help="Path to StructMemEval data directory (default: /tmp/StructMemEval/benchmark/data)",
     )
     parser.add_argument(
-        "--task", default="location",
+        "--task",
+        default="location",
         choices=["location", "accounting", "recommendations", "tree"],
         help="Task type to evaluate (default: location)",
     )
     parser.add_argument(
-        "--bench", default="small",
+        "--bench",
+        default="small",
         choices=["small", "big"],
         help="Bench size for location tasks: small (14 cases) or big (42 cases)",
     )
     parser.add_argument(
-        "--budget", type=int, default=2000,
+        "--budget",
+        type=int,
+        default=2000,
         help="Token budget for retrieval (default: 2000)",
     )
     parser.add_argument(
-        "--output", default=None,
+        "--output",
+        default=None,
         help="Write detailed results JSON to this path",
     )
     parser.add_argument(
-        "--retrieve-only", default=None, metavar="PATH",
+        "--retrieve-only",
+        default=None,
+        metavar="PATH",
         help="Run retrieval only, write question+context+reference for LLM judge scoring",
     )
     args: argparse.Namespace = parser.parse_args()
@@ -516,7 +536,10 @@ def main() -> None:
             )
 
             case_result: CaseResult = run_case(
-                case, args.task, tmpdir, budget=args.budget,
+                case,
+                args.task,
+                tmpdir,
+                budget=args.budget,
             )
             task_result.cases.append(case_result)
 
@@ -529,17 +552,21 @@ def main() -> None:
         all_gt: list[dict[str, object]] = []
         for cr in task_result.cases:
             for pq in cr.per_query:
-                all_items.append({
-                    "case_id": cr.case_id,
-                    "task": cr.task,
-                    "question": pq["question"],
-                    "context": pq["context"],
-                })
-                all_gt.append({
-                    "case_id": cr.case_id,
-                    "question": pq["question"],
-                    "reference_answer": pq["reference_answer"],
-                })
+                all_items.append(
+                    {
+                        "case_id": cr.case_id,
+                        "task": cr.task,
+                        "question": pq["question"],
+                        "context": pq["context"],
+                    }
+                )
+                all_gt.append(
+                    {
+                        "case_id": cr.case_id,
+                        "question": pq["question"],
+                        "reference_answer": pq["reference_answer"],
+                    }
+                )
         retrieve_path: Path = Path(args.retrieve_only)
         gt_path: Path = retrieve_path.with_name(
             retrieve_path.stem + "_gt" + retrieve_path.suffix,

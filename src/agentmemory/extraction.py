@@ -3,6 +3,7 @@
 Implements the Exp 57/61 dumb extraction pipeline: strip noise, split on boundaries,
 discard fragments. No classification, no keyword filtering.
 """
+
 from __future__ import annotations
 
 import re
