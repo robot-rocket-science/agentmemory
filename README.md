@@ -58,6 +58,17 @@ Without agentmemory, the agent takes "push to github" literally and runs `git pu
 
 ---
 
+## You Need This If
+
+| Your problem | What keeps happening | How agentmemory fixes it |
+|---|---|---|
+| **Complex deploy workflows** | You built a 29KB runbook with dispatch gates and safety checks. The agent skips the runbook and runs raw commands. You re-explain the procedure ~3 times a day. A manual CLAUDE.md reference reduced failures by 67% but plateaued. | The runbook becomes locked beliefs injected every session. The agent can't skip what's already in its prompt. Zero re-explanations after the first correction. |
+| **Long stateful projects** | Context drift across sessions kills multi-step work. The agent forgets which approach was abandoned, re-suggests dead ends, or loses track of where you are in a 10-phase roadmap. You spend more time re-orienting the agent than doing work. | Decisions, corrections, and project state persist across sessions. The agent starts every session knowing what was tried, what failed, and what's current. |
+| **Multi-repo or multi-project work** | Knowledge learned in one project doesn't transfer. You explain your infrastructure setup separately in every repo. The same mistakes happen in each project because each context window starts fresh. | Cross-project shared scopes (v3). Beliefs about your deploy pipeline, team conventions, or infrastructure flow between projects without duplication. |
+| **The "I already told you" loop** | You correct the agent. It acknowledges. Next session, same mistake. You correct again. After the fifth time you write it in a config file. The agent reads the config file and still doesn't follow it. | Corrections are stored with 92% detection accuracy (zero LLM cost), tracked with Bayesian confidence, and mechanically injected. The agent doesn't choose to read them. They're part of the prompt. |
+
+---
+
 ## What It Remembers
 
 | You say | It stores |
@@ -151,7 +162,7 @@ agent   [corrects the belief, supersedes the old one]
         Done. Want to lock the updated version?
 ```
 
-The system caught *its own error* because it had enough accumulated context to notice the inconsistency. [More examples and a full session transcript showing wonder + reason in action](docs/case-study-positioning.md).
+The system caught *its own error* because it had enough accumulated context to notice the inconsistency. [More examples and a full session transcript showing wonder + reason in action](docs/internal/case-study-positioning.md).
 
 ---
 
@@ -176,7 +187,7 @@ Currently supports **Claude Code** via MCP (Model Context Protocol). The archite
 
 - **Getting Started:** [Installation](docs/INSTALL.md) | [Workflow](docs/WORKFLOW.md)
 - **Reference:** [Commands](docs/COMMANDS.md) | [Obsidian Integration](docs/OBSIDIAN.md) | [Privacy](docs/PRIVACY.md)
-- **Technical:** [Architecture](docs/ARCHITECTURE.md) | [Benchmarks](docs/BENCHMARK_RESULTS.md) | [Case Studies](docs/case-study-positioning.md) | [Philosophy](docs/PHILOSOPHY.md)
+- **Technical:** [Architecture](docs/ARCHITECTURE.md) | [Benchmarks](docs/BENCHMARK_RESULTS.md) | [Case Studies](docs/internal/case-study-positioning.md) | [Philosophy](docs/PHILOSOPHY.md)
 
 ## Development
 
