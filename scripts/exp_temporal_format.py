@@ -141,7 +141,10 @@ def load_beliefs() -> list[Belief]:
         raw_beliefs.append(Belief(id=bid, content=content, created_at=dt))
 
     if not raw_beliefs:
-        print("ERROR: No beliefs found in database. Cannot run experiment.", file=sys.stderr)
+        print(
+            "ERROR: No beliefs found in database. Cannot run experiment.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     # We need enough beliefs with meaningful time spread.
@@ -166,11 +169,13 @@ def load_beliefs() -> list[Belief]:
         dt = base_time + timedelta(hours=offset_hours)
         src = raw_beliefs[i % len(raw_beliefs)]
         label = f"[syn-{i:02d}]"
-        synthetic.append(Belief(
-            id=f"syn_{i:04d}",
-            content=f"{label} {src.content}",
-            created_at=dt,
-        ))
+        synthetic.append(
+            Belief(
+                id=f"syn_{i:04d}",
+                content=f"{label} {src.content}",
+                created_at=dt,
+            )
+        )
 
     synthetic.sort(key=lambda b: b.created_at)
     return synthetic
@@ -204,7 +209,9 @@ def _make_task(
         pair = rng.sample(beliefs, 2)
         older = min(pair, key=lambda b: b.created_at)
         return Task(
-            task_id=task_id, task_type=task_type, beliefs=pair,
+            task_id=task_id,
+            task_type=task_type,
+            beliefs=pair,
             ground_truth=older.id,
         )
 
@@ -212,7 +219,9 @@ def _make_task(
         group = rng.sample(beliefs, 5)
         newest = max(group, key=lambda b: b.created_at)
         return Task(
-            task_id=task_id, task_type=task_type, beliefs=group,
+            task_id=task_id,
+            task_type=task_type,
+            beliefs=group,
             ground_truth=newest.id,
         )
 
@@ -226,7 +235,9 @@ def _make_task(
         else:
             gap_str = f"{total_hours:.1f} hours"
         return Task(
-            task_id=task_id, task_type=task_type, beliefs=pair,
+            task_id=task_id,
+            task_type=task_type,
+            beliefs=pair,
             ground_truth=gap_str,
         )
 
@@ -235,7 +246,9 @@ def _make_task(
         ordered = sorted(group, key=lambda b: b.created_at)
         order_str = ",".join(b.id for b in ordered)
         return Task(
-            task_id=task_id, task_type=task_type, beliefs=group,
+            task_id=task_id,
+            task_type=task_type,
+            beliefs=group,
             ground_truth=order_str,
         )
 
@@ -253,7 +266,9 @@ def _make_task(
         truth = ",".join(within) if within else "none"
         all_beliefs = [anchor] + picked
         return Task(
-            task_id=task_id, task_type=task_type, beliefs=all_beliefs,
+            task_id=task_id,
+            task_type=task_type,
+            beliefs=all_beliefs,
             ground_truth=truth,
         )
 
@@ -337,10 +352,14 @@ def call_llm(prompt: str) -> tuple[str, float]:
         result = subprocess.run(
             [
                 "claude",
-                "-p", prompt,
-                "--model", MODEL,
-                "--max-turns", "1",
-                "--output-format", "text",
+                "-p",
+                prompt,
+                "--model",
+                MODEL,
+                "--max-turns",
+                "1",
+                "--output-format",
+                "text",
             ],
             capture_output=True,
             text=True,
@@ -396,7 +415,9 @@ def score_response(task: Task, response: str) -> tuple[bool, str]:
         return expected_ids == got_ids, cleaned
 
     else:  # WINDOW
-        expected_set: set[str] = set(task.ground_truth.split(",")) if task.ground_truth != "none" else set()
+        expected_set: set[str] = (
+            set(task.ground_truth.split(",")) if task.ground_truth != "none" else set()
+        )
         if cleaned.lower() == "none":
             got_set: set[str] = set()
         else:
@@ -453,7 +474,9 @@ def run_experiment() -> dict[str, Any]:
             all_results.append(result)
             completed += 1
             status = "OK" if correct else "WRONG"
-            print(f"  [{completed:2d}/{total}] Task {task_obj.task_id:2d} {cond:<8s} {status:<5s} ({latency:.2f}s)")
+            print(
+                f"  [{completed:2d}/{total}] Task {task_obj.task_id:2d} {cond:<8s} {status:<5s} ({latency:.2f}s)"
+            )
 
     # Compute report
     print("\n[4/4] Computing results...\n")
@@ -535,7 +558,7 @@ def print_report(report: dict[str, Any]) -> None:
 
     print("\nOverall Accuracy by Condition:")
     print(f"  {'Condition':<12s} {'Accuracy':>10s} {'Correct':>10s} {'Latency':>10s}")
-    print(f"  {'-'*12} {'-'*10} {'-'*10} {'-'*10}")
+    print(f"  {'-' * 12} {'-' * 10} {'-' * 10} {'-' * 10}")
     per_cond: dict[str, Any] = report["per_condition"]
     for cond in CONDITIONS:
         stats: dict[str, float] = per_cond[cond]
@@ -551,7 +574,9 @@ def print_report(report: dict[str, Any]) -> None:
         print(f"\n  {tt}:")
         for cond in CONDITIONS:
             s: dict[str, float] = per_type[tt][cond]
-            print(f"    {cond:<10s} {s['accuracy_pct']:>6.1f}%  ({int(s['correct'])}/{int(s['total'])})")
+            print(
+                f"    {cond:<10s} {s['accuracy_pct']:>6.1f}%  ({int(s['correct'])}/{int(s['total'])})"
+            )
 
     print(f"\nWinner: {report['winner']}")
     print(f"Summary: {report['summary']}")

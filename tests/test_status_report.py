@@ -1,4 +1,5 @@
 """Tests for the redesigned status report: inventory, retrieval, activity, maintenance."""
+
 from __future__ import annotations
 
 from pathlib import Path

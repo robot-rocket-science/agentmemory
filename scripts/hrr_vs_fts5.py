@@ -35,21 +35,105 @@ from hrr_encoder import Edge, HRRGraph, load_edges
 
 
 SKIP_DIRS: set[str] = {
-    ".git", "node_modules", "target", ".venv", "venv", "__pycache__",
-    ".mypy_cache", ".ruff_cache", "dist", "build", ".tox", "vendor",
-    "third_party", "3rdparty",
+    ".git",
+    "node_modules",
+    "target",
+    ".venv",
+    "venv",
+    "__pycache__",
+    ".mypy_cache",
+    ".ruff_cache",
+    "dist",
+    "build",
+    ".tox",
+    "vendor",
+    "third_party",
+    "3rdparty",
 }
 
 STOP_WORDS: set[str] = {
-    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-    "have", "has", "had", "do", "does", "did", "will", "would", "could",
-    "should", "may", "might", "shall", "can", "need", "must", "to", "of",
-    "in", "for", "on", "with", "at", "by", "from", "as", "into", "through",
-    "during", "before", "after", "above", "below", "between", "out", "off",
-    "over", "under", "again", "further", "then", "once", "here", "there",
-    "when", "where", "why", "how", "all", "each", "every", "both", "few",
-    "more", "most", "other", "some", "such", "no", "nor", "not", "only",
-    "own", "same", "so", "than", "too", "very", "and", "but", "or", "if",
+    "the",
+    "a",
+    "an",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "being",
+    "have",
+    "has",
+    "had",
+    "do",
+    "does",
+    "did",
+    "will",
+    "would",
+    "could",
+    "should",
+    "may",
+    "might",
+    "shall",
+    "can",
+    "need",
+    "must",
+    "to",
+    "of",
+    "in",
+    "for",
+    "on",
+    "with",
+    "at",
+    "by",
+    "from",
+    "as",
+    "into",
+    "through",
+    "during",
+    "before",
+    "after",
+    "above",
+    "below",
+    "between",
+    "out",
+    "off",
+    "over",
+    "under",
+    "again",
+    "further",
+    "then",
+    "once",
+    "here",
+    "there",
+    "when",
+    "where",
+    "why",
+    "how",
+    "all",
+    "each",
+    "every",
+    "both",
+    "few",
+    "more",
+    "most",
+    "other",
+    "some",
+    "such",
+    "no",
+    "nor",
+    "not",
+    "only",
+    "own",
+    "same",
+    "so",
+    "than",
+    "too",
+    "very",
+    "and",
+    "but",
+    "or",
+    "if",
 }
 
 
@@ -74,7 +158,8 @@ class FTS5Index:
         """Search for files matching query terms. Returns (path, rank) pairs."""
         # Build OR query from terms
         terms: list[str] = [
-            t for t in re.findall(r"[a-zA-Z_][a-zA-Z0-9_]{2,}", query)
+            t
+            for t in re.findall(r"[a-zA-Z_][a-zA-Z0-9_]{2,}", query)
             if t.lower() not in STOP_WORDS and len(t) > 2
         ]
         if not terms:
@@ -105,10 +190,32 @@ def build_fts5_index(repo_path: Path) -> FTS5Index:
 
             # Only index text-like files
             if ext not in {
-                ".py", ".rs", ".go", ".ts", ".tsx", ".js", ".jsx",
-                ".c", ".h", ".cpp", ".cc", ".hpp", ".md", ".txt",
-                ".yml", ".yaml", ".toml", ".json", ".sh", ".sql",
-                ".css", ".html", ".xml", ".cfg", ".conf", ".ini",
+                ".py",
+                ".rs",
+                ".go",
+                ".ts",
+                ".tsx",
+                ".js",
+                ".jsx",
+                ".c",
+                ".h",
+                ".cpp",
+                ".cc",
+                ".hpp",
+                ".md",
+                ".txt",
+                ".yml",
+                ".yaml",
+                ".toml",
+                ".json",
+                ".sh",
+                ".sql",
+                ".css",
+                ".html",
+                ".xml",
+                ".cfg",
+                ".conf",
+                ".ini",
             }:
                 continue
 
@@ -130,7 +237,9 @@ class EdgeWithOverlap(NamedTuple):
     vocab_overlap: float
 
 
-def load_edges_with_overlap(extracted_dir: Path, repo_name: str) -> list[EdgeWithOverlap]:
+def load_edges_with_overlap(
+    extracted_dir: Path, repo_name: str
+) -> list[EdgeWithOverlap]:
     """Load edges from refined output that have vocab_overlap scores."""
     refined_path: Path = extracted_dir / "refined" / f"{repo_name}.json"
     if not refined_path.exists():
@@ -197,16 +306,16 @@ def main() -> None:
     print(f"  {len(edges)} edges loaded", file=sys.stderr)
 
     # Build FTS5 index
-    print(f"  building FTS5 index...", file=sys.stderr)
+    print("  building FTS5 index...", file=sys.stderr)
     fts: FTS5Index = build_fts5_index(repo_path)
 
     # Build HRR graph
-    print(f"  building HRR graph...", file=sys.stderr)
+    print("  building HRR graph...", file=sys.stderr)
     hrr: HRRGraph = HRRGraph(dim=dim)
     hrr.encode(edges)
 
     # Compute per-edge vocabulary overlap
-    print(f"  computing vocabulary overlap...", file=sys.stderr)
+    print("  computing vocabulary overlap...", file=sys.stderr)
     token_cache: dict[str, set[str] | None] = {}
 
     def get_tokens(filepath: str) -> set[str] | None:
@@ -226,9 +335,9 @@ def main() -> None:
             return None
 
     # Categorize edges by overlap
-    low_overlap: list[Edge] = []   # < 0.1
+    low_overlap: list[Edge] = []  # < 0.1
     high_overlap: list[Edge] = []  # > 0.3
-    mid_overlap: list[Edge] = []   # 0.1 - 0.3
+    mid_overlap: list[Edge] = []  # 0.1 - 0.3
     skipped: int = 0
 
     for e in edges:
@@ -271,7 +380,9 @@ def main() -> None:
 
         rng: np.random.Generator = np.random.default_rng(42)
         if len(query_keys) > max_queries:
-            indices: NDArray[np.intp] = rng.choice(len(query_keys), size=max_queries, replace=False)
+            indices: NDArray[np.intp] = rng.choice(
+                len(query_keys), size=max_queries, replace=False
+            )
             query_keys = [query_keys[int(i)] for i in indices]
 
         hrr_hits: int = 0
@@ -287,7 +398,9 @@ def main() -> None:
             total_targets += len(targets)
 
             # HRR retrieval
-            hrr_results: list[tuple[str, float]] = hrr.query_forward(source, edge_type, top_k=10)
+            hrr_results: list[tuple[str, float]] = hrr.query_forward(
+                source, edge_type, top_k=10
+            )
             hrr_found: set[str] = {r[0] for r in hrr_results[:10]}
 
             # FTS5 retrieval: use source file content as query
@@ -301,7 +414,9 @@ def main() -> None:
 
             fts_found: set[str] = set()
             if source_content:
-                fts_results: list[tuple[str, float]] = fts.search(source_content, limit=10)
+                fts_results: list[tuple[str, float]] = fts.search(
+                    source_content, limit=10
+                )
                 fts_found = {r[0] for r in fts_results if r[0] != source}
 
             # Count hits per target
@@ -339,23 +454,32 @@ def main() -> None:
         }
 
     # Run evaluation on each overlap tier
-    print(f"\n  === Low overlap (<0.1) -- HRR should add value ===", file=sys.stderr)
+    print("\n  === Low overlap (<0.1) -- HRR should add value ===", file=sys.stderr)
     low_results: dict[str, Any] = evaluate_set(low_overlap, "low_overlap")
     print(f"  HRR recall: {low_results.get('hrr_recall', 0):.3f}", file=sys.stderr)
     print(f"  FTS5 recall: {low_results.get('fts_recall', 0):.3f}", file=sys.stderr)
-    print(f"  HRR-only: {low_results.get('hrr_only', 0)}, FTS-only: {low_results.get('fts_only', 0)}, Both: {low_results.get('both_found', 0)}, Neither: {low_results.get('neither_found', 0)}", file=sys.stderr)
+    print(
+        f"  HRR-only: {low_results.get('hrr_only', 0)}, FTS-only: {low_results.get('fts_only', 0)}, Both: {low_results.get('both_found', 0)}, Neither: {low_results.get('neither_found', 0)}",
+        file=sys.stderr,
+    )
 
-    print(f"\n  === High overlap (>0.3) -- FTS5 should suffice ===", file=sys.stderr)
+    print("\n  === High overlap (>0.3) -- FTS5 should suffice ===", file=sys.stderr)
     high_results: dict[str, Any] = evaluate_set(high_overlap, "high_overlap")
     print(f"  HRR recall: {high_results.get('hrr_recall', 0):.3f}", file=sys.stderr)
     print(f"  FTS5 recall: {high_results.get('fts_recall', 0):.3f}", file=sys.stderr)
-    print(f"  HRR-only: {high_results.get('hrr_only', 0)}, FTS-only: {high_results.get('fts_only', 0)}, Both: {high_results.get('both_found', 0)}, Neither: {high_results.get('neither_found', 0)}", file=sys.stderr)
+    print(
+        f"  HRR-only: {high_results.get('hrr_only', 0)}, FTS-only: {high_results.get('fts_only', 0)}, Both: {high_results.get('both_found', 0)}, Neither: {high_results.get('neither_found', 0)}",
+        file=sys.stderr,
+    )
 
-    print(f"\n  === Mid overlap (0.1-0.3) ===", file=sys.stderr)
+    print("\n  === Mid overlap (0.1-0.3) ===", file=sys.stderr)
     mid_results: dict[str, Any] = evaluate_set(mid_overlap, "mid_overlap")
     print(f"  HRR recall: {mid_results.get('hrr_recall', 0):.3f}", file=sys.stderr)
     print(f"  FTS5 recall: {mid_results.get('fts_recall', 0):.3f}", file=sys.stderr)
-    print(f"  HRR-only: {mid_results.get('hrr_only', 0)}, FTS-only: {mid_results.get('fts_only', 0)}, Both: {mid_results.get('both_found', 0)}, Neither: {mid_results.get('neither_found', 0)}", file=sys.stderr)
+    print(
+        f"  HRR-only: {mid_results.get('hrr_only', 0)}, FTS-only: {mid_results.get('fts_only', 0)}, Both: {mid_results.get('both_found', 0)}, Neither: {mid_results.get('neither_found', 0)}",
+        file=sys.stderr,
+    )
 
     # Write results
     output_dir: Path = extracted_dir / "hrr_vs_fts5"

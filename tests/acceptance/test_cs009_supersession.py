@@ -3,6 +3,7 @@
 Pass criterion: After a correction is recorded, the original belief is excluded
 from search results and the new belief appears in its place.
 """
+
 from __future__ import annotations
 
 from agentmemory.models import (
@@ -64,7 +65,9 @@ def test_cs009_supersedes_edge_exists(store: MemoryStore) -> None:
         locked=False,
     )
 
-    correct("Use terraform for cloud functions, not gcloud", replaces="gcloud deployment")
+    correct(
+        "Use terraform for cloud functions, not gcloud", replaces="gcloud deployment"
+    )
 
     # Query for SUPERSEDES edge targeting the original belief.
     rows: list[sqlite3.Row] = store.query(
@@ -91,7 +94,9 @@ def test_cs009_terraform_belief_in_search(store: MemoryStore) -> None:
         locked=False,
     )
 
-    correct("Use terraform for cloud functions, not gcloud", replaces="gcloud deployment")
+    correct(
+        "Use terraform for cloud functions, not gcloud", replaces="gcloud deployment"
+    )
 
     # FTS5 AND semantics: use tokens present in the terraform belief content.
     results: list[Belief] = store.search("terraform cloud functions")
@@ -117,7 +122,9 @@ def test_cs009_gcloud_belief_excluded_from_search(store: MemoryStore) -> None:
         locked=False,
     )
 
-    correct("Use terraform for cloud functions, not gcloud", replaces="gcloud deployment")
+    correct(
+        "Use terraform for cloud functions, not gcloud", replaces="gcloud deployment"
+    )
 
     # FTS5 AND semantics: use tokens present in the terraform belief content.
     results: list[Belief] = store.search("terraform cloud functions")

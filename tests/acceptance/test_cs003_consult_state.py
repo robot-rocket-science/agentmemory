@@ -4,6 +4,7 @@ Pass criterion: When a belief says "TODO.md is the task list", searching for
 "what to do next" surfaces that belief. The memory system should surface
 state-document awareness beliefs before the agent recreates state from scratch.
 """
+
 from __future__ import annotations
 
 from agentmemory.models import (

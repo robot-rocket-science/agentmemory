@@ -10,6 +10,7 @@ multi-hop chaining gap identified in Exp 1 (58% of failures).
 Usage:
     uv run python benchmarks/mab_entity_index_adapter.py --retrieve-only /tmp/exp4_entity.json
 """
+
 from __future__ import annotations
 
 import argparse
@@ -57,7 +58,9 @@ class EntityIndex:
 
     def __init__(self) -> None:
         # (entity_lower, property) -> list of (serial, value, raw_text)
-        self._facts: dict[tuple[str, str], list[tuple[int, str, str]]] = defaultdict(list)
+        self._facts: dict[tuple[str, str], list[tuple[int, str, str]]] = defaultdict(
+            list
+        )
         # entity_lower -> set of properties
         self._entity_props: dict[str, set[str]] = defaultdict(set)
 
@@ -82,10 +85,14 @@ class EntityIndex:
             facts: list[tuple[int, str, str]] = self._facts.get(key, [])
             if facts:
                 best: tuple[int, str, str] = max(facts, key=lambda x: x[0])
-                results.append(EntityFact(
-                    entity=entity, property_name=prop,
-                    value=best[1], serial=best[0],
-                ))
+                results.append(
+                    EntityFact(
+                        entity=entity,
+                        property_name=prop,
+                        value=best[1],
+                        serial=best[0],
+                    )
+                )
         else:
             props: set[str] = self._entity_props.get(entity_lower, set())
             for p in props:
@@ -93,10 +100,14 @@ class EntityIndex:
                 facts = self._facts.get(key, [])
                 if facts:
                     best = max(facts, key=lambda x: x[0])
-                    results.append(EntityFact(
-                        entity=entity, property_name=p,
-                        value=best[1], serial=best[0],
-                    ))
+                    results.append(
+                        EntityFact(
+                            entity=entity,
+                            property_name=p,
+                            value=best[1],
+                            serial=best[0],
+                        )
+                    )
 
         return results
 
@@ -114,20 +125,28 @@ class EntityIndex:
             key: tuple[str, str] = (entity_lower, prop)
             facts: list[tuple[int, str, str]] = self._facts.get(key, [])
             for serial, value_str, _raw in facts:
-                results.append(EntityFact(
-                    entity=entity, property_name=prop,
-                    value=value_str, serial=serial,
-                ))
+                results.append(
+                    EntityFact(
+                        entity=entity,
+                        property_name=prop,
+                        value=value_str,
+                        serial=serial,
+                    )
+                )
         else:
             props: set[str] = self._entity_props.get(entity_lower, set())
             for p in props:
                 key = (entity_lower, p)
                 facts = self._facts.get(key, [])
                 for serial, value_str, _raw in facts:
-                    results.append(EntityFact(
-                        entity=entity, property_name=p,
-                        value=value_str, serial=serial,
-                    ))
+                    results.append(
+                        EntityFact(
+                            entity=entity,
+                            property_name=p,
+                            value=value_str,
+                            serial=serial,
+                        )
+                    )
 
         results.sort(key=lambda f: f.serial, reverse=True)
         return results
@@ -194,8 +213,8 @@ def extract_entity_from_question(question: str) -> str | None:
     # Entity after "created/developed/founded/produced/broadcasted" + name
     # Allows lowercase for things like "centrifugal governor"
     m_created: re.Match[str] | None = re.search(
-        r'(?:created|developed|founded|produced|broadcasted|established)\s+'
-        r'(?:the\s+)?([A-Za-z][a-zA-Z\s\.\-\'\,]+?)(?:\s+(?:is|was|born|located)\b|\?|$)',
+        r"(?:created|developed|founded|produced|broadcasted|established)\s+"
+        r"(?:the\s+)?([A-Za-z][a-zA-Z\s\.\-\'\,]+?)(?:\s+(?:is|was|born|located)\b|\?|$)",
         question,
     )
     if m_created:
@@ -205,7 +224,7 @@ def extract_entity_from_question(question: str) -> str | None:
 
     # Entity after "that/which/whom" + name + "is/was"
     m_that: re.Match[str] | None = re.search(
-        r'(?:that|which|whom)\s+([A-Z][a-zA-Z\s\.\-\'\,]+?)\s+(?:is|was|professes)',
+        r"(?:that|which|whom)\s+([A-Z][a-zA-Z\s\.\-\'\,]+?)\s+(?:is|was|professes)",
         question,
     )
     if m_that:
@@ -216,8 +235,8 @@ def extract_entity_from_question(question: str) -> str | None:
     # Entity after "by", "of", "with", "for" at end of question
     # Stop at common verbs (was, is, has, born, located, etc.)
     m: re.Match[str] | None = re.search(
-        r'(?:by|of|with|for)\s+([A-Z][a-zA-Z\s\.\-\']+?)'
-        r'(?:\s+(?:was|is|has|born|located|played|wrote|created)\b|\?|$)',
+        r"(?:by|of|with|for)\s+([A-Z][a-zA-Z\s\.\-\']+?)"
+        r"(?:\s+(?:was|is|has|born|located|played|wrote|created)\b|\?|$)",
         question,
     )
     if m:
@@ -227,7 +246,7 @@ def extract_entity_from_question(question: str) -> str | None:
 
     # "affiliated with <entity>" pattern
     m_affil: re.Match[str] | None = re.search(
-        r'affiliated with\s+([A-Z][a-zA-Z\s\.\-\']+?)(?:\s+was\b|\?|$)',
+        r"affiliated with\s+([A-Z][a-zA-Z\s\.\-\']+?)(?:\s+was\b|\?|$)",
         question,
     )
     if m_affil:
@@ -236,17 +255,32 @@ def extract_entity_from_question(question: str) -> str | None:
             return entity
 
     # Multi-word capitalized phrase (2+ words)
-    caps: list[str] = re.findall(r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)', question)
+    caps: list[str] = re.findall(r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)", question)
     if caps:
         return caps[-1]
 
     # Single capitalized word that looks like a proper noun (not a common word)
     # Must be at least 4 chars and not a common English word
-    common: frozenset[str] = frozenset({
-        "What", "Which", "Where", "When", "How", "Who", "That", "This",
-        "The", "Does", "Have", "City", "Name", "Country", "Language",
-    })
-    single_caps: list[str] = re.findall(r'\b([A-Z][a-z]{3,})\b', question)
+    common: frozenset[str] = frozenset(
+        {
+            "What",
+            "Which",
+            "Where",
+            "When",
+            "How",
+            "Who",
+            "That",
+            "This",
+            "The",
+            "Does",
+            "Have",
+            "City",
+            "Name",
+            "Country",
+            "Language",
+        }
+    )
+    single_caps: list[str] = re.findall(r"\b([A-Z][a-z]{3,})\b", question)
     for sc in reversed(single_caps):
         if sc not in common:
             return sc
@@ -487,23 +521,31 @@ def main() -> None:
         description="Exp 4: Entity-index retrieval for multi-hop",
     )
     parser.add_argument(
-        "--source", default=DEFAULT_SOURCE,
+        "--source",
+        default=DEFAULT_SOURCE,
         help=f"MAB source (default: {DEFAULT_SOURCE})",
     )
     parser.add_argument(
-        "--subset", type=int, default=None,
+        "--subset",
+        type=int,
+        default=None,
         help="Limit to first N questions",
     )
     parser.add_argument(
-        "--retrieve-only", default=None, metavar="PATH",
+        "--retrieve-only",
+        default=None,
+        metavar="PATH",
         help="Write retrieval results (NO answers) to PATH",
     )
     parser.add_argument(
-        "--temporal", action="store_true",
+        "--temporal",
+        action="store_true",
         help="Use temporal retrieval (explore all historical values at each hop)",
     )
     parser.add_argument(
-        "--breadth-cap", type=int, default=30,
+        "--breadth-cap",
+        type=int,
+        default=30,
         help="Breadth cap for temporal retrieval (default: 30)",
     )
     args: argparse.Namespace = parser.parse_args()
@@ -535,8 +577,8 @@ def main() -> None:
         return
 
     if args.subset is not None:
-        questions = questions[:args.subset]
-        answers = answers[:args.subset]
+        questions = questions[: args.subset]
+        answers = answers[: args.subset]
 
     # Build entity index
     t0: float = time.monotonic()
@@ -546,9 +588,11 @@ def main() -> None:
     index, total_lines, extracted = build_entity_index(context)
     build_time: float = time.monotonic() - t0
 
-    print(f"Index built: {index.entity_count} entities, {index.fact_count} facts, "
-          f"{index.conflict_count} conflicts, {extracted}/{total_lines} extracted "
-          f"in {build_time:.2f}s")
+    print(
+        f"Index built: {index.entity_count} entities, {index.fact_count} facts, "
+        f"{index.conflict_count} conflicts, {extracted}/{total_lines} extracted "
+        f"in {build_time:.2f}s"
+    )
 
     # Run queries
     per_question: list[dict[str, object]] = []
@@ -562,19 +606,25 @@ def main() -> None:
     for i, (question, answer_list) in enumerate(zip(questions, answers)):
         if args.temporal:
             ctx: str = multi_hop_retrieve_temporal(
-                index, question, breadth_cap=args.breadth_cap,
+                index,
+                question,
+                breadth_cap=args.breadth_cap,
             )
         else:
             ctx = multi_hop_retrieve(index, question)
-        per_question.append({
-            "id": i,
-            "question": question,
-            "context": ctx,
-        })
-        ground_truth.append({
-            "id": i,
-            "answers": answer_list,
-        })
+        per_question.append(
+            {
+                "id": i,
+                "question": question,
+                "context": ctx,
+            }
+        )
+        ground_truth.append(
+            {
+                "id": i,
+                "answers": answer_list,
+            }
+        )
 
         if answer_list[0].lower() in ctx.lower():
             answer_in_ctx += 1
@@ -582,7 +632,9 @@ def main() -> None:
     query_time: float = time.monotonic() - t1
 
     print(f"Queried {len(questions)} questions in {query_time:.2f}s")
-    print(f"Answer in context: {answer_in_ctx}/{len(questions)} = {answer_in_ctx/len(questions)*100:.0f}%")
+    print(
+        f"Answer in context: {answer_in_ctx}/{len(questions)} = {answer_in_ctx / len(questions) * 100:.0f}%"
+    )
 
     # Write output
     if args.retrieve_only:

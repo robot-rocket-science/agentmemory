@@ -7,6 +7,7 @@ SUPERSEDES-based conflict resolution.
 Regex-only extraction (no LLM calls). Falls through gracefully when
 text does not match any known pattern.
 """
+
 from __future__ import annotations
 
 import re
@@ -31,17 +32,44 @@ _FACT_PATTERNS: list[tuple[re.Pattern[str], int, str, int]] = [
     # "X is a citizen of Y"
     (re.compile(r"^(.+?)\s+is a citizen of\s+(.+)$", re.I), 1, "citizen_of", 2),
     # "X plays the position of Y"
-    (re.compile(r"^(.+?)\s+plays the position of\s+(.+)$", re.I), 1, "plays_position", 2),
+    (
+        re.compile(r"^(.+?)\s+plays the position of\s+(.+)$", re.I),
+        1,
+        "plays_position",
+        2,
+    ),
     # "X is associated with the sport of Y"
-    (re.compile(r"^(.+?)\s+is associated with the sport of\s+(.+)$", re.I), 1, "sport", 2),
+    (
+        re.compile(r"^(.+?)\s+is associated with the sport of\s+(.+)$", re.I),
+        1,
+        "sport",
+        2,
+    ),
     # "X is affiliated with the religion of Y"
-    (re.compile(r"^(.+?)\s+is affiliated with the religion of\s+(.+)$", re.I), 1, "religion", 2),
+    (
+        re.compile(r"^(.+?)\s+is affiliated with the religion of\s+(.+)$", re.I),
+        1,
+        "religion",
+        2,
+    ),
     # "The author of X is Y"
     (re.compile(r"^The author of\s+(.+?)\s+is\s+(.+)$", re.I), 1, "author", 2),
     # "The original language of X is Y"
-    (re.compile(r"^The (?:origianl|original) language of\s+(.+?)\s+is\s+(.+)$", re.I), 1, "language", 2),
+    (
+        re.compile(
+            r"^The (?:origianl|original) language of\s+(.+?)\s+is\s+(.+)$", re.I
+        ),
+        1,
+        "language",
+        2,
+    ),
     # "X was created in the country of Y"
-    (re.compile(r"^(.+?)\s+was created in the country of\s+(.+)$", re.I), 1, "created_in_country", 2),
+    (
+        re.compile(r"^(.+?)\s+was created in the country of\s+(.+)$", re.I),
+        1,
+        "created_in_country",
+        2,
+    ),
     # "X was founded by Y"
     (re.compile(r"^(.+?)\s+was founded by\s+(.+)$", re.I), 1, "founded_by", 2),
     # "X was created by Y"
@@ -49,43 +77,121 @@ _FACT_PATTERNS: list[tuple[re.Pattern[str], int, str, int]] = [
     # "X was developed by Y"
     (re.compile(r"^(.+?)\s+was developed by\s+(.+)$", re.I), 1, "developed_by", 2),
     # "The type of music that X plays is Y"
-    (re.compile(r"^The type of music that\s+(.+?)\s+plays is\s+(.+)$", re.I), 1, "music_type", 2),
+    (
+        re.compile(r"^The type of music that\s+(.+?)\s+plays is\s+(.+)$", re.I),
+        1,
+        "music_type",
+        2,
+    ),
     # "The company that produced X is Y"
-    (re.compile(r"^The company that produced\s+(.+?)\s+is\s+(.+)$", re.I), 1, "produced_by", 2),
+    (
+        re.compile(r"^The company that produced\s+(.+?)\s+is\s+(.+)$", re.I),
+        1,
+        "produced_by",
+        2,
+    ),
     # "X is employed by Y"
     (re.compile(r"^(.+?)\s+is employed by\s+(.+)$", re.I), 1, "employed_by", 2),
     # "X is married to Y"
     (re.compile(r"^(.+?)\s+is married to\s+(.+)$", re.I), 1, "married_to", 2),
     # "X speaks the language of Y"
-    (re.compile(r"^(.+?)\s+speaks the language of\s+(.+)$", re.I), 1, "speaks_language", 2),
+    (
+        re.compile(r"^(.+?)\s+speaks the language of\s+(.+)$", re.I),
+        1,
+        "speaks_language",
+        2,
+    ),
     # "X is located in the continent of Y"
-    (re.compile(r"^(.+?)\s+is located in the continent of\s+(.+)$", re.I), 1, "continent", 2),
+    (
+        re.compile(r"^(.+?)\s+is located in the continent of\s+(.+)$", re.I),
+        1,
+        "continent",
+        2,
+    ),
     # "X is located in the country of Y"
-    (re.compile(r"^(.+?)\s+is located in the country of\s+(.+)$", re.I), 1, "located_in_country", 2),
+    (
+        re.compile(r"^(.+?)\s+is located in the country of\s+(.+)$", re.I),
+        1,
+        "located_in_country",
+        2,
+    ),
     # "X was born in Y"
     (re.compile(r"^(.+?)\s+was born in\s+(.+)$", re.I), 1, "born_in", 2),
     # "X died in Y"
     (re.compile(r"^(.+?)\s+died in\s+(.+)$", re.I), 1, "died_in", 2),
     # "X worked in the city of Y"
-    (re.compile(r"^(.+?)\s+worked in the city of\s+(.+)$", re.I), 1, "worked_in_city", 2),
+    (
+        re.compile(r"^(.+?)\s+worked in the city of\s+(.+)$", re.I),
+        1,
+        "worked_in_city",
+        2,
+    ),
     # "X works in the field of Y"
-    (re.compile(r"^(.+?)\s+works in the field of\s+(.+)$", re.I), 1, "works_in_field", 2),
+    (
+        re.compile(r"^(.+?)\s+works in the field of\s+(.+)$", re.I),
+        1,
+        "works_in_field",
+        2,
+    ),
     # "The original broadcaster of X is Y"
-    (re.compile(r"^The (?:origianl|original) broadcaster of\s+(.+?)\s+is\s+(.+)$", re.I), 1, "broadcaster", 2),
+    (
+        re.compile(
+            r"^The (?:origianl|original) broadcaster of\s+(.+?)\s+is\s+(.+)$", re.I
+        ),
+        1,
+        "broadcaster",
+        2,
+    ),
     # "X is a member of Y"
     (re.compile(r"^(.+?)\s+is a member of\s+(.+)$", re.I), 1, "member_of", 2),
     # "The capital of X is Y"
     (re.compile(r"^The capital of\s+(.+?)\s+is\s+(.+)$", re.I), 1, "capital", 2),
     # "The head of state of X is Y"
-    (re.compile(r"^The head of (?:state|government) of\s+(.+?)\s+is\s+(.+)$", re.I), 1, "head_of_state", 2),
+    (
+        re.compile(r"^The head of (?:state|government) of\s+(.+?)\s+is\s+(.+)$", re.I),
+        1,
+        "head_of_state",
+        2,
+    ),
     # "The chairperson of X is Y"
-    (re.compile(r"^The (?:chairperson|chairman|director|CEO|manager|president|governor) of\s+(.+?)\s+is\s+(.+)$", re.I), 1, "chairperson", 2),
+    (
+        re.compile(
+            r"^The (?:chairperson|chairman|director|CEO|manager|president|governor) of\s+(.+?)\s+is\s+(.+)$",
+            re.I,
+        ),
+        1,
+        "chairperson",
+        2,
+    ),
     # "The Governor/Tanaiste/etc of X is Y"
-    (re.compile(r"^The (?:Governor|Tánaiste|Premier|Mayor) (?:of\s+)?(.+?)\s+is\s+(.+)$", re.I), 1, "head_of_state", 2),
+    (
+        re.compile(
+            r"^The (?:Governor|Tánaiste|Premier|Mayor) (?:of\s+)?(.+?)\s+is\s+(.+)$",
+            re.I,
+        ),
+        1,
+        "head_of_state",
+        2,
+    ),
     # "The headquarters of X is located in the city of Y"
-    (re.compile(r"^The headquarters of\s+(.+?)\s+is located in the city of\s+(.+)$", re.I), 1, "headquarters_city", 2),
+    (
+        re.compile(
+            r"^The headquarters of\s+(.+?)\s+is located in the city of\s+(.+)$", re.I
+        ),
+        1,
+        "headquarters_city",
+        2,
+    ),
     # "The university where X was educated is Y" (note typo: "univeristy")
-    (re.compile(r"^The (?:univeristy|university) where\s+(.+?)\s+was educated is\s+(.+)$", re.I), 1, "educated_at", 2),
+    (
+        re.compile(
+            r"^The (?:univeristy|university) where\s+(.+?)\s+was educated is\s+(.+)$",
+            re.I,
+        ),
+        1,
+        "educated_at",
+        2,
+    ),
     # "X was performed by Y"
     (re.compile(r"^(.+?)\s+was performed by\s+(.+)$", re.I), 1, "performed_by", 2),
     # "X is famous for Y"
@@ -95,22 +201,64 @@ _FACT_PATTERNS: list[tuple[re.Pattern[str], int, str, int]] = [
     # "The religion of X is Y"
     (re.compile(r"^The religion of\s+(.+?)\s+is\s+(.+)$", re.I), 1, "religion", 2),
     # "The official language of X is Y"
-    (re.compile(r"^The official language of\s+(.+?)\s+is\s+(.+)$", re.I), 1, "official_language", 2),
+    (
+        re.compile(r"^The official language of\s+(.+?)\s+is\s+(.+)$", re.I),
+        1,
+        "official_language",
+        2,
+    ),
     # --- Exp 5 additions: patterns covering the 4.9% miss rate ---
     # "The name of the current head of the X government is Y"
-    (re.compile(r"^The name of the current head of (?:the\s+)?(.+?)\s+government\s+is\s+(.+)$", re.I), 1, "head_of_government", 2),
+    (
+        re.compile(
+            r"^The name of the current head of (?:the\s+)?(.+?)\s+government\s+is\s+(.+)$",
+            re.I,
+        ),
+        1,
+        "head_of_government",
+        2,
+    ),
     # "The name of the current head of state in X is Y"
-    (re.compile(r"^The name of the current head of state in\s+(.+?)\s+is\s+(.+)$", re.I), 1, "head_of_state", 2),
+    (
+        re.compile(
+            r"^The name of the current head of state in\s+(.+?)\s+is\s+(.+)$", re.I
+        ),
+        1,
+        "head_of_state",
+        2,
+    ),
     # "X was written in the language of Y"
-    (re.compile(r"^(.+?)\s+was written in the language of\s+(.+)$", re.I), 1, "written_in_language", 2),
+    (
+        re.compile(r"^(.+?)\s+was written in the language of\s+(.+)$", re.I),
+        1,
+        "written_in_language",
+        2,
+    ),
     # "X was founded in the city of Y"
-    (re.compile(r"^(.+?)\s+was founded in the city of\s+(.+)$", re.I), 1, "founded_in_city", 2),
+    (
+        re.compile(r"^(.+?)\s+was founded in the city of\s+(.+)$", re.I),
+        1,
+        "founded_in_city",
+        2,
+    ),
     # "The chief executive officer of X is Y"
-    (re.compile(r"^The (?:chief executive officer|CEO) of\s+(.+?)\s+is\s+(.+)$", re.I), 1, "ceo", 2),
+    (
+        re.compile(
+            r"^The (?:chief executive officer|CEO) of\s+(.+?)\s+is\s+(.+)$", re.I
+        ),
+        1,
+        "ceo",
+        2,
+    ),
     # "X's child is Y"
     (re.compile(r"^(.+?)'s child is\s+(.+)$", re.I), 1, "child", 2),
     # Catch-all for "The <Title> of/is X is Y" (covers Prime Minister, Secretary General, etc.)
-    (re.compile(r"^The\s+(.+?)\s+(?:of|is)\s+(.+?)\s+is\s+(.+)$", re.I), 2, "title_holder", 3),
+    (
+        re.compile(r"^The\s+(.+?)\s+(?:of|is)\s+(.+?)\s+is\s+(.+)$", re.I),
+        2,
+        "title_holder",
+        3,
+    ),
     # "The <Title> is Y" (no "of", e.g., "The pope is Francis", "The Tánaiste is Simon Coveney")
     (re.compile(r"^The\s+(.+?)\s+is\s+(.+)$", re.I), 1, "title_holder", 2),
 ]

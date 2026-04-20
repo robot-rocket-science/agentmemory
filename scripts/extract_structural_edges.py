@@ -34,15 +34,29 @@ EdgeDict: TypeAlias = dict[str, str | bool]
 def git_head(repo: Path) -> str:
     r = subprocess.run(
         ["git", "rev-parse", "HEAD"],
-        cwd=repo, capture_output=True, text=True, timeout=5,
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        timeout=5,
     )
     return r.stdout.strip()
 
 
 SKIP_DIRS: set[str] = {
-    ".git", "node_modules", "target", ".venv", "venv", "__pycache__",
-    ".mypy_cache", ".ruff_cache", "dist", "build", ".tox", "vendor",
-    "third_party", "3rdparty",
+    ".git",
+    "node_modules",
+    "target",
+    ".venv",
+    "venv",
+    "__pycache__",
+    ".mypy_cache",
+    ".ruff_cache",
+    "dist",
+    "build",
+    ".tox",
+    "vendor",
+    "third_party",
+    "3rdparty",
 }
 
 
@@ -74,6 +88,7 @@ def _load_toml(path: Path) -> dict[str, Any] | None:
 
 # --- TESTS edges ---
 
+
 def extract_test_edges(repo: Path) -> list[EdgeDict]:
     """Match test files to source files by naming convention."""
     all_files = find_files(repo)
@@ -85,9 +100,19 @@ def extract_test_edges(repo: Path) -> list[EdgeDict]:
         rel = str(f.relative_to(repo))
         stem = f.stem
         # Skip test files themselves
-        if stem.startswith("test_") or stem.endswith("_test") or stem.endswith(".test") or stem.endswith(".spec"):
+        if (
+            stem.startswith("test_")
+            or stem.endswith("_test")
+            or stem.endswith(".test")
+            or stem.endswith(".spec")
+        ):
             continue
-        if "/test/" in rel or "/tests/" in rel or "/__tests__/" in rel or "/spec/" in rel:
+        if (
+            "/test/" in rel
+            or "/tests/" in rel
+            or "/__tests__/" in rel
+            or "/spec/" in rel
+        ):
             continue
         if stem not in source_map:
             source_map[stem] = []
@@ -126,18 +151,21 @@ def extract_test_edges(repo: Path) -> list[EdgeDict]:
                             best_overlap = overlap
                             best = candidate
                     if best:
-                        edges.append({
-                            "source": rel,
-                            "target": best,
-                            "type": "TESTS",
-                            "directed": True,
-                        })
+                        edges.append(
+                            {
+                                "source": rel,
+                                "target": best,
+                                "type": "TESTS",
+                                "directed": True,
+                            }
+                        )
                 break
 
     return edges
 
 
 # --- CROSS_REFERENCES edges (markdown links) ---
+
 
 def extract_markdown_refs(repo: Path) -> list[EdgeDict]:
     """Extract links between markdown files."""
@@ -176,34 +204,43 @@ def extract_markdown_refs(repo: Path) -> list[EdgeDict]:
                 continue
 
             if resolved_rel in md_paths and resolved_rel != rel:
-                edges.append({
-                    "source": rel,
-                    "target": resolved_rel,
-                    "type": "CROSS_REFERENCES",
-                    "directed": True,
-                })
+                edges.append(
+                    {
+                        "source": rel,
+                        "target": resolved_rel,
+                        "type": "CROSS_REFERENCES",
+                        "directed": True,
+                    }
+                )
 
     return edges
 
 
 # --- CITES edges (D###, M###, ADR-### patterns) ---
 
-def extract_citation_edges(repo: Path) -> tuple[list[EdgeDict], set[str], dict[str, dict[str, int]]]:
+
+def extract_citation_edges(
+    repo: Path,
+) -> tuple[list[EdgeDict], set[str], dict[str, dict[str, int]]]:
     """Detect and extract citation patterns from markdown files."""
     md_files = find_files(repo, {".md"})
 
     # First pass: detect which citation patterns exist
     pattern_candidates: list[tuple[re.Pattern[str], str]] = [
-        (re.compile(r"\bD(\d{2,4})\b"), "D"),          # D097, D174
-        (re.compile(r"\bM(\d{2,4})\b"), "M"),          # M001, M036
+        (re.compile(r"\bD(\d{2,4})\b"), "D"),  # D097, D174
+        (re.compile(r"\bM(\d{2,4})\b"), "M"),  # M001, M036
         (re.compile(r"\bADR[-\s]?(\d+)\b", re.I), "ADR"),  # ADR-001, ADR 1
         (re.compile(r"\bRFC[-\s]?(\d+)\b", re.I), "RFC"),  # RFC-123, RFC 7540
-        (re.compile(r"\bREQ[-_](\w+)\b"), "REQ"),       # REQ-01, REQ_FEAT_1
+        (re.compile(r"\bREQ[-_](\w+)\b"), "REQ"),  # REQ-01, REQ_FEAT_1
     ]
 
     # Count occurrences per pattern across all files
-    pattern_counts: dict[str, Counter[str]] = {p[1]: Counter() for p in pattern_candidates}
-    file_citations: dict[str, list[tuple[str, str]]] = {}  # filepath -> [(pattern_type, id)]
+    pattern_counts: dict[str, Counter[str]] = {
+        p[1]: Counter() for p in pattern_candidates
+    }
+    file_citations: dict[
+        str, list[tuple[str, str]]
+    ] = {}  # filepath -> [(pattern_type, id)]
 
     for f in md_files:
         rel = str(f.relative_to(repo))
@@ -223,7 +260,9 @@ def extract_citation_edges(repo: Path) -> tuple[list[EdgeDict], set[str], dict[s
             file_citations[rel] = cites
 
     # Only use patterns that appear frequently enough to be real (>= 3 unique IDs)
-    active_patterns: set[str] = {ptype for ptype, counter in pattern_counts.items() if len(counter) >= 3}
+    active_patterns: set[str] = {
+        ptype for ptype, counter in pattern_counts.items() if len(counter) >= 3
+    }
 
     edges: list[EdgeDict] = []
     # Build edges: file that mentions X -> file that defines/first-mentions X
@@ -245,21 +284,29 @@ def extract_citation_edges(repo: Path) -> tuple[list[EdgeDict], set[str], dict[s
         definition = files[0]
         for citing in files[1:]:
             if citing != definition:
-                edges.append({
-                    "source": citing,
-                    "target": definition,
-                    "type": "CITES",
-                    "directed": True,
-                    "citation_id": ref_id,
-                })
+                edges.append(
+                    {
+                        "source": citing,
+                        "target": definition,
+                        "type": "CITES",
+                        "directed": True,
+                        "citation_id": ref_id,
+                    }
+                )
 
-    return edges, active_patterns, {p: dict(c.most_common(10)) for p, c in pattern_counts.items()}
+    return (
+        edges,
+        active_patterns,
+        {p: dict(c.most_common(10)) for p, c in pattern_counts.items()},
+    )
 
 
 # --- SERVICE_DEPENDS_ON (docker-compose) ---
 
+
 def _parse_compose_yaml_fallback(
-    compose_files: list[Path], repo: Path,
+    compose_files: list[Path],
+    repo: Path,
 ) -> list[EdgeDict]:
     edges: list[EdgeDict] = []
     for cf in compose_files:
@@ -281,20 +328,24 @@ def _parse_compose_yaml_fallback(
             if in_depends and line.strip().startswith("- "):
                 dep = line.strip().lstrip("- ").strip().rstrip(":")
                 if dep and current_service:
-                    edges.append({
-                        "source": f"service:{current_service}",
-                        "target": f"service:{dep}",
-                        "type": "SERVICE_DEPENDS_ON",
-                        "directed": True,
-                        "compose_file": rel,
-                    })
+                    edges.append(
+                        {
+                            "source": f"service:{current_service}",
+                            "target": f"service:{dep}",
+                            "type": "SERVICE_DEPENDS_ON",
+                            "directed": True,
+                            "compose_file": rel,
+                        }
+                    )
             elif in_depends and not line.startswith("      "):
                 in_depends = False
     return edges
 
 
 def _parse_compose_yaml_lib(
-    compose_files: list[Path], repo: Path, yaml: Any,
+    compose_files: list[Path],
+    repo: Path,
+    yaml: Any,
 ) -> list[EdgeDict]:
     edges: list[EdgeDict] = []
     for cf in compose_files:
@@ -316,36 +367,50 @@ def _parse_compose_yaml_lib(
             if isinstance(deps_any, list):
                 for dep_item in cast(list[Any], deps_any):
                     dep_str: str = str(dep_item)
-                    edges.append({
-                        "source": f"service:{svc_key}",
-                        "target": f"service:{dep_str}",
-                        "type": "SERVICE_DEPENDS_ON",
-                        "directed": True,
-                        "compose_file": rel,
-                    })
+                    edges.append(
+                        {
+                            "source": f"service:{svc_key}",
+                            "target": f"service:{dep_str}",
+                            "type": "SERVICE_DEPENDS_ON",
+                            "directed": True,
+                            "compose_file": rel,
+                        }
+                    )
             elif isinstance(deps_any, dict):
                 for dep_key in cast(dict[str, Any], deps_any):
-                    edges.append({
-                        "source": f"service:{svc_key}",
-                        "target": f"service:{dep_key}",
-                        "type": "SERVICE_DEPENDS_ON",
-                        "directed": True,
-                        "compose_file": rel,
-                    })
+                    edges.append(
+                        {
+                            "source": f"service:{svc_key}",
+                            "target": f"service:{dep_key}",
+                            "type": "SERVICE_DEPENDS_ON",
+                            "directed": True,
+                            "compose_file": rel,
+                        }
+                    )
     return edges
 
 
 def extract_docker_compose_edges(repo: Path) -> list[EdgeDict]:
     """Parse docker-compose.yml for service dependencies."""
     compose_files: list[Path] = []
-    for name in ["docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"]:
+    for name in [
+        "docker-compose.yml",
+        "docker-compose.yaml",
+        "compose.yml",
+        "compose.yaml",
+    ]:
         p = repo / name
         if p.exists():
             compose_files.append(p)
     # Also check subdirectories one level deep
     for d in repo.iterdir():
         if d.is_dir() and d.name not in SKIP_DIRS:
-            for name in ["docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"]:
+            for name in [
+                "docker-compose.yml",
+                "docker-compose.yaml",
+                "compose.yml",
+                "compose.yaml",
+            ]:
                 p = d / name
                 if p.exists():
                     compose_files.append(p)
@@ -360,6 +425,7 @@ def extract_docker_compose_edges(repo: Path) -> list[EdgeDict]:
 
 # --- PACKAGE_DEPENDS_ON (workspace-level) ---
 
+
 def extract_cargo_workspace_edges(repo: Path) -> list[EdgeDict]:
     """Parse Cargo.toml workspace for internal dependencies."""
     edges: list[EdgeDict] = []
@@ -373,7 +439,9 @@ def extract_cargo_workspace_edges(repo: Path) -> list[EdgeDict]:
 
     workspace: dict[str, Any] = data.get("workspace", {})
     members_raw: Any = workspace.get("members", [])
-    members: list[Any] = cast(list[Any], members_raw) if isinstance(members_raw, list) else []
+    members: list[Any] = (
+        cast(list[Any], members_raw) if isinstance(members_raw, list) else []
+    )
 
     # Find all member Cargo.tomls
     member_cargos: dict[str, str] = {}
@@ -388,14 +456,18 @@ def extract_cargo_workspace_edges(repo: Path) -> list[EdgeDict]:
                     if ct.exists():
                         mdata = _load_toml(ct)
                         if mdata is not None:
-                            pkg_name: str = mdata.get("package", {}).get("name", d_entry.name)
+                            pkg_name: str = mdata.get("package", {}).get(
+                                "name", d_entry.name
+                            )
                             member_cargos[pkg_name] = str(ct.relative_to(repo))
         else:
             ct = repo / member_pattern / "Cargo.toml"
             if ct.exists():
                 mdata2 = _load_toml(ct)
                 if mdata2 is not None:
-                    pkg_name2: str = mdata2.get("package", {}).get("name", Path(member_pattern).name)
+                    pkg_name2: str = mdata2.get("package", {}).get(
+                        "name", Path(member_pattern).name
+                    )
                     member_cargos[pkg_name2] = str(ct.relative_to(repo))
 
     # For each member, check dependencies against other members
@@ -409,12 +481,14 @@ def extract_cargo_workspace_edges(repo: Path) -> list[EdgeDict]:
             deps: dict[str, Any] = mdata3.get(dep_section, {})
             for dep_name in deps:
                 if dep_name in member_cargos and dep_name != pkg_name_iter:
-                    edges.append({
-                        "source": f"package:{pkg_name_iter}",
-                        "target": f"package:{dep_name}",
-                        "type": "PACKAGE_DEPENDS_ON",
-                        "directed": True,
-                    })
+                    edges.append(
+                        {
+                            "source": f"package:{pkg_name_iter}",
+                            "target": f"package:{dep_name}",
+                            "type": "PACKAGE_DEPENDS_ON",
+                            "directed": True,
+                        }
+                    )
 
     return edges
 
@@ -471,12 +545,14 @@ def extract_package_json_workspace_edges(repo: Path) -> list[EdgeDict]:
                 continue
             for dep_name in cast(dict[str, Any], deps_raw):
                 if dep_name in workspace_pkgs and dep_name != pkg_name:
-                    edges.append({
-                        "source": f"package:{pkg_name}",
-                        "target": f"package:{dep_name}",
-                        "type": "PACKAGE_DEPENDS_ON",
-                        "directed": True,
-                    })
+                    edges.append(
+                        {
+                            "source": f"package:{pkg_name}",
+                            "target": f"package:{dep_name}",
+                            "type": "PACKAGE_DEPENDS_ON",
+                            "directed": True,
+                        }
+                    )
 
     return edges
 
@@ -507,7 +583,9 @@ def main() -> None:
             existing: Any = json.loads(output_path.read_text())
             if existing.get("head") == head:
                 print(f"[cached] {repo.name} HEAD={head[:8]}", file=sys.stderr)
-                edge_types: dict[str, Any] = existing.get("summary", {}).get("edges_by_type", {})
+                edge_types: dict[str, Any] = existing.get("summary", {}).get(
+                    "edges_by_type", {}
+                )
                 for etype, count in edge_types.items():
                     print(f"  {etype}: {count}", file=sys.stderr)
                 return
@@ -535,7 +613,10 @@ def main() -> None:
     cite_edges, active_patterns, pattern_stats = extract_citation_edges(repo)
     all_edges.extend(cite_edges)
     edges_by_type["CITES"] = len(cite_edges)
-    print(f"  CITES: {len(cite_edges)} edges (active patterns: {active_patterns})", file=sys.stderr)
+    print(
+        f"  CITES: {len(cite_edges)} edges (active patterns: {active_patterns})",
+        file=sys.stderr,
+    )
 
     # SERVICE_DEPENDS_ON
     docker_edges = extract_docker_compose_edges(repo)
@@ -549,7 +630,10 @@ def main() -> None:
     pkg_edges = cargo_edges + pkg_json_edges
     all_edges.extend(pkg_edges)
     edges_by_type["PACKAGE_DEPENDS_ON"] = len(pkg_edges)
-    print(f"  PACKAGE_DEPENDS_ON: {len(pkg_edges)} edges (cargo: {len(cargo_edges)}, npm: {len(pkg_json_edges)})", file=sys.stderr)
+    print(
+        f"  PACKAGE_DEPENDS_ON: {len(pkg_edges)} edges (cargo: {len(cargo_edges)}, npm: {len(pkg_json_edges)})",
+        file=sys.stderr,
+    )
 
     total = len(all_edges)
     print(f"  total: {total} structural edges", file=sys.stderr)
@@ -557,11 +641,15 @@ def main() -> None:
     summary: dict[str, int | dict[str, int] | list[str]] = {
         "total_edges": total,
         "edges_by_type": edges_by_type,
-        "citation_patterns_detected": {p: len(c) for p, c in pattern_stats.items() if c},
+        "citation_patterns_detected": {
+            p: len(c) for p, c in pattern_stats.items() if c
+        },
         "citation_active_patterns": sorted(active_patterns),
     }
 
-    result: dict[str, str | dict[str, int | dict[str, int] | list[str]] | list[EdgeDict]] = {
+    result: dict[
+        str, str | dict[str, int | dict[str, int] | list[str]] | list[EdgeDict]
+    ] = {
         "repo": str(repo),
         "name": repo.name,
         "head": head,

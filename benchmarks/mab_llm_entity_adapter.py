@@ -7,6 +7,7 @@ same output format. Only the extraction method changes.
 Usage:
     uv run python benchmarks/mab_llm_entity_adapter.py --retrieve-only /tmp/exp5_treatment_b.json
 """
+
 from __future__ import annotations
 
 import argparse
@@ -48,19 +49,26 @@ def main() -> None:
         description="Exp 5 Treatment B: LLM entity extraction for multi-hop",
     )
     parser.add_argument(
-        "--source", default=DEFAULT_SOURCE,
+        "--source",
+        default=DEFAULT_SOURCE,
         help=f"MAB source (default: {DEFAULT_SOURCE})",
     )
     parser.add_argument(
-        "--subset", type=int, default=None,
+        "--subset",
+        type=int,
+        default=None,
         help="Limit to first N questions",
     )
     parser.add_argument(
-        "--retrieve-only", default=None, metavar="PATH",
+        "--retrieve-only",
+        default=None,
+        metavar="PATH",
         help="Write retrieval results (NO answers) to PATH",
     )
     parser.add_argument(
-        "--audit-log", default=None, metavar="PATH",
+        "--audit-log",
+        default=None,
+        metavar="PATH",
         help="Write LLM extraction audit log to PATH",
     )
     args: argparse.Namespace = parser.parse_args()
@@ -91,8 +99,8 @@ def main() -> None:
         return
 
     if args.subset is not None:
-        questions = questions[:args.subset]
-        answers = answers[:args.subset]
+        questions = questions[: args.subset]
+        answers = answers[: args.subset]
 
     # Parse context into lines
     lines: list[str] = context.strip().split("\n")
@@ -109,8 +117,10 @@ def main() -> None:
     audit_log: list[dict[str, object]]
     triples, audit_log = extract_triples_llm(lines, verbose=True)
     extract_time: float = time.monotonic() - t0
-    print(f"LLM extraction: {len(triples)}/{total_lines} "
-          f"({len(triples)/total_lines*100:.1f}%) in {extract_time:.1f}s")
+    print(
+        f"LLM extraction: {len(triples)}/{total_lines} "
+        f"({len(triples) / total_lines * 100:.1f}%) in {extract_time:.1f}s"
+    )
 
     # Write audit log if requested
     if args.audit_log:
@@ -124,8 +134,10 @@ def main() -> None:
     for triple in triples:
         index.add(triple)
 
-    print(f"Index: {index.entity_count} entities, {index.fact_count} facts, "
-          f"{index.conflict_count} conflicts")
+    print(
+        f"Index: {index.entity_count} entities, {index.fact_count} facts, "
+        f"{index.conflict_count} conflicts"
+    )
 
     # Run queries (identical to regex adapter)
     per_question: list[dict[str, object]] = []
@@ -135,15 +147,19 @@ def main() -> None:
     answer_in_ctx: int = 0
     for i, (question, answer_list) in enumerate(zip(questions, answers)):
         ctx: str = multi_hop_retrieve(index, question)
-        per_question.append({
-            "id": i,
-            "question": question,
-            "context": ctx,
-        })
-        ground_truth.append({
-            "id": i,
-            "answers": answer_list,
-        })
+        per_question.append(
+            {
+                "id": i,
+                "question": question,
+                "context": ctx,
+            }
+        )
+        ground_truth.append(
+            {
+                "id": i,
+                "answers": answer_list,
+            }
+        )
 
         if answer_list[0].lower() in ctx.lower():
             answer_in_ctx += 1
@@ -151,8 +167,10 @@ def main() -> None:
     query_time: float = time.monotonic() - t1
 
     print(f"Queried {len(questions)} questions in {query_time:.2f}s")
-    print(f"Answer in context: {answer_in_ctx}/{len(questions)} "
-          f"= {answer_in_ctx/len(questions)*100:.0f}%")
+    print(
+        f"Answer in context: {answer_in_ctx}/{len(questions)} "
+        f"= {answer_in_ctx / len(questions) * 100:.0f}%"
+    )
 
     # Write output
     if args.retrieve_only:

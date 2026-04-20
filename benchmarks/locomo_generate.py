@@ -9,6 +9,7 @@ which generates answers natively without needing an API key.
 Usage (called by subagent, not directly):
     Read the retrieval JSON, generate answers, write predictions JSON.
 """
+
 from __future__ import annotations
 
 import json

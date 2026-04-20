@@ -7,6 +7,7 @@ isolation boundary.
 Validates: scanner path scoping, per-project DB routing, bulk ingest isolation.
 Related: VERIFICATION_PROJECT_ISOLATION.md (field verification 2026-04-18)
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -47,16 +48,16 @@ def test_cs030_separate_stores_no_cross_contamination(tmp_path: Path) -> None:
     # Search project-B store for project-A content
     results_b: list[Belief] = store_b.search("port 8080 systemd", top_k=10)
     b_contents: list[str] = [r.content for r in results_b]
-    assert not any(
-        "port 8080" in c for c in b_contents
-    ), f"Project-A belief leaked into project-B: {b_contents}"
+    assert not any("port 8080" in c for c in b_contents), (
+        f"Project-A belief leaked into project-B: {b_contents}"
+    )
 
     # Search project-A store for project-B content
     results_a: list[Belief] = store_a.search("FTS5 full-text search", top_k=10)
     a_contents: list[str] = [r.content for r in results_a]
-    assert not any(
-        "FTS5" in c for c in a_contents
-    ), f"Project-B belief leaked into project-A: {a_contents}"
+    assert not any("FTS5" in c for c in a_contents), (
+        f"Project-B belief leaked into project-A: {a_contents}"
+    )
 
     store_a.close()
     store_b.close()
@@ -83,14 +84,16 @@ def test_cs030_ingest_turn_respects_store_boundary(tmp_path: Path) -> None:
 
     # Verify isolation
     a_search: list[Belief] = store_a.search("insert_graph_edge transaction", top_k=10)
-    assert not any(
-        "insert_graph_edge" in r.content for r in a_search
-    ), "Store-B content found in store-A after ingest_turn"
+    assert not any("insert_graph_edge" in r.content for r in a_search), (
+        "Store-B content found in store-A after ingest_turn"
+    )
 
-    b_search: list[Belief] = store_b.search("wrangler pages deploy Cloudflare", top_k=10)
-    assert not any(
-        "wrangler" in r.content for r in b_search
-    ), "Store-A content found in store-B after ingest_turn"
+    b_search: list[Belief] = store_b.search(
+        "wrangler pages deploy Cloudflare", top_k=10
+    )
+    assert not any("wrangler" in r.content for r in b_search), (
+        "Store-A content found in store-B after ingest_turn"
+    )
 
     store_a.close()
     store_b.close()

@@ -6,6 +6,7 @@ Usage:
     uv run python benchmarks/longmemeval_score.py \
         /tmp/longmemeval_preds.json /tmp/longmemeval_gt.json /tmp/longmemeval_judge.json
 """
+
 from __future__ import annotations
 
 import json
@@ -32,7 +33,9 @@ def main() -> None:
 
     # Build lookups
     gt_by_id: dict[str, dict[str, object]] = {str(g["question_id"]): g for g in gt}
-    judge_by_id: dict[str, dict[str, object]] = {str(j["question_id"]): j for j in judges}
+    judge_by_id: dict[str, dict[str, object]] = {
+        str(j["question_id"]): j for j in judges
+    }
 
     # Score
     correct_by_type: Counter[str] = Counter()
@@ -72,7 +75,9 @@ def main() -> None:
         total_count += t
 
     overall: float = total_correct / total_count * 100 if total_count > 0 else 0.0
-    print(f"\n  {'OVERALL':35s}  {total_correct:3d}/{total_count:3d}  ({overall:5.1f}%)")
+    print(
+        f"\n  {'OVERALL':35s}  {total_correct:3d}/{total_count:3d}  ({overall:5.1f}%)"
+    )
     print()
     print("Reference: GPT-4o + LongMemEval_S pipeline = 60.6%")
     print("Note: Judge is Opus (non-standard; paper uses GPT-4o)")

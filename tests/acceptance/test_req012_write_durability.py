@@ -7,6 +7,7 @@ with SIGKILL at random points.
 
 Acceptance threshold: zero acknowledged writes lost across 100 crash cycles.
 """
+
 from __future__ import annotations
 
 import multiprocessing
@@ -32,7 +33,10 @@ def _writer_process(db_path: str, start_idx: int, count: int) -> None:
 
 
 def _writer_process_with_signal(
-    db_path: str, start_idx: int, count: int, kill_after: int,
+    db_path: str,
+    start_idx: int,
+    count: int,
+    kill_after: int,
 ) -> None:
     """Child process: write beliefs, then self-SIGKILL after kill_after writes."""
     store = MemoryStore(db_path)

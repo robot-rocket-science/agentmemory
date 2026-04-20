@@ -10,12 +10,11 @@ Hamiltonian: energy analysis of the belief population trajectory,
   conservation tests, and regime classification.
 
 Methodology adapted from Jacobian/Hamiltonian diagnostic
-skills used in prior quantitative projects.
+skills (jacobian.md, hamiltonian.md).
 """
+
 from __future__ import annotations
 
-import json
-import math
 import sqlite3
 from collections import defaultdict
 from dataclasses import dataclass
@@ -196,9 +195,7 @@ def compute_hamiltonian(db_path: str) -> HamiltonianResult:
 
     # Gini coefficient
     sorted_c: list[float] = sorted(confs)
-    gini_num: float = sum(
-        (2 * (i + 1) - n - 1) * sorted_c[i] for i in range(n)
-    )
+    gini_num: float = sum((2 * (i + 1) - n - 1) * sorted_c[i] for i in range(n))
     gini: float = gini_num / (n * sum(sorted_c)) if sum(sorted_c) > 0 else 0
 
     # Conservation: is H stable? (would need time series, approximate from
@@ -288,9 +285,7 @@ def main() -> None:
     for name, a, b in operating_points:
         j: JacobianResult = compute_jacobian(a, b)
         used_str: str = (
-            f"{j.used_events_per_10pp:.1f}"
-            if j.used_events_per_10pp < 1000
-            else "inf"
+            f"{j.used_events_per_10pp:.1f}" if j.used_events_per_10pp < 1000 else "inf"
         )
         ign_str: str = (
             f"{j.ignored_events_per_10pp:.1f}"
@@ -307,15 +302,9 @@ def main() -> None:
     print("KEY INSIGHT:")
     j_cluster = compute_jacobian(1.90, 1.00)
     j_correct = compute_jacobian(0.60, 1.00)
-    print(
-        f"  At the 0.66 cluster: dC/dalpha = {j_cluster.dc_dalpha:.4f}"
-    )
-    print(
-        f"  At the correct 0.375: dC/dalpha = {j_correct.dc_dalpha:.4f}"
-    )
-    print(
-        f"  Sensitivity ratio: {j_correct.dc_dalpha / j_cluster.dc_dalpha:.1f}x"
-    )
+    print(f"  At the 0.66 cluster: dC/dalpha = {j_cluster.dc_dalpha:.4f}")
+    print(f"  At the correct 0.375: dC/dalpha = {j_correct.dc_dalpha:.4f}")
+    print(f"  Sensitivity ratio: {j_correct.dc_dalpha / j_cluster.dc_dalpha:.1f}x")
     print(
         f"  Beliefs at 0.375 are {j_correct.dc_dalpha / j_cluster.dc_dalpha:.1f}x "
         f"MORE responsive to feedback than beliefs at 0.66."
@@ -376,8 +365,10 @@ def main() -> None:
     print("  1. Run recalibrate_scores() to reset alpha=1.9 cluster")
     print("     to type-specific priors (already committed)")
     print("  2. The recalibrated beliefs at alpha=0.6 will have")
-    print(f"     {j_correct.dc_dalpha / j_cluster.dc_dalpha:.1f}x higher "
-          f"sensitivity to feedback")
+    print(
+        f"     {j_correct.dc_dalpha / j_cluster.dc_dalpha:.1f}x higher "
+        f"sensitivity to feedback"
+    )
     print("  3. Existing feedback mechanism (weight=1.0 per used,")
     print("     0.1 per ignored) is adequate IF beliefs start at")
     print("     the correct lower prior where sensitivity is higher")

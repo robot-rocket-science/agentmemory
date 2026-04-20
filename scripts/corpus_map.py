@@ -33,21 +33,30 @@ CACHE_FILE: str = "corpus_manifest.json"
 
 # File extensions -> language mapping
 EXT_LANG: dict[str, str] = {
-    ".py": "Python", ".pyi": "Python",
+    ".py": "Python",
+    ".pyi": "Python",
     ".rs": "Rust",
     ".go": "Go",
-    ".ts": "TypeScript", ".tsx": "TypeScript",
-    ".js": "JavaScript", ".jsx": "JavaScript",
-    ".c": "C", ".h": "C/C++ Header",
-    ".cpp": "C++", ".cc": "C++", ".cxx": "C++", ".hpp": "C++ Header",
+    ".ts": "TypeScript",
+    ".tsx": "TypeScript",
+    ".js": "JavaScript",
+    ".jsx": "JavaScript",
+    ".c": "C",
+    ".h": "C/C++ Header",
+    ".cpp": "C++",
+    ".cc": "C++",
+    ".cxx": "C++",
+    ".hpp": "C++ Header",
     ".java": "Java",
     ".rb": "Ruby",
     ".md": "Markdown",
-    ".yml": "YAML", ".yaml": "YAML",
+    ".yml": "YAML",
+    ".yaml": "YAML",
     ".json": "JSON",
     ".toml": "TOML",
     ".sql": "SQL",
-    ".sh": "Shell", ".bash": "Shell",
+    ".sh": "Shell",
+    ".bash": "Shell",
     ".tf": "Terraform",
     ".proto": "Protobuf",
 }
@@ -79,9 +88,22 @@ MARKERS: dict[str, str] = {
 
 # Skip directories during scan
 SKIP_DIRS: set[str] = {
-    ".git", ".venv", "venv", "node_modules", "target", "__pycache__",
-    ".mypy_cache", ".ruff_cache", "dist", "build", ".tox", ".eggs",
-    ".pytest_cache", "vendor", "third_party", "3rdparty",
+    ".git",
+    ".venv",
+    "venv",
+    "node_modules",
+    "target",
+    "__pycache__",
+    ".mypy_cache",
+    ".ruff_cache",
+    "dist",
+    "build",
+    ".tox",
+    ".eggs",
+    ".pytest_cache",
+    "vendor",
+    "third_party",
+    "3rdparty",
 }
 
 
@@ -90,7 +112,10 @@ def git_head(repo_path: Path) -> str | None:
     try:
         result = subprocess.run(
             ["git", "rev-parse", "HEAD"],
-            cwd=repo_path, capture_output=True, text=True, timeout=5,
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         return result.stdout.strip() if result.returncode == 0 else None
     except (subprocess.TimeoutExpired, FileNotFoundError):
@@ -99,13 +124,21 @@ def git_head(repo_path: Path) -> str | None:
 
 def git_stats(repo_path: Path) -> dict[str, int | str | None]:
     """Extract git history statistics."""
-    stats: dict[str, int | str | None] = {"commits": 0, "contributors": 0, "first_commit": None, "last_commit": None}
+    stats: dict[str, int | str | None] = {
+        "commits": 0,
+        "contributors": 0,
+        "first_commit": None,
+        "last_commit": None,
+    }
 
     try:
         # Commit count
         r = subprocess.run(
             ["git", "rev-list", "--count", "HEAD"],
-            cwd=repo_path, capture_output=True, text=True, timeout=10,
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         if r.returncode == 0:
             stats["commits"] = int(r.stdout.strip())
@@ -113,7 +146,10 @@ def git_stats(repo_path: Path) -> dict[str, int | str | None]:
         # Date range and contributor count
         r = subprocess.run(
             ["git", "log", "--format=%aI%n%aN", "--no-merges"],
-            cwd=repo_path, capture_output=True, text=True, timeout=30,
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         if r.returncode == 0:
             lines = r.stdout.strip().split("\n")
@@ -219,7 +255,16 @@ def infer_graph_methods(markers: list[str], languages: dict[str, int]) -> list[s
     return methods
 
 
-def scan_repo(repo_path: Path) -> dict[str, str | None | dict[str, int | str | None] | dict[str, int | dict[str, int] | list[str]] | list[str]]:
+def scan_repo(
+    repo_path: Path,
+) -> dict[
+    str,
+    str
+    | None
+    | dict[str, int | str | None]
+    | dict[str, int | dict[str, int] | list[str]]
+    | list[str],
+]:
     """Full scan of a single repo."""
     head = git_head(repo_path)
     git = git_stats(repo_path)
@@ -288,7 +333,12 @@ def main() -> None:
         head = git_head(path)
 
         # Cache check: skip if HEAD unchanged
-        if key in cache and isinstance(cache[key], dict) and cache[key].get("head") == head and not force:  # type: ignore[union-attr]
+        if (
+            key in cache
+            and isinstance(cache[key], dict)
+            and cache[key].get("head") == head
+            and not force
+        ):  # type: ignore[union-attr]
             manifest[key] = cache[key]
             cached += 1
             print(f"  [cached] {key}", file=sys.stderr)
@@ -302,7 +352,10 @@ def main() -> None:
 
     # Write manifest
     cache_path.write_text(json.dumps(manifest, indent=2, sort_keys=False))
-    print(f"\nDone: {scanned} scanned, {cached} cached, {len(manifest)} total", file=sys.stderr)
+    print(
+        f"\nDone: {scanned} scanned, {cached} cached, {len(manifest)} total",
+        file=sys.stderr,
+    )
     print(f"Manifest: {cache_path}", file=sys.stderr)
 
 

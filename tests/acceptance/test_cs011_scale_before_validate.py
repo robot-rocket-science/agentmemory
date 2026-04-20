@@ -3,6 +3,7 @@
 Pass criterion: A locked behavioral constraint about validating before scaling
 is surfaced by search and ranked above unlocked action beliefs by retrieve().
 """
+
 from __future__ import annotations
 
 from agentmemory.models import (
