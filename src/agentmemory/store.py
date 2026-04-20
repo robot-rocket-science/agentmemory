@@ -27,7 +27,6 @@ from agentmemory.models import (
     Session,
     TestResult,
 )
-from agentmemory.multi_axis import ConfidenceAxes
 
 _SCHEMA: Final[str] = """
 CREATE TABLE IF NOT EXISTS sessions (
@@ -478,25 +477,6 @@ class MemoryStore:
                 "UPDATE beliefs SET lock_level = 'user' WHERE locked = 1"
             )
         self._conn.commit()
-        # Exp 91: backfill uncertainty_vector for beliefs that don't have one.
-        # Maps existing alpha/beta -> relevance axis; accuracy/freshness uninformative.
-        # Idempotent: only touches rows where uncertainty_vector IS NULL.
-        unfilled: int = self._conn.execute(
-            "SELECT COUNT(*) FROM beliefs WHERE uncertainty_vector IS NULL"
-        ).fetchone()[0]
-        if unfilled > 0:
-            rows_to_fill: list[sqlite3.Row] = self._conn.execute(
-                "SELECT id, alpha, beta_param FROM beliefs WHERE uncertainty_vector IS NULL"
-            ).fetchall()
-            for r in rows_to_fill:
-                axes: ConfidenceAxes = ConfidenceAxes.from_single_prior(
-                    float(str(r["alpha"])), float(str(r["beta_param"]))
-                )
-                self._conn.execute(
-                    "UPDATE beliefs SET uncertainty_vector = ? WHERE id = ?",
-                    (axes.to_json(), str(r["id"])),
-                )
-            self._conn.commit()
         # Create index on session_id (safe to run even if already exists)
         self._conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_beliefs_session_id ON beliefs(session_id)"
@@ -702,20 +682,14 @@ class MemoryStore:
             if locked and lock_level == "none":
                 effective_lock_level = "user"
 
-            # Exp 91: initialize multi-axis uncertainty_vector on creation
-            init_axes: ConfidenceAxes = ConfidenceAxes.from_single_prior(
-                alpha, beta_param
-            )
-            uv_json: str = init_axes.to_json()
-
             self._conn.execute(
                 """INSERT INTO beliefs
                    (id, content_hash, content, belief_type, alpha, beta_param,
                     source_type, locked, valid_from, valid_to, superseded_by,
                     created_at, updated_at, event_time, session_id, classified_by,
                     rigor_tier, method, sample_size, data_source,
-                    independently_validated, lock_level, uncertainty_vector)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    independently_validated, lock_level)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     belief_id,
                     ch,
@@ -736,7 +710,6 @@ class MemoryStore:
                     data_source,
                     1 if independently_validated else 0,
                     effective_lock_level,
-                    uv_json,
                 ),
             )
             self._conn.execute(
@@ -781,7 +754,6 @@ class MemoryStore:
             sample_size=sample_size,
             data_source=data_source,
             independently_validated=independently_validated,
-            uncertainty_vector=uv_json,
         )
 
     def lock_belief(self, belief_id: str) -> None:
@@ -1032,30 +1004,6 @@ class MemoryStore:
                 (alpha, beta, ts, belief_id),
             )
             self._record_confidence(belief_id, alpha, beta, f"feedback_{outcome}")
-
-            # Exp 91: multi-axis confidence update.
-            # Route outcome to per-axis Beta priors in uncertainty_vector.
-            # Runs alongside legacy alpha/beta for A/B comparison.
-            if valence is None:  # Only discrete outcomes have axis routing
-                uv_row: sqlite3.Row | None = self._conn.execute(
-                    "SELECT uncertainty_vector, alpha, beta_param "
-                    "FROM beliefs WHERE id = ?",
-                    (belief_id,),
-                ).fetchone()
-                if uv_row is not None:
-                    uv_json: str | None = uv_row["uncertainty_vector"]
-                    if uv_json is not None:
-                        axes: ConfidenceAxes = ConfidenceAxes.from_json(uv_json)
-                    else:
-                        axes = ConfidenceAxes.from_single_prior(
-                            float(str(uv_row["alpha"])),
-                            float(str(uv_row["beta_param"])),
-                        )
-                    axes.update(outcome, weight)
-                    self._conn.execute(
-                        "UPDATE beliefs SET uncertainty_vector = ? WHERE id = ?",
-                        (axes.to_json(), belief_id),
-                    )
 
             # Auto-demotion: promoted beliefs with 2+ counter-signals get demoted
             if lock_level == "promoted" and beta >= old_beta + 2.0:
