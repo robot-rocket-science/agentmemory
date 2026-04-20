@@ -8,7 +8,7 @@
 
 ---
 
-You tell your AI agent "use uv, not pip." It says "got it." Next session, it reaches for pip. You correct it again. And again. And again.
+You tell your AI agent "never commit .env files." It says "got it." Next session, it stages `.env` in a commit. You correct it again. And again. And again.
 
 **agentmemory makes the next correction your last.** It captures what matters from your conversations -- corrections, decisions, preferences -- stores them locally, and injects them into every future session. Silently. Automatically. You stop repeating yourself.
 
@@ -62,7 +62,7 @@ Without agentmemory, the agent takes "push to github" literally and runs `git pu
 
 | You say | It stores |
 |---|---|
-| "Use uv, not pip" | Permanent rule. Injected every session. |
+| "Never commit .env files" | Permanent rule. Injected every session. |
 | "The endpoint moved to /v2" | Correction. Replaces the old belief. |
 | "I prefer terse commits" | Preference. Shapes behavior silently. |
 
@@ -73,7 +73,7 @@ Beliefs accumulate over time. Each one carries a Bayesian confidence score that 
 Beliefs: 312 (18 locked, 294 learned)
 Sessions: 47
 Corrections surfaced this session: 3
-Last locked: "never commit .env files" (4 weeks ago)
+Last locked: "never force-push to main" (4 weeks ago)
 ```
 
 ---
@@ -97,7 +97,7 @@ agentmemory works in the background:
 To explicitly lock a permanent rule:
 
 ```
-/mem:lock "always use uv, never poetry"
+/mem:lock "never commit .env files"
 ```
 
 For deeper exploration:
