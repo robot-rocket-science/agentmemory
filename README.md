@@ -54,7 +54,7 @@ The agent receives this context injection alongside your message:
 - Remote 'github' points to git@github.com:robot-rocket-science/agentmemory.git
 ```
 
-Without agentmemory, the agent takes "push to github" literally and runs `git push github main`, bypassing every safety check. With it, the agent heard three words and executed the full procedure -- publish script, PII guards, pre-push hook. That procedure was never taught in one session. It accumulated from corrections over weeks.
+Without agentmemory, the agent takes "push to github" literally and runs `git push github main`, bypassing every safety check. With it, the agent heard three words and executed the full procedure -- publish script, PII guards, pre-push hook. That procedure was never taught in one session. It accumulated from corrections over weeks. [Why this matters: from low-context to high-context.](docs/PHILOSOPHY.md)
 
 ---
 
@@ -66,7 +66,7 @@ Without agentmemory, the agent takes "push to github" literally and runs `git pu
 | "The endpoint moved to /v2" | Correction. Replaces the old belief. |
 | "I prefer terse commits" | Preference. Shapes behavior silently. |
 
-Beliefs accumulate over time. Each one carries a Bayesian confidence score that strengthens when the belief proves useful and fades when it doesn't. After a few weeks:
+Beliefs accumulate over time. Each one carries a [Bayesian confidence score](https://en.wikipedia.org/wiki/Bayesian_inference) that strengthens when the belief proves useful and fades when it doesn't. After a few weeks:
 
 ```
 /mem:stats

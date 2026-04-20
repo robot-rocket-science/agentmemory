@@ -1,0 +1,33 @@
+# From Low-Context to High-Context
+
+A fresh AI session is low-context. You spell out everything from scratch every time -- your project structure, your conventions, your past decisions, why you stopped doing it that way. The agent is a new hire on day one, every single day.
+
+agentmemory changes this.
+
+## How Behavior Accumulates
+
+Take a real example. You type `push the release to github`. Without agentmemory, the agent takes that literally and runs `git push github main`, bypassing every safety check. With it, the agent heard three words and executed the full procedure -- publish script, PII guards, pre-push hook.
+
+That procedure was never taught in one session. It accumulated -- one correction about the publish script, another about the PII hook, a third about the remote rename. Each was a 5-second interaction. Weeks later, those fragments compose into a complex workflow the agent executes correctly with zero prompting. Learned behavior accumulates on increasingly complex processes and stays consistent, with minimal effort on your part.
+
+## The High-Context Analogy
+
+In linguistics, this is called [high-context communication](https://en.wikipedia.org/wiki/High-context_and_low-context_cultures). Japanese speakers leave most of a sentence unsaid because both parties carry enough shared background to fill the gaps. Three words convey a full procedure because the listener already knows the context.
+
+agentmemory moves your agent from low-context to high-context. The more sessions you work together, the less you need to explain.
+
+## The Math
+
+Every belief in agentmemory carries a confidence score updated through [Bayesian inference](https://en.wikipedia.org/wiki/Bayesian_inference). When you give feedback -- a belief helped, or it didn't -- the system updates its posterior probability. Beliefs that prove useful strengthen over time. Beliefs that don't, fade. This isn't a simple counter; it's a principled way to let evidence accumulate without letting any single data point dominate.
+
+The retrieval pipeline also uses [information-theoretic scoring](https://en.wikipedia.org/wiki/Information_theory) to decide what context to inject. With a fixed context budget per prompt, the system selects beliefs that maximize relevance while minimizing redundancy -- a practical application of rate-distortion theory.
+
+## Why Local-Only Matters
+
+Your corrections, preferences, and project decisions are yours. They live in a SQLite database on your machine. No cloud sync, no telemetry, no API calls in the retrieval path. This isn't just a privacy feature -- it's a design constraint that forces the system to be fast (retrieval completes in ~50ms) and reliable (no network dependency means no outages).
+
+## Further Reading
+
+- [Architecture](ARCHITECTURE.md) -- how the retrieval pipeline works
+- [Benchmark Results](BENCHMARK_RESULTS.md) -- academic evaluation scores
+- [Case Study: README Positioning](case-study-positioning.md) -- a real session showing the system researching its own marketing
