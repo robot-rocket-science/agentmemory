@@ -45,18 +45,10 @@ def file_pairs_from_edges(edges: list[dict[str, Any]]) -> set[tuple[str, str]]:
 
 def analyze_repo(name: str, extracted_dir: Path) -> dict[str, Any]:
     """Analyze overlap for a single repo."""
-    git_data: dict[str, Any] | None = load_json(
-        extracted_dir / "git_edges" / f"{name}.json"
-    )
-    import_data: dict[str, Any] | None = load_json(
-        extracted_dir / "import_edges" / f"{name}.json"
-    )
-    struct_data: dict[str, Any] | None = load_json(
-        extracted_dir / "structural_edges" / f"{name}.json"
-    )
-    node_data: dict[str, Any] | None = load_json(
-        extracted_dir / "node_types" / f"{name}.json"
-    )
+    git_data: dict[str, Any] | None = load_json(extracted_dir / "git_edges" / f"{name}.json")
+    import_data: dict[str, Any] | None = load_json(extracted_dir / "import_edges" / f"{name}.json")
+    struct_data: dict[str, Any] | None = load_json(extracted_dir / "structural_edges" / f"{name}.json")
+    node_data: dict[str, Any] | None = load_json(extracted_dir / "node_types" / f"{name}.json")
 
     result: dict[str, Any] = {"name": name, "edge_sources": {}}
 
@@ -100,9 +92,7 @@ def analyze_repo(name: str, extracted_dir: Path) -> dict[str, Any]:
             se_pairs: set[tuple[str, str]] = file_pairs_from_edges([se])
             struct_pairs.update(se_pairs)
         result["edge_sources"]["structural"] = len(struct_pairs)
-        result["edge_sources"]["structural_by_type"] = dict(
-            struct_by_type.most_common()
-        )
+        result["edge_sources"]["structural_by_type"] = dict(struct_by_type.most_common())
 
     # Node types
     if node_data:
@@ -118,19 +108,13 @@ def analyze_repo(name: str, extracted_dir: Path) -> dict[str, Any]:
         overlap["import_AND_cochange_w3"] = len(shared)
         overlap["import_ONLY"] = len(import_pairs - co_change_pairs)
         overlap["cochange_w3_ONLY"] = len(co_change_pairs - import_pairs)
-        overlap["import_in_cochange_pct"] = round(
-            len(shared) / max(len(import_pairs), 1) * 100, 1
-        )
-        overlap["cochange_in_import_pct"] = round(
-            len(shared) / max(len(co_change_pairs), 1) * 100, 1
-        )
+        overlap["import_in_cochange_pct"] = round(len(shared) / max(len(import_pairs), 1) * 100, 1)
+        overlap["cochange_in_import_pct"] = round(len(shared) / max(len(co_change_pairs), 1) * 100, 1)
 
     # Import vs co-change (any weight)
     if import_pairs and co_change_all:
         shared_any: set[tuple[str, str]] = import_pairs & co_change_all
-        overlap["import_in_cochange_any_pct"] = round(
-            len(shared_any) / max(len(import_pairs), 1) * 100, 1
-        )
+        overlap["import_in_cochange_any_pct"] = round(len(shared_any) / max(len(import_pairs), 1) * 100, 1)
 
     # Structural vs co-change
     if struct_pairs and co_change_pairs:
@@ -146,14 +130,8 @@ def analyze_repo(name: str, extracted_dir: Path) -> dict[str, Any]:
     # Three-way Venn
     if import_pairs and co_change_pairs and struct_pairs:
         all_three: set[tuple[str, str]] = import_pairs & co_change_pairs & struct_pairs
-        any_two: set[tuple[str, str]] = (
-            (import_pairs & co_change_pairs)
-            | (import_pairs & struct_pairs)
-            | (co_change_pairs & struct_pairs)
-        )
-        exactly_one: set[tuple[str, str]] = (
-            import_pairs | co_change_pairs | struct_pairs
-        ) - any_two
+        any_two: set[tuple[str, str]] = (import_pairs & co_change_pairs) | (import_pairs & struct_pairs) | (co_change_pairs & struct_pairs)
+        exactly_one: set[tuple[str, str]] = (import_pairs | co_change_pairs | struct_pairs) - any_two
         overlap["all_three_methods"] = len(all_three)
         overlap["any_two_methods"] = len(any_two - all_three)
         overlap["exactly_one_method"] = len(exactly_one)
@@ -203,22 +181,18 @@ def main() -> None:
         results[name] = analyze_repo(name, extracted_dir)
 
     # Print summary table
-    print(f"\n{'=' * 100}")
-    print(
-        f"{'Repo':<12} {'Nodes':>6} {'Edges':>7} {'Density':>8} {'AvgDeg':>7} | {'ImpInCo%':>8} {'CoInImp%':>8} {'ImpOnly':>8} {'CoOnly':>8}"
-    )
+    print(f"\n{'='*100}")
+    print(f"{'Repo':<12} {'Nodes':>6} {'Edges':>7} {'Density':>8} {'AvgDeg':>7} | {'ImpInCo%':>8} {'CoInImp%':>8} {'ImpOnly':>8} {'CoOnly':>8}")
     print("-" * 100)
 
     for name, r in sorted(results.items()):
         g: dict[str, Any] = r["combined_graph"]
         o: dict[str, Any] = r.get("overlap", {})
-        print(
-            f"{name:<12} {g['nodes']:>6} {g['file_edges']:>7} {g['density']:>8.5f} {g['avg_degree']:>7.1f} | "
-            f"{o.get('import_in_cochange_pct', '-'):>8} {o.get('cochange_in_import_pct', '-'):>8} "
-            f"{o.get('import_ONLY', '-'):>8} {o.get('cochange_w3_ONLY', '-'):>8}"
-        )
+        print(f"{name:<12} {g['nodes']:>6} {g['file_edges']:>7} {g['density']:>8.5f} {g['avg_degree']:>7.1f} | "
+              f"{o.get('import_in_cochange_pct', '-'):>8} {o.get('cochange_in_import_pct', '-'):>8} "
+              f"{o.get('import_ONLY', '-'):>8} {o.get('cochange_w3_ONLY', '-'):>8}")
 
-    print(f"\n{'=' * 100}")
+    print(f"\n{'='*100}")
     print("\nDetailed overlap per repo:\n")
 
     for name, r in sorted(results.items()):

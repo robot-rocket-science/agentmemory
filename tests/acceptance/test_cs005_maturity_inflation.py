@@ -4,7 +4,6 @@ Pass criterion: Provenance/rigor metadata columns (rigor_tier, method,
 sample_size) exist and round-trip correctly. Session velocity tracking
 computes and stores velocity_items_per_hour and velocity_tier.
 """
-
 from __future__ import annotations
 
 from agentmemory.models import (

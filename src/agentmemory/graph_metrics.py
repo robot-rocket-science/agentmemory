@@ -4,7 +4,6 @@ Computes structural importance (degree centrality, PageRank) from the
 belief edge graph. These metrics feed into retrieval scoring as a
 "structural boost" for hub beliefs.
 """
-
 from __future__ import annotations
 
 from typing import Final
@@ -47,7 +46,9 @@ def compute_pagerank(
     Only includes beliefs that participate in at least one edge.
     """
     # Build adjacency: out_edges[node] = list of target nodes
-    edge_rows = store.query("SELECT from_id, to_id FROM edges WHERE pruned_at IS NULL")
+    edge_rows = store.query(
+        "SELECT from_id, to_id FROM edges WHERE pruned_at IS NULL"
+    )
 
     out_edges: dict[str, list[str]] = {}
     all_nodes: set[str] = set()

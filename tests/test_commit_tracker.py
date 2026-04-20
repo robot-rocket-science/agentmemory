@@ -3,7 +3,6 @@
 Covers config load/save, git query logic, threshold evaluation,
 and nudge message generation. All git calls are mocked.
 """
-
 from __future__ import annotations
 
 import json
@@ -79,7 +78,6 @@ def test_disabled_tracker_returns_early(tmp_path: Path) -> None:
 
 def _mock_git(responses: dict[str, tuple[str, str, int]]):
     """Return a mock for _run_git that returns canned responses by first arg."""
-
     def fake_run_git(args: list[str], cwd: Path) -> tuple[str, str, int]:
         key: str = args[0]
         if key == "log":
@@ -89,7 +87,6 @@ def _mock_git(responses: dict[str, tuple[str, str, int]]):
         elif key == "rev-parse":
             key = "rev-parse"
         return responses.get(key, ("", "unknown command", 1))
-
     return fake_run_git
 
 
@@ -115,12 +112,10 @@ def test_no_commits_yet(tmp_path: Path) -> None:
         patch("agentmemory.commit_tracker._CONFIG_PATH", config_path),
         patch(
             "agentmemory.commit_tracker._run_git",
-            _mock_git(
-                {
-                    "rev-parse": ("true", "", 0),
-                    "log": ("", "no commits", 1),
-                }
-            ),
+            _mock_git({
+                "rev-parse": ("true", "", 0),
+                "log": ("", "no commits", 1),
+            }),
         ),
     ):
         result: CommitCheckResult = check_commit_status(tmp_path)
@@ -130,19 +125,19 @@ def test_no_commits_yet(tmp_path: Path) -> None:
 
 def test_time_threshold_exceeded(tmp_path: Path) -> None:
     """Nudge fires when time since last commit exceeds threshold."""
-    old_time: str = (datetime.now(timezone.utc) - timedelta(minutes=20)).isoformat()
+    old_time: str = (
+        datetime.now(timezone.utc) - timedelta(minutes=20)
+    ).isoformat()
     config_path: Path = tmp_path / "commit_tracker.json"
     with (
         patch("agentmemory.commit_tracker._CONFIG_PATH", config_path),
         patch(
             "agentmemory.commit_tracker._run_git",
-            _mock_git(
-                {
-                    "rev-parse": ("true", "", 0),
-                    "log": (old_time, "", 0),
-                    "status": ("", "", 0),  # no changes
-                }
-            ),
+            _mock_git({
+                "rev-parse": ("true", "", 0),
+                "log": (old_time, "", 0),
+                "status": ("", "", 0),  # no changes
+            }),
         ),
     ):
         result: CommitCheckResult = check_commit_status(tmp_path)
@@ -153,7 +148,9 @@ def test_time_threshold_exceeded(tmp_path: Path) -> None:
 
 def test_changes_threshold_exceeded(tmp_path: Path) -> None:
     """Nudge fires when uncommitted change count exceeds threshold."""
-    recent_time: str = (datetime.now(timezone.utc) - timedelta(seconds=30)).isoformat()
+    recent_time: str = (
+        datetime.now(timezone.utc) - timedelta(seconds=30)
+    ).isoformat()
     # 12 lines = 12 changes
     status_output: str = "\n".join(f" M file{i}.py" for i in range(12))
     config_path: Path = tmp_path / "commit_tracker.json"
@@ -161,13 +158,11 @@ def test_changes_threshold_exceeded(tmp_path: Path) -> None:
         patch("agentmemory.commit_tracker._CONFIG_PATH", config_path),
         patch(
             "agentmemory.commit_tracker._run_git",
-            _mock_git(
-                {
-                    "rev-parse": ("true", "", 0),
-                    "log": (recent_time, "", 0),
-                    "status": (status_output, "", 0),
-                }
-            ),
+            _mock_git({
+                "rev-parse": ("true", "", 0),
+                "log": (recent_time, "", 0),
+                "status": (status_output, "", 0),
+            }),
         ),
     ):
         result: CommitCheckResult = check_commit_status(tmp_path)
@@ -178,20 +173,20 @@ def test_changes_threshold_exceeded(tmp_path: Path) -> None:
 
 def test_both_thresholds_exceeded(tmp_path: Path) -> None:
     """Nudge message covers both conditions when both trip."""
-    old_time: str = (datetime.now(timezone.utc) - timedelta(minutes=20)).isoformat()
+    old_time: str = (
+        datetime.now(timezone.utc) - timedelta(minutes=20)
+    ).isoformat()
     status_output: str = "\n".join(f" M file{i}.py" for i in range(15))
     config_path: Path = tmp_path / "commit_tracker.json"
     with (
         patch("agentmemory.commit_tracker._CONFIG_PATH", config_path),
         patch(
             "agentmemory.commit_tracker._run_git",
-            _mock_git(
-                {
-                    "rev-parse": ("true", "", 0),
-                    "log": (old_time, "", 0),
-                    "status": (status_output, "", 0),
-                }
-            ),
+            _mock_git({
+                "rev-parse": ("true", "", 0),
+                "log": (old_time, "", 0),
+                "status": (status_output, "", 0),
+            }),
         ),
     ):
         result: CommitCheckResult = check_commit_status(tmp_path)
@@ -203,20 +198,20 @@ def test_both_thresholds_exceeded(tmp_path: Path) -> None:
 
 def test_within_thresholds_no_nudge(tmp_path: Path) -> None:
     """No nudge when both time and changes are within bounds."""
-    recent_time: str = (datetime.now(timezone.utc) - timedelta(seconds=30)).isoformat()
+    recent_time: str = (
+        datetime.now(timezone.utc) - timedelta(seconds=30)
+    ).isoformat()
     status_output: str = " M file1.py\n M file2.py"
     config_path: Path = tmp_path / "commit_tracker.json"
     with (
         patch("agentmemory.commit_tracker._CONFIG_PATH", config_path),
         patch(
             "agentmemory.commit_tracker._run_git",
-            _mock_git(
-                {
-                    "rev-parse": ("true", "", 0),
-                    "log": (recent_time, "", 0),
-                    "status": (status_output, "", 0),
-                }
-            ),
+            _mock_git({
+                "rev-parse": ("true", "", 0),
+                "log": (recent_time, "", 0),
+                "status": (status_output, "", 0),
+            }),
         ),
     ):
         result: CommitCheckResult = check_commit_status(tmp_path)
@@ -258,28 +253,24 @@ def test_format_status_with_nudge() -> None:
 def test_custom_thresholds_from_config(tmp_path: Path) -> None:
     """Custom max_seconds and max_changes are respected."""
     config_path: Path = tmp_path / "commit_tracker.json"
-    config_path.write_text(
-        json.dumps(
-            {
-                "enabled": True,
-                "max_seconds": 60,  # 1 minute
-                "max_changes": 3,
-            }
-        )
-    )
-    recent_time: str = (datetime.now(timezone.utc) - timedelta(seconds=90)).isoformat()
+    config_path.write_text(json.dumps({
+        "enabled": True,
+        "max_seconds": 60,   # 1 minute
+        "max_changes": 3,
+    }))
+    recent_time: str = (
+        datetime.now(timezone.utc) - timedelta(seconds=90)
+    ).isoformat()
     status_output: str = " M a.py\n M b.py\n M c.py\n M d.py"
     with (
         patch("agentmemory.commit_tracker._CONFIG_PATH", config_path),
         patch(
             "agentmemory.commit_tracker._run_git",
-            _mock_git(
-                {
-                    "rev-parse": ("true", "", 0),
-                    "log": (recent_time, "", 0),
-                    "status": (status_output, "", 0),
-                }
-            ),
+            _mock_git({
+                "rev-parse": ("true", "", 0),
+                "log": (recent_time, "", 0),
+                "status": (status_output, "", 0),
+            }),
         ),
     ):
         result: CommitCheckResult = check_commit_status(tmp_path)

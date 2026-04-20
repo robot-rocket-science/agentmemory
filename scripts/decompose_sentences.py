@@ -28,87 +28,29 @@ from typing import Any
 
 
 SKIP_DIRS: set[str] = {
-    ".git",
-    "node_modules",
-    "target",
-    ".venv",
-    "venv",
-    "__pycache__",
-    ".mypy_cache",
-    ".ruff_cache",
-    "dist",
-    "build",
-    ".tox",
-    "vendor",
-    "third_party",
-    "3rdparty",
+    ".git", "node_modules", "target", ".venv", "venv", "__pycache__",
+    ".mypy_cache", ".ruff_cache", "dist", "build", ".tox", "vendor",
+    "third_party", "3rdparty",
 }
 
 STOP_WORDS: set[str] = {
-    "the",
-    "a",
-    "an",
-    "is",
-    "are",
-    "was",
-    "were",
-    "be",
-    "been",
-    "being",
-    "have",
-    "has",
-    "had",
-    "do",
-    "does",
-    "did",
-    "will",
-    "would",
-    "could",
-    "should",
-    "may",
-    "might",
-    "shall",
-    "can",
-    "need",
-    "must",
-    "to",
-    "of",
-    "in",
-    "for",
-    "on",
-    "with",
-    "at",
-    "by",
-    "from",
-    "as",
-    "into",
-    "through",
-    "and",
-    "but",
-    "or",
-    "if",
-    "not",
-    "no",
-    "this",
-    "that",
-    "it",
-    "its",
+    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
+    "have", "has", "had", "do", "does", "did", "will", "would", "could",
+    "should", "may", "might", "shall", "can", "need", "must", "to", "of",
+    "in", "for", "on", "with", "at", "by", "from", "as", "into", "through",
+    "and", "but", "or", "if", "not", "no", "this", "that", "it", "its",
 }
 
 
 def git_head(repo: Path) -> str:
     r: subprocess.CompletedProcess[str] = subprocess.run(
         ["git", "rev-parse", "HEAD"],
-        cwd=repo,
-        capture_output=True,
-        text=True,
-        timeout=5,
+        cwd=repo, capture_output=True, text=True, timeout=5,
     )
     return r.stdout.strip()
 
 
 # --- Sentence Node ---
-
 
 class SentenceNode:
     """A sentence-level node in the decomposed graph."""
@@ -163,10 +105,7 @@ class SentenceEdge:
 
 # --- Markdown Decomposition ---
 
-
-def decompose_markdown(
-    file_path: str, content: str
-) -> tuple[list[SentenceNode], list[SentenceEdge]]:
+def decompose_markdown(file_path: str, content: str) -> tuple[list[SentenceNode], list[SentenceEdge]]:
     """Decompose a markdown file into paragraph-level nodes."""
     nodes: list[SentenceNode] = []
     edges: list[SentenceEdge] = []
@@ -186,16 +125,14 @@ def decompose_markdown(
 
         node_id: str = f"{file_path}:s{node_idx}"
         node_type: str = classify_md_sentence(text)
-        nodes.append(
-            SentenceNode(
-                node_id=node_id,
-                content=text,
-                file_path=file_path,
-                line_start=para_start_line,
-                node_type=node_type,
-                heading_context=current_heading,
-            )
-        )
+        nodes.append(SentenceNode(
+            node_id=node_id,
+            content=text,
+            file_path=file_path,
+            line_start=para_start_line,
+            node_type=node_type,
+            heading_context=current_heading,
+        ))
 
         if prev_node_id:
             edges.append(SentenceEdge(prev_node_id, node_id, "NEXT_IN_FILE"))
@@ -221,9 +158,7 @@ def decompose_markdown(
             continue
 
         # Bullet list item = its own paragraph
-        if stripped.startswith(
-            ("- ", "* ", "1.", "2.", "3.", "4.", "5.", "6.", "7.", "8.", "9.")
-        ):
+        if stripped.startswith(("- ", "* ", "1.", "2.", "3.", "4.", "5.", "6.", "7.", "8.", "9.")):
             if current_para:
                 flush_para()
                 current_para = []
@@ -249,29 +184,13 @@ def classify_md_sentence(text: str) -> str:
     """Classify a markdown paragraph by its role."""
     lower: str = text.lower()
 
-    if any(
-        w in lower
-        for w in [
-            "must",
-            "always",
-            "never",
-            "mandatory",
-            "require",
-            "rule",
-            "constraint",
-        ]
-    ):
+    if any(w in lower for w in ["must", "always", "never", "mandatory", "require", "rule", "constraint"]):
         return "CONSTRAINT"
-    if any(
-        w in lower
-        for w in ["because", "rationale", "reason", "driven by", "root cause"]
-    ):
+    if any(w in lower for w in ["because", "rationale", "reason", "driven by", "root cause"]):
         return "RATIONALE"
     if any(w in lower for w in ["decided", "decision", "chose", "chosen", "selected"]):
         return "DECISION"
-    if any(
-        w in lower for w in ["supersede", "replace", "retire", "override", "deprecated"]
-    ):
+    if any(w in lower for w in ["supersede", "replace", "retire", "override", "deprecated"]):
         return "SUPERSESSION"
     if any(w in lower for w in ["data", "showed", "result", "found", "measured", "%"]):
         return "EVIDENCE"
@@ -287,10 +206,7 @@ def classify_md_sentence(text: str) -> str:
 
 # --- Python Decomposition ---
 
-
-def decompose_python(
-    file_path: str, content: str
-) -> tuple[list[SentenceNode], list[SentenceEdge]]:
+def decompose_python(file_path: str, content: str) -> tuple[list[SentenceNode], list[SentenceEdge]]:
     """Decompose a Python file into function/class-level nodes."""
     nodes: list[SentenceNode] = []
     edges: list[SentenceEdge] = []
@@ -307,9 +223,7 @@ def decompose_python(
         if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
             node_id: str = f"{file_path}:fn:{node.name}"
             # Extract function signature + docstring as content
-            sig_lines: list[str] = content.split("\n")[
-                node.lineno - 1 : min(node.lineno + 2, len(content.split("\n")))
-            ]
+            sig_lines: list[str] = content.split("\n")[node.lineno - 1:min(node.lineno + 2, len(content.split("\n")))]
             sig: str = "\n".join(sig_lines).strip()
 
             docstring: str | None = ast.get_docstring(node)
@@ -317,28 +231,24 @@ def decompose_python(
             if docstring:
                 func_content = f"{sig}\n\n{docstring}"
 
-            nodes.append(
-                SentenceNode(
-                    node_id=node_id,
-                    content=func_content[:500],  # cap at 500 chars
-                    file_path=file_path,
-                    line_start=node.lineno,
-                    node_type="FUNCTION",
-                )
-            )
+            nodes.append(SentenceNode(
+                node_id=node_id,
+                content=func_content[:500],  # cap at 500 chars
+                file_path=file_path,
+                line_start=node.lineno,
+                node_type="FUNCTION",
+            ))
 
             # Docstring as separate belief node
             if docstring and len(docstring) > 15:
                 doc_id: str = f"{file_path}:doc:{node.name}"
-                nodes.append(
-                    SentenceNode(
-                        node_id=doc_id,
-                        content=docstring[:500],
-                        file_path=file_path,
-                        line_start=node.lineno + 1,
-                        node_type="DOCSTRING",
-                    )
-                )
+                nodes.append(SentenceNode(
+                    node_id=doc_id,
+                    content=docstring[:500],
+                    file_path=file_path,
+                    line_start=node.lineno + 1,
+                    node_type="DOCSTRING",
+                ))
                 edges.append(SentenceEdge(doc_id, node_id, "DOCUMENTS"))
 
             if prev_node_id:
@@ -354,15 +264,13 @@ def decompose_python(
             if docstring:
                 class_content = f"class {node.name}\n\n{docstring}"
 
-            nodes.append(
-                SentenceNode(
-                    node_id=node_id,
-                    content=class_content[:500],
-                    file_path=file_path,
-                    line_start=node.lineno,
-                    node_type="CLASS",
-                )
-            )
+            nodes.append(SentenceNode(
+                node_id=node_id,
+                content=class_content[:500],
+                file_path=file_path,
+                line_start=node.lineno,
+                node_type="CLASS",
+            ))
 
             if prev_node_id:
                 edges.append(SentenceEdge(prev_node_id, node_id, "NEXT_IN_FILE"))
@@ -374,10 +282,7 @@ def decompose_python(
 
 # --- Generic Code Decomposition ---
 
-
-def decompose_code_generic(
-    file_path: str, content: str, ext: str
-) -> tuple[list[SentenceNode], list[SentenceEdge]]:
+def decompose_code_generic(file_path: str, content: str, ext: str) -> tuple[list[SentenceNode], list[SentenceEdge]]:
     """Decompose code files into function-level nodes via regex."""
     nodes: list[SentenceNode] = []
     edges: list[SentenceEdge] = []
@@ -385,23 +290,12 @@ def decompose_code_generic(
     # Function patterns by language
     patterns: dict[str, re.Pattern[str]] = {
         ".rs": re.compile(r"^(\s*(?:pub\s+)?(?:async\s+)?fn\s+\w+)", re.MULTILINE),
-        ".ts": re.compile(
-            r"^(\s*(?:export\s+)?(?:async\s+)?function\s+\w+|(?:export\s+)?(?:const|let)\s+\w+\s*=\s*(?:async\s+)?\()",
-            re.MULTILINE,
-        ),
-        ".tsx": re.compile(
-            r"^(\s*(?:export\s+)?(?:async\s+)?function\s+\w+|(?:export\s+)?(?:const|let)\s+\w+\s*=\s*(?:async\s+)?\()",
-            re.MULTILINE,
-        ),
-        ".js": re.compile(
-            r"^(\s*(?:export\s+)?(?:async\s+)?function\s+\w+|(?:export\s+)?(?:const|let)\s+\w+\s*=\s*(?:async\s+)?\()",
-            re.MULTILINE,
-        ),
+        ".ts": re.compile(r"^(\s*(?:export\s+)?(?:async\s+)?function\s+\w+|(?:export\s+)?(?:const|let)\s+\w+\s*=\s*(?:async\s+)?\()", re.MULTILINE),
+        ".tsx": re.compile(r"^(\s*(?:export\s+)?(?:async\s+)?function\s+\w+|(?:export\s+)?(?:const|let)\s+\w+\s*=\s*(?:async\s+)?\()", re.MULTILINE),
+        ".js": re.compile(r"^(\s*(?:export\s+)?(?:async\s+)?function\s+\w+|(?:export\s+)?(?:const|let)\s+\w+\s*=\s*(?:async\s+)?\()", re.MULTILINE),
         ".go": re.compile(r"^(func\s+(?:\(\w+\s+\*?\w+\)\s+)?\w+)", re.MULTILINE),
         ".c": re.compile(r"^(\w[\w\s\*]+\s+\w+\s*\([^)]*\)\s*\{)", re.MULTILINE),
-        ".cpp": re.compile(
-            r"^(\w[\w\s\*:]+\s+\w+\s*\([^)]*\)\s*(?:const\s*)?\{)", re.MULTILINE
-        ),
+        ".cpp": re.compile(r"^(\w[\w\s\*:]+\s+\w+\s*\([^)]*\)\s*(?:const\s*)?\{)", re.MULTILINE),
         ".h": re.compile(r"^(\w[\w\s\*]+\s+\w+\s*\([^)]*\)\s*;)", re.MULTILINE),
     }
 
@@ -415,22 +309,20 @@ def decompose_code_generic(
 
     for m in pattern.finditer(content):
         _sig: str = m.group(1).strip()
-        line_num: int = content[: m.start()].count("\n")
+        line_num: int = content[:m.start()].count("\n")
 
         # Get a few lines of context
         context_end: int = min(line_num + 5, len(lines))
         context: str = "\n".join(lines[line_num:context_end]).strip()
 
         node_id: str = f"{file_path}:fn{node_idx}"
-        nodes.append(
-            SentenceNode(
-                node_id=node_id,
-                content=context[:500],
-                file_path=file_path,
-                line_start=line_num,
-                node_type="FUNCTION",
-            )
-        )
+        nodes.append(SentenceNode(
+            node_id=node_id,
+            content=context[:500],
+            file_path=file_path,
+            line_start=line_num,
+            node_type="FUNCTION",
+        ))
 
         if prev_node_id:
             edges.append(SentenceEdge(prev_node_id, node_id, "NEXT_IN_FILE"))
@@ -442,7 +334,6 @@ def decompose_code_generic(
 
 # --- Cross-Reference Extraction ---
 
-
 def extract_sentence_cross_refs(
     nodes: list[SentenceNode],
 ) -> list[SentenceEdge]:
@@ -450,9 +341,7 @@ def extract_sentence_cross_refs(
     edges: list[SentenceEdge] = []
 
     # Build index: reference -> list of node IDs mentioning it
-    ref_pattern: re.Pattern[str] = re.compile(
-        r"\b(D\d{2,4}|M\d{2,4}|ADR[-\s]?\d+|RFC\s?\d+)\b", re.IGNORECASE
-    )
+    ref_pattern: re.Pattern[str] = re.compile(r"\b(D\d{2,4}|M\d{2,4}|ADR[-\s]?\d+|RFC\s?\d+)\b", re.IGNORECASE)
     ref_to_nodes: dict[str, list[str]] = {}
 
     for node in nodes:
@@ -475,7 +364,6 @@ def extract_sentence_cross_refs(
 
 
 # --- Vocabulary Overlap Measurement ---
-
 
 def tokenize(text: str) -> set[str]:
     """Extract word tokens."""
@@ -500,7 +388,6 @@ def jaccard(a: set[str], b: set[str]) -> float:
 
 
 # --- Main ---
-
 
 def main() -> None:
     if len(sys.argv) < 2:
@@ -576,18 +463,13 @@ def main() -> None:
 
     print(f"  files decomposed: {file_count}", file=sys.stderr)
     print(f"  sentence nodes: {len(all_nodes)}", file=sys.stderr)
-    print(
-        f"  edges: {len(all_edges)} ({len(all_edges) - len(xref_edges)} structural + {len(xref_edges)} cross-ref)",
-        file=sys.stderr,
-    )
+    print(f"  edges: {len(all_edges)} ({len(all_edges) - len(xref_edges)} structural + {len(xref_edges)} cross-ref)", file=sys.stderr)
     print(f"  decomposition methods: {dict(files_by_method)}", file=sys.stderr)
     print(f"  node types: {dict(type_counts.most_common())}", file=sys.stderr)
 
     # Vocabulary overlap at sentence level
     # Sample: measure overlap between consecutive sentence pairs (NEXT_IN_FILE edges)
-    next_edges: list[SentenceEdge] = [
-        e for e in all_edges if e.edge_type == "NEXT_IN_FILE"
-    ]
+    next_edges: list[SentenceEdge] = [e for e in all_edges if e.edge_type == "NEXT_IN_FILE"]
     node_map: dict[str, SentenceNode] = {n.node_id: n for n in all_nodes}
     overlaps: list[float] = []
 
@@ -605,19 +487,10 @@ def main() -> None:
         mean_overlap = sum(overlaps) / len(overlaps)
         below_01 = sum(1 for o in overlaps if o < 0.1)
         above_03 = sum(1 for o in overlaps if o > 0.3)
-        print(
-            f"\n  vocabulary overlap (sentence-level, {len(overlaps)} pairs):",
-            file=sys.stderr,
-        )
+        print(f"\n  vocabulary overlap (sentence-level, {len(overlaps)} pairs):", file=sys.stderr)
         print(f"    mean: {mean_overlap:.3f}", file=sys.stderr)
-        print(
-            f"    <0.1: {below_01} ({below_01 / len(overlaps) * 100:.1f}%)",
-            file=sys.stderr,
-        )
-        print(
-            f"    >0.3: {above_03} ({above_03 / len(overlaps) * 100:.1f}%)",
-            file=sys.stderr,
-        )
+        print(f"    <0.1: {below_01} ({below_01/len(overlaps)*100:.1f}%)", file=sys.stderr)
+        print(f"    >0.3: {above_03} ({above_03/len(overlaps)*100:.1f}%)", file=sys.stderr)
 
     # Write output
     result: dict[str, Any] = {
@@ -633,12 +506,8 @@ def main() -> None:
             "node_types": dict(type_counts.most_common()),
             "files_by_method": dict(files_by_method),
             "vocab_overlap_mean": round(mean_overlap, 4) if overlaps else None,
-            "vocab_overlap_below_01_pct": round(below_01 / len(overlaps) * 100, 1)
-            if overlaps
-            else None,
-            "vocab_overlap_above_03_pct": round(above_03 / len(overlaps) * 100, 1)
-            if overlaps
-            else None,
+            "vocab_overlap_below_01_pct": round(below_01 / len(overlaps) * 100, 1) if overlaps else None,
+            "vocab_overlap_above_03_pct": round(above_03 / len(overlaps) * 100, 1) if overlaps else None,
         },
         "nodes": [n.to_dict() for n in all_nodes],
         "edges": [e.to_dict() for e in all_edges],

@@ -3,7 +3,6 @@
 Pass criterion: 20 checkpoints written to a session that is never completed
 (simulating a crash) must be recoverable at >= 90% (>= 18 of 20).
 """
-
 from __future__ import annotations
 
 from agentmemory.models import (

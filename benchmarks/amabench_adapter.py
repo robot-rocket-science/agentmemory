@@ -11,7 +11,6 @@ Usage:
     uv run python benchmarks/amabench_adapter.py --domain Game --max-episodes 10
     uv run python benchmarks/amabench_adapter.py --qa-type A --retrieve-only recall.json
 """
-
 from __future__ import annotations
 
 import argparse
@@ -124,13 +123,11 @@ def load_amabench(
         raw_traj: list[dict[str, object]] = row["trajectory"]  # type: ignore[assignment]
         trajectory: list[TrajectoryStep] = []
         for step in raw_traj:
-            trajectory.append(
-                TrajectoryStep(
-                    turn_idx=int(step["turn_idx"]),  # type: ignore[arg-type]
-                    action=str(step["action"]),
-                    observation=str(step["observation"]),
-                )
-            )
+            trajectory.append(TrajectoryStep(
+                turn_idx=int(step["turn_idx"]),  # type: ignore[arg-type]
+                action=str(step["action"]),
+                observation=str(step["observation"]),
+            ))
 
         # Parse QA pairs, optionally filtering by type
         raw_qa: list[dict[str, object]] = row["qa_pairs"]  # type: ignore[assignment]
@@ -139,32 +136,28 @@ def load_amabench(
             q_type: str = str(q["type"])
             if qa_type is not None and q_type != qa_type:
                 continue
-            qa_pairs.append(
-                QAPair(
-                    question=str(q["question"]),
-                    answer=str(q["answer"]),
-                    qa_type=q_type,
-                    question_uuid=str(q["question_uuid"]),
-                )
-            )
+            qa_pairs.append(QAPair(
+                question=str(q["question"]),
+                answer=str(q["answer"]),
+                qa_type=q_type,
+                question_uuid=str(q["question_uuid"]),
+            ))
 
         # Skip episodes with no matching QA pairs after filtering
         if qa_type is not None and not qa_pairs:
             continue
 
-        episodes.append(
-            Episode(
-                episode_id=str(row["episode_id"]),
-                task=str(row["task"]),
-                task_type=str(row["task_type"]),
-                domain=ep_domain,
-                success=bool(row["success"]),
-                num_turns=int(row["num_turns"]),  # type: ignore[arg-type]
-                total_tokens=int(row["total_tokens"]),  # type: ignore[arg-type]
-                trajectory=trajectory,
-                qa_pairs=qa_pairs,
-            )
-        )
+        episodes.append(Episode(
+            episode_id=str(row["episode_id"]),
+            task=str(row["task"]),
+            task_type=str(row["task_type"]),
+            domain=ep_domain,
+            success=bool(row["success"]),
+            num_turns=int(row["num_turns"]),  # type: ignore[arg-type]
+            total_tokens=int(row["total_tokens"]),  # type: ignore[arg-type]
+            trajectory=trajectory,
+            qa_pairs=qa_pairs,
+        ))
 
         if max_episodes is not None and len(episodes) >= max_episodes:
             break
@@ -333,25 +326,21 @@ def run_episode(
         context: str = query_agentmemory(store, qa.question, budget=budget)
 
         result.total_qa += 1
-        result.per_question.append(
-            {
-                "episode_id": episode.episode_id,
-                "domain": episode.domain,
-                "task_type": episode.task_type,
-                "question": qa.question,
-                "qa_type": qa.qa_type,
-                "qa_type_name": QA_TYPE_NAMES.get(qa.qa_type, "unknown"),
-                "question_uuid": qa.question_uuid,
-                "context": context,
-            }
-        )
-        result.ground_truth.append(
-            {
-                "question_uuid": qa.question_uuid,
-                "answer": qa.answer,
-                "qa_type": qa.qa_type,
-            }
-        )
+        result.per_question.append({
+            "episode_id": episode.episode_id,
+            "domain": episode.domain,
+            "task_type": episode.task_type,
+            "question": qa.question,
+            "qa_type": qa.qa_type,
+            "qa_type_name": QA_TYPE_NAMES.get(qa.qa_type, "unknown"),
+            "question_uuid": qa.question_uuid,
+            "context": context,
+        })
+        result.ground_truth.append({
+            "question_uuid": qa.question_uuid,
+            "answer": qa.answer,
+            "qa_type": qa.qa_type,
+        })
 
     result.query_time_s = time.monotonic() - t1
     return result
@@ -394,7 +383,9 @@ def print_results(agg: AggregateResult) -> None:
 
     # Context length stats
     if agg.per_question:
-        lengths: list[int] = [len(str(q["context"]).split()) for q in agg.per_question]
+        lengths: list[int] = [
+            len(str(q["context"]).split()) for q in agg.per_question
+        ]
         avg_len: float = sum(lengths) / len(lengths)
         min_len: int = min(lengths)
         max_len: int = max(lengths)
@@ -420,37 +411,27 @@ def main() -> None:
         description="Run AMA-Bench benchmark on agentmemory",
     )
     parser.add_argument(
-        "--max-episodes",
-        type=int,
-        default=None,
+        "--max-episodes", type=int, default=None,
         help="Limit to first N episodes (default: all 208)",
     )
     parser.add_argument(
-        "--domain",
-        default=None,
+        "--domain", default=None,
         help="Filter to a specific domain (e.g. Game, Text2SQL, 'Software Engineer')",
     )
     parser.add_argument(
-        "--qa-type",
-        default=None,
-        choices=["A", "B", "C", "D"],
+        "--qa-type", default=None, choices=["A", "B", "C", "D"],
         help="Filter QA pairs to a specific type (A=Recall, B=Causal, C=State, D=Abstraction)",
     )
     parser.add_argument(
-        "--budget",
-        type=int,
-        default=2000,
+        "--budget", type=int, default=2000,
         help="Token budget for retrieval (default: 2000)",
     )
     parser.add_argument(
-        "--output",
-        default=None,
+        "--output", default=None,
         help="Write detailed results JSON to this path",
     )
     parser.add_argument(
-        "--retrieve-only",
-        default=None,
-        metavar="PATH",
+        "--retrieve-only", default=None, metavar="PATH",
         help="Run retrieval only, write question+context pairs to PATH for LLM judge scoring",
     )
     args: argparse.Namespace = parser.parse_args()
@@ -486,9 +467,7 @@ def main() -> None:
             )
 
             ep_result: EpisodeResult = run_episode(
-                episode,
-                tmpdir,
-                budget=args.budget,
+                episode, tmpdir, budget=args.budget,
             )
             results.append(ep_result)
 

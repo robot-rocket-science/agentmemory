@@ -8,7 +8,6 @@ HRR vocabulary bridging without requiring manual citations.
 This runs as a post-onboarding pass: all beliefs exist in the DB,
 and we're adding edges between them.
 """
-
 from __future__ import annotations
 
 import json
@@ -28,9 +27,7 @@ _HAIKU_MODEL: Final[str] = "claude-haiku-4-5-20251001"
 LINK_BATCH_SIZE: Final[int] = 30
 
 # Prompt template: given N beliefs, identify pairs that discuss the same topic.
-_LINK_PROMPT: Final[
-    str
-] = """You are linking beliefs in a memory system. Below are {count} beliefs extracted from a project.
+_LINK_PROMPT: Final[str] = """You are linking beliefs in a memory system. Below are {count} beliefs extracted from a project.
 
 Identify pairs that discuss the SAME concept, decision, or topic -- even if they use different words. Focus on semantic meaning, not surface vocabulary.
 

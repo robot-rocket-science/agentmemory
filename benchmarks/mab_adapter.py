@@ -12,7 +12,6 @@ Usage:
     uv run python benchmarks/mab_adapter.py --split Conflict_Resolution --source factconsolidation_mh_262k
     uv run python benchmarks/mab_adapter.py --split Conflict_Resolution --retrieve-only /tmp/mab_retrieval.json
 """
-
 from __future__ import annotations
 
 import argparse
@@ -106,16 +105,12 @@ def normalize_answer(s: str) -> str:
 
 def score_exact_match(prediction: str, ground_truth: str) -> float:
     """Normalized string exact match."""
-    return (
-        1.0 if normalize_answer(prediction) == normalize_answer(ground_truth) else 0.0
-    )
+    return 1.0 if normalize_answer(prediction) == normalize_answer(ground_truth) else 0.0
 
 
 def score_substring_exact_match(prediction: str, ground_truth: str) -> float:
     """Ground truth is substring of prediction (after normalization)."""
-    return (
-        1.0 if normalize_answer(ground_truth) in normalize_answer(prediction) else 0.0
-    )
+    return 1.0 if normalize_answer(ground_truth) in normalize_answer(prediction) else 0.0
 
 
 def score_f1(prediction: str, ground_truth: str) -> float:
@@ -276,14 +271,9 @@ def load_mab_split(split: str, source_filter: str | None = None) -> list[MABRow]
         else:
             metadata = {}
         raw_answers: object = item.get("answers", [])
-        answers: list[list[str]] = (
-            [
-                [str(x) for x in a]
-                for a in raw_answers  # type: ignore[union-attr]
-            ]
-            if isinstance(raw_answers, list)
-            else []
-        )
+        answers: list[list[str]] = [
+            [str(x) for x in a] for a in raw_answers  # type: ignore[union-attr]
+        ] if isinstance(raw_answers, list) else []
         row: MABRow = MABRow(
             context=str(item.get("context", "")),
             questions=[str(q) for q in item.get("questions", [])],  # type: ignore[union-attr]
@@ -386,22 +376,18 @@ def run_row(
         for metric, val in scores.items():
             result.scores[metric].append(val)
 
-        result.per_question.append(
-            {
-                "id": q_idx,
-                "row_idx": row_idx,
-                "source": row.source,
-                "question": question,
-                "context": prediction,
-            }
-        )
-        result.ground_truth.append(
-            {
-                "id": q_idx,
-                "row_idx": row_idx,
-                "answers": answer_list,
-            }
-        )
+        result.per_question.append({
+            "id": q_idx,
+            "row_idx": row_idx,
+            "source": row.source,
+            "question": question,
+            "context": prediction,
+        })
+        result.ground_truth.append({
+            "id": q_idx,
+            "row_idx": row_idx,
+            "answers": answer_list,
+        })
 
     result.query_time_s = time.monotonic() - t1
     return result
@@ -413,22 +399,14 @@ def print_results(result: MABResult) -> None:
     print(f"MAB Results: {result.label}")
     print(f"{'=' * 60}")
     print(f"Total questions:         {result.total_questions}")
-    print(
-        f"Exact match:             {result.mean_score('exact_match'):.4f} ({result.mean_score('exact_match') * 100:.1f}%)"
-    )
-    print(
-        f"Substring exact match:   {result.mean_score('substring_exact_match'):.4f} ({result.mean_score('substring_exact_match') * 100:.1f}%)"
-    )
-    print(
-        f"F1:                      {result.mean_score('f1'):.4f} ({result.mean_score('f1') * 100:.1f}%)"
-    )
+    print(f"Exact match:             {result.mean_score('exact_match'):.4f} ({result.mean_score('exact_match') * 100:.1f}%)")
+    print(f"Substring exact match:   {result.mean_score('substring_exact_match'):.4f} ({result.mean_score('substring_exact_match') * 100:.1f}%)")
+    print(f"F1:                      {result.mean_score('f1'):.4f} ({result.mean_score('f1') * 100:.1f}%)")
     print(f"Chunks ingested:         {result.ingest_chunks}")
     print(f"Ingest time:             {result.ingest_time_s:.2f}s")
     print(f"Query time:              {result.query_time_s:.2f}s")
     if result.total_questions > 0:
-        print(
-            f"Avg query latency:       {result.query_time_s / result.total_questions * 1000:.1f}ms"
-        )
+        print(f"Avg query latency:       {result.query_time_s / result.total_questions * 1000:.1f}ms")
     print()
 
     # Paper baselines
@@ -448,49 +426,36 @@ def main() -> None:
         description="Run MemoryAgentBench benchmark on agentmemory",
     )
     parser.add_argument(
-        "--split",
-        default="Conflict_Resolution",
+        "--split", default="Conflict_Resolution",
         choices=VALID_SPLITS,
         help="Dataset split to evaluate (default: Conflict_Resolution)",
     )
     parser.add_argument(
-        "--source",
-        default=None,
+        "--source", default=None,
         help="Filter by metadata.source (e.g., factconsolidation_mh_262k)",
     )
     parser.add_argument(
-        "--rows",
-        type=int,
-        default=None,
+        "--rows", type=int, default=None,
         help="Limit to first N rows (default: all)",
     )
     parser.add_argument(
-        "--subset",
-        type=int,
-        default=None,
+        "--subset", type=int, default=None,
         help="Limit to first N questions per row (for debugging)",
     )
     parser.add_argument(
-        "--chunk-size",
-        type=int,
-        default=DEFAULT_CHUNK_SIZE,
+        "--chunk-size", type=int, default=DEFAULT_CHUNK_SIZE,
         help=f"Token chunk size for context ingestion (default: {DEFAULT_CHUNK_SIZE})",
     )
     parser.add_argument(
-        "--budget",
-        type=int,
-        default=2000,
+        "--budget", type=int, default=2000,
         help="Token budget for retrieval (default: 2000)",
     )
     parser.add_argument(
-        "--output",
-        default=None,
+        "--output", default=None,
         help="Write detailed results JSON to this path",
     )
     parser.add_argument(
-        "--retrieve-only",
-        default=None,
-        metavar="PATH",
+        "--retrieve-only", default=None, metavar="PATH",
         help="Run retrieval only, write question+context pairs to PATH for LLM answer generation",
     )
     args: argparse.Namespace = parser.parse_args()
@@ -506,7 +471,7 @@ def main() -> None:
         return
 
     if args.rows is not None:
-        rows = rows[: args.rows]
+        rows = rows[:args.rows]
         print(f"Using first {len(rows)} rows")
 
     results: list[MABResult] = []
@@ -524,9 +489,7 @@ def main() -> None:
             )
 
             row_result: MABResult = run_row(
-                row,
-                tmpdir,
-                idx,
+                row, tmpdir, idx,
                 chunk_size=args.chunk_size,
                 budget=args.budget,
                 subset=args.subset,
@@ -578,23 +541,17 @@ def main() -> None:
             src_merged: MABResult = merge_results(src_results, label=src)
             sem: float = src_merged.mean_score("substring_exact_match")
             f1: float = src_merged.mean_score("f1")
-            print(
-                f"  {src}: SEM={sem * 100:.1f}% F1={f1 * 100:.1f}% n={src_merged.total_questions}"
-            )
+            print(f"  {src}: SEM={sem * 100:.1f}% F1={f1 * 100:.1f}% n={src_merged.total_questions}")
 
     # Write detailed output
     if args.output:
-        out_result: MABResult = (
-            merge_results(results) if len(results) > 1 else results[0]
-        )
+        out_result: MABResult = merge_results(results) if len(results) > 1 else results[0]
         output_data: dict[str, object] = {
             "split": args.split,
             "source_filter": args.source,
             "total_questions": out_result.total_questions,
             "exact_match": round(out_result.mean_score("exact_match"), 4),
-            "substring_exact_match": round(
-                out_result.mean_score("substring_exact_match"), 4
-            ),
+            "substring_exact_match": round(out_result.mean_score("substring_exact_match"), 4),
             "f1": round(out_result.mean_score("f1"), 4),
             "per_question": out_result.per_question,
         }

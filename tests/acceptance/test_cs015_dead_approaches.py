@@ -3,7 +3,6 @@
 Pass criterion: Superseded beliefs are excluded from search results.
 Only the latest version in a supersession chain should be returned.
 """
-
 from __future__ import annotations
 
 from agentmemory.models import (
@@ -38,9 +37,7 @@ def test_cs015_superseded_excluded_from_search(store: MemoryStore) -> None:
         beta_param=0.5,
     )
 
-    store.supersede_belief(
-        old_id=belief_a.id, new_id=belief_b.id, reason="D183 results"
-    )
+    store.supersede_belief(old_id=belief_a.id, new_id=belief_b.id, reason="D183 results")
 
     # Search for the topic. Superseded belief A must be excluded.
     results: list[Belief] = store.search("price filter signal quality")
@@ -87,9 +84,7 @@ def test_cs015_supersession_chain(store: MemoryStore) -> None:
 
     # Chain: A -> B -> C
     store.supersede_belief(old_id=belief_a.id, new_id=belief_b.id, reason="EMA better")
-    store.supersede_belief(
-        old_id=belief_b.id, new_id=belief_c.id, reason="Adaptive best"
-    )
+    store.supersede_belief(old_id=belief_b.id, new_id=belief_c.id, reason="Adaptive best")
 
     # Only C should survive in search results.
     results: list[Belief] = store.search("moving average crossover trend detection")

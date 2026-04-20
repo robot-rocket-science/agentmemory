@@ -3,7 +3,6 @@
 Pass criterion: Beliefs containing specific task IDs are retrievable by
 searching for those IDs, and ID collisions are detectable.
 """
-
 from __future__ import annotations
 
 from agentmemory.models import (

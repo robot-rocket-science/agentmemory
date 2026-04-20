@@ -6,7 +6,6 @@ retrieval on MAB MH 262K.
 Usage:
     uv run python benchmarks/exp6_score.py
 """
-
 from __future__ import annotations
 
 import json
@@ -62,15 +61,13 @@ def score_condition_reader(condition: str, reader: str) -> dict[str, object] | N
         sem_scores.append(scores["substring_exact_match"])
         f1_scores.append(scores["f1"])
 
-        per_question.append(
-            {
-                "id": pred_id,
-                "prediction": prediction,
-                "gt_answers": answers,
-                "sem": scores["substring_exact_match"],
-                "f1": scores["f1"],
-            }
-        )
+        per_question.append({
+            "id": pred_id,
+            "prediction": prediction,
+            "gt_answers": answers,
+            "sem": scores["substring_exact_match"],
+            "f1": scores["f1"],
+        })
 
     sem_pct: float = sum(sem_scores) / len(sem_scores) * 100 if sem_scores else 0.0
     f1_pct: float = sum(f1_scores) / len(f1_scores) * 100 if f1_scores else 0.0
@@ -102,9 +99,7 @@ def main() -> None:
                 print(f"  {condition:12s} / {reader:6s}: MISSING")
                 continue
             results.append(result)
-            print(
-                f"  {condition:12s} / {reader:6s}: SEM={result['sem_pct']}%  F1={result['f1_pct']}%  (n={result['n']})"
-            )
+            print(f"  {condition:12s} / {reader:6s}: SEM={result['sem_pct']}%  F1={result['f1_pct']}%  (n={result['n']})")
 
     print()
     print("=" * 60)

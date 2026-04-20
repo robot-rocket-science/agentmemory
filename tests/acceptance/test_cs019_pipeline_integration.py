@@ -3,7 +3,6 @@
 Pass criterion: CALLS edges enable pipeline traversal via BFS, and stages
 without TESTS edges are detectable as untested.
 """
-
 from __future__ import annotations
 
 from agentmemory.models import (
@@ -27,15 +26,9 @@ def test_cs019_pipeline_traversable_via_bfs(store: MemoryStore) -> None:
         stages[label] = b
 
     # Create CALLS chain: A -> B -> C -> D
-    store.insert_graph_edge(
-        from_id=stages["A"].id, to_id=stages["B"].id, edge_type="CALLS"
-    )
-    store.insert_graph_edge(
-        from_id=stages["B"].id, to_id=stages["C"].id, edge_type="CALLS"
-    )
-    store.insert_graph_edge(
-        from_id=stages["C"].id, to_id=stages["D"].id, edge_type="CALLS"
-    )
+    store.insert_graph_edge(from_id=stages["A"].id, to_id=stages["B"].id, edge_type="CALLS")
+    store.insert_graph_edge(from_id=stages["B"].id, to_id=stages["C"].id, edge_type="CALLS")
+    store.insert_graph_edge(from_id=stages["C"].id, to_id=stages["D"].id, edge_type="CALLS")
 
     # BFS from A: collect all reachable nodes within depth 3.
     conn = store._conn  # pyright: ignore[reportPrivateUsage]
@@ -60,7 +53,8 @@ def test_cs019_pipeline_traversable_via_bfs(store: MemoryStore) -> None:
     visited.update(frontier)
 
     assert stages["D"].id in visited, (
-        f"BFS from stage A should reach stage D within depth 3. Visited: {visited}"
+        f"BFS from stage A should reach stage D within depth 3. "
+        f"Visited: {visited}"
     )
 
 

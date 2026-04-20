@@ -36,7 +36,6 @@ from agentmemory.retrieval import retrieve
 # Result container
 # ---------------------------------------------------------------------------
 
-
 @dataclass
 class OnboardResult:
     """Typed container for scan + extract outputs."""
@@ -52,11 +51,9 @@ class OnboardResult:
 # Fixtures
 # ---------------------------------------------------------------------------
 
-TEST_PROJECT = (
-    Path(os.environ.get("TEST_PROJECT", "~/projects/robotrocketscience"))
-    .expanduser()
-    .resolve()
-)
+TEST_PROJECT = Path(
+    os.environ.get("TEST_PROJECT", "~/projects/robotrocketscience")
+).expanduser().resolve()
 
 
 @pytest.fixture(scope="module")
@@ -112,16 +109,14 @@ def scan_result(store: MemoryStore) -> OnboardResult:
         observations_created += 1
 
         for text, src in extracted.sentences:
-            all_sentences.append(
-                {
-                    "text": text,
-                    "source": src,
-                    "observation_id": extracted.observation.id,
-                    "created_at": node.date or "",
-                    "is_correction": str(extracted.full_text_is_correction),
-                    "full_text": node.content,
-                }
-            )
+            all_sentences.append({
+                "text": text,
+                "source": src,
+                "observation_id": extracted.observation.id,
+                "created_at": node.date or "",
+                "is_correction": str(extracted.full_text_is_correction),
+                "full_text": node.content,
+            })
 
     # Phase 3: Insert edges
     edges_inserted = 0
@@ -138,15 +133,10 @@ def scan_result(store: MemoryStore) -> OnboardResult:
     # Record provenance
     commit_hash: str | None = None
     try:
-        commit_hash = (
-            subprocess.check_output(
-                ["git", "rev-parse", "HEAD"],
-                cwd=str(TEST_PROJECT),
-                stderr=subprocess.DEVNULL,
-            )
-            .decode()
-            .strip()
-        )
+        commit_hash = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=str(TEST_PROJECT),
+            stderr=subprocess.DEVNULL,
+        ).decode().strip()
     except Exception:
         pass
     store.record_onboarding_run(
@@ -188,40 +178,33 @@ def beliefs_created(store: MemoryStore, scan_result: OnboardResult) -> int:
 # Phase 1: Install verification (import-level)
 # ---------------------------------------------------------------------------
 
-
 class TestPhase1Install:
     """Verify the package imports and core components are available."""
 
     def test_import_store(self) -> None:
         from agentmemory.store import MemoryStore as _MS
-
         assert _MS is not None
 
     def test_import_scanner(self) -> None:
         from agentmemory.scanner import scan_project as _sp
-
         assert _sp is not None
 
     def test_import_retrieval(self) -> None:
         from agentmemory.retrieval import retrieve as _r
-
         assert _r is not None
 
     def test_import_server(self) -> None:
         from agentmemory.server import mcp
-
         assert mcp is not None
 
     def test_import_cli(self) -> None:
         from agentmemory.cli import main
-
         assert main is not None
 
 
 # ---------------------------------------------------------------------------
 # Phase 2: Onboard pipeline
 # ---------------------------------------------------------------------------
-
 
 class TestPhase2Onboard:
     """Verify the scan + extract pipeline produces expected outputs."""
@@ -235,7 +218,9 @@ class TestPhase2Onboard:
         assert scan_result.scan is not None
 
     def test_scan_time_reasonable(self, scan_result: OnboardResult) -> None:
-        assert scan_result.scan_time < 30.0, f"Scan took {scan_result.scan_time:.1f}s"
+        assert scan_result.scan_time < 30.0, (
+            f"Scan took {scan_result.scan_time:.1f}s"
+        )
 
     def test_nodes_extracted(self, scan_result: OnboardResult) -> None:
         assert len(scan_result.scan.nodes) > 0, "No nodes extracted"
@@ -258,18 +243,18 @@ class TestPhase2Onboard:
         assert len(scan_result.sentences) > 0
 
     def test_sentences_have_required_fields(
-        self,
-        scan_result: OnboardResult,
+        self, scan_result: OnboardResult,
     ) -> None:
         required = {"text", "source", "observation_id"}
         for s in scan_result.sentences[:10]:
-            assert required.issubset(s.keys()), f"Missing keys: {required - s.keys()}"
+            assert required.issubset(s.keys()), (
+                f"Missing keys: {required - s.keys()}"
+            )
 
 
 # ---------------------------------------------------------------------------
 # Phase 3: Belief creation
 # ---------------------------------------------------------------------------
-
 
 class TestPhase3Beliefs:
     """Verify beliefs are created and indexed correctly."""
@@ -278,17 +263,13 @@ class TestPhase3Beliefs:
         assert beliefs_created > 0, "No beliefs created"
 
     def test_fts5_search_works(
-        self,
-        store: MemoryStore,
-        beliefs_created: int,
+        self, store: MemoryStore, beliefs_created: int,
     ) -> None:
         results = store.search("project", top_k=5)
         assert isinstance(results, list)
 
     def test_belief_retrievable_by_id(
-        self,
-        store: MemoryStore,
-        beliefs_created: int,
+        self, store: MemoryStore, beliefs_created: int,
     ) -> None:
         all_beliefs = store.get_all_active_beliefs(limit=1)
         assert len(all_beliefs) >= 1
@@ -300,22 +281,17 @@ class TestPhase3Beliefs:
 # Phase 4: Retrieval pipeline
 # ---------------------------------------------------------------------------
 
-
 class TestPhase4Retrieval:
     """Verify the full retrieval pipeline works end-to-end."""
 
     def test_retrieve_returns_results(
-        self,
-        store: MemoryStore,
-        beliefs_created: int,
+        self, store: MemoryStore, beliefs_created: int,
     ) -> None:
         result = retrieve(store, "project structure files")
         assert len(result.beliefs) > 0, "Retrieval returned nothing"
 
     def test_retrieve_latency(
-        self,
-        store: MemoryStore,
-        beliefs_created: int,
+        self, store: MemoryStore, beliefs_created: int,
     ) -> None:
         t0 = time.perf_counter()
         retrieve(store, "configuration settings")
@@ -323,9 +299,7 @@ class TestPhase4Retrieval:
         assert latency_ms < 2000, f"Retrieval took {latency_ms:.0f}ms"
 
     def test_retrieve_has_scores(
-        self,
-        store: MemoryStore,
-        beliefs_created: int,
+        self, store: MemoryStore, beliefs_created: int,
     ) -> None:
         result = retrieve(store, "code functions implementation")
         for belief in result.beliefs:
@@ -334,9 +308,7 @@ class TestPhase4Retrieval:
             assert belief.content, f"Belief {belief.id} has empty content"
 
     def test_retrieve_respects_budget(
-        self,
-        store: MemoryStore,
-        beliefs_created: int,
+        self, store: MemoryStore, beliefs_created: int,
     ) -> None:
         result = retrieve(store, "everything about the project", budget=500)
         assert result.total_tokens <= 600, (
@@ -347,7 +319,6 @@ class TestPhase4Retrieval:
 # ---------------------------------------------------------------------------
 # Phase 5: MCP tool coverage (store-level)
 # ---------------------------------------------------------------------------
-
 
 class TestPhase5Tools:
     """Verify core MCP tool operations work at the store level."""
@@ -432,7 +403,6 @@ class TestPhase5Tools:
 # Phase 6: Session continuity
 # ---------------------------------------------------------------------------
 
-
 class TestPhase6SessionContinuity:
     """Verify data persists across store re-instantiation."""
 
@@ -472,13 +442,11 @@ class TestPhase6SessionContinuity:
 # Phase 7: Edge cases
 # ---------------------------------------------------------------------------
 
-
 class TestPhase7EdgeCases:
     """Verify incremental onboard and robustness."""
 
     def test_incremental_onboard_detects_previous(
-        self,
-        store: MemoryStore,
+        self, store: MemoryStore,
     ) -> None:
         if not TEST_PROJECT.is_dir():
             pytest.skip(f"Test project not found: {TEST_PROJECT}")
@@ -503,7 +471,6 @@ class TestPhase7EdgeCases:
 # ---------------------------------------------------------------------------
 # Phase 8: Summary report (runs last)
 # ---------------------------------------------------------------------------
-
 
 class TestPhase8Summary:
     """Print a summary of what was validated."""

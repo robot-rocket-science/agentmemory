@@ -3,7 +3,6 @@
 Pass criterion: IMPLEMENTS edges can detect missing roadmap-to-DB mappings --
 milestones without IMPLEMENTS edges are identifiable as unimplemented.
 """
-
 from __future__ import annotations
 
 from agentmemory.models import (
@@ -48,7 +47,9 @@ def test_cs018_missing_implements_detectable(store: MemoryStore) -> None:
     ).fetchall()
     implemented_reqs: set[str] = {r["to_id"] for r in rows}
 
-    assert "req:M005-S01" in implemented_reqs, "S01 should have an IMPLEMENTS edge"
+    assert "req:M005-S01" in implemented_reqs, (
+        "S01 should have an IMPLEMENTS edge"
+    )
 
     # S02 and S03 requirement IDs have no IMPLEMENTS edges.
     # Check that their corresponding req: identifiers are absent.

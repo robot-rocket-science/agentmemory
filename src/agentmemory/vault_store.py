@@ -6,7 +6,6 @@ Reads go through SQLite for performance (FTS5, indexed queries).
 
 The vault can reconstruct the index at any time via rebuild_index().
 """
-
 from __future__ import annotations
 
 import hashlib
@@ -32,7 +31,6 @@ _ARCHIVE_SUBFOLDER: Final[str] = "beliefs/_archive"
 @dataclass
 class RebuildResult:
     """Result of an index rebuild operation."""
-
     beliefs_indexed: int
     edges_created: int
     elapsed_seconds: float
@@ -219,9 +217,7 @@ class VaultStore:
 
     def _get_edges_for_belief(self, belief_id: str) -> list[tuple[str, str, str]]:
         """Get edges formatted for .md file rendering."""
-        all_edges: dict[str, list[Edge]] = self.index.get_edges_by_belief_ids(
-            [belief_id]
-        )
+        all_edges: dict[str, list[Edge]] = self.index.get_edges_by_belief_ids([belief_id])
         return collect_edges_for_belief(belief_id, all_edges)
 
     # ------------------------------------------------------------------
@@ -254,13 +250,8 @@ class VaultStore:
 
             # Collect pending edges for second pass (FK targets must exist first)
             _OUTGOING_TYPES: set[str] = {
-                "SUPERSEDES",
-                "SUPPORTS",
-                "CONTRADICTS",
-                "RELATES_TO",
-                "CITES",
-                "TESTS",
-                "IMPLEMENTS",
+                "SUPERSEDES", "SUPPORTS", "CONTRADICTS",
+                "RELATES_TO", "CITES", "TESTS", "IMPLEMENTS",
             }
             pending_edges: list[tuple[str, str, str]] = []
 
@@ -278,7 +269,7 @@ class VaultStore:
 
                     # Extract body text (between frontmatter and ## Relationships)
                     fm_match: re.Match[str] | None = FRONTMATTER_RE.match(content)
-                    body: str = content[fm_match.end() :] if fm_match else content
+                    body: str = content[fm_match.end():] if fm_match else content
                     body_lines: list[str] = body.strip().split("\n")
                     text_lines: list[str] = []
                     in_relationships: bool = False
@@ -318,21 +309,13 @@ class VaultStore:
                             source_type, locked, created_at, updated_at,
                             classified_by, rigor_tier, data_source)
                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                        (
-                            belief_id,
-                            content_hash,
-                            belief_text,
-                            fm.get("type", "factual"),
-                            alpha,
-                            beta,
-                            fm.get("source", "agent_inferred"),
-                            locked_int,
-                            ts,
-                            updated,
-                            fm.get("classified_by", "offline"),
-                            fm.get("rigor", "hypothesis"),
-                            fm.get("data_source", ""),
-                        ),
+                        (belief_id, content_hash, belief_text,
+                         fm.get("type", "factual"), alpha, beta,
+                         fm.get("source", "agent_inferred"), locked_int,
+                         ts, updated,
+                         fm.get("classified_by", "offline"),
+                         fm.get("rigor", "hypothesis"),
+                         fm.get("data_source", "")),
                     )
                     # Add to FTS5 index
                     self.index.query(
@@ -361,9 +344,7 @@ class VaultStore:
                 if from_id in indexed_ids and to_id in indexed_ids:
                     try:
                         self.index.insert_edge(
-                            from_id,
-                            to_id,
-                            edge_type,
+                            from_id, to_id, edge_type,
                             reason="rebuilt from vault",
                         )
                         edges_created += 1

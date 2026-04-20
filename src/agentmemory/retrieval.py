@@ -3,7 +3,6 @@
 Connects MemoryStore, scoring, and compression into a single callable that
 returns a token-budget-aware ranked list of beliefs.
 """
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -21,26 +20,11 @@ from agentmemory.triple_extraction import FactTriple, extract_triple
 # Words that appear structurally in correction beliefs but carry no topical
 # signal. When the query contains these, deprioritize beliefs that match ONLY
 # on these words (CS-032: negation pattern noise).
-_NEGATION_STOP_WORDS: frozenset[str] = frozenset(
-    {
-        "not",
-        "no",
-        "dont",
-        "don't",
-        "never",
-        "cannot",
-        "can't",
-        "isn't",
-        "aren't",
-        "wasn't",
-        "weren't",
-        "doesn't",
-        "didn't",
-        "without",
-        "none",
-        "nor",
-    }
-)
+_NEGATION_STOP_WORDS: frozenset[str] = frozenset({
+    "not", "no", "dont", "don't", "never", "cannot", "can't",
+    "isn't", "aren't", "wasn't", "weren't", "doesn't", "didn't",
+    "without", "none", "nor",
+})
 
 
 def _filter_negation_noise(
@@ -57,7 +41,9 @@ def _filter_negation_noise(
     This filter splits query terms into topical vs negation, then pushes
     beliefs with zero topical overlap to the end of the list.
     """
-    query_terms: set[str] = {t.lower() for t in re.split(r"\W+", query) if len(t) >= 2}
+    query_terms: set[str] = {
+        t.lower() for t in re.split(r'\W+', query) if len(t) >= 2
+    }
     topical_terms: set[str] = query_terms - _NEGATION_STOP_WORDS
     if not topical_terms:
         return beliefs  # Query is all negation words -- can't filter
@@ -66,7 +52,7 @@ def _filter_negation_noise(
     noise: list[Belief] = []
     for b in beliefs:
         belief_terms: set[str] = {
-            t.lower() for t in re.split(r"\W+", b.content) if len(t) >= 2
+            t.lower() for t in re.split(r'\W+', b.content) if len(t) >= 2
         }
         # Check if belief shares any topical term with the query
         if topical_terms & belief_terms:
@@ -79,12 +65,13 @@ def _filter_negation_noise(
     return result[:keep_top]
 
 
+
 @dataclass
 class RetrievalResult:
     """Output of a single retrieve() call."""
 
     beliefs: list[Belief]
-    scores: dict[str, float]  # belief_id -> score
+    scores: dict[str, float]   # belief_id -> score
     total_tokens: int
     budget_remaining: int
     contradiction_warnings: list[str] | None = None
@@ -123,9 +110,7 @@ def _get_entity_index(store: MemoryStore) -> dict[str, list[tuple[str, str, str]
             val_key: str = triple.value.lower()
             if val_key not in index:
                 index[val_key] = []
-            index[val_key].append(
-                (belief.id, f"_reverse_{triple.property_name}", triple.entity)
-            )
+            index[val_key].append((belief.id, f"_reverse_{triple.property_name}", triple.entity))
 
     _entity_index = index
     _entity_index_count = belief_count
@@ -155,32 +140,17 @@ def _entity_expand(
     entity_candidates.extend(quoted)
 
     # Proper noun phrases (2+ capitalized words)
-    proper_nouns: list[str] = re.findall(r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)", query)
+    proper_nouns: list[str] = re.findall(r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)', query)
     entity_candidates.extend(proper_nouns)
 
     # Single capitalized words (3+ chars, not common words)
-    common_words: frozenset[str] = frozenset(
-        {
-            "What",
-            "Which",
-            "Where",
-            "When",
-            "Who",
-            "How",
-            "The",
-            "This",
-            "That",
-            "Does",
-            "Did",
-            "Can",
-            "Has",
-            "Are",
-            "Was",
-            "Were",
-        }
-    )
+    common_words: frozenset[str] = frozenset({
+        "What", "Which", "Where", "When", "Who", "How", "The", "This",
+        "That", "Does", "Did", "Can", "Has", "Are", "Was", "Were",
+    })
     singles: list[str] = [
-        w for w in re.findall(r"\b([A-Z][a-z]{2,})\b", query) if w not in common_words
+        w for w in re.findall(r'\b([A-Z][a-z]{2,})\b', query)
+        if w not in common_words
     ]
     entity_candidates.extend(singles)
 
@@ -237,17 +207,9 @@ def _get_hrr_graph(store: MemoryStore) -> HRRGraph | None:
 # Edge types worth querying via HRR. Semantic edges provide vocabulary
 # bridging; structural edges (COMMIT_TOUCHES, CO_CHANGED, SENTENCE_IN_FILE,
 # WITHIN_SECTION) add noise without improving retrieval quality.
-_HRR_EDGE_TYPES: frozenset[str] = frozenset(
-    {
-        "SUPERSEDES",
-        "CONTRADICTS",
-        "SUPPORTS",
-        "CALLS",
-        "CITES",
-        "TESTS",
-        "IMPLEMENTS",
-    }
-)
+_HRR_EDGE_TYPES: frozenset[str] = frozenset({
+    "SUPERSEDES", "CONTRADICTS", "SUPPORTS", "CALLS", "CITES", "TESTS", "IMPLEMENTS",
+})
 
 
 def _hrr_expand(
@@ -263,15 +225,15 @@ def _hrr_expand(
     to avoid O(seeds * edge_types * cleanup_size) blowup.
     """
     # Only query edge types that exist in the graph AND are semantic.
-    active_types: list[str] = [et for et in hrr.edge_types() if et in _HRR_EDGE_TYPES]
+    active_types: list[str] = [
+        et for et in hrr.edge_types() if et in _HRR_EDGE_TYPES
+    ]
 
     found_ids: set[str] = set()
     for seed_id in seed_ids[:3]:  # Cap seeds to limit query count.
         for edge_type in active_types:
             results: list[tuple[str, float]] = hrr.query_forward(
-                seed_id,
-                edge_type,
-                top_k=3,
+                seed_id, edge_type, top_k=3,
             )
             for label, _sim in results:
                 found_ids.add(label)
@@ -327,9 +289,7 @@ def retrieve(
     locked_beliefs: list[Belief] = []
     if include_locked:
         all_locked: list[Belief] = store.get_locked_beliefs()
-        query_terms_lower: list[str] = [
-            t.lower() for t in query_stripped.split() if len(t) >= 2
-        ]
+        query_terms_lower: list[str] = [t.lower() for t in query_stripped.split() if len(t) >= 2]
         relevant_locked: list[Belief] = []
         irrelevant_locked: list[Belief] = []
         for belief in all_locked:
@@ -339,7 +299,7 @@ def retrieve(
             else:
                 irrelevant_locked.append(belief)
         max_irrelevant: int = min(10, max_locked - len(relevant_locked))
-        locked_beliefs = relevant_locked + irrelevant_locked[: max(0, max_irrelevant)]
+        locked_beliefs = relevant_locked + irrelevant_locked[:max(0, max_irrelevant)]
 
     # Step 1.5: behavioral beliefs (L1) -- unlocked directives always included.
     behavioral_beliefs: list[Belief] = store.get_behavioral_beliefs(limit=10)
@@ -349,9 +309,7 @@ def retrieve(
     if query_stripped:
         fts_beliefs = store.search(query_stripped, top_k=top_k)
         # CS-032: deprioritize beliefs matching only on negation words
-        fts_beliefs = _filter_negation_noise(
-            query_stripped, fts_beliefs, keep_top=top_k
-        )
+        fts_beliefs = _filter_negation_noise(query_stripped, fts_beliefs, keep_top=top_k)
 
     # Step 2.5: Entity-index expansion (L2.5).
     entity_beliefs: list[Belief] = []
@@ -372,9 +330,7 @@ def retrieve(
         bfs_seed_ids: list[str] = [b.id for b in fts_beliefs[:5] + hrr_beliefs[:3]]
         if bfs_seed_ids:
             expanded: dict[str, list[tuple[Belief, str, int]]] = store.expand_graph(
-                seed_ids=bfs_seed_ids,
-                depth=2,
-                max_nodes=20,
+                seed_ids=bfs_seed_ids, depth=2, max_nodes=20,
             )
             for entries in expanded.values():
                 for belief, _edge_type, _hop in entries:
@@ -418,9 +374,7 @@ def retrieve(
 
     # Step 4.5: batch-query retrieval stats for frequency boost.
     candidate_ids: list[str] = [b.id for b in candidates]
-    stats_batch: dict[str, dict[str, int]] = store.get_retrieval_stats_batch(
-        candidate_ids
-    )
+    stats_batch: dict[str, dict[str, int]] = store.get_retrieval_stats_batch(candidate_ids)
 
     # Step 5: score every candidate.
     scores: dict[str, float] = {}
@@ -481,8 +435,7 @@ def flag_contradictions(
 
     for belief in beliefs:
         neighbors = store.get_neighbors(
-            belief.id,
-            edge_types=[EDGE_CONTRADICTS],
+            belief.id, edge_types=[EDGE_CONTRADICTS],
         )
         for neighbor, _edge in neighbors:
             if neighbor.id in result_ids:
@@ -492,8 +445,8 @@ def flag_contradictions(
                     snippet_a: str = belief.content[:60].replace("\n", " ")
                     snippet_b: str = neighbor.content[:60].replace("\n", " ")
                     warnings.append(
-                        f'CONTRADICTS: [{belief.id}] "{snippet_a}" '
-                        f'vs [{neighbor.id}] "{snippet_b}"'
+                        f"CONTRADICTS: [{belief.id}] \"{snippet_a}\" "
+                        f"vs [{neighbor.id}] \"{snippet_b}\""
                     )
 
     return warnings

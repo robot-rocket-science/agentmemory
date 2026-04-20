@@ -10,7 +10,6 @@ retrievable after 5+ sessions of additional content.
 This test uses production data. If turns.jsonl doesn't exist or has
 insufficient data, the test is skipped.
 """
-
 from __future__ import annotations
 
 import json
@@ -32,9 +31,7 @@ _ARCHIVE_DIR: Path = _LOGS_DIR / "archive"
 # Patterns that indicate a user decision, directive, or correction.
 _DECISION_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"\b(always use|we use|switch to|prefer|use uv)\b", re.IGNORECASE),
-    re.compile(
-        r"\b(never|don'?t|do not|stop doing|avoid)\b.*\b\w{4,}\b", re.IGNORECASE
-    ),
+    re.compile(r"\b(never|don'?t|do not|stop doing|avoid)\b.*\b\w{4,}\b", re.IGNORECASE),
     re.compile(r"\b(the rule is|decision:|we decided)\b", re.IGNORECASE),
     re.compile(r"\b(LLM classification should)\b", re.IGNORECASE),
     re.compile(r"\b(commit the|never commit)\b", re.IGNORECASE),
@@ -43,9 +40,7 @@ _DECISION_PATTERNS: list[re.Pattern[str]] = [
 # Minimum text length to be a meaningful decision
 _MIN_TEXT_LEN: int = 30
 # Skip turns that are mostly XML/task-notification noise
-_NOISE_PATTERN: re.Pattern[str] = re.compile(
-    r"<(task-notification|tool-use-id|output-file)"
-)
+_NOISE_PATTERN: re.Pattern[str] = re.compile(r"<(task-notification|tool-use-id|output-file)")
 
 
 def _is_decision_turn(text: str) -> bool:
@@ -63,40 +58,10 @@ def _extract_decision_query(text: str) -> str:
     snippet: str = text[:200]
     words: list[str] = re.findall(r"[a-zA-Z]{3,}", snippet)
     stopwords: set[str] = {
-        "the",
-        "and",
-        "for",
-        "with",
-        "that",
-        "this",
-        "from",
-        "have",
-        "has",
-        "are",
-        "was",
-        "were",
-        "been",
-        "will",
-        "would",
-        "should",
-        "could",
-        "not",
-        "but",
-        "can",
-        "all",
-        "also",
-        "just",
-        "like",
-        "use",
-        "you",
-        "don",
-        "please",
-        "need",
-        "want",
-        "let",
-        "its",
-        "our",
-        "your",
+        "the", "and", "for", "with", "that", "this", "from", "have", "has",
+        "are", "was", "were", "been", "will", "would", "should", "could",
+        "not", "but", "can", "all", "also", "just", "like", "use", "you",
+        "don", "please", "need", "want", "let", "its", "our", "your",
     }
     key_words: list[str] = [w for w in words if w.lower() not in stopwords][:8]
     return " ".join(key_words)
@@ -126,13 +91,11 @@ def _load_jsonl_into(
                 continue
             if not isinstance(sid, str) or not isinstance(ts, str):
                 continue
-            sessions[sid].append(
-                {
-                    "event": event,
-                    "text": text,
-                    "timestamp": ts,
-                }
-            )
+            sessions[sid].append({
+                "event": event,
+                "text": text,
+                "timestamp": ts,
+            })
 
 
 def _load_sessions() -> dict[str, list[dict[str, str]]]:
@@ -228,10 +191,7 @@ def test_req001_decisions_persist_across_sessions(replay_store: MemoryStore) -> 
 
     for original_text, query in test_decisions:
         result: RetrievalResult = retrieve(
-            replay_store,
-            query,
-            budget=2000,
-            include_locked=False,
+            replay_store, query, budget=2000, include_locked=False,
         )
         # Check if any retrieved belief overlaps with the original decision
         # Use 3+ word overlap as a relevance signal

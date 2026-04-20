@@ -3,7 +3,6 @@
 Pass criterion: Beliefs from a research phase are retrievable during execution,
 and IMPLEMENTS edges link execution artifacts to research requirements.
 """
-
 from __future__ import annotations
 
 from agentmemory.models import (

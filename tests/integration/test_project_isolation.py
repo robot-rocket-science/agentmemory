@@ -5,7 +5,6 @@ Each MemoryStore instance operating on a different DB path must be fully
 independent -- beliefs inserted in one must never appear in another.
 Also validates cross-project feedback firewall and readonly store mode.
 """
-
 from __future__ import annotations
 
 import sqlite3
@@ -70,7 +69,6 @@ def test_separate_dbs_no_leakage(tmp_path: Path) -> None:
 def test_foreign_id_detection() -> None:
     """IDs with ':' are detected as foreign (cross-project)."""
     import agentmemory.server as _srv
-
     is_foreign = _srv._is_foreign_id  # pyright: ignore[reportPrivateUsage]
     assert is_foreign("abc123:def456") is True
     assert is_foreign("4b0f8c37972f:a1b2c3d4e5f6") is True

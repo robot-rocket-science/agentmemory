@@ -5,7 +5,6 @@ Replaces regex triple extraction for the Treatment B condition.
 
 This module is benchmark-only. It is NOT part of the production pipeline.
 """
-
 from __future__ import annotations
 
 import json
@@ -23,13 +22,9 @@ from agentmemory.triple_extraction import FactTriple
 # ---------------------------------------------------------------------------
 
 HAIKU_MODEL: Final[str] = "claude-haiku-4-5-20251001"
-BATCH_SIZE: Final[int] = (
-    50  # facts per Haiku call (larger than classification; simpler task)
-)
+BATCH_SIZE: Final[int] = 50  # facts per Haiku call (larger than classification; simpler task)
 
-_EXTRACTION_PROMPT: Final[
-    str
-] = """Extract structured facts from these numbered statements.
+_EXTRACTION_PROMPT: Final[str] = """Extract structured facts from these numbered statements.
 For each statement, extract:
 - entity: the primary subject (use its canonical/short name)
 - property: what relationship is being stated (use snake_case)
@@ -108,11 +103,7 @@ def _parse_extraction_response(
 
         if not entity or not prop or not value:
             continue
-        if (
-            not isinstance(entity, str)
-            or not isinstance(prop, str)
-            or not isinstance(value, str)
-        ):
+        if not isinstance(entity, str) or not isinstance(prop, str) or not isinstance(value, str):
             continue
 
         entity = entity.strip()
@@ -122,15 +113,13 @@ def _parse_extraction_response(
         if not entity or not value:
             continue
 
-        results.append(
-            FactTriple(
-                entity=entity,
-                property_name=prop,
-                value=value,
-                serial=item_id if item_id > 0 else None,
-                source_text=serial_to_text.get(item_id, ""),
-            )
-        )
+        results.append(FactTriple(
+            entity=entity,
+            property_name=prop,
+            value=value,
+            serial=item_id if item_id > 0 else None,
+            source_text=serial_to_text.get(item_id, ""),
+        ))
 
     return results
 
@@ -199,9 +188,7 @@ def extract_triples_llm(
             "input_tokens": input_tok,
             "output_tokens": output_tok,
             "prompt": prompt[:200] + "..." if len(prompt) > 200 else prompt,
-            "response_preview": raw_text[:300] + "..."
-            if len(raw_text) > 300
-            else raw_text,
+            "response_preview": raw_text[:300] + "..." if len(raw_text) > 300 else raw_text,
         }
         audit_log.append(audit_entry)
 

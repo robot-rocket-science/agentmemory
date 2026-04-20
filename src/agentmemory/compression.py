@@ -5,7 +5,6 @@ requirement, preference) are kept in full. Procedural beliefs are trimmed to
 the first sentence plus key terms. Causal and relational beliefs are trimmed
 to the first sentence.
 """
-
 from __future__ import annotations
 
 from agentmemory.models import Belief
@@ -43,8 +42,7 @@ def _extract_key_terms(text: str) -> str:
     """Extract capitalized words and quoted phrases as rough key terms."""
     words: list[str] = text.split()
     key_terms: list[str] = [
-        w.strip("\"',;:()[]")
-        for w in words
+        w.strip("\"',;:()[]") for w in words
         if w and (w[0].isupper() or w.startswith('"') or len(w) > 8)
     ]
     # Deduplicate while preserving order.
@@ -74,7 +72,7 @@ def compress_belief(belief: Belief) -> str:
 
     if belief.belief_type == "procedural":
         sentence: str = _first_sentence(content)
-        remainder: str = content[len(sentence) :].strip()
+        remainder: str = content[len(sentence):].strip()
         if remainder:
             key_terms: str = _extract_key_terms(remainder)
             if key_terms:
@@ -86,8 +84,7 @@ def compress_belief(belief: Belief) -> str:
 
 
 def pack_beliefs(
-    beliefs: list[Belief],
-    budget_tokens: int = 2000,
+    beliefs: list[Belief], budget_tokens: int = 2000,
 ) -> tuple[list[Belief], int]:
     """Pack beliefs into a token budget.
 

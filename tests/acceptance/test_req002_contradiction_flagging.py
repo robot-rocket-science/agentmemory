@@ -12,7 +12,6 @@ The test exercises the full path:
   3. retrieve() calls flag_contradictions() on result set
   4. RetrievalResult.contradiction_warnings contains all pairs
 """
-
 from __future__ import annotations
 
 from agentmemory.models import (

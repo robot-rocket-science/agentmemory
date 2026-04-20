@@ -1,5 +1,4 @@
 """Shared fixtures for Phase 2 acceptance tests."""
-
 from __future__ import annotations
 
 from collections.abc import Generator
@@ -38,24 +37,9 @@ def populated_store(tmp_path: Path) -> Generator[MemoryStore, None, None]:
         ("Frontend uses React with TypeScript", BELIEF_FACTUAL, BSRC_USER_STATED, True),
         ("API follows REST conventions", BELIEF_FACTUAL, BSRC_USER_STATED, True),
         ("Tests use pytest with fixtures", BELIEF_FACTUAL, BSRC_USER_STATED, True),
-        (
-            "Deploy to AWS ECS via GitHub Actions",
-            BELIEF_PROCEDURAL,
-            BSRC_USER_STATED,
-            True,
-        ),
-        (
-            "Use uv for package management",
-            BELIEF_PROCEDURAL,
-            BSRC_AGENT_INFERRED,
-            False,
-        ),
-        (
-            "Code must pass pyright strict",
-            BELIEF_REQUIREMENT,
-            BSRC_AGENT_INFERRED,
-            False,
-        ),
+        ("Deploy to AWS ECS via GitHub Actions", BELIEF_PROCEDURAL, BSRC_USER_STATED, True),
+        ("Use uv for package management", BELIEF_PROCEDURAL, BSRC_AGENT_INFERRED, False),
+        ("Code must pass pyright strict", BELIEF_REQUIREMENT, BSRC_AGENT_INFERRED, False),
         ("Never use async_bash", BELIEF_REQUIREMENT, BSRC_USER_CORRECTED, False),
         ("Calls and puts are equal citizens", BELIEF_FACTUAL, BSRC_USER_STATED, False),
         ("Capital is 5000 dollars", BELIEF_FACTUAL, BSRC_USER_STATED, False),

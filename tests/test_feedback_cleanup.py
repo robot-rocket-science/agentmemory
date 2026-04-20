@@ -5,7 +5,6 @@ Regression test for the fix that adds store.clear_pending_feedback(session_id)
 at the end of _process_auto_feedback(). Without the fix, rows accumulate
 indefinitely in the pending_feedback table.
 """
-
 from __future__ import annotations
 
 from collections.abc import Generator

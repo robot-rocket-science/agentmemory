@@ -7,7 +7,6 @@ Results are fed to exp5_build_index.py for Phase 2.
 Usage:
     uv run python benchmarks/exp5_export_lines.py /tmp/exp5_lines.json
 """
-
 from __future__ import annotations
 
 import json

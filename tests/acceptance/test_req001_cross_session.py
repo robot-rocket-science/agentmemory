@@ -4,7 +4,6 @@ Pass criterion: After inserting 10 diverse locked decisions in session 1 and
 simulating 4 additional sessions, at least 8 of 10 decisions are retrievable
 in session 5 via targeted search.
 """
-
 from __future__ import annotations
 
 from agentmemory.models import (
@@ -39,9 +38,7 @@ _REQUIREMENT: float = 0.80  # >= 80% retention
 def test_req001_cross_session_retention(store: MemoryStore) -> None:
     """10 locked decisions from session 1 must be retrievable in session 5 at >= 80%."""
     # Session 1: insert all decisions as locked beliefs.
-    session1: Session = store.create_session(
-        model="claude", project_context="agentmemory"
-    )
+    session1: Session = store.create_session(model="claude", project_context="agentmemory")
     for content, _, _ in _DECISIONS:
         # Determine belief type by content.
         if "must" in content.lower() or "never" in content.lower():

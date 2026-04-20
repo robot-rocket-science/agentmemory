@@ -4,7 +4,6 @@ Verifies that the memory system's core guarantees hold across session
 boundaries: locked beliefs persist, corrections rank high, superseded
 beliefs are excluded, feedback persists, and stale detection works.
 """
-
 from __future__ import annotations
 
 from pathlib import Path

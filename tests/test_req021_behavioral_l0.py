@@ -4,7 +4,6 @@ Locked behavioral beliefs appear via get_locked_beliefs() (L0 layer).
 Unlocked behavioral beliefs appear via get_behavioral_beliefs() (L1 layer).
 Both layers are always included in retrieve() results, independent of query.
 """
-
 from __future__ import annotations
 
 from collections.abc import Generator
@@ -158,8 +157,7 @@ class TestReq021BehavioralL0:
             )
 
     def test_behavioral_beliefs_coexist_with_fts_results(
-        self,
-        store: MemoryStore,
+        self, store: MemoryStore,
     ) -> None:
         """Both behavioral (L0) and FTS5 (L2) results appear together."""
         # Insert locked behavioral beliefs

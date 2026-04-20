@@ -3,7 +3,6 @@
 Pass criterion: A correction about gcloud filter syntax can be found by
 searching for the exact tool name or the general topic.
 """
-
 from __future__ import annotations
 
 from agentmemory.models import (

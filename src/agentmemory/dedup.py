@@ -4,7 +4,6 @@ Identifies exact duplicates (same content_hash) and near-duplicates
 (high word-level Jaccard similarity). Provides merge functionality
 that keeps the highest-confidence belief and supersedes the rest.
 """
-
 from __future__ import annotations
 
 import re
@@ -14,71 +13,19 @@ from agentmemory.models import Belief
 from agentmemory.store import MemoryStore
 
 _WORD_RE: re.Pattern[str] = re.compile(r"[a-zA-Z0-9]+")
-_STOPWORDS: frozenset[str] = frozenset(
-    {
-        "the",
-        "a",
-        "an",
-        "is",
-        "are",
-        "was",
-        "were",
-        "be",
-        "been",
-        "being",
-        "have",
-        "has",
-        "had",
-        "do",
-        "does",
-        "did",
-        "will",
-        "would",
-        "shall",
-        "should",
-        "may",
-        "might",
-        "must",
-        "can",
-        "could",
-        "of",
-        "in",
-        "to",
-        "for",
-        "with",
-        "on",
-        "at",
-        "by",
-        "from",
-        "as",
-        "into",
-        "through",
-        "that",
-        "this",
-        "these",
-        "those",
-        "it",
-        "its",
-        "not",
-        "no",
-        "all",
-        "and",
-        "or",
-        "but",
-        "if",
-        "then",
-        "than",
-        "when",
-        "where",
-        "how",
-    }
-)
+_STOPWORDS: frozenset[str] = frozenset({
+    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
+    "have", "has", "had", "do", "does", "did", "will", "would", "shall",
+    "should", "may", "might", "must", "can", "could", "of", "in", "to",
+    "for", "with", "on", "at", "by", "from", "as", "into", "through",
+    "that", "this", "these", "those", "it", "its", "not", "no", "all",
+    "and", "or", "but", "if", "then", "than", "when", "where", "how",
+})
 
 
 @dataclass
 class DuplicateCluster:
     """A group of duplicate or near-duplicate beliefs."""
-
     canonical_id: str  # highest-confidence belief in the cluster
     duplicate_ids: list[str] = field(default_factory=lambda: [])
     similarity: float = 1.0  # 1.0 for exact, <1.0 for near-duplicates
@@ -87,7 +34,6 @@ class DuplicateCluster:
 @dataclass
 class DeduplicationResult:
     """Result of a deduplication operation."""
-
     exact_clusters: list[DuplicateCluster]
     near_clusters: list[DuplicateCluster]
     total_duplicates: int
@@ -140,13 +86,11 @@ def find_exact_duplicates(store: MemoryStore) -> list[DuplicateCluster]:
         beliefs.sort(key=lambda b: b.confidence, reverse=True)
         canonical: Belief = beliefs[0]
         dupes: list[str] = [b.id for b in beliefs[1:]]
-        clusters.append(
-            DuplicateCluster(
-                canonical_id=canonical.id,
-                duplicate_ids=dupes,
-                similarity=1.0,
-            )
-        )
+        clusters.append(DuplicateCluster(
+            canonical_id=canonical.id,
+            duplicate_ids=dupes,
+            similarity=1.0,
+        ))
 
     return clusters
 
@@ -204,15 +148,14 @@ def find_near_duplicates(
             canonical: Belief = all_in_cluster[0]
             dupes: list[str] = [b.id for b in all_in_cluster[1:]]
             min_sim: float = min(
-                _jaccard(tokens[canonical.id], tokens[d]) for d in dupes
+                _jaccard(tokens[canonical.id], tokens[d])
+                for d in dupes
             )
-            clusters.append(
-                DuplicateCluster(
-                    canonical_id=canonical.id,
-                    duplicate_ids=dupes,
-                    similarity=min_sim,
-                )
-            )
+            clusters.append(DuplicateCluster(
+                canonical_id=canonical.id,
+                duplicate_ids=dupes,
+                similarity=min_sim,
+            ))
 
     return clusters
 

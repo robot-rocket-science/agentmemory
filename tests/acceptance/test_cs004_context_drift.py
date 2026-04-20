@@ -3,7 +3,6 @@
 Pass criterion: Locked beliefs survive and remain ranked highly even when
 many unlocked beliefs are inserted, preventing context drift within a session.
 """
-
 from __future__ import annotations
 
 from agentmemory.models import (

@@ -1,5 +1,4 @@
 """Tests for health diagnostics (credal gap, orphans, edge counts)."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -20,19 +19,11 @@ def test_health_metrics_returns_expected_keys(store: MemoryStore) -> None:
     """get_health_metrics() returns all expected keys even on empty DB."""
     metrics: dict[str, object] = store.get_health_metrics()
     expected_keys: set[str] = {
-        "active_beliefs",
-        "credal_gap_count",
-        "credal_gap_pct",
-        "orphan_count",
-        "orphan_pct",
-        "contradicts_edges",
-        "supports_edges",
-        "supersedes_edges",
-        "feedback_coverage_count",
-        "feedback_coverage_pct",
-        "avg_confidence",
-        "stale_sessions",
-        "type_priors",
+        "active_beliefs", "credal_gap_count", "credal_gap_pct",
+        "orphan_count", "orphan_pct",
+        "contradicts_edges", "supports_edges", "supersedes_edges",
+        "feedback_coverage_count", "feedback_coverage_pct",
+        "avg_confidence", "stale_sessions", "type_priors",
     }
     assert set(metrics.keys()) == expected_keys
 
@@ -158,9 +149,7 @@ def test_snapshot_returns_beliefs_at_time(store: MemoryStore) -> None:
     assert len(snapshot) == 2
 
     # Snapshot at future time includes both
-    snapshot_future: list[Belief] = store.get_snapshot(
-        at_time="2099-01-01T00:00:00+00:00"
-    )
+    snapshot_future: list[Belief] = store.get_snapshot(at_time="2099-01-01T00:00:00+00:00")
     assert len(snapshot_future) == 2
 
 

@@ -3,7 +3,6 @@
 Pass criterion: Locked decisions are surfaced when relevant topics are queried,
 preventing the agent from re-opening settled decisions.
 """
-
 from __future__ import annotations
 
 from agentmemory.models import (
@@ -16,7 +15,8 @@ from agentmemory.retrieval import RetrievalResult, retrieve
 from agentmemory.store import MemoryStore
 
 _DECISION_TEXT: str = (
-    "Calls and puts are equal citizens (D073). This is not open for discussion."
+    "Calls and puts are equal citizens (D073). "
+    "This is not open for discussion."
 )
 
 

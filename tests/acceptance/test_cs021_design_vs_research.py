@@ -3,7 +3,6 @@
 Pass criterion: rigor_tier distinguishes design hypotheses from empirically
 tested findings, so consumers do not conflate speculation with evidence.
 """
-
 from __future__ import annotations
 
 from agentmemory.models import (
@@ -31,9 +30,7 @@ def test_cs021_hypothesis_vs_empirical(store: MemoryStore) -> None:
         rigor_tier="empirically_tested",
     )
 
-    result: RetrievalResult = retrieve(
-        store, "event sourcing architecture belief history"
-    )
+    result: RetrievalResult = retrieve(store, "event sourcing architecture belief history")
     returned: dict[str, Belief] = {b.id: b for b in result.beliefs}
 
     assert hypothesis.id in returned, (

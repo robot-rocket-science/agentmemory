@@ -8,18 +8,12 @@ Verifies that:
 5. Telemetry can be disabled via config
 6. Send-telemetry offset tracking and payload construction
 """
-
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
-from agentmemory.models import (
-    BELIEF_FACTUAL,
-    BSRC_AGENT_INFERRED,
-    BSRC_USER_STATED,
-    Belief,
-)
+from agentmemory.models import BELIEF_FACTUAL, BSRC_AGENT_INFERRED, BSRC_USER_STATED, Belief
 from agentmemory.store import MemoryStore
 from agentmemory.telemetry import (
     collect_belief_metrics,
@@ -276,7 +270,6 @@ def test_emit_telemetry_respects_disabled(tmp_path: Path) -> None:
 
     # Override config to disable telemetry
     from agentmemory import config as _cfg
-
     mp = pytest.MonkeyPatch()
     mp.setattr(_cfg, "_CONFIG_PATH", tmp_path / "config.json")
     (tmp_path / "config.json").write_text(
@@ -286,11 +279,9 @@ def test_emit_telemetry_respects_disabled(tmp_path: Path) -> None:
     # Override telemetry output path
     out: Path = tmp_path / "telemetry.jsonl"
     from agentmemory import telemetry as _tel
-
     mp.setattr(_tel, "_default_path", lambda: out)
 
     from agentmemory import server as _srv
-
     _srv._emit_telemetry(store, s.id)  # pyright: ignore[reportPrivateUsage]
 
     # File should not exist (telemetry disabled)
@@ -312,7 +303,6 @@ def test_emit_telemetry_writes_when_enabled(tmp_path: Path) -> None:
 
     # Override config to enable telemetry
     from agentmemory import config as _cfg
-
     mp = pytest.MonkeyPatch()
     mp.setattr(_cfg, "_CONFIG_PATH", tmp_path / "config.json")
     (tmp_path / "config.json").write_text(
@@ -321,12 +311,10 @@ def test_emit_telemetry_writes_when_enabled(tmp_path: Path) -> None:
 
     # Override default telemetry path
     from agentmemory import telemetry as _tel
-
     out: Path = tmp_path / "telemetry.jsonl"
     mp.setattr(_tel, "_default_path", lambda: out)
 
     from agentmemory import server as _srv
-
     _srv._emit_telemetry(store, s.id)  # pyright: ignore[reportPrivateUsage]
 
     # File should exist with one line

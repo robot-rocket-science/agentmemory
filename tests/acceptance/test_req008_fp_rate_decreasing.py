@@ -9,7 +9,6 @@ repeated retrieval-feedback cycles. Irrelevant beliefs that are marked
 "harmful" should have their confidence decrease, causing them to rank
 lower in subsequent retrievals (reducing FP rate).
 """
-
 from __future__ import annotations
 
 from agentmemory.models import (
@@ -48,7 +47,8 @@ _IRRELEVANT: list[str] = [
 
 # Additional filler to make the store realistic
 _FILLER: list[str] = [
-    f"Unrelated filler belief about topic {i} for test padding" for i in range(30)
+    f"Unrelated filler belief about topic {i} for test padding"
+    for i in range(30)
 ]
 
 
@@ -96,7 +96,9 @@ def _compute_fp_rate(
     """Fraction of retrieved beliefs that are irrelevant (false positives)."""
     if not beliefs:
         return 0.0
-    fp_count: int = sum(1 for b in beliefs if not relevance.get(b.id, False))
+    fp_count: int = sum(
+        1 for b in beliefs if not relevance.get(b.id, False)
+    )
     return fp_count / len(beliefs)
 
 
@@ -106,10 +108,7 @@ def _run_feedback_cycle(
 ) -> float:
     """Run one retrieval-feedback cycle and return the FP rate."""
     result: RetrievalResult = retrieve(
-        store,
-        _QUERY,
-        budget=2000,
-        include_locked=False,
+        store, _QUERY, budget=2000, include_locked=False,
     )
 
     # Give feedback: "used" for relevant, "harmful" for irrelevant

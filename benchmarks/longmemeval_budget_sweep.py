@@ -7,7 +7,6 @@ Usage:
     uv run python benchmarks/longmemeval_budget_sweep.py
     uv run python benchmarks/longmemeval_budget_sweep.py --subset 20
 """
-
 from __future__ import annotations
 
 import argparse
@@ -32,9 +31,9 @@ from agentmemory.store import MemoryStore
 
 # (top_k, budget) combinations to sweep
 CONFIGS: Final[list[tuple[int, int]]] = [
-    (50, 2000),  # current default
-    (100, 4000),  # 2x candidates, 2x budget
-    (200, 8000),  # 4x candidates, 4x budget
+    (50, 2000),    # current default
+    (100, 4000),   # 2x candidates, 2x budget
+    (200, 8000),   # 4x candidates, 4x budget
 ]
 
 
@@ -51,9 +50,7 @@ def main() -> None:
         description="LongMemEval top_k/budget sweep on multi-session questions",
     )
     parser.add_argument(
-        "--subset",
-        type=int,
-        default=None,
+        "--subset", type=int, default=None,
         help="Limit to first N multi-session questions",
     )
     args: argparse.Namespace = parser.parse_args()
@@ -67,7 +64,7 @@ def main() -> None:
     print(f"Multi-session questions: {len(ms_questions)}")
 
     if args.subset is not None:
-        ms_questions = ms_questions[: args.subset]
+        ms_questions = ms_questions[:args.subset]
         print(f"Using first {len(ms_questions)}")
 
     for top_k, budget in CONFIGS:
@@ -107,9 +104,9 @@ def main() -> None:
                 if (i + 1) % 10 == 0:
                     elapsed: float = time.monotonic() - t0
                     print(
-                        f"  [{i + 1}/{len(ms_questions)}] "
-                        f"GT-in-ctx: {gt_hits}/{total} ({gt_hits / total * 100:.0f}%) "
-                        f"avg_beliefs: {total_beliefs / total:.0f} "
+                        f"  [{i+1}/{len(ms_questions)}] "
+                        f"GT-in-ctx: {gt_hits}/{total} ({gt_hits/total*100:.0f}%) "
+                        f"avg_beliefs: {total_beliefs/total:.0f} "
                         f"elapsed: {elapsed:.0f}s"
                     )
 

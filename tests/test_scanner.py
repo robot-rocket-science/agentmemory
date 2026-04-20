@@ -2,7 +2,6 @@
 
 Creates temporary test fixture repos to validate extraction logic.
 """
-
 from __future__ import annotations
 
 import subprocess
@@ -43,13 +42,11 @@ def fixture_repo(tmp_path: Path) -> Generator[Path, None, None]:
     subprocess.run(["git", "init", str(repo)], capture_output=True, check=True)
     subprocess.run(
         ["git", "-C", str(repo), "config", "user.email", "test@test.com"],
-        capture_output=True,
-        check=True,
+        capture_output=True, check=True,
     )
     subprocess.run(
         ["git", "-C", str(repo), "config", "user.name", "Test"],
-        capture_output=True,
-        check=True,
+        capture_output=True, check=True,
     )
 
     # Create directory structure
@@ -59,20 +56,20 @@ def fixture_repo(tmp_path: Path) -> Generator[Path, None, None]:
 
     # Python file with functions
     (repo / "src" / "main.py").write_text(
-        "from __future__ import annotations\n\n"
-        "def process_data(items: list[str]) -> list[str]:\n"
-        "    return [transform(i) for i in items]\n\n"
-        "def transform(item: str) -> str:\n"
-        "    return item.upper()\n\n"
-        "def run() -> None:\n"
+        'from __future__ import annotations\n\n'
+        'def process_data(items: list[str]) -> list[str]:\n'
+        '    return [transform(i) for i in items]\n\n'
+        'def transform(item: str) -> str:\n'
+        '    return item.upper()\n\n'
+        'def run() -> None:\n'
         '    data = process_data(["a", "b"])\n'
         '    transform("c")\n'
     )
 
     # Another Python file
     (repo / "src" / "utils.py").write_text(
-        "from __future__ import annotations\n\n"
-        "def helper() -> str:\n"
+        'from __future__ import annotations\n\n'
+        'def helper() -> str:\n'
         '    return "help"\n'
     )
 
@@ -114,33 +111,20 @@ def fixture_repo(tmp_path: Path) -> Generator[Path, None, None]:
     (repo / "pyproject.toml").write_text('[project]\nname = "test-project"\n')
 
     # First commit: initial files
+    subprocess.run(["git", "-C", str(repo), "add", "."], capture_output=True, check=True)
     subprocess.run(
-        ["git", "-C", str(repo), "add", "."], capture_output=True, check=True
-    )
-    subprocess.run(
-        [
-            "git",
-            "-C",
-            str(repo),
-            "commit",
-            "-m",
-            "Initial commit: add project structure",
-        ],
-        capture_output=True,
-        check=True,
+        ["git", "-C", str(repo), "commit", "-m", "Initial commit: add project structure"],
+        capture_output=True, check=True,
     )
 
     # Second commit: modify a file
     (repo / "src" / "main.py").write_text(
         (repo / "src" / "main.py").read_text() + "\n# Updated\n"
     )
-    subprocess.run(
-        ["git", "-C", str(repo), "add", "."], capture_output=True, check=True
-    )
+    subprocess.run(["git", "-C", str(repo), "add", "."], capture_output=True, check=True)
     subprocess.run(
         ["git", "-C", str(repo), "commit", "-m", "Update main.py with improvements"],
-        capture_output=True,
-        check=True,
+        capture_output=True, check=True,
     )
 
     # Third commit: modify main.py and utils.py together (for co-change tracking)
@@ -150,13 +134,10 @@ def fixture_repo(tmp_path: Path) -> Generator[Path, None, None]:
     (repo / "src" / "utils.py").write_text(
         (repo / "src" / "utils.py").read_text() + "\n# Change 2\n"
     )
-    subprocess.run(
-        ["git", "-C", str(repo), "add", "."], capture_output=True, check=True
-    )
+    subprocess.run(["git", "-C", str(repo), "add", "."], capture_output=True, check=True)
     subprocess.run(
         ["git", "-C", str(repo), "commit", "-m", "Refactor main and utils together"],
-        capture_output=True,
-        check=True,
+        capture_output=True, check=True,
     )
 
     yield repo
@@ -441,9 +422,7 @@ class TestOnboardIntegration:
                 aggregate.merge(turn_result)
 
             assert aggregate.observations_created > 0
-            assert (
-                aggregate.beliefs_created >= 0
-            )  # offline classification may not persist all
+            assert aggregate.beliefs_created >= 0  # offline classification may not persist all
 
             # Verify beliefs are searchable
             stats: dict[str, int] = store.status()

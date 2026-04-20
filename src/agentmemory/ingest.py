@@ -7,7 +7,6 @@ Provides two paths:
 
 Also handles JSONL batch ingestion from conversation-logger.sh hook output.
 """
-
 from __future__ import annotations
 
 import json
@@ -59,7 +58,6 @@ class IngestResult:
 @dataclass
 class ExtractedTurn:
     """Result of extract_turn(): observation created, sentences ready for classification."""
-
     observation: Observation
     sentences: list[tuple[str, str]]  # (text, source) pairs
     full_text_is_correction: bool
@@ -73,16 +71,16 @@ class ExtractedTurn:
 
 # Map Exp 61 classification types to agentmemory belief_type values.
 _TYPE_TO_BELIEF: dict[str, str] = {
-    "REQUIREMENT": "requirement",
-    "CORRECTION": "correction",
-    "PREFERENCE": "preference",
-    "FACT": "factual",
-    "ASSUMPTION": "factual",
-    "DECISION": "factual",
-    "ANALYSIS": "factual",
+    "REQUIREMENT":  "requirement",
+    "CORRECTION":   "correction",
+    "PREFERENCE":   "preference",
+    "FACT":         "factual",
+    "ASSUMPTION":   "factual",
+    "DECISION":     "factual",
+    "ANALYSIS":     "factual",
     "COORDINATION": "factual",
-    "QUESTION": "factual",
-    "META": "factual",
+    "QUESTION":     "factual",
+    "META":         "factual",
 }
 
 
@@ -332,12 +330,7 @@ def ingest_turn(
     bulk: skip per-belief FTS5 relationship checks during onboard.
     """
     extracted: ExtractedTurn = extract_turn(
-        store,
-        text,
-        source,
-        session_id,
-        created_at,
-        source_path,
+        store, text, source, session_id, created_at, source_path,
         source_id=source_id,
     )
 

@@ -8,7 +8,6 @@ Usage:
     uv run python benchmarks/mab_reader.py /tmp/exp6_temporal.json --model opus
     uv run python benchmarks/mab_reader.py /tmp/exp6_temporal.json --model haiku
 """
-
 from __future__ import annotations
 
 import argparse
@@ -77,20 +76,15 @@ def main() -> None:
         help="Path to retrieval JSON (from mab_entity_index_adapter.py)",
     )
     parser.add_argument(
-        "--model",
-        default="opus",
-        choices=list(MODEL_MAP.keys()),
+        "--model", default="opus", choices=list(MODEL_MAP.keys()),
         help="Reader model (default: opus)",
     )
     parser.add_argument(
-        "--output",
-        default=None,
+        "--output", default=None,
         help="Output predictions path (default: auto-generated)",
     )
     parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=10,
+        "--batch-size", type=int, default=10,
         help="Print progress every N questions",
     )
     args: argparse.Namespace = parser.parse_args()
@@ -129,9 +123,7 @@ def main() -> None:
             print(f"  [{i + 1}/{len(items)}] {rate:.1f} q/s - last: {answer[:60]}")
 
     elapsed = time.monotonic() - t0
-    print(
-        f"\nDone: {len(items)} questions in {elapsed:.1f}s ({len(items) / elapsed:.1f} q/s)"
-    )
+    print(f"\nDone: {len(items)} questions in {elapsed:.1f}s ({len(items)/elapsed:.1f} q/s)")
 
     with out_path.open("w", encoding="utf-8") as f:
         json.dump(predictions, f, indent=2)

@@ -4,7 +4,6 @@ Pass criterion: FTS5 search for a task surfaces a belief (or observation) that
 the task is complete, allowing the agent to say "already done" instead of
 re-executing.
 """
-
 from __future__ import annotations
 
 from agentmemory.models import (

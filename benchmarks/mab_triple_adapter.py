@@ -15,7 +15,6 @@ Usage:
     uv run python benchmarks/mab_triple_adapter.py --no-supersedes --retrieve-only /tmp/exp3_ctrl_a.json
     uv run python benchmarks/mab_triple_adapter.py --no-bfs --retrieve-only /tmp/exp3_ctrl_b.json
 """
-
 from __future__ import annotations
 
 import argparse
@@ -88,7 +87,6 @@ def _synthetic_timestamp(serial: int, total_lines: int) -> str:
     This gives temporal decay a gradient to work with.
     """
     from datetime import datetime, timedelta, timezone
-
     now: datetime = datetime.now(timezone.utc)
     if total_lines <= 1:
         return now.isoformat()
@@ -157,7 +155,6 @@ def ingest_with_triples(
 
             # Find the belief we just created by searching for its text
             from agentmemory.models import Belief
-
             found_beliefs: list[Belief] = store.search(triple.source_text[:50], top_k=1)
             if not found_beliefs:
                 continue
@@ -173,14 +170,8 @@ def ingest_with_triples(
                 for existing_triple, existing_id in triple_beliefs[key]:
                     if existing_triple.value.lower() != triple.value.lower():
                         # Determine which is newer
-                        new_serial: int = (
-                            triple.serial if triple.serial is not None else 0
-                        )
-                        old_serial: int = (
-                            existing_triple.serial
-                            if existing_triple.serial is not None
-                            else 0
-                        )
+                        new_serial: int = triple.serial if triple.serial is not None else 0
+                        old_serial: int = existing_triple.serial if existing_triple.serial is not None else 0
 
                         if new_serial > old_serial:
                             store.supersede_belief(
@@ -270,41 +261,31 @@ def run_condition(
         # Ingest
         t0: float = time.monotonic()
         result.ingest_stats = ingest_with_triples(
-            store,
-            context,
-            source_name,
+            store, context, source_name,
             create_supersedes=create_supersedes,
         )
         result.ingest_time_s = time.monotonic() - t0
 
-        print(
-            f"  Ingested: {result.ingest_stats.beliefs_created} beliefs, "
-            f"{result.ingest_stats.triples_extracted} triples, "
-            f"{result.ingest_stats.supersedes_created} SUPERSEDES edges "
-            f"in {result.ingest_time_s:.1f}s"
-        )
+        print(f"  Ingested: {result.ingest_stats.beliefs_created} beliefs, "
+              f"{result.ingest_stats.triples_extracted} triples, "
+              f"{result.ingest_stats.supersedes_created} SUPERSEDES edges "
+              f"in {result.ingest_time_s:.1f}s")
 
         # Query
         t1: float = time.monotonic()
         for q_idx, (question, answer_list) in enumerate(zip(questions, answers)):
-            ctx: str = query_agentmemory(
-                store, question, budget=budget, use_bfs=use_bfs
-            )
+            ctx: str = query_agentmemory(store, question, budget=budget, use_bfs=use_bfs)
 
             result.total_questions += 1
-            result.per_question.append(
-                {
-                    "id": q_idx,
-                    "question": question,
-                    "context": ctx,
-                }
-            )
-            result.ground_truth.append(
-                {
-                    "id": q_idx,
-                    "answers": answer_list,
-                }
-            )
+            result.per_question.append({
+                "id": q_idx,
+                "question": question,
+                "context": ctx,
+            })
+            result.ground_truth.append({
+                "id": q_idx,
+                "answers": answer_list,
+            })
 
         result.query_time_s = time.monotonic() - t1
 
@@ -321,36 +302,27 @@ def main() -> None:
         description="Exp 3: Structured triple extraction for FactConsolidation",
     )
     parser.add_argument(
-        "--source",
-        default=DEFAULT_SOURCE,
+        "--source", default=DEFAULT_SOURCE,
         help=f"MAB source filter (default: {DEFAULT_SOURCE})",
     )
     parser.add_argument(
-        "--no-supersedes",
-        action="store_true",
+        "--no-supersedes", action="store_true",
         help="Control A: ingest triples but skip SUPERSEDES edges",
     )
     parser.add_argument(
-        "--no-bfs",
-        action="store_true",
+        "--no-bfs", action="store_true",
         help="Control B: skip BFS expansion in retrieval",
     )
     parser.add_argument(
-        "--budget",
-        type=int,
-        default=2000,
+        "--budget", type=int, default=2000,
         help="Retrieval token budget (default: 2000)",
     )
     parser.add_argument(
-        "--subset",
-        type=int,
-        default=None,
+        "--subset", type=int, default=None,
         help="Limit to first N questions (for debugging)",
     )
     parser.add_argument(
-        "--retrieve-only",
-        default=None,
-        metavar="PATH",
+        "--retrieve-only", default=None, metavar="PATH",
         help="Write retrieval results (NO answers) to PATH",
     )
     args: argparse.Namespace = parser.parse_args()
@@ -389,8 +361,8 @@ def main() -> None:
         return
 
     if args.subset is not None:
-        questions = questions[: args.subset]
-        answers = answers[: args.subset]
+        questions = questions[:args.subset]
+        answers = answers[:args.subset]
 
     print(f"Context: {len(context)} chars, {len(questions)} questions")
 
@@ -418,9 +390,7 @@ def main() -> None:
             json.dump(result.per_question, f, indent=2)
         with gt_path.open("w", encoding="utf-8") as f:
             json.dump(result.ground_truth, f, indent=2)
-        print(
-            f"Wrote {result.total_questions} retrieval results to {args.retrieve_only}"
-        )
+        print(f"Wrote {result.total_questions} retrieval results to {args.retrieve_only}")
         print(f"Wrote {result.total_questions} ground truth to {gt_path}")
         print("ISOLATION: retrieval file contains NO ground truth")
 

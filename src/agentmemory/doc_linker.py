@@ -5,7 +5,6 @@ Scans project documents (.md files), extracts cross-references
 Obsidian vault notes with wikilinks. Creates bidirectional links
 between documents and beliefs.
 """
-
 from __future__ import annotations
 
 import re
@@ -31,39 +30,24 @@ _DECISION_RE: Final[re.Pattern[str]] = re.compile(r"\bD(\d{3})\b")
 _BELIEF_ID_RE: Final[re.Pattern[str]] = re.compile(r"\b([0-9a-f]{12})\b")
 
 # Directories to skip when scanning for documents
-_SKIP_DIRS: Final[frozenset[str]] = frozenset(
-    {
-        "beliefs",
-        "_index",
-        "_dashboards",
-        "_canvas",
-        "_archive",
-        ".obsidian",
-        ".venv",
-        ".git",
-        "__pycache__",
-        "node_modules",
-        ".claude",
-        "dist",
-        "build",
-        ".egg-info",
-    }
-)
+_SKIP_DIRS: Final[frozenset[str]] = frozenset({
+    "beliefs", "_index", "_dashboards", "_canvas", "_archive",
+    ".obsidian", ".venv", ".git", "__pycache__", "node_modules",
+    ".claude", "dist", "build", ".egg-info",
+})
 
 
 @dataclass
 class DocRef:
     """A cross-reference found in a document."""
-
     ref_type: str  # "REQ" | "CS" | "EXP" | "DECISION" | "BELIEF"
-    ref_id: str  # e.g., "003", "006", "44", "a1b2c3d4e5f6"
-    display: str  # e.g., "REQ-003", "CS-006", "Exp 44"
+    ref_id: str    # e.g., "003", "006", "44", "a1b2c3d4e5f6"
+    display: str   # e.g., "REQ-003", "CS-006", "Exp 44"
 
 
 @dataclass
 class ProjectDoc:
     """A project document with extracted metadata and references."""
-
     original_path: Path
     relative_path: str
     title: str
@@ -75,7 +59,6 @@ class ProjectDoc:
 @dataclass
 class LinkResult:
     """Result of the document linking pipeline."""
-
     docs_exported: int
     refs_linked: int
     belief_refs_added: int
@@ -86,25 +69,17 @@ class LinkResult:
 # Document scanning
 # ---------------------------------------------------------------------------
 
-
 def _classify_doc(rel_path: str, filename: str) -> str:
     """Classify a document by its path and name."""
     lower: str = rel_path.lower()
     fname: str = filename.lower()
-    if (
-        "experiment" in lower
-        or lower.startswith("experiments/")
-        or fname.startswith("exp")
-    ):
+    if "experiment" in lower or lower.startswith("experiments/") or fname.startswith("exp"):
         return "experiment"
     if "case_stud" in lower or "cs-" in fname:
         return "case_study"
     if "requirement" in lower or "req" in fname:
         return "requirement"
-    if any(
-        w in lower
-        for w in ("research", "architecture", "design", "pipeline", "approach")
-    ):
+    if any(w in lower for w in ("research", "architecture", "design", "pipeline", "approach")):
         return "research"
     if "benchmark" in lower or "results" in lower:
         return "benchmark"
@@ -159,7 +134,6 @@ def scan_project_docs(project_path: Path) -> list[ProjectDoc]:
 # ---------------------------------------------------------------------------
 # Reference extraction
 # ---------------------------------------------------------------------------
-
 
 def extract_refs(content: str) -> list[DocRef]:
     """Extract all cross-references from document content."""
@@ -226,7 +200,6 @@ def find_beliefs_mentioning_doc(
 # Document export to vault
 # ---------------------------------------------------------------------------
 
-
 def _doc_vault_id(doc: ProjectDoc) -> str:
     """Generate a stable vault filename for a document."""
     # Use the relative path, replacing separators with dashes
@@ -265,7 +238,7 @@ def doc_to_markdown(
     # Remove existing frontmatter from content (we add our own)
     fm_match: re.Match[str] | None = re.match(r"^---\n.*?\n---\n", linkified, re.DOTALL)
     if fm_match:
-        linkified = linkified[fm_match.end() :]
+        linkified = linkified[fm_match.end():]
 
     # Remove original H1 (we add our own)
     linkified = re.sub(r"^#\s+.*\n", "", linkified, count=1)
@@ -303,7 +276,6 @@ def doc_to_markdown(
 # Reference index notes
 # ---------------------------------------------------------------------------
 
-
 def _generate_ref_index(
     ref_type: str,
     ref_map: dict[str, list[str]],
@@ -331,13 +303,14 @@ def _generate_ref_index(
         lines.append("")
 
         safe_name: str = re.sub(r"[^a-zA-Z0-9_-]", "_", ref_id)
-        (docs_dir / f"{safe_name}.md").write_text("\n".join(lines), encoding="utf-8")
+        (docs_dir / f"{safe_name}.md").write_text(
+            "\n".join(lines), encoding="utf-8"
+        )
 
 
 # ---------------------------------------------------------------------------
 # Main linking pipeline
 # ---------------------------------------------------------------------------
-
 
 def link_documents(
     store: MemoryStore,
@@ -355,7 +328,6 @@ def link_documents(
     5. Generate reference index notes (one per REQ, CS, Exp, etc.)
     """
     import time
-
     start: float = time.monotonic()
 
     docs_dir: Path = vault_path / docs_subfolder

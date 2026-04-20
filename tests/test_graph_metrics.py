@@ -1,5 +1,4 @@
 """Tests for graph metrics: degree, PageRank, structural importance."""
-
 from __future__ import annotations
 
 from collections.abc import Generator

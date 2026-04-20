@@ -5,7 +5,6 @@ directives, citations) and extracts nodes + edges for ingestion into the memory 
 
 Based on validated extraction logic from Exp 48/49.
 """
-
 from __future__ import annotations
 
 import ast as python_ast
@@ -20,26 +19,11 @@ from typing import Any, Final
 # Constants
 # ---------------------------------------------------------------------------
 
-SKIP_DIRS: Final[frozenset[str]] = frozenset(
-    {
-        ".venv",
-        "venv",
-        "__pycache__",
-        ".git",
-        "node_modules",
-        ".egg-info",
-        "target",
-        ".mypy_cache",
-        ".pytest_cache",
-        ".ruff_cache",
-        "dist",
-        "build",
-        ".tox",
-        "vendor",
-        ".next",
-        ".nuxt",
-    }
-)
+SKIP_DIRS: Final[frozenset[str]] = frozenset({
+    ".venv", "venv", "__pycache__", ".git", "node_modules", ".egg-info",
+    "target", ".mypy_cache", ".pytest_cache", ".ruff_cache", "dist", "build",
+    ".tox", "vendor", ".next", ".nuxt",
+})
 
 LANGUAGE_EXTENSIONS: Final[dict[str, str]] = {
     ".py": "python",
@@ -53,24 +37,14 @@ LANGUAGE_EXTENSIONS: Final[dict[str, str]] = {
 
 DOC_EXTENSIONS: Final[frozenset[str]] = frozenset({".md", ".rst", ".txt", ".adoc"})
 
-DIRECTIVE_FILES: Final[frozenset[str]] = frozenset(
-    {
-        "CLAUDE.md",
-        ".cursorrules",
-        ".aider.conf.yml",
-    }
-)
+DIRECTIVE_FILES: Final[frozenset[str]] = frozenset({
+    "CLAUDE.md", ".cursorrules", ".aider.conf.yml",
+})
 
-BUILD_CONFIGS: Final[frozenset[str]] = frozenset(
-    {
-        "pyproject.toml",
-        "Cargo.toml",
-        "package.json",
-        "Makefile",
-        "docker-compose.yml",
-        "Dockerfile",
-    }
-)
+BUILD_CONFIGS: Final[frozenset[str]] = frozenset({
+    "pyproject.toml", "Cargo.toml", "package.json", "Makefile",
+    "docker-compose.yml", "Dockerfile",
+})
 
 DIRECTIVE_PATTERNS: Final[list[re.Pattern[str]]] = [
     re.compile(r"\bBANNED\b"),
@@ -82,53 +56,14 @@ DIRECTIVE_PATTERNS: Final[list[re.Pattern[str]]] = [
 ]
 
 # AST builtins to exclude from call graph
-_AST_BUILTINS: Final[frozenset[str]] = frozenset(
-    {
-        "print",
-        "len",
-        "range",
-        "enumerate",
-        "zip",
-        "map",
-        "filter",
-        "sorted",
-        "reversed",
-        "list",
-        "dict",
-        "set",
-        "tuple",
-        "str",
-        "int",
-        "float",
-        "bool",
-        "type",
-        "isinstance",
-        "issubclass",
-        "hasattr",
-        "getattr",
-        "setattr",
-        "delattr",
-        "super",
-        "property",
-        "staticmethod",
-        "classmethod",
-        "abs",
-        "min",
-        "max",
-        "sum",
-        "any",
-        "all",
-        "next",
-        "iter",
-        "open",
-        "repr",
-        "hash",
-        "id",
-        "vars",
-        "dir",
-        "callable",
-    }
-)
+_AST_BUILTINS: Final[frozenset[str]] = frozenset({
+    "print", "len", "range", "enumerate", "zip", "map", "filter", "sorted",
+    "reversed", "list", "dict", "set", "tuple", "str", "int", "float", "bool",
+    "type", "isinstance", "issubclass", "hasattr", "getattr", "setattr",
+    "delattr", "super", "property", "staticmethod", "classmethod", "abs",
+    "min", "max", "sum", "any", "all", "next", "iter", "open", "repr", "hash",
+    "id", "vars", "dir", "callable",
+})
 
 _MIN_SENTENCE_LEN: Final[int] = 20
 _CO_CHANGE_MIN_WEIGHT: Final[int] = 3
@@ -142,7 +77,6 @@ _CO_CHANGE_MIN_WEIGHT: Final[int] = 3
 @dataclass
 class Node:
     """A node extracted from a project signal source."""
-
     id: str
     content: str
     node_type: str
@@ -154,7 +88,6 @@ class Node:
 @dataclass
 class Edge:
     """A directed edge between two nodes."""
-
     src: str
     tgt: str
     edge_type: str
@@ -165,7 +98,6 @@ class Edge:
 @dataclass
 class Manifest:
     """Detected project signals and capabilities."""
-
     root: Path
     name: str
     has_git: bool = False
@@ -185,7 +117,6 @@ class Manifest:
 @dataclass
 class ScanResult:
     """Complete result of scanning a project directory."""
-
     manifest: Manifest
     nodes: list[Node] = field(default_factory=lambda: list[Node]())
     edges: list[Edge] = field(default_factory=lambda: list[Edge]())
@@ -314,14 +245,12 @@ def extract_file_tree(project_root: Path) -> tuple[list[Node], list[Edge]]:
 
     for rel_path in _walk_files(root):
         file_id: str = f"file:{rel_path}"
-        nodes.append(
-            Node(
-                id=file_id,
-                content=rel_path.name,
-                node_type="file",
-                file=str(rel_path),
-            )
-        )
+        nodes.append(Node(
+            id=file_id,
+            content=rel_path.name,
+            node_type="file",
+            file=str(rel_path),
+        ))
 
         parent: str = str(rel_path.parent)
         if parent != ".":
@@ -399,22 +328,18 @@ def extract_git_history(
     # Create commit nodes and COMMIT_TOUCHES edges
     for c in filtered:
         commit_id: str = f"commit:{c['hash']}"
-        nodes.append(
-            Node(
-                id=commit_id,
-                content=c["message"],
-                node_type="commit_belief",
-                date=c["date"],
-            )
-        )
+        nodes.append(Node(
+            id=commit_id,
+            content=c["message"],
+            node_type="commit_belief",
+            date=c["date"],
+        ))
         for f in c["files"]:
-            edges.append(
-                Edge(
-                    src=commit_id,
-                    tgt=f"file:{f}",
-                    edge_type="COMMIT_TOUCHES",
-                )
-            )
+            edges.append(Edge(
+                src=commit_id,
+                tgt=f"file:{f}",
+                edge_type="COMMIT_TOUCHES",
+            ))
 
     # CO_CHANGED edges (from all commits, including filtered ones)
     pair_counts: Counter[tuple[str, str]] = Counter()
@@ -427,27 +352,23 @@ def extract_git_history(
 
     for (f_a, f_b), count in pair_counts.items():
         if count >= _CO_CHANGE_MIN_WEIGHT:
-            edges.append(
-                Edge(
-                    src=f"file:{f_a}",
-                    tgt=f"file:{f_b}",
-                    edge_type="CO_CHANGED",
-                    weight=float(count),
-                )
-            )
+            edges.append(Edge(
+                src=f"file:{f_a}",
+                tgt=f"file:{f_b}",
+                edge_type="CO_CHANGED",
+                weight=float(count),
+            ))
 
     # TEMPORAL_NEXT edges (chronological order)
     if len(filtered) >= 2:
         # git log returns newest first, reverse for chronological
         chronological: list[dict[str, Any]] = list(reversed(filtered))
         for i in range(len(chronological) - 1):
-            edges.append(
-                Edge(
-                    src=f"commit:{chronological[i]['hash']}",
-                    tgt=f"commit:{chronological[i + 1]['hash']}",
-                    edge_type="TEMPORAL_NEXT",
-                )
-            )
+            edges.append(Edge(
+                src=f"commit:{chronological[i]['hash']}",
+                tgt=f"commit:{chronological[i + 1]['hash']}",
+                edge_type="TEMPORAL_NEXT",
+            ))
 
     return nodes, edges
 
@@ -507,21 +428,15 @@ def extract_document_sentences(
                     continue
                 node_id: str = f"doc:{doc_path_str}:h:{node_idx}"
                 node_idx += 1
-                nodes.append(
-                    Node(
-                        id=node_id,
-                        content=heading_text,
-                        node_type="heading",
-                        file=doc_path_str,
-                    )
-                )
-                edges.append(
-                    Edge(src=node_id, tgt=file_id, edge_type="SENTENCE_IN_FILE")
-                )
+                nodes.append(Node(
+                    id=node_id,
+                    content=heading_text,
+                    node_type="heading",
+                    file=doc_path_str,
+                ))
+                edges.append(Edge(src=node_id, tgt=file_id, edge_type="SENTENCE_IN_FILE"))
                 if prev_node_id is not None:
-                    edges.append(
-                        Edge(src=prev_node_id, tgt=node_id, edge_type="WITHIN_SECTION")
-                    )
+                    edges.append(Edge(src=prev_node_id, tgt=node_id, edge_type="WITHIN_SECTION"))
                 prev_node_id = node_id
                 continue
 
@@ -533,21 +448,15 @@ def extract_document_sentences(
                     continue
                 node_id = f"doc:{doc_path_str}:s:{node_idx}"
                 node_idx += 1
-                nodes.append(
-                    Node(
-                        id=node_id,
-                        content=sentence,
-                        node_type="sentence",
-                        file=doc_path_str,
-                    )
-                )
-                edges.append(
-                    Edge(src=node_id, tgt=file_id, edge_type="SENTENCE_IN_FILE")
-                )
+                nodes.append(Node(
+                    id=node_id,
+                    content=sentence,
+                    node_type="sentence",
+                    file=doc_path_str,
+                ))
+                edges.append(Edge(src=node_id, tgt=file_id, edge_type="SENTENCE_IN_FILE"))
                 if prev_node_id is not None:
-                    edges.append(
-                        Edge(src=prev_node_id, tgt=node_id, edge_type="WITHIN_SECTION")
-                    )
+                    edges.append(Edge(src=prev_node_id, tgt=node_id, edge_type="WITHIN_SECTION"))
                 prev_node_id = node_id
 
     return nodes, edges
@@ -568,7 +477,9 @@ def extract_ast_calls(
     nodes: list[Node] = []
     edges: list[Edge] = []
 
-    py_files: list[Path] = [f for f in _walk_files(root) if f.suffix == ".py"]
+    py_files: list[Path] = [
+        f for f in _walk_files(root) if f.suffix == ".py"
+    ]
 
     for rel_path in py_files:
         full_path: Path = root / rel_path
@@ -587,15 +498,13 @@ def extract_ast_calls(
             if isinstance(node, (python_ast.FunctionDef, python_ast.AsyncFunctionDef)):
                 func_id: str = f"func:{module}.{node.name}"
                 defined_names.add(node.name)
-                nodes.append(
-                    Node(
-                        id=func_id,
-                        content=f"def {node.name}",
-                        node_type="callable",
-                        file=str(rel_path),
-                        line=node.lineno,
-                    )
-                )
+                nodes.append(Node(
+                    id=func_id,
+                    content=f"def {node.name}",
+                    node_type="callable",
+                    file=str(rel_path),
+                    line=node.lineno,
+                ))
 
         # Collect calls (intra-file only, exclude builtins)
         for node in python_ast.walk(tree):
@@ -612,13 +521,11 @@ def extract_ast_calls(
             if callee_name in _AST_BUILTINS:
                 continue
             if callee_name in defined_names:
-                edges.append(
-                    Edge(
-                        src=f"file:{rel_path}",
-                        tgt=f"func:{module}.{callee_name}",
-                        edge_type="CALLS",
-                    )
-                )
+                edges.append(Edge(
+                    src=f"file:{rel_path}",
+                    tgt=f"func:{module}.{callee_name}",
+                    edge_type="CALLS",
+                ))
 
     return nodes, edges
 
@@ -639,9 +546,7 @@ def extract_citations(
     file_citations: dict[str, set[str]] = {}
     for doc_path_str in doc_files:
         try:
-            text: str = (root / doc_path_str).read_text(
-                encoding="utf-8", errors="replace"
-            )
+            text: str = (root / doc_path_str).read_text(encoding="utf-8", errors="replace")
             matches: list[str] = pattern.findall(text)
             if matches:
                 file_citations[doc_path_str] = set(matches)
@@ -653,18 +558,14 @@ def extract_citations(
     file_list: list[str] = sorted(file_citations.keys())
     for i in range(len(file_list)):
         for j in range(i + 1, len(file_list)):
-            shared: set[str] = (
-                file_citations[file_list[i]] & file_citations[file_list[j]]
-            )
+            shared: set[str] = file_citations[file_list[i]] & file_citations[file_list[j]]
             if shared:
-                edges.append(
-                    Edge(
-                        src=f"file:{file_list[i]}",
-                        tgt=f"file:{file_list[j]}",
-                        edge_type="CITES",
-                        metadata={"shared": sorted(shared)},
-                    )
-                )
+                edges.append(Edge(
+                    src=f"file:{file_list[i]}",
+                    tgt=f"file:{file_list[j]}",
+                    edge_type="CITES",
+                    metadata={"shared": sorted(shared)},
+                ))
 
     return edges
 
@@ -741,13 +642,11 @@ def extract_test_edges(
                         pair: tuple[str, str] = (str(rel_path), resolved)
                         if pair not in seen:
                             seen.add(pair)
-                            edges.append(
-                                Edge(
-                                    src=test_file_id,
-                                    tgt=f"file:{resolved}",
-                                    edge_type="TESTS",
-                                )
-                            )
+                            edges.append(Edge(
+                                src=test_file_id,
+                                tgt=f"file:{resolved}",
+                                edge_type="TESTS",
+                            ))
             elif isinstance(node, python_ast.ImportFrom):
                 if node.module is not None:
                     module_name = node.module
@@ -756,13 +655,11 @@ def extract_test_edges(
                         pair = (str(rel_path), resolved)
                         if pair not in seen:
                             seen.add(pair)
-                            edges.append(
-                                Edge(
-                                    src=test_file_id,
-                                    tgt=f"file:{resolved}",
-                                    edge_type="TESTS",
-                                )
-                            )
+                            edges.append(Edge(
+                                src=test_file_id,
+                                tgt=f"file:{resolved}",
+                                edge_type="TESTS",
+                            ))
 
         # --- Strategy 2: Naming convention ---
         # test_foo.py -> foo.py, test_foo_bar.py -> foo_bar.py
@@ -780,13 +677,11 @@ def extract_test_edges(
             pair = (str(rel_path), resolved_name)
             if pair not in seen:
                 seen.add(pair)
-                edges.append(
-                    Edge(
-                        src=test_file_id,
-                        tgt=f"file:{resolved_name}",
-                        edge_type="TESTS",
-                    )
-                )
+                edges.append(Edge(
+                    src=test_file_id,
+                    tgt=f"file:{resolved_name}",
+                    edge_type="TESTS",
+                ))
 
     return edges
 
@@ -823,13 +718,11 @@ def extract_implements_edges(
             if req_id in seen:
                 continue
             seen.add(req_id)
-            edges.append(
-                Edge(
-                    src=f"file:{rel_str}",
-                    tgt=f"req:{req_id}",
-                    edge_type="IMPLEMENTS",
-                )
-            )
+            edges.append(Edge(
+                src=f"file:{rel_str}",
+                tgt=f"req:{req_id}",
+                edge_type="IMPLEMENTS",
+            ))
 
     return edges
 
@@ -858,15 +751,13 @@ def extract_directives(
             for pat in DIRECTIVE_PATTERNS:
                 if pat.search(stripped):
                     node_id: str = f"directive:{df}:{line_num}"
-                    nodes.append(
-                        Node(
-                            id=node_id,
-                            content=stripped,
-                            node_type="behavioral_belief",
-                            file=df,
-                            line=line_num,
-                        )
-                    )
+                    nodes.append(Node(
+                        id=node_id,
+                        content=stripped,
+                        node_type="behavioral_belief",
+                        file=df,
+                        line=line_num,
+                    ))
                     break  # one match per line is enough
 
     return nodes
@@ -956,7 +847,9 @@ def scan_project(
     # Implements edges (requirement traceability)
     if manifest.citation_regex:
         t = time.monotonic()
-        impl_edges: list[Edge] = extract_implements_edges(root, manifest.citation_regex)
+        impl_edges: list[Edge] = extract_implements_edges(
+            root, manifest.citation_regex
+        )
         all_edges.extend(impl_edges)
         timings["implements"] = time.monotonic() - t
 

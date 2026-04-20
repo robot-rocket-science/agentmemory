@@ -3,7 +3,6 @@
 Pass criterion: CO_CHANGED edges surface coupled files, and beliefs about
 configuration defaults are retrievable alongside the coupling data.
 """
-
 from __future__ import annotations
 
 from agentmemory.models import (
@@ -42,7 +41,8 @@ def test_cs017_cochanged_files_surfaced(store: MemoryStore) -> None:
     results: list[Belief] = store.search("capital configuration")
     result_ids: list[str] = [r.id for r in results]
     assert capital_belief.id in result_ids, (
-        f"Belief about default capital must be retrievable. Got IDs: {result_ids}"
+        "Belief about default capital must be retrievable. "
+        f"Got IDs: {result_ids}"
     )
 
     # Verify CO_CHANGED edges exist.

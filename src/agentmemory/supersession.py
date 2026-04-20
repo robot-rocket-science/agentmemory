@@ -8,7 +8,6 @@ The core insight: when two beliefs share the same topic, the newer one
 almost always reflects current understanding. Time is the strongest
 signal for contradiction detection.
 """
-
 from __future__ import annotations
 
 import re
@@ -35,108 +34,19 @@ _MAX_CANDIDATES: Final[int] = 10
 # Very short beliefs (e.g., "def build_fts") are too ambiguous.
 _MIN_TERMS: Final[int] = 3
 
-_STOPWORDS: Final[frozenset[str]] = frozenset(
-    {
-        "the",
-        "a",
-        "an",
-        "is",
-        "are",
-        "was",
-        "were",
-        "be",
-        "been",
-        "being",
-        "have",
-        "has",
-        "had",
-        "do",
-        "does",
-        "did",
-        "will",
-        "would",
-        "shall",
-        "should",
-        "may",
-        "might",
-        "must",
-        "can",
-        "could",
-        "of",
-        "in",
-        "to",
-        "for",
-        "with",
-        "on",
-        "at",
-        "by",
-        "from",
-        "as",
-        "into",
-        "through",
-        "that",
-        "this",
-        "these",
-        "those",
-        "it",
-        "its",
-        "not",
-        "no",
-        "all",
-        "and",
-        "or",
-        "but",
-        "if",
-        "then",
-        "than",
-        "so",
-        "just",
-        "also",
-        "about",
-        "up",
-        "out",
-        "when",
-        "where",
-        "how",
-        "what",
-        "which",
-        "who",
-        "whom",
-        "there",
-        "here",
-        "each",
-        "every",
-        "both",
-        "few",
-        "more",
-        "most",
-        "other",
-        "some",
-        "such",
-        "only",
-        "own",
-        "same",
-        "very",
-        "too",
-        "any",
-        "new",
-        "one",
-        "two",
-        "we",
-        "you",
-        "they",
-        "my",
-        "your",
-        "our",
-        "his",
-        "her",
-        "me",
-        "us",
-        "them",
-        "he",
-        "she",
-    }
-)
+_STOPWORDS: Final[frozenset[str]] = frozenset({
+    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
+    "have", "has", "had", "do", "does", "did", "will", "would", "shall",
+    "should", "may", "might", "must", "can", "could", "of", "in", "to",
+    "for", "with", "on", "at", "by", "from", "as", "into", "through",
+    "that", "this", "these", "those", "it", "its", "not", "no", "all",
+    "and", "or", "but", "if", "then", "than", "so", "just", "also",
+    "about", "up", "out", "when", "where", "how", "what", "which",
+    "who", "whom", "there", "here", "each", "every", "both", "few",
+    "more", "most", "other", "some", "such", "only", "own", "same",
+    "very", "too", "any", "new", "one", "two", "we", "you", "they",
+    "my", "your", "our", "his", "her", "me", "us", "them", "he", "she",
+})
 
 
 @dataclass
@@ -200,8 +110,7 @@ def check_temporal_supersession(
 
     # Search for candidates using the new belief's content as query
     candidates: list[Belief] = store.search(
-        new_belief.content,
-        top_k=_MAX_CANDIDATES,
+        new_belief.content, top_k=_MAX_CANDIDATES,
     )
 
     new_dt: datetime = _parse_iso(new_belief.created_at)
@@ -259,5 +168,8 @@ def check_temporal_supersession(
     result.superseded_content = best_match.content
     result.jaccard = best_jaccard
     result.age_gap_hours = best_age_gap
-    result.reason = f"superseded (jaccard={best_jaccard:.2f}, age={best_age_gap:.1f}h)"
+    result.reason = (
+        f"superseded (jaccard={best_jaccard:.2f}, "
+        f"age={best_age_gap:.1f}h)"
+    )
     return result

@@ -3,7 +3,6 @@
 Pass criterion: The store tracks rigor metadata on beliefs and can distinguish
 validated from unvalidated findings via the rigor_tier field.
 """
-
 from __future__ import annotations
 
 from agentmemory.models import (
@@ -39,15 +38,9 @@ def test_cs007_rigor_tier_distinguishes_findings(store: MemoryStore) -> None:
     results: list[Belief] = store.search("retrieval latency")
     result_map: dict[str, Belief] = {r.id: r for r in results}
 
-    assert b_hyp.id in result_map, (
-        f"Hypothesis belief missing from results: {list(result_map)}"
-    )
-    assert b_sim.id in result_map, (
-        f"Simulated belief missing from results: {list(result_map)}"
-    )
-    assert b_emp.id in result_map, (
-        f"Empirical belief missing from results: {list(result_map)}"
-    )
+    assert b_hyp.id in result_map, f"Hypothesis belief missing from results: {list(result_map)}"
+    assert b_sim.id in result_map, f"Simulated belief missing from results: {list(result_map)}"
+    assert b_emp.id in result_map, f"Empirical belief missing from results: {list(result_map)}"
 
     assert result_map[b_hyp.id].rigor_tier == "hypothesis"
     assert result_map[b_sim.id].rigor_tier == "simulated"
@@ -84,7 +77,5 @@ def test_cs007_unvalidated_beliefs_identifiable(store: MemoryStore) -> None:
     ).fetchall()
     unvalidated: list[str] = [r["id"] for r in rows if r["rigor_tier"] == "hypothesis"]
 
-    assert len(unvalidated) == 8, (
-        f"Expected 8 unvalidated beliefs, got {len(unvalidated)}"
-    )
+    assert len(unvalidated) == 8, f"Expected 8 unvalidated beliefs, got {len(unvalidated)}"
     assert set(unvalidated) == set(hyp_ids)

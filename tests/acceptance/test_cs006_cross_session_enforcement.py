@@ -3,7 +3,6 @@
 Pass criterion: A locked correction created in session 1 is still retrievable
 and highly ranked in session 2, proving cross-session enforcement works.
 """
-
 from __future__ import annotations
 
 from agentmemory.models import (
@@ -27,9 +26,7 @@ def test_cs006_correction_survives_session_boundary(store: MemoryStore) -> None:
     This validates that locked beliefs persist across session boundaries.
     """
     # Session 1: create and insert locked correction.
-    session1: Session = store.create_session(
-        model="test", project_context="agentmemory"
-    )
+    session1: Session = store.create_session(model="test", project_context="agentmemory")
     locked: Belief = store.insert_belief(
         content=_CORRECTION_TEXT,
         belief_type=BELIEF_CORRECTION,
@@ -42,9 +39,7 @@ def test_cs006_correction_survives_session_boundary(store: MemoryStore) -> None:
     store.complete_session(session1.id, summary="session 1 done")
 
     # Session 2: start fresh.
-    session2: Session = store.create_session(
-        model="test", project_context="agentmemory"
-    )
+    session2: Session = store.create_session(model="test", project_context="agentmemory")
     assert session2.id != session1.id
 
     # Locked beliefs must survive the session boundary.
@@ -62,9 +57,7 @@ def test_cs006_correction_outranks_suggestions(store: MemoryStore) -> None:
     the locked correction ranks above the suggestion.
     """
     # Session 1: locked correction.
-    session1: Session = store.create_session(
-        model="test", project_context="agentmemory"
-    )
+    session1: Session = store.create_session(model="test", project_context="agentmemory")
     store.insert_belief(
         content=_CORRECTION_TEXT,
         belief_type=BELIEF_CORRECTION,
@@ -77,9 +70,7 @@ def test_cs006_correction_outranks_suggestions(store: MemoryStore) -> None:
     store.complete_session(session1.id, summary="session 1 done")
 
     # Session 2: competing suggestion.
-    session2: Session = store.create_session(
-        model="test", project_context="agentmemory"
-    )
+    session2: Session = store.create_session(model="test", project_context="agentmemory")
     store.insert_belief(
         content="Let's build the prototype and start implementation now.",
         belief_type=BELIEF_FACTUAL,
@@ -90,9 +81,7 @@ def test_cs006_correction_outranks_suggestions(store: MemoryStore) -> None:
         session_id=session2.id,
     )
 
-    result: RetrievalResult = retrieve(
-        store, "implementation next steps research phase"
-    )
+    result: RetrievalResult = retrieve(store, "implementation next steps research phase")
     assert result.beliefs, "Expected results from retrieve()"
 
     # The locked correction must rank above the unlocked suggestion.

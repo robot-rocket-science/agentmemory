@@ -31,32 +31,16 @@ EdgeDict = dict[str, str | bool]
 def git_head(repo: Path) -> str:
     r = subprocess.run(
         ["git", "rev-parse", "HEAD"],
-        cwd=repo,
-        capture_output=True,
-        text=True,
-        timeout=5,
+        cwd=repo, capture_output=True, text=True, timeout=5,
     )
     return r.stdout.strip()
 
 
 def find_files(repo: Path, extensions: set[str]) -> list[Path]:
     """Find all files with given extensions, skipping build/vendor dirs."""
-    skip: set[str] = {
-        ".git",
-        "node_modules",
-        "target",
-        ".venv",
-        "venv",
-        "vendor",
-        "third_party",
-        "3rdparty",
-        "dist",
-        "build",
-        "__pycache__",
-        ".mypy_cache",
-        ".ruff_cache",
-        ".tox",
-    }
+    skip: set[str] = {".git", "node_modules", "target", ".venv", "venv", "vendor",
+            "third_party", "3rdparty", "dist", "build", "__pycache__",
+            ".mypy_cache", ".ruff_cache", ".tox"}
     results: list[Path] = []
     for root, dirs, files in os.walk(repo):
         dirs[:] = [d for d in dirs if d not in skip]
@@ -67,7 +51,6 @@ def find_files(repo: Path, extensions: set[str]) -> list[Path]:
 
 
 # --- Rust ---
-
 
 def extract_rust_imports(repo: Path) -> list[EdgeDict]:
     """Parse Rust use/mod statements and resolve to file paths."""
@@ -100,9 +83,7 @@ def extract_rust_imports(repo: Path) -> list[EdgeDict]:
             mod_to_file[mod_path] = str(rel)
 
     # Parse use statements
-    use_pattern = re.compile(
-        r"^\s*use\s+(?:crate::)?(\S+?)(?:\s*;|\s*\{)", re.MULTILINE
-    )
+    use_pattern = re.compile(r"^\s*use\s+(?:crate::)?(\S+?)(?:\s*;|\s*\{)", re.MULTILINE)
     mod_pattern = re.compile(r"^\s*(?:pub\s+)?mod\s+(\w+)\s*;", re.MULTILINE)
 
     for f in files:
@@ -123,15 +104,13 @@ def extract_rust_imports(repo: Path) -> list[EdgeDict]:
             for end in range(len(parts), 0, -1):
                 candidate = "::".join(parts[:end])
                 if candidate in mod_to_file and mod_to_file[candidate] != rel:
-                    edges.append(
-                        {
-                            "source": rel,
-                            "target": mod_to_file[candidate],
-                            "type": "IMPORTS",
-                            "directed": True,
-                            "raw_import": import_path,
-                        }
-                    )
+                    edges.append({
+                        "source": rel,
+                        "target": mod_to_file[candidate],
+                        "type": "IMPORTS",
+                        "directed": True,
+                        "raw_import": import_path,
+                    })
                     break
 
         # mod foo; -> resolve to foo.rs or foo/mod.rs
@@ -155,22 +134,19 @@ def extract_rust_imports(repo: Path) -> list[EdgeDict]:
 
             for c in candidates:
                 if (repo / c).exists() and c != rel:
-                    edges.append(
-                        {
-                            "source": rel,
-                            "target": c,
-                            "type": "IMPORTS",
-                            "directed": True,
-                            "raw_import": f"mod {mod_name}",
-                        }
-                    )
+                    edges.append({
+                        "source": rel,
+                        "target": c,
+                        "type": "IMPORTS",
+                        "directed": True,
+                        "raw_import": f"mod {mod_name}",
+                    })
                     break
 
     return edges
 
 
 # --- Python ---
-
 
 def extract_python_imports(repo: Path) -> list[EdgeDict]:
     """Parse Python import statements and resolve to file paths."""
@@ -190,9 +166,7 @@ def extract_python_imports(repo: Path) -> list[EdgeDict]:
         if mod_path:
             mod_to_file[mod_path] = str(rel)
 
-    import_pattern = re.compile(
-        r"^\s*(?:from\s+(\S+)\s+import|import\s+(\S+))", re.MULTILINE
-    )
+    import_pattern = re.compile(r"^\s*(?:from\s+(\S+)\s+import|import\s+(\S+))", re.MULTILINE)
 
     for f in files:
         rel = str(f.relative_to(repo))
@@ -213,7 +187,7 @@ def extract_python_imports(repo: Path) -> list[EdgeDict]:
                 parent_parts = list(Path(rel).parent.parts)
                 dots = len(import_path) - len(import_path.lstrip("."))
                 if dots <= len(parent_parts):
-                    base = parent_parts[: len(parent_parts) - dots + 1]
+                    base = parent_parts[:len(parent_parts) - dots + 1]
                     rest = import_path.lstrip(".")
                     if rest:
                         import_path = ".".join(base) + "." + rest
@@ -225,22 +199,19 @@ def extract_python_imports(repo: Path) -> list[EdgeDict]:
             for end in range(len(parts), 0, -1):
                 candidate = ".".join(parts[:end])
                 if candidate in mod_to_file and mod_to_file[candidate] != rel:
-                    edges.append(
-                        {
-                            "source": rel,
-                            "target": mod_to_file[candidate],
-                            "type": "IMPORTS",
-                            "directed": True,
-                            "raw_import": import_path,
-                        }
-                    )
+                    edges.append({
+                        "source": rel,
+                        "target": mod_to_file[candidate],
+                        "type": "IMPORTS",
+                        "directed": True,
+                        "raw_import": import_path,
+                    })
                     break
 
     return edges
 
 
 # --- TypeScript/JavaScript ---
-
 
 def extract_ts_js_imports(repo: Path) -> list[EdgeDict]:
     """Parse TS/JS import/require statements and resolve to file paths."""
@@ -294,15 +265,13 @@ def extract_ts_js_imports(repo: Path) -> list[EdgeDict]:
                 try:
                     target_rel = str(resolved.relative_to(repo.resolve()))
                     if target_rel != rel:
-                        edges.append(
-                            {
-                                "source": rel,
-                                "target": target_rel,
-                                "type": "IMPORTS",
-                                "directed": True,
-                                "raw_import": import_path,
-                            }
-                        )
+                        edges.append({
+                            "source": rel,
+                            "target": target_rel,
+                            "type": "IMPORTS",
+                            "directed": True,
+                            "raw_import": import_path,
+                        })
                 except ValueError:
                     pass
 
@@ -311,12 +280,9 @@ def extract_ts_js_imports(repo: Path) -> list[EdgeDict]:
 
 # --- C/C++ ---
 
-
 def extract_c_cpp_includes(repo: Path) -> list[EdgeDict]:
     """Parse C/C++ local #include statements and resolve to file paths."""
-    files: list[Path] = find_files(
-        repo, {".c", ".cc", ".cpp", ".cxx", ".h", ".hpp", ".hxx"}
-    )
+    files: list[Path] = find_files(repo, {".c", ".cc", ".cpp", ".cxx", ".h", ".hpp", ".hxx"})
     edges: list[EdgeDict] = []
 
     include_pattern = re.compile(r'^\s*#include\s+"([^"]+)"', re.MULTILINE)
@@ -358,15 +324,13 @@ def extract_c_cpp_includes(repo: Path) -> list[EdgeDict]:
                         resolved = candidates[0]
 
             if resolved is not None and resolved != rel:
-                edges.append(
-                    {
-                        "source": rel,
-                        "target": resolved,
-                        "type": "IMPORTS",
-                        "directed": True,
-                        "raw_import": include_path,
-                    }
-                )
+                edges.append({
+                    "source": rel,
+                    "target": resolved,
+                    "type": "IMPORTS",
+                    "directed": True,
+                    "raw_import": include_path,
+                })
 
     return edges
 
@@ -375,25 +339,14 @@ def detect_languages(repo: Path) -> set[str]:
     """Detect languages present in repo."""
     langs: set[str] = set()
     ext_map: dict[str, str] = {
-        ".py": "python",
-        ".rs": "rust",
-        ".ts": "typescript",
-        ".tsx": "typescript",
-        ".js": "javascript",
-        ".jsx": "javascript",
-        ".c": "c",
-        ".h": "c",
-        ".cpp": "cpp",
-        ".cc": "cpp",
-        ".cxx": "cpp",
-        ".hpp": "cpp",
+        ".py": "python", ".rs": "rust",
+        ".ts": "typescript", ".tsx": "typescript",
+        ".js": "javascript", ".jsx": "javascript",
+        ".c": "c", ".h": "c",
+        ".cpp": "cpp", ".cc": "cpp", ".cxx": "cpp", ".hpp": "cpp",
     }
     for _root, dirs, files in os.walk(repo):
-        dirs[:] = [
-            d
-            for d in dirs
-            if d not in {".git", "node_modules", "target", ".venv", "vendor"}
-        ]
+        dirs[:] = [d for d in dirs if d not in {".git", "node_modules", "target", ".venv", "vendor"}]
         for f in files:
             ext = Path(f).suffix.lower()
             if ext in ext_map:
@@ -430,9 +383,7 @@ def main() -> None:
             existing: Any = json.loads(output_path.read_text())
             if existing.get("head") == head:
                 print(f"[cached] {repo.name} HEAD={head[:8]}", file=sys.stderr)
-                for lang, count in (
-                    existing.get("summary", {}).get("edges_by_language", {}).items()
-                ):
+                for lang, count in existing.get("summary", {}).get("edges_by_language", {}).items():
                     print(f"  {lang}: {count} edges", file=sys.stderr)
                 return
         except (json.JSONDecodeError, KeyError):
@@ -492,14 +443,9 @@ def main() -> None:
         "languages_detected": sorted(langs),
     }
 
-    print(
-        f"  total: {len(unique_edges)} unique import edges ({len(sources)} sources -> {len(targets)} targets)",
-        file=sys.stderr,
-    )
+    print(f"  total: {len(unique_edges)} unique import edges ({len(sources)} sources -> {len(targets)} targets)", file=sys.stderr)
 
-    result: dict[
-        str, str | dict[str, int | list[str] | dict[str, int]] | list[EdgeDict]
-    ] = {
+    result: dict[str, str | dict[str, int | list[str] | dict[str, int]] | list[EdgeDict]] = {
         "repo": str(repo),
         "name": repo.name,
         "head": head,

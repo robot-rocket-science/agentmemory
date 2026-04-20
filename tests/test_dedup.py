@@ -1,5 +1,4 @@
 """Tests for duplicate detection and deduplication."""
-
 from __future__ import annotations
 
 import hashlib
@@ -51,7 +50,6 @@ def _make_belief(store: MemoryStore, content: str, alpha: float = 2.0) -> str:
 def _insert_raw_belief(store: MemoryStore, content: str, alpha: float = 2.0) -> str:
     """Insert a belief bypassing content-hash dedup (for testing exact dupes)."""
     import uuid
-
     bid: str = uuid.uuid4().hex[:12]
     ch: str = hashlib.sha256(content.encode()).hexdigest()[:12]
     ts: str = "2026-01-01T00:00:00+00:00"
@@ -104,11 +102,11 @@ def test_near_duplicates(store: MemoryStore) -> None:
     """Beliefs with high word overlap are near-duplicates."""
     _make_belief(
         store,
-        "The retrieval pipeline uses FTS5 for keyword search and HRR for vocabulary bridging across beliefs",
+        "The retrieval pipeline uses FTS5 for keyword search and HRR for vocabulary bridging across beliefs"
     )
     _make_belief(
         store,
-        "The retrieval pipeline uses FTS5 for keyword matching and HRR for vocabulary bridge across beliefs",
+        "The retrieval pipeline uses FTS5 for keyword matching and HRR for vocabulary bridge across beliefs"
     )
 
     clusters = find_near_duplicates(store, threshold=0.65)
@@ -150,11 +148,11 @@ def test_find_and_report(store: MemoryStore) -> None:
     _insert_raw_belief(store, "Exact dup content for report test case")
     _make_belief(
         store,
-        "The scoring function combines type weight and source weight and length multiplier for ranking",
+        "The scoring function combines type weight and source weight and length multiplier for ranking"
     )
     _make_belief(
         store,
-        "The scoring function combines type weight and source weight and length penalty for ranking",
+        "The scoring function combines type weight and source weight and length penalty for ranking"
     )
 
     result: DeduplicationResult = find_and_report(store, near_threshold=0.7)

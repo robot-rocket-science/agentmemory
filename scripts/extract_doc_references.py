@@ -27,45 +27,16 @@ from pathlib import Path
 from typing import Any
 
 
-SKIP_DIRS: frozenset[str] = frozenset(
-    {
-        ".git",
-        "node_modules",
-        ".venv",
-        "venv",
-        "__pycache__",
-        ".mypy_cache",
-        ".ruff_cache",
-        "dist",
-        "build",
-        ".tox",
-    }
-)
+SKIP_DIRS: frozenset[str] = frozenset({
+    ".git", "node_modules", ".venv", "venv", "__pycache__",
+    ".mypy_cache", ".ruff_cache", "dist", "build", ".tox",
+})
 
-FILE_EXTENSIONS: frozenset[str] = frozenset(
-    {
-        ".py",
-        ".ts",
-        ".tsx",
-        ".js",
-        ".jsx",
-        ".rs",
-        ".go",
-        ".md",
-        ".json",
-        ".toml",
-        ".yaml",
-        ".yml",
-        ".sql",
-        ".html",
-        ".css",
-        ".sh",
-        ".c",
-        ".cpp",
-        ".h",
-        ".hpp",
-    }
-)
+FILE_EXTENSIONS: frozenset[str] = frozenset({
+    ".py", ".ts", ".tsx", ".js", ".jsx", ".rs", ".go",
+    ".md", ".json", ".toml", ".yaml", ".yml", ".sql",
+    ".html", ".css", ".sh", ".c", ".cpp", ".h", ".hpp",
+})
 
 # Sentence boundary pattern: split on `. `, `.\n`, `? `, `?\n`, `! `, `!\n`
 _SENTENCE_SPLIT: re.Pattern[str] = re.compile(r"(?<=[.?!])(?:\s|\n)+")
@@ -193,8 +164,7 @@ def build_graph(
         seen_in_file: set[str] = set()
         for sentence in sentences:
             refs: list[tuple[str, str]] = extract_refs_from_sentence(
-                sentence,
-                has_dm,
+                sentence, has_dm,
             )
             for ref_type, ref_id in refs:
                 ref_type_counts[ref_type] += 1
@@ -264,14 +234,12 @@ def build_graph(
     direct_edges: list[dict[str, str | list[str] | int]] = []
     for (src, tgt), ref_ids in sorted(direct_edge_map.items()):
         sorted_refs: list[str] = sorted(ref_ids)
-        direct_edges.append(
-            {
-                "source": src,
-                "target": tgt,
-                "refs": sorted_refs,
-                "count": len(sorted_refs),
-            }
-        )
+        direct_edges.append({
+            "source": src,
+            "target": tgt,
+            "refs": sorted_refs,
+            "count": len(sorted_refs),
+        })
 
     # --- Pass 6: build co-citation edges ---
 
@@ -290,35 +258,37 @@ def build_graph(
         if len(shared) < min_refs:
             continue
         sorted_shared: list[str] = sorted(shared)
-        co_citation_edges.append(
-            {
-                "file_a": fa,
-                "file_b": fb,
-                "shared_refs": sorted_shared,
-                "count": len(sorted_shared),
-            }
-        )
+        co_citation_edges.append({
+            "file_a": fa,
+            "file_b": fb,
+            "shared_refs": sorted_shared,
+            "count": len(sorted_shared),
+        })
 
     # --- Build nodes ---
 
     nodes: list[dict[str, str | int]] = []
     for rel_path in sorted(file_contents.keys()):
-        nodes.append(
-            {
-                "file": rel_path,
-                "sentences": len(file_sentences.get(rel_path, [])),
-            }
-        )
+        nodes.append({
+            "file": rel_path,
+            "sentences": len(file_sentences.get(rel_path, [])),
+        })
 
-    total_sentences: int = sum(len(sents) for sents in file_sentences.values())
+    total_sentences: int = sum(
+        len(sents) for sents in file_sentences.values()
+    )
 
     total_refs: int = sum(len(r) for r in file_refs.values())
     num_files_with_refs: int = sum(1 for r in file_refs.values() if r)
     avg_refs: float = (
-        round(total_refs / num_files_with_refs, 2) if num_files_with_refs > 0 else 0.0
+        round(total_refs / num_files_with_refs, 2)
+        if num_files_with_refs > 0
+        else 0.0
     )
 
-    reference_types: dict[str, int] = {k: v for k, v in sorted(ref_type_counts.items())}
+    reference_types: dict[str, int] = {
+        k: v for k, v in sorted(ref_type_counts.items())
+    }
 
     result: dict[str, Any] = {
         "repo": repo.name,

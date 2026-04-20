@@ -3,7 +3,6 @@
 Validates that classify_sentences_offline handles common sentence patterns
 correctly, and that parse_classification_response handles LLM output correctly.
 """
-
 from __future__ import annotations
 
 import pytest
@@ -22,24 +21,9 @@ from agentmemory.classification import (
 # Format: (text, source, expected_type, expected_persist)
 
 GIT_COMMITS: list[tuple[str, str, str, bool]] = [
-    (
-        "Fix CLAUDE.md tool names to match Claude Code MCP convention",
-        "assistant",
-        "FACT",
-        True,
-    ),
-    (
-        "Bridge belief-scanner ID gap: content-hash mapping enables HRR vocabulary bridge",
-        "assistant",
-        "FACT",
-        True,
-    ),
-    (
-        "Integrate HRR into retrieval pipeline: FTS5 plus HRR vocabulary-bridge expansion",
-        "assistant",
-        "FACT",
-        True,
-    ),
+    ("Fix CLAUDE.md tool names to match Claude Code MCP convention", "assistant", "FACT", True),
+    ("Bridge belief-scanner ID gap: content-hash mapping enables HRR vocabulary bridge", "assistant", "FACT", True),
+    ("Integrate HRR into retrieval pipeline: FTS5 plus HRR vocabulary-bridge expansion", "assistant", "FACT", True),
 ]
 
 HEADINGS_MARKDOWN: list[tuple[str, str, str, bool]] = [
@@ -49,12 +33,7 @@ HEADINGS_MARKDOWN: list[tuple[str, str, str, bool]] = [
 ]
 
 REQUIREMENTS: list[tuple[str, str, str, bool]] = [
-    (
-        "All code must use strict static typing with pyright strict mode",
-        "user",
-        "REQUIREMENT",
-        True,
-    ),
+    ("All code must use strict static typing with pyright strict mode", "user", "REQUIREMENT", True),
     ("Never commit large data files or results files", "user", "REQUIREMENT", True),
     ("You must always use uv for package management", "user", "REQUIREMENT", True),
 ]
@@ -68,12 +47,7 @@ EPHEMERAL: list[tuple[str, str, str, bool]] = [
 CORRECTIONS: list[tuple[str, str, str, bool]] = [
     ("No, use SQLite not PostgreSQL for storage", "user", "CORRECTION", True),
     ("Don't do that, always run tests before committing", "user", "CORRECTION", True),
-    (
-        "That's wrong, the half-life for factual beliefs is 14 days not 7",
-        "user",
-        "CORRECTION",
-        True,
-    ),
+    ("That's wrong, the half-life for factual beliefs is 14 days not 7", "user", "CORRECTION", True),
 ]
 
 
@@ -195,20 +169,10 @@ class TestOfflineClassification:
 
     def test_all_sentences_return_valid_types(self) -> None:
         """Every classified sentence should have a valid type from the taxonomy."""
-        valid_types: frozenset[str] = frozenset(
-            {
-                "REQUIREMENT",
-                "CORRECTION",
-                "PREFERENCE",
-                "FACT",
-                "ASSUMPTION",
-                "DECISION",
-                "ANALYSIS",
-                "COORDINATION",
-                "QUESTION",
-                "META",
-            }
-        )
+        valid_types: frozenset[str] = frozenset({
+            "REQUIREMENT", "CORRECTION", "PREFERENCE", "FACT", "ASSUMPTION",
+            "DECISION", "ANALYSIS", "COORDINATION", "QUESTION", "META",
+        })
         pairs: list[tuple[str, str]] = [(t, s) for t, s, _, _ in ALL_SENTENCES]
         results: list[ClassifiedSentence] = classify_sentences_offline(pairs)
         assert len(results) == 15
@@ -238,7 +202,6 @@ class TestLLMClassificationMocked:
     def _build_mock_response(sentences: list[tuple[str, str, str, bool]]) -> str:
         """Build a mock LLM JSON response that returns correct classifications."""
         import json
-
         items: list[dict[str, str | int]] = []
         for i, (_, _, expected_type, expected_persist) in enumerate(sentences, start=1):
             persist_label: str = "PERSIST" if expected_persist else "EPHEMERAL"
@@ -250,15 +213,11 @@ class TestLLMClassificationMocked:
         mock_response_text: str = self._build_mock_response(ALL_SENTENCES)
 
         pairs: list[tuple[str, str]] = [(t, s) for t, s, _, _ in ALL_SENTENCES]
-        results: list[ClassifiedSentence] = parse_classification_response(
-            mock_response_text, pairs
-        )
+        results: list[ClassifiedSentence] = parse_classification_response(mock_response_text, pairs)
 
         assert len(results) == 15
 
-        for cs, (text, _, expected_type, expected_persist) in zip(
-            results, ALL_SENTENCES, strict=True
-        ):
+        for cs, (text, _, expected_type, expected_persist) in zip(results, ALL_SENTENCES, strict=True):
             assert cs.sentence_type == expected_type, (
                 f"Parse: expected {expected_type} for {text!r}, got {cs.sentence_type}"
             )
@@ -271,9 +230,7 @@ class TestLLMClassificationMocked:
         mock_response_text: str = self._build_mock_response(CORRECTIONS)
 
         pairs: list[tuple[str, str]] = [(t, s) for t, s, _, _ in CORRECTIONS]
-        results: list[ClassifiedSentence] = parse_classification_response(
-            mock_response_text, pairs
-        )
+        results: list[ClassifiedSentence] = parse_classification_response(mock_response_text, pairs)
 
         for cs in results:
             assert cs.persist is True
@@ -290,9 +247,7 @@ class TestLLMClassificationMocked:
         mock_response_text: str = self._build_mock_response(mock_items)
 
         pairs: list[tuple[str, str]] = [(t, s) for t, s, _, _ in mock_items]
-        results: list[ClassifiedSentence] = parse_classification_response(
-            mock_response_text, pairs
-        )
+        results: list[ClassifiedSentence] = parse_classification_response(mock_response_text, pairs)
 
         for cs in results:
             assert cs.persist is False, (
