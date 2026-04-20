@@ -1,5 +1,0 @@
-The palace has **10,000 drawers** across one wing (`project_a`) with 9 rooms. The bulk is in `archive` (6,556), `data` (1,226), and `results` (886) -- looks like the project-a project content dominates the palace.
-
-No `agentmemory` wing exists yet, so prior session context for this project isn't in MemPalace -- it's only in the flat memory files under `/home/user/.claude/projects/`.
-
-Want me to mine the agentmemory project into MemPalace so it becomes searchable there too?

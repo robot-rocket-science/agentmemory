@@ -1,7 +1,0 @@
-{
-  "benchmark": "mab_mh_262k",
-  "metric": "SEM",
-  "score_pct": 58.0,
-  "correct": 58,
-  "total": 100
-}
