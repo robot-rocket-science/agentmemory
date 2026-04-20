@@ -909,6 +909,35 @@ def search_for_prompt(
                 all_scored.append(sb)
                 seen_ids.add(r["id"])
 
+    # --- Layer 1.7: Intention-cluster expansion ---
+    # Exp 94b: 98% of same-cluster pairs have <10% vocab overlap.
+    # Pull top beliefs from the same clusters as FTS5 hits that FTS5 missed.
+    if seen_ids:
+        fts_cluster_ids: list[str] = list(seen_ids)[:10]
+        ph_cl: str = ",".join("?" * len(fts_cluster_ids))
+        try:
+            cluster_rows: list[sqlite3.Row] = db.execute(
+                f"""SELECT DISTINCT b.* FROM belief_clusters bc
+                    JOIN belief_clusters bc2 ON bc2.cluster_id = bc.cluster_id
+                    JOIN beliefs b ON b.id = bc2.belief_id
+                    WHERE bc.belief_id IN ({ph_cl})
+                      AND b.valid_to IS NULL
+                      AND b.id NOT IN ({ph_cl})
+                    ORDER BY b.confidence DESC
+                    LIMIT 5""",
+                fts_cluster_ids + fts_cluster_ids,
+            ).fetchall()
+        except sqlite3.OperationalError:
+            cluster_rows = []
+
+        for r in cluster_rows:
+            if r["id"] not in seen_ids:
+                sb = score_belief(r, query_words, now)
+                sb.via = "intention_cluster"
+                sb.score *= 0.75  # discount for intention-only match
+                all_scored.append(sb)
+                seen_ids.add(r["id"])
+
     # --- Layer 2: Entity-aware search (corrections/user statements) ---
     entities: list[str] = extract_entity_candidates(query_words)
     action_targets: list[str] = detect_action_targets(prompt)

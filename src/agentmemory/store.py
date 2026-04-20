@@ -211,6 +211,14 @@ CREATE TABLE IF NOT EXISTS hrr_neighbors (
 
 CREATE INDEX IF NOT EXISTS idx_hrr_neighbors_belief ON hrr_neighbors(belief_id);
 CREATE INDEX IF NOT EXISTS idx_hrr_neighbors_neighbor ON hrr_neighbors(neighbor_id);
+
+CREATE TABLE IF NOT EXISTS belief_clusters (
+    belief_id TEXT PRIMARY KEY,
+    cluster_id INTEGER NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_belief_clusters_cluster ON belief_clusters(cluster_id);
 """
 
 

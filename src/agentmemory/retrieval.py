@@ -234,7 +234,19 @@ def _get_hrr_graph(store: MemoryStore) -> HRRGraph | None:
     _hrr_edge_count = len(triples)
     # Precompute neighbors for hook-path SQL lookup
     precompute_hrr_neighbors(store, graph)
+    # Build intention clusters for vocabulary-gap bridging
+    _build_intention_clusters(store)
     return graph
+
+
+def _build_intention_clusters(store: MemoryStore) -> None:
+    """Build intention clusters if the table exists."""
+    try:
+        from agentmemory.intention import build_cluster_table
+
+        build_cluster_table(store.connection)
+    except Exception:
+        pass  # Table missing or import error -- skip silently
 
 
 def precompute_hrr_neighbors(
