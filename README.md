@@ -182,7 +182,7 @@ Here's a real example. The user types:
 push the release to github
 ```
 
-Before the agent sees this message, agentmemory's hook fires and runs a 6-layer search in ~50ms:
+Before the agent sees this message, agentmemory's hook fires and runs a 7-layer search in ~50ms:
 
 ```
 Layer 0: Structural analysis
@@ -204,6 +204,9 @@ Layer 4: Supersession check
 
 Layer 5: Recent observations
          Correction from 2 days ago: "never push directly, use publish script"
+
+Layer 6: Cross-project shared scopes
+         Subscribed to "infra" scope -> 0 additional (already found locally)
 ```
 
 The agent receives this structured context injection alongside your message:
@@ -249,6 +252,7 @@ agentmemory has been evaluated against 5 published academic benchmarks with prot
 | StructMemEval | 100% | Perfect state tracking (14/14) |
 | MAB Multi-Hop 262K | 58% | 8x the published 7% ceiling |
 | LongMemEval | 59.6% | Near GPT-4o pipeline (60.6%) |
+| LoCoMo | 50.8% | Multi-session dialogue reasoning |
 
 Full results, methodology, and audit trails: [docs/BENCHMARK_RESULTS.md](docs/BENCHMARK_RESULTS.md).
 
