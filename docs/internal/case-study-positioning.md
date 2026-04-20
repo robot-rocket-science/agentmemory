@@ -168,7 +168,7 @@ The result: a complete marketing strategy, grounded in evidence, executed in one
 
 The story didn't end with the rewrite. Over the next hour, the maintainer read the result and made rapid corrections:
 
-1. **A factual claim in the worked example was inaccurate.** Quick correction, single atomic commit.
+1. **The README claimed "You said nothing. It understood anyway."** The user had actually typed a brief instruction ("push the release to github"). The real demonstration isn't silence -- it's that brief input carries full procedural meaning because the system has accumulated context over weeks. The correction reframed around that mechanism: accumulated context makes terse communication sufficient.
 2. **The accumulation mechanism was missing.** The worked example showed *what* happened but not *why* it was impressive: that the knowledge assembled itself from fragments over weeks. Two sentences added.
 3. **A high-context communication analogy was added, then cut.** It was intellectually satisfying but slowed the scroll. The wonder's own recommendation (progressive disclosure) won. The analogy moved to documentation, the README stayed fast.
 
