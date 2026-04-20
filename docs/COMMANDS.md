@@ -24,7 +24,7 @@ Most commands are available as Claude Code slash commands after setup. Some tool
 | `/mem:enable` | Re-enable agentmemory |
 | `/mem:help` | Command reference |
 
-Additional tools are available via MCP (called by the agent automatically): `remember`, `correct`, `observe`, `feedback`, `ingest`, `search`, `status`, `create_beliefs`, `reclassify`, `bulk_delete`, `snapshot`, `timeline`, `evolution`, `diff`, `graph_metrics`, `link_docs`, `import_obsidian`, `sync_obsidian`.
+Additional tools are available via MCP (29 total, called by the agent automatically): `remember`, `correct`, `observe`, `feedback`, `ingest`, `search`, `status`, `get_locked`, `get_unclassified`, `create_beliefs`, `reclassify`, `bulk_delete`, `delete`, `lock`, `confirm`, `recalibrate`, `onboard`, `snapshot`, `timeline`, `evolution`, `diff`, `graph_metrics`, `link_docs`, `import_obsidian`, `sync_obsidian`, `session_quality`, `wonder`, `wonder_ingest`, `wonder_gc`.
 
 All commands also work from the terminal without Claude Code:
 

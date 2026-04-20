@@ -81,4 +81,4 @@ These rules are not enforceable via hooks. You must self-enforce them.
 
 This IS the agentmemory project -- a persistent memory system for AI coding agents. The system you are using (the MCP server) is the artifact this project builds. Testing the system on itself is intentional.
 
-Phases 1-4 complete. Phase 5 complete (except REQ-011 cross-model, blocked on external access). v2.4.0, 84 experiments, 902 tests, 29 MCP tools, 29 production modules. All 15 triggered beliefs implemented. All 35 case studies have acceptance tests. All open research questions closed. Production system in daily use.
+Phases 1-4 complete. Phase 5 complete (except REQ-011 cross-model, blocked on external access). v2.4.1, 84 experiments, 902 tests, 29 MCP tools, 28 production modules. All 15 triggered beliefs implemented. All 35 case studies have acceptance tests. All open research questions closed. Production system in daily use.

@@ -2,6 +2,31 @@
 
 ## [Unreleased]
 
+## [2.4.1] - 2026-04-19
+
+### Added
+- Exp 90: Jacobian + Hamiltonian scoring dynamics analysis
+- Exp 90 post-fix validation (Gini 0.026 -> 0.148, 5.7x improvement)
+
+### Fixed
+- CI lint: ruff format entire codebase, resolve pyright strict errors in hrr.py
+- Exclude benchmarks/ and scripts/ from pyright strict (not production code)
+
+## [2.4.0] - 2026-04-19
+
+### Added
+- Exploratory wonder: 3 new MCP tools (wonder, wonder_ingest, wonder_gc)
+- Gap analysis, parallel subagent research, speculative belief ingestion
+- TTL-based garbage collection for unvalidated speculative beliefs
+- UCB exploration bonus for under-retrieved beliefs (Fix 4)
+
+### Fixed
+- Confidence differentiation (Fixes 2-5):
+  - Fix 2: Source-type decay modifiers (agent-inferred 0.5x, user-corrected 2.0x half-life)
+  - Fix 3: First-signal amplification (3x weight on first feedback event)
+  - Fix 4: UCB exploration bonus (under-retrieved beliefs surface for feedback)
+  - Fix 5: Asymmetric feedback weights (harmful=-2.0, weak=-0.6, ignored=-0.1)
+
 ## [2.3.2] - 2026-04-19
 
 ### Added
