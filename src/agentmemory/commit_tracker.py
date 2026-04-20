@@ -4,6 +4,7 @@ Tracks time since last git commit and number of uncommitted changes.
 Compares against configurable thresholds and produces a plain-text nudge.
 All logic is pure datetime arithmetic and subprocess calls -- no LLM.
 """
+
 from __future__ import annotations
 
 import json
@@ -16,7 +17,7 @@ from typing import Final
 _CONFIG_PATH: Final[Path] = Path.home() / ".agentmemory" / "commit_tracker.json"
 
 # Defaults
-_DEFAULT_MAX_SECONDS: Final[int] = 900   # 15 minutes
+_DEFAULT_MAX_SECONDS: Final[int] = 900  # 15 minutes
 _DEFAULT_MAX_CHANGES: Final[int] = 10
 
 
@@ -33,16 +34,16 @@ class CommitTrackerConfig:
 class CommitCheckResult:
     """Deterministic result of a commit status check."""
 
-    checked: bool = False           # False if tracker disabled or not a git repo
+    checked: bool = False  # False if tracker disabled or not a git repo
     is_git_repo: bool = False
-    last_commit_iso: str = ""       # ISO 8601 timestamp of last commit
+    last_commit_iso: str = ""  # ISO 8601 timestamp of last commit
     seconds_since_commit: int = 0
     uncommitted_changes: int = 0
     threshold_seconds: int = 0
     threshold_changes: int = 0
     time_exceeded: bool = False
     changes_exceeded: bool = False
-    nudge: str = ""                 # Empty string = no nudge needed
+    nudge: str = ""  # Empty string = no nudge needed
     errors: list[str] = field(default_factory=lambda: list[str]())
 
 
@@ -115,9 +116,7 @@ def check_commit_status(project_dir: Path) -> CommitCheckResult:
     out.checked = True
 
     # Get last commit time
-    stdout, stderr, rc = _run_git(
-        ["log", "-1", "--format=%cI"], resolved
-    )
+    stdout, stderr, rc = _run_git(["log", "-1", "--format=%cI"], resolved)
     if rc != 0 or not stdout:
         # Repo may have no commits yet
         out.errors.append(stderr if stderr else "No commits found")

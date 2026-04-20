@@ -34,27 +34,83 @@ from hrr_encoder import Edge, HRRGraph, load_edges
 
 
 SKIP_DIRS: set[str] = {
-    ".git", "node_modules", "target", ".venv", "venv", "__pycache__",
-    ".mypy_cache", ".ruff_cache", "dist", "build", ".tox", "vendor",
+    ".git",
+    "node_modules",
+    "target",
+    ".venv",
+    "venv",
+    "__pycache__",
+    ".mypy_cache",
+    ".ruff_cache",
+    "dist",
+    "build",
+    ".tox",
+    "vendor",
 }
 
 STOP_WORDS: set[str] = {
-    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-    "have", "has", "had", "do", "does", "did", "will", "would", "could",
-    "should", "may", "might", "shall", "can", "need", "must", "to", "of",
-    "in", "for", "on", "with", "at", "by", "from", "as", "into", "through",
-    "and", "but", "or", "if", "not", "no", "this", "that", "it", "its",
+    "the",
+    "a",
+    "an",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "being",
+    "have",
+    "has",
+    "had",
+    "do",
+    "does",
+    "did",
+    "will",
+    "would",
+    "could",
+    "should",
+    "may",
+    "might",
+    "shall",
+    "can",
+    "need",
+    "must",
+    "to",
+    "of",
+    "in",
+    "for",
+    "on",
+    "with",
+    "at",
+    "by",
+    "from",
+    "as",
+    "into",
+    "through",
+    "and",
+    "but",
+    "or",
+    "if",
+    "not",
+    "no",
+    "this",
+    "that",
+    "it",
+    "its",
 }
 
 
 # --- FTS5 ---
+
 
 class FTS5Index:
     """SQLite FTS5 index for file content retrieval."""
 
     def __init__(self) -> None:
         self.db: sqlite3.Connection = sqlite3.connect(":memory:")
-        self.db.execute("CREATE VIRTUAL TABLE fts USING fts5(path, content, tokenize='porter')")
+        self.db.execute(
+            "CREATE VIRTUAL TABLE fts USING fts5(path, content, tokenize='porter')"
+        )
         self._count: int = 0
 
     def add(self, path: str, content: str) -> None:
@@ -67,7 +123,8 @@ class FTS5Index:
     def search(self, query: str, limit: int = 10) -> list[str]:
         """Return file paths matching query."""
         terms: list[str] = [
-            t for t in re.findall(r"[a-zA-Z_][a-zA-Z0-9_]{2,}", query)
+            t
+            for t in re.findall(r"[a-zA-Z_][a-zA-Z0-9_]{2,}", query)
             if t.lower() not in STOP_WORDS and len(t) > 2
         ]
         if not terms:
@@ -90,9 +147,26 @@ def build_fts5(repo_path: Path) -> FTS5Index:
     """Build FTS5 index from repo files."""
     index: FTS5Index = FTS5Index()
     text_exts: set[str] = {
-        ".py", ".rs", ".go", ".ts", ".tsx", ".js", ".jsx",
-        ".c", ".h", ".cpp", ".cc", ".hpp", ".md", ".txt",
-        ".yml", ".yaml", ".toml", ".json", ".sh", ".sql",
+        ".py",
+        ".rs",
+        ".go",
+        ".ts",
+        ".tsx",
+        ".js",
+        ".jsx",
+        ".c",
+        ".h",
+        ".cpp",
+        ".cc",
+        ".hpp",
+        ".md",
+        ".txt",
+        ".yml",
+        ".yaml",
+        ".toml",
+        ".json",
+        ".sh",
+        ".sql",
     }
     for root, dirs, files in os.walk(repo_path):
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
@@ -112,12 +186,15 @@ def build_fts5(repo_path: Path) -> FTS5Index:
 
 # --- BFS ---
 
+
 class GraphAdjacency:
     """Simple adjacency list for BFS traversal."""
 
     def __init__(self) -> None:
         self.adj: dict[str, set[str]] = defaultdict(set)
-        self.typed_adj: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
+        self.typed_adj: dict[str, dict[str, set[str]]] = defaultdict(
+            lambda: defaultdict(set)
+        )
 
     def add_edge(self, source: str, target: str, edge_type: str) -> None:
         self.adj[source].add(target)
@@ -125,7 +202,9 @@ class GraphAdjacency:
         self.typed_adj[source][edge_type].add(target)
         self.typed_adj[target][edge_type].add(source)
 
-    def bfs(self, start_nodes: set[str], max_depth: int = 2, max_results: int = 20) -> set[str]:
+    def bfs(
+        self, start_nodes: set[str], max_depth: int = 2, max_results: int = 20
+    ) -> set[str]:
         """BFS from start nodes, return all reachable within max_depth."""
         visited: set[str] = set(start_nodes)
         frontier: set[str] = set(start_nodes)
@@ -159,6 +238,7 @@ def build_adjacency(edges: list[Edge]) -> GraphAdjacency:
 
 # --- Combined Pipeline ---
 
+
 class CombinedPipeline:
     """FTS5 + HRR + BFS combined retrieval."""
 
@@ -176,9 +256,13 @@ class CombinedPipeline:
         """FTS5 keyword search."""
         return set(self.fts5.search(query_content, limit=limit))
 
-    def retrieve_hrr_only(self, source: str, edge_type: str, limit: int = 10) -> set[str]:
+    def retrieve_hrr_only(
+        self, source: str, edge_type: str, limit: int = 10
+    ) -> set[str]:
         """HRR typed traversal."""
-        results: list[tuple[str, float]] = self.hrr.query_forward(source, edge_type, top_k=limit)
+        results: list[tuple[str, float]] = self.hrr.query_forward(
+            source, edge_type, top_k=limit
+        )
         return {r[0] for r in results}
 
     def retrieve_bfs_only(self, start_nodes: set[str], max_depth: int = 2) -> set[str]:
@@ -221,6 +305,7 @@ class CombinedPipeline:
 
 # --- Evaluation ---
 
+
 def evaluate_combined(
     pipeline: CombinedPipeline,
     edges: list[Edge],
@@ -238,7 +323,9 @@ def evaluate_combined(
 
     query_keys: list[tuple[str, str]] = [k for k, v in gt.items() if len(v) >= 1]
     if len(query_keys) > num_queries:
-        indices: NDArray[np.intp] = rng.choice(len(query_keys), size=num_queries, replace=False)
+        indices: NDArray[np.intp] = rng.choice(
+            len(query_keys), size=num_queries, replace=False
+        )
         query_keys = [query_keys[int(i)] for i in indices]
 
     # Per-method hit tracking
@@ -310,7 +397,9 @@ def evaluate_combined(
 
 def main() -> None:
     if len(sys.argv) < 3:
-        print(f"Usage: PYTHONPATH=scripts {sys.argv[0]} /path/to/repo /path/to/extracted_dir")
+        print(
+            f"Usage: PYTHONPATH=scripts {sys.argv[0]} /path/to/repo /path/to/extracted_dir"
+        )
         sys.exit(1)
 
     repo_path: Path = Path(sys.argv[1]).resolve()
@@ -329,7 +418,7 @@ def main() -> None:
         return
 
     # Build FTS5
-    print(f"  building FTS5...", file=sys.stderr)
+    print("  building FTS5...", file=sys.stderr)
     fts5: FTS5Index = build_fts5(repo_path)
     print(f"  FTS5: {fts5.size()} files indexed", file=sys.stderr)
 
@@ -338,29 +427,35 @@ def main() -> None:
     hrr: HRRGraph = HRRGraph(dim=dim)
     hrr.routing = "routed"
     hrr.encode(edges)
-    print(f"  HRR: {len(hrr.node_vectors)} nodes, {len(hrr.partitions)} partitions", file=sys.stderr)
+    print(
+        f"  HRR: {len(hrr.node_vectors)} nodes, {len(hrr.partitions)} partitions",
+        file=sys.stderr,
+    )
 
     # Build BFS adjacency
-    print(f"  building BFS adjacency...", file=sys.stderr)
+    print("  building BFS adjacency...", file=sys.stderr)
     bfs_graph: GraphAdjacency = build_adjacency(edges)
 
     # Combined pipeline
     pipeline: CombinedPipeline = CombinedPipeline(fts5, hrr, bfs_graph)
 
     # Evaluate
-    print(f"\n  evaluating (50 queries)...", file=sys.stderr)
+    print("\n  evaluating (50 queries)...", file=sys.stderr)
     results: dict[str, Any] = evaluate_combined(pipeline, edges, repo_path)
 
-    print(f"\n  Results:", file=sys.stderr)
+    print("\n  Results:", file=sys.stderr)
     print(f"  {'Method':<15} {'Recall':>8}", file=sys.stderr)
-    print(f"  {'-'*25}", file=sys.stderr)
+    print(f"  {'-' * 25}", file=sys.stderr)
     for method, recall in sorted(results["recalls"].items()):
         print(f"  {method:<15} {recall:>8.3f}", file=sys.stderr)
 
-    print(f"\n  Unique contributions:", file=sys.stderr)
+    print("\n  Unique contributions:", file=sys.stderr)
     for method, count in sorted(results["unique_contributions"].items()):
         print(f"    {method}: {count}", file=sys.stderr)
-    print(f"    neither: {results['neither_found']} ({results['neither_pct']}%)", file=sys.stderr)
+    print(
+        f"    neither: {results['neither_found']} ({results['neither_pct']}%)",
+        file=sys.stderr,
+    )
 
     # Write
     output_dir: Path = extracted_dir / "combined"

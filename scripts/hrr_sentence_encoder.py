@@ -86,14 +86,16 @@ class SentenceHRRGraph:
         for node_id in nodes_in_partition:
             self.node_to_partitions[node_id].add(partition_idx)
 
-        self.partitions.append({
-            "superposition": S,
-            "edge_count": len(edges),
-            "edge_types": dict(edge_types),
-            "capacity_usage": round(len(edges) / self.capacity, 3),
-            "label": label,
-            "nodes": nodes_in_partition,
-        })
+        self.partitions.append(
+            {
+                "superposition": S,
+                "edge_count": len(edges),
+                "edge_types": dict(edge_types),
+                "capacity_usage": round(len(edges) / self.capacity, 3),
+                "label": label,
+                "nodes": nodes_in_partition,
+            }
+        )
 
     def encode_sentence_graph(
         self,
@@ -133,8 +135,12 @@ class SentenceHRRGraph:
             else:
                 # Split large files into chunks
                 for i in range(0, len(file_edges), self.capacity):
-                    chunk: list[tuple[str, str, str]] = file_edges[i:i + self.capacity]
-                    self._encode_partition(chunk, f"file:{file_path}:chunk{i // self.capacity}")
+                    chunk: list[tuple[str, str, str]] = file_edges[
+                        i : i + self.capacity
+                    ]
+                    self._encode_partition(
+                        chunk, f"file:{file_path}:chunk{i // self.capacity}"
+                    )
 
         # Encode cross-file edges
         if cross_file:
@@ -148,10 +154,14 @@ class SentenceHRRGraph:
                     self._encode_partition(type_edges, f"cross:{etype}")
                 else:
                     for i in range(0, len(type_edges), self.capacity):
-                        chunk = type_edges[i:i + self.capacity]
-                        self._encode_partition(chunk, f"cross:{etype}:chunk{i // self.capacity}")
+                        chunk = type_edges[i : i + self.capacity]
+                        self._encode_partition(
+                            chunk, f"cross:{etype}:chunk{i // self.capacity}"
+                        )
 
-    def query_forward(self, source: str, edge_type: str, top_k: int = 10) -> list[tuple[str, float]]:
+    def query_forward(
+        self, source: str, edge_type: str, top_k: int = 10
+    ) -> list[tuple[str, float]]:
         """Single-hop forward query with partition routing."""
         if source not in self.node_vectors or edge_type not in self.edge_type_vectors:
             return []
@@ -168,7 +178,9 @@ class SentenceHRRGraph:
         for idx in relevant:
             S: Vector = self.partitions[idx]["superposition"]
             result_vec: Vector = unbind(query_vec, S)
-            matches: list[tuple[str, float]] = self.cleanup.query(result_vec, top_k=top_k)
+            matches: list[tuple[str, float]] = self.cleanup.query(
+                result_vec, top_k=top_k
+            )
             for label, sim in matches:
                 if label != source:
                     if label not in all_results or sim > all_results[label]:
@@ -180,12 +192,18 @@ class SentenceHRRGraph:
         return sorted_results[:top_k]
 
     def summary(self) -> dict[str, Any]:
-        partitions_per_node: list[int] = [len(v) for v in self.node_to_partitions.values()]
+        partitions_per_node: list[int] = [
+            len(v) for v in self.node_to_partitions.values()
+        ]
         avg_ppn: float = sum(partitions_per_node) / max(len(partitions_per_node), 1)
         max_ppn: int = max(partitions_per_node) if partitions_per_node else 0
 
-        within_count: int = sum(1 for p in self.partitions if p["label"].startswith("file:"))
-        cross_count: int = sum(1 for p in self.partitions if p["label"].startswith("cross:"))
+        within_count: int = sum(
+            1 for p in self.partitions if p["label"].startswith("file:")
+        )
+        cross_count: int = sum(
+            1 for p in self.partitions if p["label"].startswith("cross:")
+        )
 
         return {
             "dim": self.dim,
@@ -201,6 +219,7 @@ class SentenceHRRGraph:
 
 
 # --- Evaluation ---
+
 
 def evaluate_sentence_retrieval(
     graph: SentenceHRRGraph,
@@ -218,13 +237,17 @@ def evaluate_sentence_retrieval(
 
     query_keys: list[tuple[str, str]] = [k for k, v in gt.items() if len(v) >= 1]
     if len(query_keys) > num_queries:
-        indices: NDArray[np.intp] = rng.choice(len(query_keys), size=num_queries, replace=False)
+        indices: NDArray[np.intp] = rng.choice(
+            len(query_keys), size=num_queries, replace=False
+        )
         query_keys = [query_keys[int(i)] for i in indices]
 
     results: list[dict[str, Any]] = []
     for source, edge_type in query_keys:
         targets: set[str] = gt[(source, edge_type)]
-        retrieved: list[tuple[str, float]] = graph.query_forward(source, edge_type, top_k=10)
+        retrieved: list[tuple[str, float]] = graph.query_forward(
+            source, edge_type, top_k=10
+        )
 
         retrieved_5: set[str] = {r[0] for r in retrieved[:5]}
         retrieved_10: set[str] = {r[0] for r in retrieved[:10]}
@@ -232,15 +255,21 @@ def evaluate_sentence_retrieval(
         hits_5: int = len(targets & retrieved_5)
         hits_10: int = len(targets & retrieved_10)
 
-        results.append({
-            "edge_type": edge_type,
-            "source": source,
-            "n_targets": len(targets),
-            "recall_at_5": round(hits_5 / len(targets), 4) if targets else 0.0,
-            "recall_at_10": round(hits_10 / len(targets), 4) if targets else 0.0,
-            "precision_at_5": round(hits_5 / min(5, len(retrieved)), 4) if retrieved else 0.0,
-            "precision_at_10": round(hits_10 / min(10, len(retrieved)), 4) if retrieved else 0.0,
-        })
+        results.append(
+            {
+                "edge_type": edge_type,
+                "source": source,
+                "n_targets": len(targets),
+                "recall_at_5": round(hits_5 / len(targets), 4) if targets else 0.0,
+                "recall_at_10": round(hits_10 / len(targets), 4) if targets else 0.0,
+                "precision_at_5": round(hits_5 / min(5, len(retrieved)), 4)
+                if retrieved
+                else 0.0,
+                "precision_at_10": round(hits_10 / min(10, len(retrieved)), 4)
+                if retrieved
+                else 0.0,
+            }
+        )
 
     return results
 
@@ -281,14 +310,18 @@ def main() -> None:
     graph.encode_sentence_graph(nodes, edges)
 
     summary: dict[str, Any] = graph.summary()
-    print(f"  encoded: {summary['total_nodes']} nodes, {summary['num_partitions']} partitions "
-          f"({summary['within_file_partitions']} within-file, {summary['cross_file_partitions']} cross-file)",
-          file=sys.stderr)
-    print(f"  routing: avg {summary['avg_partitions_per_node']} partitions/node, max {summary['max_partitions_per_node']}",
-          file=sys.stderr)
+    print(
+        f"  encoded: {summary['total_nodes']} nodes, {summary['num_partitions']} partitions "
+        f"({summary['within_file_partitions']} within-file, {summary['cross_file_partitions']} cross-file)",
+        file=sys.stderr,
+    )
+    print(
+        f"  routing: avg {summary['avg_partitions_per_node']} partitions/node, max {summary['max_partitions_per_node']}",
+        file=sys.stderr,
+    )
 
     # Evaluate
-    print(f"\n  evaluating retrieval (50 queries)...", file=sys.stderr)
+    print("\n  evaluating retrieval (50 queries)...", file=sys.stderr)
     results: list[dict[str, Any]] = evaluate_sentence_retrieval(graph, edges)
 
     # Aggregate by type
@@ -296,8 +329,11 @@ def main() -> None:
     for r in results:
         by_type[r["edge_type"]].append(r)
 
-    print(f"\n  {'Edge Type':<25} {'Queries':>8} {'R@5':>6} {'R@10':>6} {'P@5':>6} {'P@10':>6}", file=sys.stderr)
-    print(f"  {'-'*70}", file=sys.stderr)
+    print(
+        f"\n  {'Edge Type':<25} {'Queries':>8} {'R@5':>6} {'R@10':>6} {'P@5':>6} {'P@10':>6}",
+        file=sys.stderr,
+    )
+    print(f"  {'-' * 70}", file=sys.stderr)
 
     type_summaries: dict[str, dict[str, float | int]] = {}
     for etype, type_results in sorted(by_type.items()):
@@ -306,10 +342,16 @@ def main() -> None:
         avg_r10: float = sum(r["recall_at_10"] for r in type_results) / n
         avg_p5: float = sum(r["precision_at_5"] for r in type_results) / n
         avg_p10: float = sum(r["precision_at_10"] for r in type_results) / n
-        print(f"  {etype:<25} {n:>8} {avg_r5:>6.3f} {avg_r10:>6.3f} {avg_p5:>6.3f} {avg_p10:>6.3f}", file=sys.stderr)
+        print(
+            f"  {etype:<25} {n:>8} {avg_r5:>6.3f} {avg_r10:>6.3f} {avg_p5:>6.3f} {avg_p10:>6.3f}",
+            file=sys.stderr,
+        )
         type_summaries[etype] = {
-            "queries": n, "recall_at_5": round(avg_r5, 4), "recall_at_10": round(avg_r10, 4),
-            "precision_at_5": round(avg_p5, 4), "precision_at_10": round(avg_p10, 4),
+            "queries": n,
+            "recall_at_5": round(avg_r5, 4),
+            "recall_at_10": round(avg_r10, 4),
+            "precision_at_5": round(avg_p5, 4),
+            "precision_at_10": round(avg_p10, 4),
         }
 
     # Overall
@@ -318,7 +360,10 @@ def main() -> None:
     overall_r10: float = sum(r["recall_at_10"] for r in results) / max(total_q, 1)
     overall_p5: float = sum(r["precision_at_5"] for r in results) / max(total_q, 1)
     overall_p10: float = sum(r["precision_at_10"] for r in results) / max(total_q, 1)
-    print(f"  {'OVERALL':<25} {total_q:>8} {overall_r5:>6.3f} {overall_r10:>6.3f} {overall_p5:>6.3f} {overall_p10:>6.3f}", file=sys.stderr)
+    print(
+        f"  {'OVERALL':<25} {total_q:>8} {overall_r5:>6.3f} {overall_r10:>6.3f} {overall_p5:>6.3f} {overall_p10:>6.3f}",
+        file=sys.stderr,
+    )
 
     # Write
     output_dir: Path = extracted_dir / "hrr_sentences"

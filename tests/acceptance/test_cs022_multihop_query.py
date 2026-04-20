@@ -3,6 +3,7 @@
 Pass criterion: BFS traversal via expand_graph can answer multi-hop queries --
 depth=2 reaches two hops away, depth=1 does not.
 """
+
 from __future__ import annotations
 
 from agentmemory.models import (
@@ -41,8 +42,12 @@ def test_cs022_two_hop_traversal(store: MemoryStore) -> None:
     )
 
     reached_ids: set[str] = set(graph.keys())
-    assert b.id in reached_ids, f"B should be reachable at depth 1. Reached: {reached_ids}"
-    assert c.id in reached_ids, f"C should be reachable at depth 2. Reached: {reached_ids}"
+    assert b.id in reached_ids, (
+        f"B should be reachable at depth 1. Reached: {reached_ids}"
+    )
+    assert c.id in reached_ids, (
+        f"C should be reachable at depth 2. Reached: {reached_ids}"
+    )
 
     # Verify hop distances.
     b_hops: list[int] = [hop for _, _, hop in graph[b.id]]
@@ -79,7 +84,9 @@ def test_cs022_single_hop_insufficient(store: MemoryStore) -> None:
     )
 
     reached_ids: set[str] = set(graph.keys())
-    assert b.id in reached_ids, f"B should be reachable at depth 1. Reached: {reached_ids}"
+    assert b.id in reached_ids, (
+        f"B should be reachable at depth 1. Reached: {reached_ids}"
+    )
     assert c.id not in reached_ids, (
         f"C should NOT be reachable at depth 1. Reached: {reached_ids}"
     )

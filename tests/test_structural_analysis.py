@@ -4,6 +4,7 @@
 Validates task-type detection, subagent suitability, activation_condition
 predicate matching, and edge-based vocabulary expansion.
 """
+
 from __future__ import annotations
 
 import sqlite3
@@ -126,7 +127,9 @@ def test_subagent_short_prompt_not_suitable() -> None:
 
 def test_condition_task_type_match() -> None:
     """task_type:planning matches when planning is detected."""
-    analysis: StructuralAnalysis = StructuralAnalysis(task_types=["planning", "debugging"])
+    analysis: StructuralAnalysis = StructuralAnalysis(
+        task_types=["planning", "debugging"]
+    )
     assert _condition_matches("task_type:planning", analysis, set())
     assert _condition_matches("task_type:debugging", analysis, set())
     assert not _condition_matches("task_type:deployment", analysis, set())
@@ -168,11 +171,15 @@ def test_condition_and_operator() -> None:
     analysis: StructuralAnalysis = StructuralAnalysis(task_types=["deployment"])
     words: set[str] = {"production", "deploy"}
     assert _condition_matches(
-        "task_type:deployment+keyword_any:production,staging", analysis, words,
+        "task_type:deployment+keyword_any:production,staging",
+        analysis,
+        words,
     )
     # Missing keyword
     assert not _condition_matches(
-        "task_type:deployment+keyword_any:merge,clone", analysis, words,
+        "task_type:deployment+keyword_any:merge,clone",
+        analysis,
+        words,
     )
 
 
@@ -192,7 +199,9 @@ def test_condition_empty_string() -> None:
 def test_eval_structural_predicate_operators() -> None:
     """All comparison operators work."""
     analysis: StructuralAnalysis = StructuralAnalysis(
-        enumerated_items=5, unique_entities=3, word_count=50,
+        enumerated_items=5,
+        unique_entities=3,
+        word_count=50,
     )
     assert _eval_structural_predicate("enumerated_items>=5", analysis)
     assert _eval_structural_predicate("enumerated_items<=5", analysis)
@@ -269,7 +278,9 @@ def test_activation_condition_no_match_no_inject(tmp_path: Path) -> None:
     # Search with a NON-deployment prompt (research)
     db: sqlite3.Connection = sqlite3.connect(str(db_path))
     db.row_factory = sqlite3.Row
-    result: SearchResult = search_for_prompt(db, "research how memory persistence works")
+    result: SearchResult = search_for_prompt(
+        db, "research how memory persistence works"
+    )
 
     # The directive should NOT be in results
     contents: list[str] = [b.content for b in result.beliefs]

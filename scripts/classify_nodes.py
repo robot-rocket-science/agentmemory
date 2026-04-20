@@ -27,15 +27,31 @@ from typing import Any
 def git_head(repo: Path) -> str:
     r: subprocess.CompletedProcess[str] = subprocess.run(
         ["git", "rev-parse", "HEAD"],
-        cwd=repo, capture_output=True, text=True, timeout=5,
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        timeout=5,
     )
     return r.stdout.strip()
 
 
 SKIP_DIRS: set[str] = {
-    ".git", "node_modules", "target", ".venv", "venv", "__pycache__",
-    ".mypy_cache", ".ruff_cache", "dist", "build", ".tox", ".eggs",
-    ".pytest_cache", "vendor", "third_party", "3rdparty",
+    ".git",
+    "node_modules",
+    "target",
+    ".venv",
+    "venv",
+    "__pycache__",
+    ".mypy_cache",
+    ".ruff_cache",
+    "dist",
+    "build",
+    ".tox",
+    ".eggs",
+    ".pytest_cache",
+    "vendor",
+    "third_party",
+    "3rdparty",
 }
 
 # Path patterns -> node type (checked in order, first match wins)
@@ -81,9 +97,25 @@ EXT_RULES: dict[str, str] = {
 }
 
 CODE_EXTENSIONS: set[str] = {
-    ".py", ".rs", ".go", ".ts", ".tsx", ".js", ".jsx",
-    ".c", ".h", ".cpp", ".cc", ".cxx", ".hpp", ".hxx",
-    ".java", ".rb", ".swift", ".kt", ".cs",
+    ".py",
+    ".rs",
+    ".go",
+    ".ts",
+    ".tsx",
+    ".js",
+    ".jsx",
+    ".c",
+    ".h",
+    ".cpp",
+    ".cc",
+    ".cxx",
+    ".hpp",
+    ".hxx",
+    ".java",
+    ".rb",
+    ".swift",
+    ".kt",
+    ".cs",
 }
 
 # Filename exact matches
@@ -125,7 +157,11 @@ def classify_file(rel_path: str, content_hint: str | None = None) -> str:
 
     # Content hint (lightweight check)
     if content_hint:
-        if "def test_" in content_hint or "#[test]" in content_hint or "describe(" in content_hint:
+        if (
+            "def test_" in content_hint
+            or "#[test]" in content_hint
+            or "describe(" in content_hint
+        ):
             return "TEST"
 
     # Extension match
@@ -168,7 +204,9 @@ def main() -> None:
             existing: dict[str, Any] = json.loads(output_path.read_text())
             if existing.get("head") == head:
                 print(f"[cached] {repo.name} HEAD={head[:8]}", file=sys.stderr)
-                type_dist: dict[str, Any] = existing.get("summary", {}).get("type_distribution", {})
+                type_dist: dict[str, Any] = existing.get("summary", {}).get(
+                    "type_distribution", {}
+                )
                 for ntype, count in sorted(type_dist.items()):
                     print(f"  {ntype}: {count}", file=sys.stderr)
                 return
@@ -205,10 +243,16 @@ def main() -> None:
     unknown: int = type_counts.get("OTHER", 0)
 
     print(f"  total files: {total}", file=sys.stderr)
-    print(f"  classified: {total - unknown} ({(total - unknown) / max(total, 1) * 100:.1f}%)", file=sys.stderr)
-    print(f"  distribution:", file=sys.stderr)
+    print(
+        f"  classified: {total - unknown} ({(total - unknown) / max(total, 1) * 100:.1f}%)",
+        file=sys.stderr,
+    )
+    print("  distribution:", file=sys.stderr)
     for ntype, count in type_counts.most_common():
-        print(f"    {ntype}: {count} ({count / max(total, 1) * 100:.1f}%)", file=sys.stderr)
+        print(
+            f"    {ntype}: {count} ({count / max(total, 1) * 100:.1f}%)",
+            file=sys.stderr,
+        )
 
     summary: dict[str, Any] = {
         "total_files": total,

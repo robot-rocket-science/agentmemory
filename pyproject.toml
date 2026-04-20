@@ -47,10 +47,10 @@ dev = [
 [tool.pyright]
 pythonVersion = "3.12"
 typeCheckingMode = "strict"
-exclude = ["experiments/"]
+exclude = ["experiments/", "benchmarks/", "scripts/"]
 
 [tool.ruff]
-extend-exclude = ["experiments/"]
+extend-exclude = ["experiments/", "benchmarks/", "scripts/"]
 
 [tool.ruff.lint]
 extend-ignore = ["E402"]

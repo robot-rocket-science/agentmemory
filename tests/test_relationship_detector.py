@@ -1,4 +1,5 @@
 """Tests for relationship detector (CONTRADICTS/SUPPORTS/gap closure)."""
+
 from __future__ import annotations
 
 from pathlib import Path

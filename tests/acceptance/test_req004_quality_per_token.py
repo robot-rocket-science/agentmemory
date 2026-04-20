@@ -7,6 +7,7 @@ known-relevant and known-irrelevant beliefs for 20 queries.
 Acceptance threshold: quality at 2K >= 0.95 * quality at 10K.
 Hallucination rate at 2K <= hallucination rate at 10K.
 """
+
 from __future__ import annotations
 
 from agentmemory.models import (
@@ -135,10 +136,16 @@ def test_req004_2k_quality_matches_10k(store: MemoryStore) -> None:
 
     for query, relevant, _irrelevant in _QUERY_GROUND_TRUTH:
         result_2k: RetrievalResult = retrieve(
-            store, query, budget=2000, include_locked=False,
+            store,
+            query,
+            budget=2000,
+            include_locked=False,
         )
         result_10k: RetrievalResult = retrieve(
-            store, query, budget=10000, include_locked=False,
+            store,
+            query,
+            budget=10000,
+            include_locked=False,
         )
 
         contents_2k: list[str] = [b.content for b in result_2k.beliefs]
@@ -167,7 +174,10 @@ def test_req004_2k_recall_comparable(store: MemoryStore) -> None:
 
     for query, relevant, _irrelevant in _QUERY_GROUND_TRUTH:
         result_2k: RetrievalResult = retrieve(
-            store, query, budget=2000, include_locked=False,
+            store,
+            query,
+            budget=2000,
+            include_locked=False,
         )
         contents_2k: list[str] = [b.content for b in result_2k.beliefs]
         recalls_2k.append(_recall_at_k(contents_2k, relevant))
@@ -188,7 +198,10 @@ def test_req004_budget_enforced(store: MemoryStore) -> None:
 
     for query, _relevant, _irrelevant in _QUERY_GROUND_TRUTH:
         result: RetrievalResult = retrieve(
-            store, query, budget=2000, include_locked=False,
+            store,
+            query,
+            budget=2000,
+            include_locked=False,
         )
         assert result.total_tokens <= 2000, (
             f"Query '{query}' exceeded budget: {result.total_tokens} > 2000"

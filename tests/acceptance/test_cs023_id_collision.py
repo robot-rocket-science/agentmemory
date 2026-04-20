@@ -3,6 +3,7 @@
 Pass criterion: Content-hash dedup in insert_observation prevents duplicate
 observations from being stored, while distinct content produces separate rows.
 """
+
 from __future__ import annotations
 
 from agentmemory.models import OBS_TYPE_DECISION, SRC_AGENT, Observation

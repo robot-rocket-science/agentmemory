@@ -3,6 +3,7 @@
 Validates Beta entropy, VOI, evidence propagation, hibernation scoring,
 and the UncertaintyVector lifecycle for speculative beliefs.
 """
+
 from __future__ import annotations
 
 import json
@@ -18,6 +19,7 @@ from agentmemory.uncertainty import (
 
 
 # --- BetaAxis tests ---
+
 
 def test_beta_axis_mean() -> None:
     """Beta(3,1) has mean 0.75."""
@@ -69,12 +71,17 @@ def test_beta_axis_voi_decreases_with_evidence() -> None:
     """More evidence = less VOI (already well-characterized)."""
     uncertain: BetaAxis = BetaAxis(1.0, 1.0)
     certain: BetaAxis = BetaAxis(50.0, 50.0)
-    voi_uncertain: float = uncertain.entropy() - uncertain.expected_entropy_after_observation()
-    voi_certain: float = certain.entropy() - certain.expected_entropy_after_observation()
+    voi_uncertain: float = (
+        uncertain.entropy() - uncertain.expected_entropy_after_observation()
+    )
+    voi_certain: float = (
+        certain.entropy() - certain.expected_entropy_after_observation()
+    )
     assert voi_uncertain > voi_certain
 
 
 # --- UncertaintyVector tests ---
+
 
 def test_default_vector_has_4_dimensions() -> None:
     """Default vector has feasibility, value, cost, dependency."""
@@ -110,12 +117,14 @@ def test_best_experiment_dimension() -> None:
 
 def test_hibernation_score_high_for_promising_certain() -> None:
     """High mean + low entropy = high hibernation score (promising, well-understood)."""
-    uv: UncertaintyVector = UncertaintyVector(axes=[
-        BetaAxis(50.0, 5.0),   # feasibility: high confidence
-        BetaAxis(40.0, 10.0),  # value: high confidence
-        BetaAxis(30.0, 5.0),   # cost: favorable
-        BetaAxis(45.0, 5.0),   # dependency: met
-    ])
+    uv: UncertaintyVector = UncertaintyVector(
+        axes=[
+            BetaAxis(50.0, 5.0),  # feasibility: high confidence
+            BetaAxis(40.0, 10.0),  # value: high confidence
+            BetaAxis(30.0, 5.0),  # cost: favorable
+            BetaAxis(45.0, 5.0),  # dependency: met
+        ]
+    )
     score: float = uv.hibernation_score()
     assert score > 0.5, f"Expected > 0.5, got {score}"
 
@@ -131,10 +140,12 @@ def test_hibernation_score_low_for_uncertain() -> None:
 
 def test_json_roundtrip() -> None:
     """UncertaintyVector survives JSON serialization."""
-    uv: UncertaintyVector = UncertaintyVector(axes=[
-        BetaAxis(3.0, 1.0),
-        BetaAxis(2.0, 5.0),
-    ])
+    uv: UncertaintyVector = UncertaintyVector(
+        axes=[
+            BetaAxis(3.0, 1.0),
+            BetaAxis(2.0, 5.0),
+        ]
+    )
     json_str: str = uv.to_json()
     parsed: list[list[float]] = json.loads(json_str)
     assert len(parsed) == 2
@@ -164,6 +175,7 @@ def test_dimension_summary() -> None:
 
 # --- Evidence propagation tests ---
 
+
 def test_propagate_evidence() -> None:
     """Evidence propagates from source dimension to target with weight scaling."""
     source: UncertaintyVector = UncertaintyVector()
@@ -183,7 +195,10 @@ def test_propagate_evidence() -> None:
     )
 
     # Target cost should increase by weight * delta_alpha = 0.5 * 4.0 = 2.0
-    assert abs(target.axes[DIMENSION_COST].alpha - (original_target_cost_alpha + 2.0)) < 1e-6
+    assert (
+        abs(target.axes[DIMENSION_COST].alpha - (original_target_cost_alpha + 2.0))
+        < 1e-6
+    )
 
 
 def test_propagate_no_effect_on_wrong_dimension() -> None:
@@ -205,6 +220,7 @@ def test_propagate_no_effect_on_wrong_dimension() -> None:
 
 
 # --- Speculative belief lifecycle tests ---
+
 
 def test_speculative_lifecycle() -> None:
     """Full lifecycle: create -> update -> evaluate -> hibernate -> revive."""

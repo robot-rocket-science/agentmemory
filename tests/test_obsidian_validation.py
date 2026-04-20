@@ -47,6 +47,10 @@ def live_conn() -> sqlite3.Connection:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(
+    os.environ.get("CI") == "true",
+    reason="Obsidian vault only exists in local dev environment",
+)
 def test_obsidian_vault_exists() -> None:
     """The agentmemory project root has .obsidian/ -- it is already a vault."""
     vault_marker: Path = Path("/home/user/projects/agentmemory/.obsidian")

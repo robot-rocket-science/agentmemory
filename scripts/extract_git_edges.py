@@ -68,23 +68,59 @@ class IssueRefEdge(TypedDict):
 
 # Files to ignore in co-change analysis
 IGNORE_PATTERNS: set[str] = {
-    ".gitignore", ".gitattributes", "LICENSE", "LICENSE.md",
-    "Cargo.lock", "package-lock.json", "yarn.lock", "uv.lock",
-    "poetry.lock", "Pipfile.lock", "go.sum", "pnpm-lock.yaml",
+    ".gitignore",
+    ".gitattributes",
+    "LICENSE",
+    "LICENSE.md",
+    "Cargo.lock",
+    "package-lock.json",
+    "yarn.lock",
+    "uv.lock",
+    "poetry.lock",
+    "Pipfile.lock",
+    "go.sum",
+    "pnpm-lock.yaml",
 }
 
 IGNORE_EXTENSIONS: set[str] = {
-    ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".woff", ".woff2",
-    ".ttf", ".eot", ".mp3", ".mp4", ".wav", ".pdf", ".zip", ".tar",
-    ".gz", ".bin", ".exe", ".dll", ".so", ".dylib", ".pyc", ".pyo",
-    ".o", ".obj", ".a", ".lib",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".svg",
+    ".ico",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".eot",
+    ".mp3",
+    ".mp4",
+    ".wav",
+    ".pdf",
+    ".zip",
+    ".tar",
+    ".gz",
+    ".bin",
+    ".exe",
+    ".dll",
+    ".so",
+    ".dylib",
+    ".pyc",
+    ".pyo",
+    ".o",
+    ".obj",
+    ".a",
+    ".lib",
 }
 
 
 def git_head(repo: Path) -> str:
     r: subprocess.CompletedProcess[str] = subprocess.run(
         ["git", "rev-parse", "HEAD"],
-        cwd=repo, capture_output=True, text=True, timeout=5,
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        timeout=5,
     )
     return r.stdout.strip()
 
@@ -110,7 +146,10 @@ def parse_git_log(repo: Path, max_files: int = 50) -> list[CommitRecord]:
     fmt: str = "%x00%H%x01%aI%x01%aN%x01%s%x01%b"
     r: subprocess.CompletedProcess[str] = subprocess.run(
         ["git", "log", "--format=" + fmt, "--name-only", "--no-merges"],
-        cwd=repo, capture_output=True, text=True, timeout=600,
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        timeout=600,
         errors="replace",
     )
     if r.returncode != 0:
@@ -159,14 +198,16 @@ def parse_git_log(repo: Path, max_files: int = 50) -> list[CommitRecord]:
         if subject.lower() in ("wip", "fix", "update", ".", "tmp", "temp"):
             continue
 
-        commits.append(CommitRecord(
-            hash=hash_val,
-            date=date,
-            author=author,
-            subject=subject,
-            body=body,
-            files=files,
-        ))
+        commits.append(
+            CommitRecord(
+                hash=hash_val,
+                date=date,
+                author=author,
+                subject=subject,
+                body=body,
+                files=files,
+            )
+        )
 
     return commits
 
@@ -184,13 +225,15 @@ def extract_co_changed(commits: list[CommitRecord]) -> list[CoChangedEdge]:
 
     edges: list[CoChangedEdge] = []
     for (a, b), weight in pair_counts.most_common():
-        edges.append(CoChangedEdge(
-            source=a,
-            target=b,
-            type="CO_CHANGED",
-            weight=weight,
-            directed=False,
-        ))
+        edges.append(
+            CoChangedEdge(
+                source=a,
+                target=b,
+                type="CO_CHANGED",
+                weight=weight,
+                directed=False,
+            )
+        )
 
     return edges
 
@@ -203,7 +246,7 @@ def split_sentences(text: str) -> list[str]:
         return []
 
     # First split on newlines (commit messages are often line-per-thought)
-    lines: list[str] = [l.strip() for l in text.split("\n") if l.strip()]
+    lines: list[str] = [line.strip() for line in text.split("\n") if line.strip()]
 
     sentences: list[str] = []
     for line in lines:
@@ -218,7 +261,9 @@ def split_sentences(text: str) -> list[str]:
     return sentences
 
 
-def extract_commit_beliefs(commits: list[CommitRecord]) -> tuple[list[BeliefNode], list[BeliefEdge]]:
+def extract_commit_beliefs(
+    commits: list[CommitRecord],
+) -> tuple[list[BeliefNode], list[BeliefEdge]]:
     """Extract COMMIT_BELIEF edges: sentence -> files touched.
 
     Returns (belief_nodes, edges).
@@ -242,22 +287,26 @@ def extract_commit_beliefs(commits: list[CommitRecord]) -> tuple[list[BeliefNode
 
         for i, sentence in enumerate(sentences):
             belief_id: str = f"commit:{commit['hash'][:8]}:s{i}"
-            belief_nodes.append(BeliefNode(
-                id=belief_id,
-                type="COMMIT_BELIEF",
-                content=sentence,
-                commit_hash=commit["hash"],
-                date=commit["date"],
-                author=commit["author"],
-            ))
+            belief_nodes.append(
+                BeliefNode(
+                    id=belief_id,
+                    type="COMMIT_BELIEF",
+                    content=sentence,
+                    commit_hash=commit["hash"],
+                    date=commit["date"],
+                    author=commit["author"],
+                )
+            )
 
             for filepath in commit["files"]:
-                edges.append(BeliefEdge(
-                    source=belief_id,
-                    target=filepath,
-                    type="COMMIT_BELIEF",
-                    directed=True,
-                ))
+                edges.append(
+                    BeliefEdge(
+                        source=belief_id,
+                        target=filepath,
+                        type="COMMIT_BELIEF",
+                        directed=True,
+                    )
+                )
 
     return belief_nodes, edges
 
@@ -277,20 +326,24 @@ def extract_issue_references(commits: list[CommitRecord]) -> list[IssueRefEdge]:
 
         matches: list[str] = issue_pattern.findall(full_msg)
         for issue_num in set(matches):
-            edges.append(IssueRefEdge(
-                source=f"commit:{commit['hash'][:8]}",
-                target=f"issue:#{issue_num}",
-                type="REFERENCES_ISSUE",
-                directed=True,
-                commit_hash=commit["hash"],
-            ))
+            edges.append(
+                IssueRefEdge(
+                    source=f"commit:{commit['hash'][:8]}",
+                    target=f"issue:#{issue_num}",
+                    type="REFERENCES_ISSUE",
+                    directed=True,
+                    commit_hash=commit["hash"],
+                )
+            )
 
     return edges
 
 
 def main() -> None:
     if len(sys.argv) < 2:
-        print(f"Usage: {sys.argv[0]} /path/to/repo [--output path] [--max-files-per-commit N]")
+        print(
+            f"Usage: {sys.argv[0]} /path/to/repo [--output path] [--max-files-per-commit N]"
+        )
         sys.exit(1)
 
     repo: Path = Path(sys.argv[1])
@@ -321,10 +374,17 @@ def main() -> None:
             if existing.get("head") == head:
                 print(f"[cached] {repo.name} HEAD={head[:8]}", file=sys.stderr)
                 # Print summary even for cached
-                summary_data: dict[str, Any] = existing['summary']
-                print(f"  co_changed: {summary_data['co_changed_edges']}", file=sys.stderr)
-                print(f"  commit_beliefs: {summary_data['belief_nodes']} nodes, {summary_data['commit_belief_edges']} edges", file=sys.stderr)
-                print(f"  issue_refs: {summary_data['issue_ref_edges']}", file=sys.stderr)
+                summary_data: dict[str, Any] = existing["summary"]
+                print(
+                    f"  co_changed: {summary_data['co_changed_edges']}", file=sys.stderr
+                )
+                print(
+                    f"  commit_beliefs: {summary_data['belief_nodes']} nodes, {summary_data['commit_belief_edges']} edges",
+                    file=sys.stderr,
+                )
+                print(
+                    f"  issue_refs: {summary_data['issue_ref_edges']}", file=sys.stderr
+                )
                 return
         except (json.JSONDecodeError, KeyError):
             pass
@@ -370,19 +430,53 @@ def main() -> None:
     }
 
     print(f"  files: {len(all_files)}", file=sys.stderr)
-    print(f"  co_changed: {co_changed_raw} total, {len(co_changed_t3)} (w>=3), {len(co_changed_t5)} (w>=5)", file=sys.stderr)
-    print(f"  co_changed max weight: {summary['co_changed_max_weight']}", file=sys.stderr)
-    print(f"  commit_beliefs: {len(belief_nodes)} nodes, {len(belief_edges)} edges", file=sys.stderr)
-    print(f"  issue_refs: {len(issue_refs)} edges, {len(issue_ids)} unique issues", file=sys.stderr)
+    print(
+        f"  co_changed: {co_changed_raw} total, {len(co_changed_t3)} (w>=3), {len(co_changed_t5)} (w>=5)",
+        file=sys.stderr,
+    )
+    print(
+        f"  co_changed max weight: {summary['co_changed_max_weight']}", file=sys.stderr
+    )
+    print(
+        f"  commit_beliefs: {len(belief_nodes)} nodes, {len(belief_edges)} edges",
+        file=sys.stderr,
+    )
+    print(
+        f"  issue_refs: {len(issue_refs)} edges, {len(issue_ids)} unique issues",
+        file=sys.stderr,
+    )
 
     # Weight distribution
     weight_dist: Counter[str] = Counter()
     for e in co_changed:
-        bucket: str = "1" if e["weight"] == 1 else "2" if e["weight"] == 2 else "3-5" if e["weight"] <= 5 else "6-10" if e["weight"] <= 10 else "11-50" if e["weight"] <= 50 else "50+"
+        bucket: str = (
+            "1"
+            if e["weight"] == 1
+            else "2"
+            if e["weight"] == 2
+            else "3-5"
+            if e["weight"] <= 5
+            else "6-10"
+            if e["weight"] <= 10
+            else "11-50"
+            if e["weight"] <= 50
+            else "50+"
+        )
         weight_dist[bucket] += 1
-    print(f"  co_changed weight distribution: {dict(sorted(weight_dist.items()))}", file=sys.stderr)
+    print(
+        f"  co_changed weight distribution: {dict(sorted(weight_dist.items()))}",
+        file=sys.stderr,
+    )
 
-    result: dict[str, str | dict[str, int] | list[CoChangedEdge] | list[BeliefNode] | list[BeliefEdge] | list[IssueRefEdge]] = {
+    result: dict[
+        str,
+        str
+        | dict[str, int]
+        | list[CoChangedEdge]
+        | list[BeliefNode]
+        | list[BeliefEdge]
+        | list[IssueRefEdge],
+    ] = {
         "repo": str(repo),
         "name": repo.name,
         "head": head,

@@ -12,6 +12,7 @@ Usage:
     uv run python benchmarks/longmemeval_adapter.py --question-type temporal-reasoning
     uv run python benchmarks/longmemeval_adapter.py --subset 10
 """
+
 from __future__ import annotations
 
 import argparse
@@ -177,18 +178,18 @@ def parse_questions(raw: list[dict[str, object]]) -> list[LongMemEvalQuestion]:
     questions: list[LongMemEvalQuestion] = []
     for row in raw:
         # Parse haystack_sessions: list of sessions, each session is list of turns
-        raw_sessions: list[list[dict[str, object]]] = row.get(
-            "haystack_sessions", []
-        )  # type: ignore[assignment]
+        raw_sessions: list[list[dict[str, object]]] = row.get("haystack_sessions", [])  # type: ignore[assignment]
         parsed_sessions: list[list[SessionTurn]] = []
         for session in raw_sessions:
             turns: list[SessionTurn] = []
             for turn in session:
-                turns.append(SessionTurn(
-                    role=str(turn.get("role", "")),
-                    content=str(turn.get("content", "")),
-                    has_answer=bool(turn.get("has_answer", False)),
-                ))
+                turns.append(
+                    SessionTurn(
+                        role=str(turn.get("role", "")),
+                        content=str(turn.get("content", "")),
+                        has_answer=bool(turn.get("has_answer", False)),
+                    )
+                )
             parsed_sessions.append(turns)
 
         # Answer can be string or list
@@ -199,17 +200,21 @@ def parse_questions(raw: list[dict[str, object]]) -> list[LongMemEvalQuestion]:
         else:
             answer = str(raw_answer)
 
-        questions.append(LongMemEvalQuestion(
-            question_id=str(row.get("question_id", "")),
-            question_type=str(row.get("question_type", "")),
-            question=str(row.get("question", "")),
-            answer=answer,
-            question_date=str(row.get("question_date", "")),
-            haystack_dates=[str(d) for d in row.get("haystack_dates", [])],  # type: ignore[union-attr]
-            haystack_session_ids=[str(s) for s in row.get("haystack_session_ids", [])],  # type: ignore[union-attr]
-            haystack_sessions=parsed_sessions,
-            answer_session_ids=[str(s) for s in row.get("answer_session_ids", [])],  # type: ignore[union-attr]
-        ))
+        questions.append(
+            LongMemEvalQuestion(
+                question_id=str(row.get("question_id", "")),
+                question_type=str(row.get("question_type", "")),
+                question=str(row.get("question", "")),
+                answer=answer,
+                question_date=str(row.get("question_date", "")),
+                haystack_dates=[str(d) for d in row.get("haystack_dates", [])],  # type: ignore[union-attr]
+                haystack_session_ids=[
+                    str(s) for s in row.get("haystack_session_ids", [])
+                ],  # type: ignore[union-attr]
+                haystack_sessions=parsed_sessions,
+                answer_session_ids=[str(s) for s in row.get("answer_session_ids", [])],  # type: ignore[union-attr]
+            )
+        )
     return questions
 
 
@@ -344,7 +349,10 @@ def run_question(
     # Query
     t1: float = time.monotonic()
     context, num_beliefs = query_agentmemory(
-        store, question.question, question.question_date, budget=budget,
+        store,
+        question.question,
+        question.question_date,
+        budget=budget,
     )
     latency_ms: float = (time.monotonic() - t1) * 1000.0
 
@@ -371,7 +379,7 @@ def run_benchmark(
     with tempfile.TemporaryDirectory(prefix="longmemeval_bench_") as tmpdir:
         for i, q in enumerate(questions):
             print(
-                f"  [{i+1}/{len(questions)}] {q.question_id} "
+                f"  [{i + 1}/{len(questions)}] {q.question_id} "
                 f"({q.question_type}, {len(q.haystack_sessions)} sessions)"
             )
 
@@ -404,9 +412,9 @@ def run_benchmark(
 
 def print_results(result: BenchmarkResult) -> None:
     """Print formatted benchmark results to stdout."""
-    print(f"\n{'='*65}")
+    print(f"\n{'=' * 65}")
     print("LongMemEval Benchmark Results (retrieval-only)")
-    print(f"{'='*65}")
+    print(f"{'=' * 65}")
     print(f"Total questions:      {result.total_questions}")
     print(f"Total ingested turns: {result.total_ingest_turns}")
     print(f"Total ingest time:    {result.total_ingest_time_s:.2f}s")
@@ -432,7 +440,7 @@ def print_results(result: BenchmarkResult) -> None:
     print("  BM25 session-level NDCG@5:          0.516")
     print("  GPT-4o with oracle sessions:        0.924 accuracy")
     print("  GPT-4o with LongMemEval_S pipeline: 0.606 accuracy")
-    print(f"{'='*65}")
+    print(f"{'=' * 65}")
 
 
 def write_retrieve_results(result: BenchmarkResult, output_path: str) -> None:
@@ -441,21 +449,25 @@ def write_retrieve_results(result: BenchmarkResult, output_path: str) -> None:
     gt_items: list[dict[str, object]] = []
     for qr in result.per_question:
         # Retrieval file: NO answers, only context for LLM reader
-        items.append({
-            "question_id": qr.question_id,
-            "question_type": qr.question_type,
-            "question": qr.question,
-            "question_date": qr.question_date,
-            "retrieved_context": qr.retrieved_context,
-            "num_beliefs": qr.num_beliefs,
-            "retrieval_latency_ms": round(qr.retrieval_latency_ms, 2),
-        })
+        items.append(
+            {
+                "question_id": qr.question_id,
+                "question_type": qr.question_type,
+                "question": qr.question,
+                "question_date": qr.question_date,
+                "retrieved_context": qr.retrieved_context,
+                "num_beliefs": qr.num_beliefs,
+                "retrieval_latency_ms": round(qr.retrieval_latency_ms, 2),
+            }
+        )
         # Ground truth file: answers for scoring AFTER generation
-        gt_items.append({
-            "question_id": qr.question_id,
-            "question_type": qr.question_type,
-            "answer": qr.answer,
-        })
+        gt_items.append(
+            {
+                "question_id": qr.question_id,
+                "question_type": qr.question_type,
+                "answer": qr.answer,
+            }
+        )
 
     path: Path = Path(output_path)
     gt_path: Path = path.with_name(path.stem + "_gt" + path.suffix)
@@ -480,27 +492,37 @@ def main() -> None:
         description="Run LongMemEval benchmark on agentmemory",
     )
     parser.add_argument(
-        "--data", default=None,
+        "--data",
+        default=None,
         help="Path to local longmemeval_oracle.json (default: download from HuggingFace)",
     )
     parser.add_argument(
-        "--subset", type=int, default=None,
+        "--subset",
+        type=int,
+        default=None,
         help="Limit to first N questions (for debugging)",
     )
     parser.add_argument(
-        "--budget", type=int, default=2000,
+        "--budget",
+        type=int,
+        default=2000,
         help="Token budget for retrieval (default: 2000)",
     )
     parser.add_argument(
-        "--question-type", default=None, choices=QUESTION_TYPES,
+        "--question-type",
+        default=None,
+        choices=QUESTION_TYPES,
         help="Filter to a single question category",
     )
     parser.add_argument(
-        "--retrieve-only", default=None, metavar="PATH",
+        "--retrieve-only",
+        default=None,
+        metavar="PATH",
         help="Write retrieval results to PATH for LLM-judge scoring (primary mode)",
     )
     parser.add_argument(
-        "--output", default=None,
+        "--output",
+        default=None,
         help="Write full results JSON to this path",
     )
     args: argparse.Namespace = parser.parse_args()
@@ -523,7 +545,7 @@ def main() -> None:
 
     # Subset
     if args.subset is not None:
-        questions = questions[:args.subset]
+        questions = questions[: args.subset]
         print(f"Using first {len(questions)} questions")
 
     # Print distribution

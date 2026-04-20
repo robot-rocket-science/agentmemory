@@ -8,6 +8,7 @@ fuzzy-start typed traversal, not multi-hop (Exp 26 finding).
 
 Architecture: FTS5 (92% keyword) + HRR single-hop (8% vocabulary bridge).
 """
+
 from __future__ import annotations
 
 from typing import Final
@@ -41,7 +42,9 @@ def random_vector(dim: int, rng: np.random.Generator) -> Vector:
 
 def bind(a: Vector, b: Vector) -> Vector:
     """Circular convolution (binding) via FFT."""
-    result: Vector = np.real(np.fft.ifft(np.fft.fft(a) * np.fft.fft(b))).astype(np.float64)
+    result: Vector = np.real(np.fft.ifft(np.fft.fft(a) * np.fft.fft(b))).astype(
+        np.float64
+    )
     return result
 
 
@@ -167,7 +170,7 @@ class HRRGraph:
         partitions: list[list[tuple[str, str, str]]] = []
         for etype, type_edges in by_type.items():
             for i in range(0, len(type_edges), self.capacity):
-                partitions.append(type_edges[i:i + self.capacity])
+                partitions.append(type_edges[i : i + self.capacity])
 
         # Encode each partition
         for part_edges in partitions:
@@ -191,12 +194,14 @@ class HRRGraph:
             superposition: Vector = superpose(triples)
             part_idx: int = len(self._partitions)
 
-            self._partitions.append({
-                "vector": superposition,
-                "edge_count": len(triples),
-                "edge_types": edge_types_in_part,
-                "nodes": nodes_in_part,
-            })
+            self._partitions.append(
+                {
+                    "vector": superposition,
+                    "edge_count": len(triples),
+                    "edge_types": edge_types_in_part,
+                    "nodes": nodes_in_part,
+                }
+            )
 
             # Update routing index
             for node in nodes_in_part:
@@ -206,10 +211,16 @@ class HRRGraph:
 
     def _relevant_partitions(self, node_id: str) -> list[int]:
         """Get partition indices containing this node."""
-        return sorted(self._node_to_partitions.get(node_id, range(len(self._partitions))))
+        return sorted(
+            self._node_to_partitions.get(node_id, range(len(self._partitions)))
+        )
 
     def query_forward(
-        self, source: str, edge_type: str, top_k: int = 10, threshold: float = 0.05,
+        self,
+        source: str,
+        edge_type: str,
+        top_k: int = 10,
+        threshold: float = 0.05,
     ) -> list[tuple[str, float]]:
         """Query: what does source connect to via edge_type?
 
@@ -231,17 +242,24 @@ class HRRGraph:
             aggregated = aggregated + unbound
 
         # Recover targets from cleanup memory
-        results: list[tuple[str, float]] = self._cleanup.query(aggregated, top_k=top_k + 1)
+        results: list[tuple[str, float]] = self._cleanup.query(
+            aggregated, top_k=top_k + 1
+        )
 
         # Filter out self and below threshold
         filtered: list[tuple[str, float]] = [
-            (label, sim) for label, sim in results
+            (label, sim)
+            for label, sim in results
             if label != source and sim >= threshold
         ]
         return filtered[:top_k]
 
     def query_reverse(
-        self, target: str, edge_type: str, top_k: int = 10, threshold: float = 0.05,
+        self,
+        target: str,
+        edge_type: str,
+        top_k: int = 10,
+        threshold: float = 0.05,
     ) -> list[tuple[str, float]]:
         """Query: what connects to target via edge_type?
 
@@ -262,9 +280,12 @@ class HRRGraph:
             unbound = unbind(e_vec, unbound)
             aggregated = aggregated + unbound
 
-        results: list[tuple[str, float]] = self._cleanup.query(aggregated, top_k=top_k + 1)
+        results: list[tuple[str, float]] = self._cleanup.query(
+            aggregated, top_k=top_k + 1
+        )
         filtered: list[tuple[str, float]] = [
-            (label, sim) for label, sim in results
+            (label, sim)
+            for label, sim in results
             if label != target and sim >= threshold
         ]
         return filtered[:top_k]
@@ -290,7 +311,5 @@ class HRRGraph:
             "nodes": self.node_count(),
             "edge_types": sorted(self._edge_type_vecs.keys()),
             "partitions": self.partition_count(),
-            "total_edges": sum(
-                int(p["edge_count"]) for p in self._partitions  # type: ignore[arg-type]
-            ),
+            "total_edges": sum(int(str(p["edge_count"])) for p in self._partitions),
         }
