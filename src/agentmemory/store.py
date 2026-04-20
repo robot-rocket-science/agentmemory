@@ -959,6 +959,18 @@ class MemoryStore:
             is_user_locked: bool = lock_level == "user"
             ts: str = _now()
 
+            # Fix 3: First-signal amplification (FSRS-inspired).
+            # The first feedback event applies 3x weight to create meaningful
+            # separation from the prior. Skip for user-locked beliefs to avoid
+            # breaching the LOCKED_EVIDENCE_THRESHOLD on casual feedback.
+            if not is_user_locked:
+                prior_feedback: int = self._conn.execute(
+                    "SELECT COUNT(*) FROM tests WHERE belief_id = ?",
+                    (belief_id,),
+                ).fetchone()[0]
+                if prior_feedback == 0:
+                    weight = weight * 3.0
+
             if valence is not None:
                 # Continuous valence path
                 if valence > 0:

@@ -102,15 +102,19 @@ OUTCOME_HARMFUL: Final[str] = "harmful"
 OUTCOME_CONFIRMED: Final[str] = "confirmed"
 OUTCOME_WEAK: Final[str] = "weak"
 
-# Valence map: string outcome -> continuous score [-1.0, +1.0]
+# Valence map: string outcome -> continuous score [-2.0, +1.0]
 # Positive = alpha boost, negative = beta boost, zero = no change.
+# Asymmetric: negative feedback applies stronger weight (Fix 5, SM-2-inspired).
+# "ignored" changed from 0.0 to -0.1 (weak negative signal).
+# "weak" changed from -0.3 to -0.6 (moderate negative).
+# "harmful" changed from -1.0 to -2.0 (strong negative, 2x asymmetry).
 VALENCE_MAP: dict[str, float] = {
     "confirmed": +1.0,
     "used": +0.5,
-    "ignored": 0.0,
+    "ignored": -0.1,
     "contradicted": 0.0,
-    "weak": -0.3,
-    "harmful": -1.0,
+    "weak": -0.6,
+    "harmful": -2.0,
 }
 
 # Detection layers

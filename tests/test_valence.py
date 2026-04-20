@@ -9,6 +9,7 @@ Validates the core behavioral changes from the spectrum feedback design:
 5. session_quality() with hub-weighted credit assignment
 6. Gradient auto-feedback (overlap ratio instead of binary)
 """
+
 from __future__ import annotations
 
 from collections.abc import Generator
@@ -92,7 +93,7 @@ def test_valence_map_signs() -> None:
     """Positive outcomes have positive valence, negative have negative."""
     assert VALENCE_MAP["confirmed"] > 0
     assert VALENCE_MAP["used"] > 0
-    assert VALENCE_MAP["ignored"] == 0.0
+    assert VALENCE_MAP["ignored"] == -0.1  # weak negative signal (Fix 5)
     assert VALENCE_MAP["weak"] < 0
     assert VALENCE_MAP["harmful"] < 0
 
@@ -104,30 +105,47 @@ def test_valence_map_signs() -> None:
 
 def test_positive_valence_increases_alpha(store: MemoryStore) -> None:
     """Positive valence should increment alpha proportionally."""
-    b: Belief = store.insert_belief("Test positive valence", BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
-                                    alpha=5.0, beta_param=1.0)
+    b: Belief = store.insert_belief(
+        "Test positive valence",
+        BELIEF_FACTUAL,
+        BSRC_AGENT_INFERRED,
+        alpha=5.0,
+        beta_param=1.0,
+    )
     store.update_confidence(b.id, "ignored", valence=0.7)
     updated: Belief | None = store.get_belief(b.id)
     assert updated is not None
-    assert updated.alpha == pytest.approx(5.7)  # pyright: ignore[reportUnknownMemberType]
+    # First feedback event gets 3x weight (Fix 3), so alpha += 0.7 * 3 = 2.1
+    assert updated.alpha == pytest.approx(7.1)  # pyright: ignore[reportUnknownMemberType]
     assert updated.beta_param == pytest.approx(1.0)  # pyright: ignore[reportUnknownMemberType]
 
 
 def test_negative_valence_increases_beta(store: MemoryStore) -> None:
     """Negative valence should increment beta proportionally."""
-    b: Belief = store.insert_belief("Test negative valence", BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
-                                    alpha=5.0, beta_param=1.0)
+    b: Belief = store.insert_belief(
+        "Test negative valence",
+        BELIEF_FACTUAL,
+        BSRC_AGENT_INFERRED,
+        alpha=5.0,
+        beta_param=1.0,
+    )
     store.update_confidence(b.id, "ignored", valence=-0.3)
     updated: Belief | None = store.get_belief(b.id)
     assert updated is not None
     assert updated.alpha == pytest.approx(5.0)  # pyright: ignore[reportUnknownMemberType]
-    assert updated.beta_param == pytest.approx(1.3)  # pyright: ignore[reportUnknownMemberType]
+    # First-signal amplification: weight 1.0 * 3.0 = 3.0, beta += abs(-0.3) * 3.0 = 0.9
+    assert updated.beta_param == pytest.approx(1.9)  # pyright: ignore[reportUnknownMemberType]
 
 
 def test_zero_valence_no_change(store: MemoryStore) -> None:
     """Zero valence should not change alpha or beta."""
-    b: Belief = store.insert_belief("Test zero valence", BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
-                                    alpha=5.0, beta_param=1.0)
+    b: Belief = store.insert_belief(
+        "Test zero valence",
+        BELIEF_FACTUAL,
+        BSRC_AGENT_INFERRED,
+        alpha=5.0,
+        beta_param=1.0,
+    )
     store.update_confidence(b.id, "ignored", valence=0.0)
     updated: Belief | None = store.get_belief(b.id)
     assert updated is not None
@@ -137,13 +155,21 @@ def test_zero_valence_no_change(store: MemoryStore) -> None:
 
 def test_locked_resists_negative_valence(store: MemoryStore) -> None:
     """Locked beliefs should resist negative valence below LOCKED_EVIDENCE_THRESHOLD."""
-    b: Belief = store.insert_belief("Locked belief", BELIEF_FACTUAL, BSRC_USER_STATED,
-                                    alpha=9.0, beta_param=0.5, locked=True)
+    b: Belief = store.insert_belief(
+        "Locked belief",
+        BELIEF_FACTUAL,
+        BSRC_USER_STATED,
+        alpha=9.0,
+        beta_param=0.5,
+        locked=True,
+    )
     # weight=1.0 * valence=-0.5 = 0.5, below LOCKED_EVIDENCE_THRESHOLD (3.0)
     store.update_confidence(b.id, "harmful", valence=-0.5)
     updated: Belief | None = store.get_belief(b.id)
     assert updated is not None
-    assert updated.beta_param == pytest.approx(0.5)  # unchanged  # pyright: ignore[reportUnknownMemberType]
+    assert updated.beta_param == pytest.approx(  # pyright: ignore[reportUnknownMemberType]
+        0.5
+    )  # unchanged
 
 
 # ---------------------------------------------------------------------------
@@ -153,10 +179,12 @@ def test_locked_resists_negative_valence(store: MemoryStore) -> None:
 
 def test_propagation_supports_strengthens(store: MemoryStore) -> None:
     """Positive valence propagates through SUPPORTS edges, strengthening neighbors."""
-    a: Belief = store.insert_belief("Seed belief A", BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
-                                    alpha=5.0, beta_param=1.0)
-    b: Belief = store.insert_belief("Neighbor B", BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
-                                    alpha=5.0, beta_param=1.0)
+    a: Belief = store.insert_belief(
+        "Seed belief A", BELIEF_FACTUAL, BSRC_AGENT_INFERRED, alpha=5.0, beta_param=1.0
+    )
+    b: Belief = store.insert_belief(
+        "Neighbor B", BELIEF_FACTUAL, BSRC_AGENT_INFERRED, alpha=5.0, beta_param=1.0
+    )
     store.insert_edge(a.id, b.id, EDGE_SUPPORTS)
 
     updated_count: int = store.propagate_valence(a.id, valence=1.0)
@@ -170,10 +198,20 @@ def test_propagation_supports_strengthens(store: MemoryStore) -> None:
 
 def test_propagation_contradicts_inverts(store: MemoryStore) -> None:
     """Positive valence through CONTRADICTS edges should WEAKEN the neighbor."""
-    a: Belief = store.insert_belief("Confirmed belief", BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
-                                    alpha=5.0, beta_param=1.0)
-    b: Belief = store.insert_belief("Contradicting belief", BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
-                                    alpha=5.0, beta_param=1.0)
+    a: Belief = store.insert_belief(
+        "Confirmed belief",
+        BELIEF_FACTUAL,
+        BSRC_AGENT_INFERRED,
+        alpha=5.0,
+        beta_param=1.0,
+    )
+    b: Belief = store.insert_belief(
+        "Contradicting belief",
+        BELIEF_FACTUAL,
+        BSRC_AGENT_INFERRED,
+        alpha=5.0,
+        beta_param=1.0,
+    )
     store.insert_edge(a.id, b.id, EDGE_CONTRADICTS)
 
     store.propagate_valence(a.id, valence=1.0)
@@ -187,10 +225,16 @@ def test_propagation_contradicts_inverts(store: MemoryStore) -> None:
 
 def test_propagation_supersedes_no_propagation(store: MemoryStore) -> None:
     """SUPERSEDES edges should not propagate valence (multiplier = 0.0)."""
-    a: Belief = store.insert_belief("New belief", BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
-                                    alpha=5.0, beta_param=1.0)
-    b: Belief = store.insert_belief("Old superseded belief", BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
-                                    alpha=5.0, beta_param=1.0)
+    a: Belief = store.insert_belief(
+        "New belief", BELIEF_FACTUAL, BSRC_AGENT_INFERRED, alpha=5.0, beta_param=1.0
+    )
+    b: Belief = store.insert_belief(
+        "Old superseded belief",
+        BELIEF_FACTUAL,
+        BSRC_AGENT_INFERRED,
+        alpha=5.0,
+        beta_param=1.0,
+    )
     store.insert_edge(a.id, b.id, EDGE_SUPERSEDES)
 
     updated: int = store.propagate_valence(a.id, valence=1.0)
@@ -203,12 +247,15 @@ def test_propagation_supersedes_no_propagation(store: MemoryStore) -> None:
 
 def test_propagation_decay_per_hop(store: MemoryStore) -> None:
     """Valence decays exponentially with hop distance."""
-    a: Belief = store.insert_belief("Root", BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
-                                    alpha=5.0, beta_param=1.0)
-    b: Belief = store.insert_belief("Hop 1", BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
-                                    alpha=5.0, beta_param=1.0)
-    c: Belief = store.insert_belief("Hop 2", BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
-                                    alpha=5.0, beta_param=1.0)
+    a: Belief = store.insert_belief(
+        "Root", BELIEF_FACTUAL, BSRC_AGENT_INFERRED, alpha=5.0, beta_param=1.0
+    )
+    b: Belief = store.insert_belief(
+        "Hop 1", BELIEF_FACTUAL, BSRC_AGENT_INFERRED, alpha=5.0, beta_param=1.0
+    )
+    c: Belief = store.insert_belief(
+        "Hop 2", BELIEF_FACTUAL, BSRC_AGENT_INFERRED, alpha=5.0, beta_param=1.0
+    )
     store.insert_edge(a.id, b.id, EDGE_SUPPORTS)
     store.insert_edge(b.id, c.id, EDGE_SUPPORTS)
 
@@ -225,14 +272,22 @@ def test_propagation_decay_per_hop(store: MemoryStore) -> None:
 
 def test_propagation_stops_at_threshold(store: MemoryStore) -> None:
     """Propagation should stop when valence drops below min_threshold."""
-    a: Belief = store.insert_belief("Root for threshold", BELIEF_FACTUAL, BSRC_AGENT_INFERRED)
-    b: Belief = store.insert_belief("Hop 1 threshold", BELIEF_FACTUAL, BSRC_AGENT_INFERRED)
-    c: Belief = store.insert_belief("Hop 2 threshold", BELIEF_FACTUAL, BSRC_AGENT_INFERRED)
+    a: Belief = store.insert_belief(
+        "Root for threshold", BELIEF_FACTUAL, BSRC_AGENT_INFERRED
+    )
+    b: Belief = store.insert_belief(
+        "Hop 1 threshold", BELIEF_FACTUAL, BSRC_AGENT_INFERRED
+    )
+    c: Belief = store.insert_belief(
+        "Hop 2 threshold", BELIEF_FACTUAL, BSRC_AGENT_INFERRED
+    )
     store.insert_edge(a.id, b.id, EDGE_SUPPORTS)
     store.insert_edge(b.id, c.id, EDGE_SUPPORTS)
 
     # Start with small valence so hop 2 falls below threshold
-    updated: int = store.propagate_valence(a.id, valence=0.2, decay=0.5, min_threshold=0.08)
+    updated: int = store.propagate_valence(
+        a.id, valence=0.2, decay=0.5, min_threshold=0.08
+    )
     # Hop 1: 0.2 * 0.5 = 0.1 (above 0.08, propagates)
     # Hop 2: 0.1 * 0.5 = 0.05 (below 0.08, stops)
     assert updated == 1  # only hop 1
@@ -240,9 +295,17 @@ def test_propagation_stops_at_threshold(store: MemoryStore) -> None:
 
 def test_propagation_locked_resists_negative(store: MemoryStore) -> None:
     """Locked beliefs should resist indirect negative valence propagation."""
-    a: Belief = store.insert_belief("Source of negative", BELIEF_FACTUAL, BSRC_AGENT_INFERRED)
-    b: Belief = store.insert_belief("Locked neighbor", BELIEF_FACTUAL, BSRC_USER_STATED,
-                                    alpha=9.0, beta_param=0.5, locked=True)
+    a: Belief = store.insert_belief(
+        "Source of negative", BELIEF_FACTUAL, BSRC_AGENT_INFERRED
+    )
+    b: Belief = store.insert_belief(
+        "Locked neighbor",
+        BELIEF_FACTUAL,
+        BSRC_USER_STATED,
+        alpha=9.0,
+        beta_param=0.5,
+        locked=True,
+    )
     store.insert_edge(a.id, b.id, EDGE_CONTRADICTS)
 
     # Positive valence on a, inverted through CONTRADICTS = negative to b
@@ -262,8 +325,13 @@ def test_propagation_locked_resists_negative(store: MemoryStore) -> None:
 def test_confirm_increases_alpha() -> None:
     """confirm() should increase alpha by CONFIRM_WEIGHT."""
     store: MemoryStore = server_mod._get_store()
-    b: Belief = store.insert_belief("Confirmable belief", BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
-                                    alpha=5.0, beta_param=1.0)
+    b: Belief = store.insert_belief(
+        "Confirmable belief",
+        BELIEF_FACTUAL,
+        BSRC_AGENT_INFERRED,
+        alpha=5.0,
+        beta_param=1.0,
+    )
 
     result: str = confirm(b.id)
     assert "Confirmed" in result
@@ -278,10 +346,20 @@ def test_confirm_increases_alpha() -> None:
 def test_confirm_propagates_valence() -> None:
     """confirm() should propagate valence to connected beliefs."""
     store: MemoryStore = server_mod._get_store()
-    a: Belief = store.insert_belief("Confirmed belief", BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
-                                    alpha=5.0, beta_param=1.0)
-    b: Belief = store.insert_belief("Connected to confirmed", BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
-                                    alpha=5.0, beta_param=1.0)
+    a: Belief = store.insert_belief(
+        "Confirmed belief",
+        BELIEF_FACTUAL,
+        BSRC_AGENT_INFERRED,
+        alpha=5.0,
+        beta_param=1.0,
+    )
+    b: Belief = store.insert_belief(
+        "Connected to confirmed",
+        BELIEF_FACTUAL,
+        BSRC_AGENT_INFERRED,
+        alpha=5.0,
+        beta_param=1.0,
+    )
     store.insert_edge(a.id, b.id, EDGE_SUPPORTS)
 
     result: str = confirm(a.id)
@@ -305,8 +383,11 @@ def test_session_quality_positive() -> None:
     beliefs: list[Belief] = []
     for i in range(5):
         b: Belief = store.insert_belief(
-            f"Session quality test belief {i}", BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
-            alpha=5.0, beta_param=1.0,
+            f"Session quality test belief {i}",
+            BELIEF_FACTUAL,
+            BSRC_AGENT_INFERRED,
+            alpha=5.0,
+            beta_param=1.0,
         )
         beliefs.append(b)
         # Record a test result so the belief appears in the session
@@ -333,7 +414,9 @@ def test_session_quality_records_score() -> None:
     store: MemoryStore = server_mod._get_store()
     session_id: str = server_mod._session_id  # type: ignore[assignment]
 
-    b: Belief = store.insert_belief("Quality record test", BELIEF_FACTUAL, BSRC_AGENT_INFERRED)
+    b: Belief = store.insert_belief(
+        "Quality record test", BELIEF_FACTUAL, BSRC_AGENT_INFERRED
+    )
     store.record_test_result(b.id, session_id, OUTCOME_IGNORED, LAYER_IMPLICIT)
 
     session_quality(0.8)
@@ -356,7 +439,8 @@ def test_gradient_auto_feedback_valence() -> None:
     # Insert a belief with 5 key terms
     b: Belief = store.insert_belief(
         "Python virtual environments should use uv package manager",
-        BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
+        BELIEF_FACTUAL,
+        BSRC_AGENT_INFERRED,
     )
 
     # Simulate retrieval buffer
@@ -387,8 +471,13 @@ def test_gradient_auto_feedback_valence() -> None:
 def test_feedback_confirmed_outcome() -> None:
     """feedback() with 'confirmed' should increase alpha more than 'used'."""
     store: MemoryStore = server_mod._get_store()
-    b: Belief = store.insert_belief("Test confirmed feedback", BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
-                                    alpha=5.0, beta_param=1.0)
+    b: Belief = store.insert_belief(
+        "Test confirmed feedback",
+        BELIEF_FACTUAL,
+        BSRC_AGENT_INFERRED,
+        alpha=5.0,
+        beta_param=1.0,
+    )
 
     result: str = feedback(b.id, "confirmed")
     assert "Feedback recorded" in result
@@ -402,16 +491,21 @@ def test_feedback_confirmed_outcome() -> None:
 def test_feedback_weak_outcome() -> None:
     """feedback() with 'weak' should slightly increase beta."""
     store: MemoryStore = server_mod._get_store()
-    b: Belief = store.insert_belief("Test weak feedback", BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
-                                    alpha=5.0, beta_param=1.0)
+    b: Belief = store.insert_belief(
+        "Test weak feedback",
+        BELIEF_FACTUAL,
+        BSRC_AGENT_INFERRED,
+        alpha=5.0,
+        beta_param=1.0,
+    )
 
     result: str = feedback(b.id, "weak")
     assert "Feedback recorded" in result
 
     updated: Belief | None = store.get_belief(b.id)
     assert updated is not None
-    # weak: valence=-0.3, beta += 0.3
-    assert updated.beta_param == pytest.approx(1.3)  # pyright: ignore[reportUnknownMemberType]
+    # weak: valence=-0.6 (Fix 5: asymmetric), beta += 0.6
+    assert updated.beta_param == pytest.approx(1.6)  # pyright: ignore[reportUnknownMemberType]
 
 
 # ---------------------------------------------------------------------------
@@ -425,11 +519,17 @@ def test_contradiction_resolution_via_confirm() -> None:
 
     correct_belief: Belief = store.insert_belief(
         "Use uv for Python package management",
-        BELIEF_FACTUAL, BSRC_USER_STATED, alpha=5.0, beta_param=1.0,
+        BELIEF_FACTUAL,
+        BSRC_USER_STATED,
+        alpha=5.0,
+        beta_param=1.0,
     )
     wrong_belief: Belief = store.insert_belief(
         "Use pip for Python package management",
-        BELIEF_FACTUAL, BSRC_AGENT_INFERRED, alpha=5.0, beta_param=1.0,
+        BELIEF_FACTUAL,
+        BSRC_AGENT_INFERRED,
+        alpha=5.0,
+        beta_param=1.0,
     )
     store.insert_edge(correct_belief.id, wrong_belief.id, EDGE_CONTRADICTS)
 

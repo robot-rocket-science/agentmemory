@@ -1,4 +1,5 @@
 """Tests for the retrieval pipeline: scoring, compression, and full retrieve()."""
+
 from __future__ import annotations
 
 from collections.abc import Generator
@@ -213,13 +214,14 @@ class TestDecayFactor:
             belief_type=BELIEF_FACTUAL,
             source_type=BSRC_AGENT_INFERRED,
         )
-        # Simulate 336 hours (exactly one half-life) in the future
+        # agent_inferred factual: base HL=336h * 0.5x source modifier = 168h effective
+        # At 336h (2 effective half-lives): factor = 0.5^2 = 0.25
         import datetime as dt
 
         created: dt.datetime = dt.datetime.fromisoformat(b.created_at)
         future: dt.datetime = created + dt.timedelta(hours=336)
         factor: float = decay_factor(b, future.isoformat())
-        assert 0.48 <= factor <= 0.52  # should be approx 0.5
+        assert 0.24 <= factor <= 0.26  # 0.25 with 0.5x source modifier
 
 
 class TestLockBoostTyped:
@@ -282,7 +284,9 @@ class TestScoreBelief:
         assert superseded is not None
         assert score_belief(superseded, "any query", superseded.created_at) == 0.01
 
-    def test_locked_scores_higher_than_normal_on_average(self, store: MemoryStore) -> None:
+    def test_locked_scores_higher_than_normal_on_average(
+        self, store: MemoryStore
+    ) -> None:
         locked_b: Belief = store.insert_belief(
             content="Locked high confidence belief",
             belief_type=BELIEF_FACTUAL,
@@ -299,15 +303,20 @@ class TestScoreBelief:
             beta_param=0.5,
         )
         import random
+
         random.seed(42)
         # Use a query that matches the locked belief content so lock_boost activates.
         locked_scores: list[float] = [
-            score_belief(locked_b, "locked confidence belief", locked_b.created_at) for _ in range(50)
+            score_belief(locked_b, "locked confidence belief", locked_b.created_at)
+            for _ in range(50)
         ]
         normal_scores: list[float] = [
-            score_belief(normal_b, "locked confidence belief", normal_b.created_at) for _ in range(50)
+            score_belief(normal_b, "locked confidence belief", normal_b.created_at)
+            for _ in range(50)
         ]
-        assert sum(locked_scores) / len(locked_scores) > sum(normal_scores) / len(normal_scores)
+        assert sum(locked_scores) / len(locked_scores) > sum(normal_scores) / len(
+            normal_scores
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -468,18 +477,14 @@ class TestRetrieve:
         assert scores == sorted(scores, reverse=True), "Results not sorted by score"
 
     def test_scores_dict_matches_beliefs(self, populated_store: MemoryStore) -> None:
-        result: RetrievalResult = retrieve(
-            populated_store, query="typing", budget=4000
-        )
+        result: RetrievalResult = retrieve(populated_store, query="typing", budget=4000)
         for b in result.beliefs:
             assert b.id in result.scores
 
     def test_include_locked_false_excludes_locked(
         self, populated_store: MemoryStore
     ) -> None:
-        locked_ids: set[str] = {
-            b.id for b in populated_store.get_locked_beliefs()
-        }
+        locked_ids: set[str] = {b.id for b in populated_store.get_locked_beliefs()}
         result: RetrievalResult = retrieve(
             populated_store,
             query="python typing",
@@ -494,9 +499,7 @@ class TestRetrieve:
     def test_empty_query_still_returns_locked(
         self, populated_store: MemoryStore
     ) -> None:
-        result: RetrievalResult = retrieve(
-            populated_store, query="", budget=4000
-        )
+        result: RetrievalResult = retrieve(populated_store, query="", budget=4000)
         locked_in_store: list[Belief] = populated_store.get_locked_beliefs()
         result_ids: set[str] = {b.id for b in result.beliefs}
         for locked_b in locked_in_store:

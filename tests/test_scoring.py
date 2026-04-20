@@ -75,7 +75,11 @@ class TestDecayFactor:
         """After 14 days (336 hours), a factual belief should decay to ~0.5."""
         now = datetime.now(timezone.utc)
         created = now - timedelta(days=14)
-        b = _make_belief(belief_type="factual", created_at=created.isoformat())
+        b = _make_belief(
+            belief_type="factual",
+            source_type="document_recent",
+            created_at=created.isoformat(),
+        )
         result = decay_factor(b, now)
         assert result == pytest.approx(0.5, abs=0.01)
 
@@ -83,7 +87,11 @@ class TestDecayFactor:
         """After 24 weeks, a requirement belief should decay to ~0.5."""
         now = datetime.now(timezone.utc)
         created = now - timedelta(weeks=24)
-        b = _make_belief(belief_type="requirement", created_at=created.isoformat())
+        b = _make_belief(
+            belief_type="requirement",
+            source_type="document_recent",
+            created_at=created.isoformat(),
+        )
         result = decay_factor(b, now)
         assert result == pytest.approx(0.5, abs=0.01)
 
@@ -91,7 +99,11 @@ class TestDecayFactor:
         """After 8 weeks, a correction belief should decay to ~0.5."""
         now = datetime.now(timezone.utc)
         created = now - timedelta(weeks=8)
-        b = _make_belief(belief_type="correction", created_at=created.isoformat())
+        b = _make_belief(
+            belief_type="correction",
+            source_type="document_recent",
+            created_at=created.isoformat(),
+        )
         result = decay_factor(b, now)
         assert result == pytest.approx(0.5, abs=0.01)
 
@@ -99,7 +111,11 @@ class TestDecayFactor:
         """After 12 weeks, a preference belief should decay to ~0.5."""
         now = datetime.now(timezone.utc)
         created = now - timedelta(weeks=12)
-        b = _make_belief(belief_type="preference", created_at=created.isoformat())
+        b = _make_belief(
+            belief_type="preference",
+            source_type="document_recent",
+            created_at=created.isoformat(),
+        )
         result = decay_factor(b, now)
         assert result == pytest.approx(0.5, abs=0.01)
 
@@ -147,7 +163,11 @@ class TestDecayFactor:
         """After 2 half-lives, decay should be ~0.25."""
         now = datetime.now(timezone.utc)
         created = now - timedelta(days=28)  # 2x factual half-life (14d)
-        b = _make_belief(belief_type="factual", created_at=created.isoformat())
+        b = _make_belief(
+            belief_type="factual",
+            source_type="document_recent",
+            created_at=created.isoformat(),
+        )
         result = decay_factor(b, now)
         assert result == pytest.approx(0.25, abs=0.01)
 
@@ -165,7 +185,11 @@ class TestDecayFactorVelocity:
         now = datetime.now(timezone.utc)
         # factual half-life = 336h. At velocity >10, effective = 336*0.1 = 33.6h
         created = now - timedelta(hours=33.6)
-        b = _make_belief(belief_type="factual", created_at=created.isoformat())
+        b = _make_belief(
+            belief_type="factual",
+            source_type="document_recent",
+            created_at=created.isoformat(),
+        )
         result = decay_factor(b, now, session_velocity=15.0)
         assert result == pytest.approx(0.5, abs=0.02)
 
@@ -173,7 +197,11 @@ class TestDecayFactorVelocity:
         """Deep velocity (<2) gives 1.0x multiplier -- no scaling."""
         now = datetime.now(timezone.utc)
         created = now - timedelta(days=14)
-        b = _make_belief(belief_type="factual", created_at=created.isoformat())
+        b = _make_belief(
+            belief_type="factual",
+            source_type="document_recent",
+            created_at=created.isoformat(),
+        )
         result_no_vel = decay_factor(b, now)
         result_deep = decay_factor(b, now, session_velocity=1.0)
         assert result_deep == pytest.approx(result_no_vel, abs=0.001)
@@ -410,7 +438,11 @@ class TestCoreScore:
     def test_with_decay(self) -> None:
         now = datetime.now(timezone.utc)
         created = now - timedelta(days=14)
-        b = _make_belief(belief_type="factual", created_at=created.isoformat())
+        b = _make_belief(
+            belief_type="factual",
+            source_type="document_recent",
+            created_at=created.isoformat(),
+        )
         score_no_time = core_score(b)
         score_with_time = core_score(b, current_time_iso=now.isoformat())
         # With 14-day-old factual, decay ~0.5, so score_with_time < score_no_time
@@ -450,17 +482,20 @@ class TestScoreBelief:
     def test_locked_relevant_scores_higher(self) -> None:
         """Locked relevant belief should consistently score higher than unlocked."""
         now = datetime.now(timezone.utc)
+        created = (now - timedelta(hours=48)).isoformat()
         b_locked = _make_belief(
             locked=True,
             content="always use pytest for testing",
             alpha=10.0,
             beta_param=1.0,
+            created_at=created,
         )
         b_unlocked = _make_belief(
             locked=False,
             content="always use pytest for testing",
             alpha=10.0,
             beta_param=1.0,
+            created_at=created,
         )
         # Run multiple times to account for Thompson sampling variance
         locked_scores: list[float] = []

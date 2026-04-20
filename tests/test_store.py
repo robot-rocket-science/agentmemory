@@ -1,4 +1,5 @@
 """Tests for MemoryStore: schema, CRUD, dedup, locking, FTS5, sessions, benchmarks."""
+
 from __future__ import annotations
 
 import json
@@ -165,7 +166,9 @@ def test_belief_dedup_same_content(store: MemoryStore) -> None:
 
 
 def test_belief_with_observation_evidence(store: MemoryStore) -> None:
-    obs = store.insert_observation("user said pyright strict", OBS_TYPE_USER_STATEMENT, SRC_USER)
+    obs = store.insert_observation(
+        "user said pyright strict", OBS_TYPE_USER_STATEMENT, SRC_USER
+    )
     belief = store.insert_belief(
         content="Pyright strict mode is required",
         belief_type=BELIEF_FACTUAL,
@@ -200,7 +203,9 @@ def test_belief_appears_in_search_index(store: MemoryStore) -> None:
 
 
 def test_lock_belief(store: MemoryStore) -> None:
-    belief = store.insert_belief("strict typing always", BELIEF_FACTUAL, BSRC_USER_STATED)
+    belief = store.insert_belief(
+        "strict typing always", BELIEF_FACTUAL, BSRC_USER_STATED
+    )
     store.lock_belief(belief.id)
     updated = store.get_belief(belief.id)
     assert updated is not None
@@ -210,8 +215,7 @@ def test_lock_belief(store: MemoryStore) -> None:
 def test_locked_belief_resists_weak_evidence(store: MemoryStore) -> None:
     """Weak 'harmful' evidence (weight < 3.0) must not reduce locked belief confidence."""
     belief = store.insert_belief(
-        "use uv always", BELIEF_FACTUAL, BSRC_USER_STATED,
-        alpha=10.0, beta_param=1.0
+        "use uv always", BELIEF_FACTUAL, BSRC_USER_STATED, alpha=10.0, beta_param=1.0
     )
     store.lock_belief(belief.id)
     original_beta: float = belief.beta_param
@@ -228,8 +232,11 @@ def test_locked_belief_resists_weak_evidence(store: MemoryStore) -> None:
 def test_locked_belief_yields_to_strong_evidence(store: MemoryStore) -> None:
     """Strong 'harmful' evidence (weight >= 3.0) CAN reduce locked belief confidence."""
     belief = store.insert_belief(
-        "robotrocketscience is public", BELIEF_FACTUAL, BSRC_USER_STATED,
-        alpha=10.0, beta_param=1.0
+        "robotrocketscience is public",
+        BELIEF_FACTUAL,
+        BSRC_USER_STATED,
+        alpha=10.0,
+        beta_param=1.0,
     )
     store.lock_belief(belief.id)
     original_beta: float = belief.beta_param
@@ -246,7 +253,9 @@ def test_locked_belief_yields_to_strong_evidence(store: MemoryStore) -> None:
 def test_locked_belief_can_be_unlocked(store: MemoryStore) -> None:
     """Locked beliefs can be unlocked."""
     belief = store.insert_belief(
-        "temporary rule", BELIEF_FACTUAL, BSRC_USER_STATED,
+        "temporary rule",
+        BELIEF_FACTUAL,
+        BSRC_USER_STATED,
     )
     store.lock_belief(belief.id)
     assert store.get_belief(belief.id) is not None
@@ -262,11 +271,15 @@ def test_locked_belief_can_be_unlocked(store: MemoryStore) -> None:
 def test_locked_belief_can_be_superseded(store: MemoryStore) -> None:
     """Locked beliefs can be superseded by stronger evidence."""
     old = store.insert_belief(
-        "old locked fact", BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
+        "old locked fact",
+        BELIEF_FACTUAL,
+        BSRC_AGENT_INFERRED,
     )
     store.lock_belief(old.id)
     new = store.insert_belief(
-        "new corrected fact", "correction", "user_corrected",
+        "new corrected fact",
+        "correction",
+        "user_corrected",
     )
     store.supersede_belief(old.id, new.id, "evidence override")
     updated = store.get_belief(old.id)
@@ -276,24 +289,33 @@ def test_locked_belief_can_be_superseded(store: MemoryStore) -> None:
 
 def test_unlocked_belief_confidence_decreases_on_harmful(store: MemoryStore) -> None:
     belief = store.insert_belief(
-        "agent should cache results", BELIEF_FACTUAL, BSRC_AGENT_INFERRED,
-        alpha=5.0, beta_param=1.0
+        "agent should cache results",
+        BELIEF_FACTUAL,
+        BSRC_AGENT_INFERRED,
+        alpha=5.0,
+        beta_param=1.0,
     )
     store.update_confidence(belief.id, OUTCOME_HARMFUL, weight=2.0)
     updated = store.get_belief(belief.id)
     assert updated is not None
-    assert abs(updated.beta_param - 3.0) < 1e-9
+    # First-signal amplification: weight 2.0 * 3.0 = 6.0, beta = 1.0 + 6.0 = 7.0
+    assert abs(updated.beta_param - 7.0) < 1e-9
 
 
 def test_used_outcome_increases_alpha(store: MemoryStore) -> None:
     belief = store.insert_belief(
-        "use pytest for tests", BELIEF_FACTUAL, BSRC_USER_STATED,
-        alpha=2.0, beta_param=1.0
+        "use pytest for tests",
+        BELIEF_FACTUAL,
+        BSRC_USER_STATED,
+        alpha=2.0,
+        beta_param=1.0,
     )
+    # First feedback event gets 3x weight (Fix 3: first-signal amplification).
+    # alpha goes from 2.0 to 2.0 + 1.0*3 = 5.0
     store.update_confidence(belief.id, OUTCOME_USED, weight=1.0)
     updated = store.get_belief(belief.id)
     assert updated is not None
-    assert abs(updated.alpha - 3.0) < 1e-9
+    assert abs(updated.alpha - 5.0) < 1e-9
 
 
 # ---------------------------------------------------------------------------
@@ -302,8 +324,12 @@ def test_used_outcome_increases_alpha(store: MemoryStore) -> None:
 
 
 def test_supersede_belief(store: MemoryStore) -> None:
-    old = store.insert_belief("Python 3.11 is required", BELIEF_FACTUAL, BSRC_USER_STATED)
-    new = store.insert_belief("Python 3.12 is required", BELIEF_FACTUAL, BSRC_USER_STATED)
+    old = store.insert_belief(
+        "Python 3.11 is required", BELIEF_FACTUAL, BSRC_USER_STATED
+    )
+    new = store.insert_belief(
+        "Python 3.12 is required", BELIEF_FACTUAL, BSRC_USER_STATED
+    )
 
     store.supersede_belief(old.id, new.id, "version requirement updated")
 
@@ -379,8 +405,12 @@ def test_fts5_search_excludes_superseded(store: MemoryStore) -> None:
 
 
 def test_search_observations(store: MemoryStore) -> None:
-    store.insert_observation("agent crashed with OOM error", OBS_TYPE_DECISION, SRC_AGENT)
-    store.insert_observation("user approved the plan", OBS_TYPE_USER_STATEMENT, SRC_USER)
+    store.insert_observation(
+        "agent crashed with OOM error", OBS_TYPE_DECISION, SRC_AGENT
+    )
+    store.insert_observation(
+        "user approved the plan", OBS_TYPE_USER_STATEMENT, SRC_USER
+    )
     results = store.search_observations("crashed OOM", top_k=5)
     assert len(results) > 0
     assert any("crash" in r.content or "OOM" in r.content for r in results)
@@ -403,7 +433,9 @@ def test_get_locked_beliefs(store: MemoryStore) -> None:
 
 
 def test_create_session(store: MemoryStore) -> None:
-    session = store.create_session(model="claude-sonnet-4-6", project_context="agentmemory")
+    session = store.create_session(
+        model="claude-sonnet-4-6", project_context="agentmemory"
+    )
     assert session.id
     assert session.started_at
     assert session.completed_at is None

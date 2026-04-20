@@ -3,6 +3,7 @@
 Tests call the tool functions directly, bypassing MCP protocol.
 Each test uses a fresh MemoryStore backed by a tmp_path database.
 """
+
 from __future__ import annotations
 
 import sqlite3
@@ -61,7 +62,9 @@ def test_remember_creates_high_confidence_belief() -> None:
     assert len(locked) == 0
 
     # Verify the belief exists and has high confidence but is NOT locked
-    beliefs: list[sqlite3.Row] = store.query("SELECT * FROM beliefs WHERE valid_to IS NULL")
+    beliefs: list[sqlite3.Row] = store.query(
+        "SELECT * FROM beliefs WHERE valid_to IS NULL"
+    )
     assert len(beliefs) == 1
     belief: Belief | None = store.get_belief(str(beliefs[0]["id"]))
     assert belief is not None
@@ -114,7 +117,9 @@ def test_correct_without_replaces() -> None:
     assert len(locked) == 0
 
     # Verify high-confidence but unlocked correction belief
-    beliefs: list[sqlite3.Row] = store.query("SELECT * FROM beliefs WHERE valid_to IS NULL")
+    beliefs: list[sqlite3.Row] = store.query(
+        "SELECT * FROM beliefs WHERE valid_to IS NULL"
+    )
     assert len(beliefs) == 1
     belief: Belief | None = store.get_belief(str(beliefs[0]["id"]))
     assert belief is not None
@@ -239,11 +244,19 @@ def test_lock_already_locked() -> None:
 def test_search_respects_budget() -> None:
     # Create many beliefs to potentially exceed budget
     words: list[str] = [
-        "authentication", "authorization", "database", "caching",
-        "logging", "monitoring", "deployment", "configuration",
+        "authentication",
+        "authorization",
+        "database",
+        "caching",
+        "logging",
+        "monitoring",
+        "deployment",
+        "configuration",
     ]
     for word in words:
-        remember(f"The {word} system requires careful attention to security and performance.")
+        remember(
+            f"The {word} system requires careful attention to security and performance."
+        )
 
     # Very small budget -- should return fewer results
     result_small: str = search("system security", budget=50)
@@ -307,12 +320,15 @@ def test_feedback_harmful_increases_beta() -> None:
         beta_param=1.0,
     )
 
-    result: str = feedback(belief.id, "harmful", detail="user complained about reformatting")
+    result: str = feedback(
+        belief.id, "harmful", detail="user complained about reformatting"
+    )
 
     assert "Feedback recorded" in result
     updated: Belief | None = store.get_belief(belief.id)
     assert updated is not None
-    assert updated.beta_param == pytest.approx(2.0)  # pyright: ignore[reportUnknownMemberType]
+    # harmful valence is -2.0 (Fix 5: asymmetric), so beta += 2.0
+    assert updated.beta_param == pytest.approx(3.0)  # pyright: ignore[reportUnknownMemberType]
     assert updated.confidence < belief.confidence
 
 
@@ -400,7 +416,10 @@ def test_auto_feedback_marks_used_on_term_overlap() -> None:
     assert "strict static typing" in result1
 
     # Simulate agent using the belief (ingest text with overlapping terms)
-    ingest("I updated the config to enforce strict static typing via pyright.", source="assistant")
+    ingest(
+        "I updated the config to enforce strict static typing via pyright.",
+        source="assistant",
+    )
 
     # Second search triggers auto-feedback on the first batch
     search("something else entirely")
@@ -430,7 +449,10 @@ def test_auto_feedback_marks_ignored_when_no_overlap() -> None:
     search("HRR retrieval value archetypes")
 
     # Ingest completely unrelated text
-    ingest("The compaction hook rotates log files to the archive directory.", source="assistant")
+    ingest(
+        "The compaction hook rotates log files to the archive directory.",
+        source="assistant",
+    )
 
     # Trigger auto-feedback
     search("unrelated query")
@@ -461,6 +483,7 @@ def test_auto_feedback_skips_explicit() -> None:
 
     # Extract belief ID
     import re as _re
+
     ids: list[str] = _re.findall(r"ID: ([a-f0-9]+)", result)
     assert len(ids) >= 1
     bid: str = ids[0]
@@ -498,6 +521,7 @@ def test_auto_feedback_increments_session_metric() -> None:
     session_id: str | None = server_mod._session_id  # pyright: ignore[reportPrivateUsage]
     assert session_id is not None
     from agentmemory.models import Session
+
     session: Session | None = store.get_session(session_id)
     assert session is not None
     assert session.feedback_given >= 1

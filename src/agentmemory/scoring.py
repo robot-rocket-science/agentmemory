@@ -23,6 +23,16 @@ DECAY_HALF_LIVES: dict[str, float | None] = {
     "relational": 336.0,  # 14 days
 }
 
+# Source-type decay modifiers (v2.4.0, confidence differentiation Fix 2).
+# Multiplied against base half-life to differentiate agent-inferred vs user-sourced.
+# 0.5x floor for agent_inferred prevents killing facts too fast (0.3x was too aggressive,
+# killed in 4 days per Exp 90 validation).
+SOURCE_DECAY_MODIFIER: dict[str, float] = {
+    "user_corrected": 2.0,  # 2x half-life (slower decay)
+    "user_stated": 1.5,  # 1.5x half-life
+    "agent_inferred": 0.5,  # 0.5x half-life (faster decay, 7-day factual)
+}
+
 
 def _parse_iso(ts: str) -> datetime:
     """Parse an ISO 8601 timestamp. Returns a timezone-aware datetime."""
@@ -86,11 +96,13 @@ def decay_factor(
     if age_hours <= 0.0:
         return 1.0
 
-    effective_hl: float = half_life
+    # Apply source-type decay modifier (Fix 2: confidence differentiation).
+    source_mod: float = SOURCE_DECAY_MODIFIER.get(belief.source_type, 1.0)
+    effective_hl: float = half_life * source_mod
     if session_velocity is not None:
-        effective_hl = half_life * velocity_scale(session_velocity)
-        if effective_hl <= 0.0:
-            return 0.01
+        effective_hl = effective_hl * velocity_scale(session_velocity)
+    if effective_hl <= 0.0:
+        return 0.01
 
     return math.pow(0.5, age_hours / effective_hl)
 
@@ -270,6 +282,29 @@ def recency_boost(
     return 1.0 + math.pow(0.5, age_hours / half_life_hours)
 
 
+def ucb_exploration_bonus(
+    retrieval_count: int, total_retrievals: int, c: float = 0.1
+) -> float:
+    """UCB1-style exploration bonus for under-retrieved beliefs (Fix 4).
+
+    Boosts beliefs that have been retrieved fewer times, ensuring all beliefs
+    eventually surface and receive feedback. C=0.1 gives max ~0.26 bonus.
+    """
+    if total_retrievals <= 0:
+        return 0.0
+    return c * math.sqrt(math.log(total_retrievals) / max(1, retrieval_count))
+
+
+# Approximate global retrieval count, updated lazily. Used for UCB bonus.
+_global_retrieval_estimate: int = 1000
+
+
+def set_global_retrieval_estimate(n: int) -> None:
+    """Set the global retrieval count estimate for UCB exploration bonus."""
+    global _global_retrieval_estimate
+    _global_retrieval_estimate = max(1, n)
+
+
 def score_belief(
     belief: Belief,
     query: str,
@@ -277,11 +312,11 @@ def score_belief(
     retrieval_count: int = 0,
     used_count: int = 0,
 ) -> float:
-    """Combined scoring using decay, lock boost, Thompson sampling, type/source weights, recency, and frequency.
+    """Combined scoring using decay, lock boost, Thompson sampling, type/source weights, recency, frequency, and UCB.
 
     Superseded beliefs always score 0.01.
     Locked beliefs: score = lock_boost_typed * thompson_sample (always elevated, no frequency boost).
-    Normal beliefs: score = type_weight * source_weight * thompson_sample * decay_factor * recency_boost * freq_boost.
+    Normal beliefs: score = type_weight * source_weight * thompson_sample * decay_factor * recency_boost * freq_boost + ucb_bonus.
 
     current_time_iso accepts a pre-parsed datetime to avoid redundant parsing.
     """
@@ -309,4 +344,6 @@ def score_belief(
         return boost * sample
 
     freq_boost: float = retrieval_frequency_boost(retrieval_count, used_count)
-    return type_w * source_w * sample * decay * recency * freq_boost
+    base: float = type_w * source_w * sample * decay * recency * freq_boost
+    ucb: float = ucb_exploration_bonus(retrieval_count, _global_retrieval_estimate)
+    return base * (1.0 + ucb)
