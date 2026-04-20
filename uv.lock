@@ -3,7 +3,7 @@ revision = 3
 requires-python = ">=3.12"
 
 [[package]]
-name = "agentmemory"
+name = "agentmemory-rrs"
 version = "2.4.1"
 source = { editable = "." }
 dependencies = [
