@@ -2,6 +2,37 @@
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-04-20
+
+Retrieval quality overhaul: beliefs that answer the question now outrank beliefs
+that just match keywords. Three new retrieval layers, two new modules, zero
+breaking changes.
+
+### Added
+- `intention.py`: intention-space clustering for vocabulary-gap bridging (Exp 94b: 98% of same-cluster pairs share <10% vocab). Hook search Layer 1.7 expands FTS5 results by pulling same-cluster beliefs.
+- `multimodel.py`: archaeology-style Bayesian model selection (SIGNAL/NOISE/STALE/CONTESTED) from Wikipedia Bayesian inference framework. Applied as 0.6-1.3x multiplier on beliefs with feedback; neutral on beliefs without.
+- Precomputed HRR neighbors: `hrr_neighbors` table populated during graph build. Hook search Layer 1.5 now does SQL JOIN (0.03ms) instead of skipping HRR entirely.
+- `belief_clusters` table for intention cluster assignments, rebuilt on graph changes.
+- `HRRGraph.node_ids()` and `HRRGraph.has_node()` public API methods.
+- Exploration sampling: 3 random never-feedback beliefs added to pending_feedback per search for long-tail coverage.
+- Exp 92: Lagrangian factorial sweep (2 kinetic x 3 potential energy definitions)
+- Exp 93/93b/93c: multi-model Bayesian scoring experiments
+- Exp 94: HRR performance profiling (bottleneck identified: cleanup memory cosine, not FFT)
+- Exp 94b: intention-space clustering (97.9% vocab gap in same-cluster pairs)
+- Exp 95: entity layer scoring calibration (relevance-gated weights)
+- Exp 96: hierarchical clustering (k=40 drops mega-cluster from 81% to 29%)
+- 34 new tests across test_hrr_hook_path.py, test_intention.py, test_multimodel.py
+
+### Fixed
+- Relevance-gated type/source weights: correction (2.0) * user_corrected (1.5) compound boost now interpolated by query term overlap. Irrelevant corrections no longer dominate results. Entity scores dropped from 43x to 14-22x.
+- O(n^2) intention cluster self-join rewritten as subquery (16.7s -> 150ms per query).
+- Intention cluster count increased from k=8 to k=40 (Exp 96: largest cluster 81% -> 29%).
+- `score_belief()` extended with `ignored_count` and `harmful_count` params (backwards compatible, default 0).
+
+### Changed
+- Hook search Layer 1.5 upgraded from edge-only traversal to precomputed HRR neighbors with edge fallback.
+- PyPI package renamed to `agentmemory-rrs` with `tool.hatch.build.targets.wheel` config.
+
 ## [2.4.1] - 2026-04-19
 
 ### Added
