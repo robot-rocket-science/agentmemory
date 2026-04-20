@@ -15,7 +15,7 @@ Conversations become scored beliefs. Beliefs get stronger when they help, weaker
 - **Temporal decay.** Content-aware half-lives (facts 14 days, corrections 8 weeks, requirements 24 weeks). Session velocity scaling.
 - **Per-project isolation.** Each project gets its own SQLite database at `~/.agentmemory/projects/<hash>/`.
 
-For deeper architecture notes see [V2_ARCHITECTURE.md](V2_ARCHITECTURE.md).
+For deeper architecture notes see [V2_ARCHITECTURE.md](internal/V2_ARCHITECTURE.md).
 
 ---
 

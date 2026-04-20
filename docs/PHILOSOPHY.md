@@ -48,4 +48,4 @@ Your corrections, preferences, and project decisions are yours. They live in a S
 
 - [Architecture](ARCHITECTURE.md): how the retrieval pipeline works
 - [Benchmark Results](BENCHMARK_RESULTS.md): academic evaluation scores
-- [Case Study: README Positioning](case-study-positioning.md): a real session showing the system researching its own marketing
+- [Case Study: README Positioning](internal/case-study-positioning.md): a real session showing the system researching its own marketing

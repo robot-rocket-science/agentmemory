@@ -245,10 +245,10 @@ All adapters in `benchmarks/`. Protocol in `docs/BENCHMARK_PROTOCOL.md`.
 - [EXP3_STRUCTURED_TRIPLES_PLAN.md](EXP3_STRUCTURED_TRIPLES_PLAN.md) - Exp 3 design
 - [WONDER_MULTIHOP_CONFLICT.md](WONDER_MULTIHOP_CONFLICT.md) - Research synthesis
 - [BENCHMARK_SESSION_LOG_V12.md](BENCHMARK_SESSION_LOG_V12.md) - v1.2 session (Exp 5, LongMemEval)
-- [EXP5_LLM_ENTITY_EXTRACTION.md](EXP5_LLM_ENTITY_EXTRACTION.md) - Exp 5 design
-- [EXP5_RESULTS.md](EXP5_RESULTS.md) - Exp 5 results
-- [CODE_AUDIT_EXP5.md](CODE_AUDIT_EXP5.md) - Benchmark code audit
-- [NEXT_STEPS.md](NEXT_STEPS.md) - Research priorities
-- [EXP6_TEMPORAL_COHERENCE.md](EXP6_TEMPORAL_COHERENCE.md) - Exp 6 temporal coherence
-- [LONGMEMEVAL_MULTI_SESSION_ANALYSIS.md](LONGMEMEVAL_MULTI_SESSION_ANALYSIS.md) - Multi-session failure analysis
+- [EXP5_LLM_ENTITY_EXTRACTION.md](internal/EXP5_LLM_ENTITY_EXTRACTION.md) - Exp 5 design
+- [EXP5_RESULTS.md](internal/EXP5_RESULTS.md) - Exp 5 results
+- [CODE_AUDIT_EXP5.md](internal/CODE_AUDIT_EXP5.md) - Benchmark code audit
+- [NEXT_STEPS.md](internal/NEXT_STEPS.md) - Research priorities
+- [EXP6_TEMPORAL_COHERENCE.md](internal/EXP6_TEMPORAL_COHERENCE.md) - Exp 6 temporal coherence
+- [LONGMEMEVAL_MULTI_SESSION_ANALYSIS.md](benchmarks/LONGMEMEVAL_MULTI_SESSION_ANALYSIS.md) - Multi-session failure analysis
 - [RESEARCH_FREEZE_20260416.md](RESEARCH_FREEZE_20260416.md) - Research freeze with all ceilings and future levers
